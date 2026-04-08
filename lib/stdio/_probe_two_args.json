@@ -1,0 +1,29 @@
+{
+  "__parents__": {
+    "global": null,
+    "second": "global"
+  },
+  "global": {
+    "second": {
+      "datatype": "FunDecl(IntType(), Name('second'), [Alloc(Writeable(), IntType(), Name('a'), 'param'), Alloc(Writeable(), IntType(), Name('b'), 'param')])",
+      "name": "second",
+      "param_size": 2
+    }
+  },
+  "second": {
+    "a": {
+      "addr": 0,
+      "datatype": "IntType()",
+      "name": "a",
+      "size": 1,
+      "type_qual": "Writeable()"
+    },
+    "b": {
+      "addr": 1,
+      "datatype": "IntType()",
+      "name": "b",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  }
+}

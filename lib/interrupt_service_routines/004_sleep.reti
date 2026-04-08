@@ -1,0 +1,3 @@
+NOP
+JUMP== -1
+RTI

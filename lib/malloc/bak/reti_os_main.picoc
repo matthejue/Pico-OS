@@ -1,0 +1,55 @@
+#include "malloc.h"
+
+int heap_area[256];
+
+int main(void) {
+    debug;
+    init_heap(heap_area, (int)(sizeof(heap_area) / sizeof(heap_area[0])));
+    int ok = 1;
+
+    debug;
+    int *numbers = (int *)simple_malloc(4 * (int)sizeof(int));
+    debug;
+    if (numbers == NULL) {
+        ok = 0;
+    } else {
+        numbers[0] = 11;
+        numbers[1] = 22;
+        numbers[2] = 33;
+        numbers[3] = 44;
+    }
+    debug;
+
+    char *buffer = (char *)simple_malloc(3 * (char)sizeof(char));
+    if (buffer == NULL) {
+        ok = 0;
+    } else {
+        buffer[0] = 'O';
+        buffer[1] = 'K';
+        buffer[2] = '\0';
+    }
+
+    if (numbers != NULL && numbers[0] != 11) {
+        ok = 0;
+    }
+    if (buffer != NULL && (buffer[0] != 'O' || buffer[1] != 'K')) {
+        ok = 0;
+    }
+
+    simple_free(numbers);
+    simple_free(buffer);
+
+    int *again = (int *)simple_malloc(2 * (int)sizeof(int));
+    if (again == NULL) {
+        ok = 0;
+    } else {
+        again[0] = 1;
+        again[1] = 2;
+        if (again[0] != 1 || again[1] != 2) {
+            ok = 0;
+        }
+        simple_free(again);
+    }
+
+    print(ok);
+}

@@ -1,0 +1,58 @@
+{
+  "__parents__": {
+    "demo1": "global",
+    "demo2": "global",
+    "global": null,
+    "one": "global",
+    "two": "global"
+  },
+  "demo1": {},
+  "demo2": {},
+  "global": {
+    "demo1": {
+      "datatype": "FunDecl(IntType(), Name('demo1'), [])",
+      "name": "demo1",
+      "param_size": 0
+    },
+    "demo2": {
+      "datatype": "FunDecl(IntType(), Name('demo2'), [])",
+      "name": "demo2",
+      "param_size": 0
+    },
+    "one": {
+      "datatype": "FunDecl(IntType(), Name('one'), [Alloc(Writeable(), IntType(), Name('a'), 'param')])",
+      "name": "one",
+      "param_size": 1
+    },
+    "two": {
+      "datatype": "FunDecl(IntType(), Name('two'), [Alloc(Writeable(), IntType(), Name('a'), 'param'), Alloc(Writeable(), IntType(), Name('b'), 'param')])",
+      "name": "two",
+      "param_size": 2
+    }
+  },
+  "one": {
+    "a": {
+      "addr": 0,
+      "datatype": "IntType()",
+      "name": "a",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "two": {
+    "a": {
+      "addr": 0,
+      "datatype": "IntType()",
+      "name": "a",
+      "size": 1,
+      "type_qual": "Writeable()"
+    },
+    "b": {
+      "addr": 1,
+      "datatype": "IntType()",
+      "name": "b",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  }
+}

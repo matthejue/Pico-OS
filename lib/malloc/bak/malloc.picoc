@@ -1,0 +1,100 @@
+#include "malloc.h"
+
+// These define the heap region
+int *heap_base = NULL;       // start of heap
+int *program_break = NULL;   // current end of heap
+int *heap_limit = NULL;      // max heap address (simulated limit)
+
+// Linked list of blocks
+struct BlockHeader *free_list = NULL;
+
+// Initialize heap memory region
+void init_heap(void *heap_start, int heap_size) {
+    heap_base = (int*)heap_start;
+    program_break = heap_base;
+    heap_limit = heap_base + heap_size;
+    free_list = NULL;
+}
+
+// Simulated sbrk(): move the program break
+void *simple_sbrk(int increment) {
+    if (program_break + increment > heap_limit) {
+        return (void*)-1; // out of simulated memory
+    }
+
+    void *old_break = program_break;
+    program_break += increment;
+    return old_break;
+}
+
+// Merge adjacent free blocks (helper)
+void merge_free_blocks() {
+    struct BlockHeader *current = free_list;
+
+    while (current != NULL && current->next != NULL) {
+        if (current->free && current->next->free) {
+            current->size += sizeof(struct BlockHeader) + current->next->size;
+            current->next = current->next->next;
+        } else {
+            current = current->next;
+        }
+    }
+}
+
+// Allocate memory
+void *simple_malloc(int size) {
+    struct BlockHeader *current = free_list;
+    struct BlockHeader *last = NULL;
+
+    // 1️⃣ Search for a free block large enough
+    while (current != NULL) {
+        if (current->free && current->size >= size) {
+            if (current->size >= size + sizeof(struct BlockHeader) + 1) {
+                // Split the block
+                struct BlockHeader *new_block =
+                    (struct BlockHeader*)((int*)(current + 1) + size);
+                new_block->size = current->size - size - sizeof(struct BlockHeader);
+                new_block->free = 1;
+                new_block->next = current->next;
+
+                current->size = size;
+                current->next = new_block;
+            }
+
+            current->free = 0;
+            return (void*)(current + 1);
+        }
+        last = current;
+        current = current->next;
+    }
+
+    // 2️⃣ No suitable block found — extend heap
+    void *mem = simple_sbrk(sizeof(struct BlockHeader) + size);
+    if (mem == (void*)-1) {
+        return NULL; // no memory left
+    }
+
+    struct BlockHeader *new_block = (struct BlockHeader*)mem;
+    new_block->size = size;
+    new_block->free = 0;
+    new_block->next = NULL;
+
+    // Add to free list
+    if (free_list == NULL) {
+        free_list = new_block;
+    } else {
+        last->next = new_block;
+    }
+
+    return (void*)(new_block + 1);
+}
+
+// Free memory
+void simple_free(void *ptr) {
+    if (ptr == NULL) return;
+
+    struct BlockHeader *header = (struct BlockHeader*)ptr - 1;
+    header->free = 1;
+
+    merge_free_blocks();
+}
