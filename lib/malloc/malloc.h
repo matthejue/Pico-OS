@@ -10,5 +10,5 @@ struct BlockHeader {
 };
 
 void init_heap();
-void *simple_malloc(int size);
-void simple_free(void *ptr);
+void *malloc(int size);
+void free(void *ptr);

@@ -1,0 +1,10 @@
+*
+!*/
+!.gitignore
+!*.picoc
+!*.h
+!*.reti
+reti_blocks
+json
+bak/
+converted_to_c/
