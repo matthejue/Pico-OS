@@ -1,0 +1,13 @@
+// in:1234
+// expected:ok 42 Z
+
+#include "stdio.h"
+
+int main() {
+    int value;
+
+    scanf("%d", &value);
+    printf("ok %d %c", value, 'Z');
+
+    return 0;
+}

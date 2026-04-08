@@ -8,10 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-FILENAME_RE = re.compile(
-    r"^(?P<index>\d{3})_(?P<name>[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*)"
-    r"(?:_(?P<device>KEYPRESS|INTTIMER)_(?P<priority>\d+))?\.reti$"
+BASE_NAME_RE = r"[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*"
+FILENAME_WITH_DEVICE_RE = re.compile(
+    r"^(?P<index>\d{3})_(?P<name>[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*?)_"
+    r"(?P<device>KEYPRESS|INTTIMER)_(?P<priority>\d+)\.reti$"
 )
+FILENAME_RE = re.compile(rf"^(?P<index>\d{{3}})_(?P<name>{BASE_NAME_RE})\.reti$")
 
 
 @dataclass(frozen=True)
@@ -52,9 +54,13 @@ def load_isr_files(directory: Path) -> list[IsrFile]:
     isr_files: list[IsrFile] = []
 
     for path in sorted(directory.glob("*.reti")):
-        match = FILENAME_RE.fullmatch(path.name)
+        match = FILENAME_WITH_DEVICE_RE.fullmatch(path.name)
+        if not match:
+            match = FILENAME_RE.fullmatch(path.name)
         if not match:
             continue
+
+        groups = match.groupdict()
 
         raw_lines = path.read_text(encoding="utf-8").splitlines()
         if not raw_lines:
@@ -62,10 +68,10 @@ def load_isr_files(directory: Path) -> list[IsrFile]:
 
         isr_files.append(
             IsrFile(
-                index=int(match.group("index")),
-                name=match.group("name"),
-                device=match.group("device"),
-                priority=int(match.group("priority")) if match.group("priority") else None,
+                index=int(groups["index"]),
+                name=groups["name"],
+                device=groups.get("device"),
+                priority=int(groups["priority"]) if groups.get("priority") else None,
                 path=path,
                 lines=raw_lines,
             )
