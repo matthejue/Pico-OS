@@ -1,0 +1,130 @@
+{
+  "__parents__": {
+    "global": null,
+    "mutex_init": "global",
+    "mutex_lock": "global",
+    "mutex_unlock": "global",
+    "sleep": "global",
+    "testset": "global",
+    "wakeup": "global"
+  },
+  "global": {
+    "mutex": {
+      "attrs": [
+        "Name('lock')",
+        "Name('id')"
+      ],
+      "datatype": "StructDecl(Name('mutex'), [Alloc(Writeable(), IntType(), Name('lock'), 'local_var'), Alloc(Writeable(), IntType(), Name('id'), 'local_var')])",
+      "name": "mutex",
+      "size": 2,
+      "type_qual": "Empty()"
+    },
+    "mutex_init": {
+      "datatype": "FunDecl(VoidType(), Name('mutex_init'), [Alloc(Writeable(), PntrDecl(StructSpec(Name('mutex'))), Name('m'), 'local_var')])",
+      "name": "mutex_init",
+      "param_size": 1
+    },
+    "mutex_lock": {
+      "datatype": "FunDecl(VoidType(), Name('mutex_lock'), [Alloc(Writeable(), PntrDecl(StructSpec(Name('mutex'))), Name('m'), 'local_var')])",
+      "name": "mutex_lock",
+      "param_size": 1
+    },
+    "mutex_unlock": {
+      "datatype": "FunDecl(VoidType(), Name('mutex_unlock'), [Alloc(Writeable(), PntrDecl(StructSpec(Name('mutex'))), Name('m'), 'local_var')])",
+      "name": "mutex_unlock",
+      "param_size": 1
+    },
+    "sleep": {
+      "datatype": "FunDecl(VoidType(), Name('sleep'), [Alloc(Writeable(), IntType(), Name('id'), 'local_var')])",
+      "name": "sleep",
+      "param_size": 1
+    },
+    "testset": {
+      "datatype": "FunDecl(IntType(), Name('testset'), [Alloc(Writeable(), PntrDecl(IntType()), Name('lock_addr'), 'local_var')])",
+      "name": "testset",
+      "param_size": 1
+    },
+    "wakeup": {
+      "datatype": "FunDecl(VoidType(), Name('wakeup'), [Alloc(Writeable(), IntType(), Name('id'), 'local_var')])",
+      "name": "wakeup",
+      "param_size": 1
+    }
+  },
+  "mutex": {
+    "id": {
+      "addr": "Empty()",
+      "datatype": "IntType()",
+      "name": "id",
+      "size": 1,
+      "type_qual": "Empty()"
+    },
+    "lock": {
+      "addr": "Empty()",
+      "datatype": "IntType()",
+      "name": "lock",
+      "size": 1,
+      "type_qual": "Empty()"
+    }
+  },
+  "mutex_init": {
+    "m": {
+      "addr": 0,
+      "datatype": "PntrDecl(StructSpec(Name('mutex')))",
+      "name": "m",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "mutex_lock": {
+    "m": {
+      "addr": 0,
+      "datatype": "PntrDecl(StructSpec(Name('mutex')))",
+      "name": "m",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "mutex_unlock": {
+    "m": {
+      "addr": 0,
+      "datatype": "PntrDecl(StructSpec(Name('mutex')))",
+      "name": "m",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "sleep": {
+    "id": {
+      "addr": 0,
+      "datatype": "IntType()",
+      "name": "id",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "testset": {
+    "lock_addr": {
+      "addr": 0,
+      "datatype": "PntrDecl(IntType())",
+      "name": "lock_addr",
+      "size": 1,
+      "type_qual": "Writeable()"
+    },
+    "old": {
+      "addr": 1,
+      "datatype": "IntType()",
+      "name": "old",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  },
+  "wakeup": {
+    "id": {
+      "addr": 0,
+      "datatype": "IntType()",
+      "name": "id",
+      "size": 1,
+      "type_qual": "Writeable()"
+    }
+  }
+}

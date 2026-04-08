@@ -1,0 +1,10 @@
+_global_inits:
+second:
+  SUBI SP 0
+  LOADIN BAF ACC -3
+  SUBI SP 1
+  LOADIN BAF ACC -3
+  STOREIN SP ACC 1
+  LOADIN SP ACC 1
+  ADDI SP 1
+  LOADIN BAF PC -1
