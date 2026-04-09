@@ -1,10 +1,7 @@
-*
-!*/
-!.gitignore
-!*.picoc
-!*.h
-!*.reti
-reti_blocks
-json
+*.reti_blocks
+*.json
+*.bak
 bak/
 converted_to_c/
+.codex
+__pycache__/
