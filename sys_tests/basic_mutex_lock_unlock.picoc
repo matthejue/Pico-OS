@@ -1,0 +1,26 @@
+// in:
+// expected:42 84
+
+#include "./include/mutex.h"
+
+int main() {
+    struct mutex m;
+
+    mutex_init(&m);
+
+    debug;
+    mutex_lock(&m);
+    debug;
+    print(42);
+    mutex_unlock(&m);
+    debug;
+
+    m.lock = 1;
+    mutex_lock(&m);
+    debug;
+    print(84);
+    mutex_unlock(&m);
+    debug;
+
+    return 0;
+}
