@@ -1,3 +1,6 @@
-NOP
-JUMP!= -1
+# sleep(wait_queue*)
+# Hardware already pushed PC and status word on the current process stack.
+# The real ISR flow should save registers and SP into the current activation record,
+# call the scheduler to mark the current process BLOCKED and enqueue it on the wait queue,
+# dispatch the next READY process, then return with RTI on that process stack.
 RTI

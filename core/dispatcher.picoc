@@ -1,0 +1,47 @@
+#include "scheduler.h"
+#include "dispatcher.h"
+
+struct dispatcher os_dispatcher_state;
+
+struct dispatcher *os_dispatcher() {
+    return &os_dispatcher_state;
+}
+
+void dispatcher_init() {
+    os_dispatcher()->from = 0;
+    os_dispatcher()->to = 0;
+    os_dispatcher()->switch_requested = 0;
+}
+
+void dispatcher_save_context(
+    struct process *process,
+    int *stack_pointer,
+    int program_counter,
+    int status_word,
+    int acc,
+    int in1,
+    int in2,
+    int ds
+) {
+    if (process == 0) {
+        return;
+    }
+
+    process->stack_pointer = stack_pointer;
+    process->saved_program_counter = program_counter;
+    process->saved_status_word = status_word;
+    process->saved_acc = acc;
+    process->saved_in1 = in1;
+    process->saved_in2 = in2;
+    process->saved_ds = ds;
+}
+
+void dispatcher_prepare_switch(struct process *from_process, struct process *next_process) {
+    os_dispatcher()->from = from_process;
+    os_dispatcher()->to = next_process;
+    os_dispatcher()->switch_requested = next_process != 0;
+}
+
+struct process *dispatcher_target_process() {
+    return os_dispatcher()->to;
+}

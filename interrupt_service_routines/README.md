@@ -65,7 +65,8 @@ How the address is computed:
 - The `IVTE` table itself occupies the first `N` lines, where `N` is the number of ISR files.
 - The first ISR therefore starts at absolute address `N`.
 - Each later ISR starts immediately after the previous ISR body ends.
-- The script counts addresses by line count in the generated file.
+- The script counts only assembly instruction lines in each ISR body.
+- Blank lines, full-line comments, and inline `# ...` comment text do not affect addresses.
 
 Mapping examples:
 

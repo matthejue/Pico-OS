@@ -1,0 +1,72 @@
+#pragma once
+
+void *memcpy(void *destination, void *source, int count);
+void *memset(void *buffer, int value, int count);
+char *strcpy(char *destination, char *source);
+char *strcat(char *destination, char *source);
+int strlen(char *string);
+
+void *memcpy(void *destination, void *source, int count) {
+    char *destination_bytes = (char *)destination;
+    char *source_bytes = (char *)source;
+    int index = 0;
+
+    while (index < count) {
+        destination_bytes[index] = source_bytes[index];
+        index = index + 1;
+    }
+
+    return destination;
+}
+
+void *memset(void *buffer, int value, int count) {
+    char *bytes = (char *)buffer;
+    int index = 0;
+
+    while (index < count) {
+        bytes[index] = value;
+        index = index + 1;
+    }
+
+    return buffer;
+}
+
+char *strcpy(char *destination, char *source) {
+    int index = 0;
+
+    while (source[index] != 0) {
+        destination[index] = source[index];
+        index = index + 1;
+    }
+
+    destination[index] = 0;
+    return destination;
+}
+
+char *strcat(char *destination, char *source) {
+    int destination_index = 0;
+    int source_index = 0;
+
+    while (destination[destination_index] != 0) {
+        destination_index = destination_index + 1;
+    }
+
+    while (source[source_index] != 0) {
+        destination[destination_index] = source[source_index];
+        destination_index = destination_index + 1;
+        source_index = source_index + 1;
+    }
+
+    destination[destination_index] = 0;
+    return destination;
+}
+
+int strlen(char *string) {
+    int index = 0;
+
+    while (string[index] != 0) {
+        index = index + 1;
+    }
+
+    return index;
+}

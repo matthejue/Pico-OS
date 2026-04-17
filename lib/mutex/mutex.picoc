@@ -11,31 +11,19 @@ int testset(int *lock_addr) {
 
 void mutex_init(struct mutex *m) {
     m->lock = 0;
-    m->id = (int)m;
-    return;
-}
-
-void sleep(int id) {
-    asm("LOADIN BAF ACC -2");
-    asm("INT 4");
-    return;
-}
-
-void wakeup(int id) {
-    asm("LOADIN BAF ACC -2");
-    asm("INT 5");
+    wait_queue_init(&(m->waiters));
     return;
 }
 
 void mutex_lock(struct mutex *m) {
     while (testset(&(m->lock))) {
-        sleep(m->id);
+        sleep(&(m->waiters));
     }
     return;
 }
 
 void mutex_unlock(struct mutex *m) {
     m->lock = 0;
-    wakeup(m->id);
+    wakeup(&(m->waiters));
     return;
 }

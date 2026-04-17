@@ -1,1 +1,6 @@
+# timer interrupt
+# 1. Save register contents and stack pointer of the RUNNING process.
+# 2. Call the round-robin scheduler.
+# 3. Let the dispatcher restore the next READY process context.
+# 4. Return with RTI so hardware resumes using the restored process stack.
 RTI

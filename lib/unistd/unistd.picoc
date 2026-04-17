@@ -1,0 +1,19 @@
+#include "unistd.h"
+
+void sleep(struct wait_queue *wq) {
+    if (wq == 0) {
+        return;
+    }
+
+    asm("LOADIN BAF ACC -2");
+    asm("INT 4");
+}
+
+void wakeup(struct wait_queue *wq) {
+    if (wq == 0) {
+        return;
+    }
+
+    asm("LOADIN BAF ACC -2");
+    asm("INT 5");
+}

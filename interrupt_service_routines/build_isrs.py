@@ -26,6 +26,17 @@ class IsrFile:
     lines: list[str]
 
 
+def count_instruction_lines(lines: list[str]) -> int:
+    instruction_count = 0
+
+    for line in lines:
+        instruction = line.split("#", 1)[0].strip()
+        if instruction:
+            instruction_count += 1
+
+    return instruction_count
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -110,7 +121,7 @@ def build_output(entries: list[IsrFile]) -> str:
     for entry in entries:
         ivte_lines.append(build_ivte_line(current_address, entry))
         body_lines.extend(entry.lines)
-        current_address += len(entry.lines)
+        current_address += count_instruction_lines(entry.lines)
 
     return "\n".join(ivte_lines + body_lines) + "\n"
 
