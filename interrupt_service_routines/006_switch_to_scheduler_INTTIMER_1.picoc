@@ -1,0 +1,25 @@
+#include "../core/scheduler.h"
+#include "../core/dispatcher.h"
+
+void handle_timer_interrupt(
+    int *stack_pointer,
+    int program_counter,
+    int status_word,
+    int acc,
+    int in1,
+    int in2,
+    int ds
+) {
+    dispatcher_save_context(
+        scheduler_current_process(),
+        stack_pointer,
+        program_counter,
+        status_word,
+        acc,
+        in1,
+        in2,
+        ds
+    );
+
+    scheduler_on_timer_interrupt();
+}

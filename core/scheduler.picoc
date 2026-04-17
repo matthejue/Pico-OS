@@ -1,0 +1,221 @@
+#include "scheduler.h"
+#include "dispatcher.h"
+
+struct scheduler os_scheduler_state;
+
+struct scheduler *os_scheduler() {
+    return &os_scheduler_state;
+}
+
+struct process *scheduler_current_process() {
+    return os_scheduler()->current;
+}
+
+void wait_queue_init(struct wait_queue *wq) {
+    wq->head = 0;
+    wq->tail = 0;
+}
+
+void wait_queue_push(struct wait_queue *wq, struct process *process) {
+    process->next = 0;
+
+    if (wq->tail == 0) {
+        wq->head = process;
+        wq->tail = process;
+        return;
+    }
+
+    wq->tail->next = process;
+    wq->tail = process;
+}
+
+struct process *wait_queue_pop(struct wait_queue *wq) {
+    struct process *process = wq->head;
+
+    if (process == 0) {
+        return 0;
+    }
+
+    wq->head = process->next;
+    if (wq->head == 0) {
+        wq->tail = 0;
+    }
+
+    process->next = 0;
+    return process;
+}
+
+void scheduler_init() {
+    int index = 0;
+
+    if (os_scheduler()->heap_initialized == 0) {
+        init_heap();
+        os_scheduler()->heap_initialized = 1;
+    }
+
+    os_scheduler()->current = 0;
+    os_scheduler()->process_count = 0;
+    os_scheduler()->next_pid = 1;
+    wait_queue_init(&(os_scheduler()->ready_queue));
+    dispatcher_init();
+
+    while (index < MAX_PROCESSES) {
+        os_scheduler()->processes[index] = 0;
+        index = index + 1;
+    }
+}
+
+struct process *process_create(void *entry_point, int stack_words) {
+    struct process *process;
+    int slot = 0;
+
+    if (stack_words <= 0) {
+        stack_words = DEFAULT_STACK_WORDS;
+    }
+
+    if (os_scheduler()->process_count >= MAX_PROCESSES) {
+        return NULL;
+    }
+
+    process = (struct process *)malloc(sizeof(struct process));
+    if (process == NULL) {
+        return NULL;
+    }
+
+    process->stack_base = (int *)malloc(stack_words);
+    if (process->stack_base == NULL) {
+        free(process);
+        return NULL;
+    }
+
+    process->pid = os_scheduler()->next_pid;
+    os_scheduler()->next_pid = os_scheduler()->next_pid + 1;
+    process->state = PROCESS_NEW;
+    process->entry_point = entry_point;
+    process->stack_words = stack_words;
+    process->stack_pointer = process->stack_base + stack_words;
+    process->saved_program_counter = (int)entry_point;
+    process->saved_status_word = 0;
+    process->saved_acc = 0;
+    process->saved_in1 = 0;
+    process->saved_in2 = 0;
+    process->saved_ds = 0;
+    process->waiting_on = 0;
+    process->next = 0;
+
+    while (slot < MAX_PROCESSES) {
+        if (os_scheduler()->processes[slot] == 0) {
+            os_scheduler()->processes[slot] = process;
+            os_scheduler()->process_count = os_scheduler()->process_count + 1;
+            scheduler_make_ready(process);
+            return process;
+        }
+
+        slot = slot + 1;
+    }
+
+    free(process->stack_base);
+    free(process);
+    return NULL;
+}
+
+void process_destroy(struct process *process) {
+    int index = 0;
+
+    if (process == 0) {
+        return;
+    }
+
+    process->state = PROCESS_TERMINATED;
+
+    while (index < MAX_PROCESSES) {
+        if (os_scheduler()->processes[index] == process) {
+            os_scheduler()->processes[index] = 0;
+            os_scheduler()->process_count = os_scheduler()->process_count - 1;
+            index = MAX_PROCESSES;
+        } else {
+            index = index + 1;
+        }
+    }
+
+    free(process->stack_base);
+    free(process);
+}
+
+void scheduler_make_ready(struct process *process) {
+    if (process == 0) {
+        return;
+    }
+
+    process->state = PROCESS_READY;
+    process->waiting_on = 0;
+    wait_queue_push(&(os_scheduler()->ready_queue), process);
+}
+
+struct process *scheduler_choose_next_round_robin() {
+    return wait_queue_pop(&(os_scheduler()->ready_queue));
+}
+
+struct process *scheduler_schedule() {
+    struct process *current = scheduler_current_process();
+    struct process *next = scheduler_choose_next_round_robin();
+
+    if (next == 0) {
+        if (current != 0) {
+            current->state = PROCESS_RUNNING;
+        }
+
+        dispatcher_prepare_switch(current, current);
+        return current;
+    }
+
+    if (current != 0 && current->state == PROCESS_RUNNING) {
+        current->state = PROCESS_READY;
+        wait_queue_push(&(os_scheduler()->ready_queue), current);
+    }
+
+    next->state = PROCESS_RUNNING;
+    os_scheduler()->current = next;
+    dispatcher_prepare_switch(current, next);
+    return next;
+}
+
+void scheduler_block_current_process(struct wait_queue *wq) {
+    struct process *process = scheduler_current_process();
+
+    if (process == 0 || wq == 0) {
+        return;
+    }
+
+    process->state = PROCESS_BLOCKED;
+    process->waiting_on = wq;
+    wait_queue_push(wq, process);
+    os_scheduler()->current = 0;
+    scheduler_schedule();
+}
+
+void scheduler_wake_one(struct wait_queue *wq) {
+    struct process *process = wait_queue_pop(wq);
+
+    if (process == 0) {
+        return;
+    }
+
+    scheduler_make_ready(process);
+}
+
+struct process *scheduler_on_timer_interrupt() {
+    return scheduler_schedule();
+}
+
+void scheduler_exit_current_process() {
+    struct process *process = scheduler_current_process();
+
+    if (process == 0) {
+        return;
+    }
+
+    os_scheduler()->current = 0;
+    process_destroy(process);
+    scheduler_schedule();
+}

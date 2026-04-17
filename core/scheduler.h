@@ -1,0 +1,54 @@
+#pragma once
+
+#include "../lib/malloc/malloc.h"
+#include "../lib/unistd/unistd.h"
+
+#define MAX_PROCESSES 8
+#define DEFAULT_STACK_WORDS 64
+
+#define PROCESS_NEW 0
+#define PROCESS_READY 1
+#define PROCESS_RUNNING 2
+#define PROCESS_BLOCKED 3
+#define PROCESS_TERMINATED 4
+
+struct process {
+    int pid;
+    int state;
+    void *entry_point;
+    int *stack_base;
+    int stack_words;
+    int *stack_pointer;
+    int saved_program_counter;
+    int saved_status_word;
+    int saved_acc;
+    int saved_in1;
+    int saved_in2;
+    int saved_ds;
+    struct wait_queue *waiting_on;
+    struct process *next;
+};
+
+struct scheduler {
+    struct process *current;
+    struct wait_queue ready_queue;
+    struct process *processes[MAX_PROCESSES];
+    int process_count;
+    int next_pid;
+    int heap_initialized;
+};
+
+struct scheduler *os_scheduler();
+struct process *scheduler_current_process();
+
+void wait_queue_init(struct wait_queue *wq);
+void scheduler_init();
+struct process *process_create(void *entry_point, int stack_words);
+void process_destroy(struct process *process);
+void scheduler_make_ready(struct process *process);
+void scheduler_block_current_process(struct wait_queue *wq);
+void scheduler_wake_one(struct wait_queue *wq);
+struct process *scheduler_choose_next_round_robin();
+struct process *scheduler_schedule();
+struct process *scheduler_on_timer_interrupt();
+void scheduler_exit_current_process();

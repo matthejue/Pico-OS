@@ -1,7 +1,8 @@
 // in:1234
 // expected:ok 42 Z
 
-#include "stdio.h"
+#include "../lib/stdio/stdio.h"
+#include "../lib/stdio/stdio.picoc"
 
 int main() {
     int value;

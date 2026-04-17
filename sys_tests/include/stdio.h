@@ -1,4 +1,4 @@
-int printf(char *format);
+int printf(char *format, ...);
 int scanf(char *format, int *value);
 
 int frame_base() {
@@ -32,6 +32,54 @@ int uart_print_character(int value) {
     return 0;
 }
 
+int append_character(char *buffer, int index, int value) {
+    buffer[index] = value;
+    return index + 1;
+}
+
+int append_string(char *buffer, int index, char *value) {
+    int string_index = 0;
+
+    while (value[string_index] != 0) {
+        buffer[index] = value[string_index];
+        index = index + 1;
+        string_index = string_index + 1;
+    }
+
+    return index;
+}
+
+int append_decimal(char *buffer, int index, int value) {
+    char digits[12];
+    int digit_count = 0;
+    int current = value;
+
+    if (current == 0) {
+        buffer[index] = '0';
+        return index + 1;
+    }
+
+    if (current < 0) {
+        buffer[index] = '-';
+        index = index + 1;
+        current = 0 - current;
+    }
+
+    while (current != 0) {
+        digits[digit_count] = (current % 10) + '0';
+        current = current / 10;
+        digit_count = digit_count + 1;
+    }
+
+    while (digit_count != 0) {
+        digit_count = digit_count - 1;
+        buffer[index] = digits[digit_count];
+        index = index + 1;
+    }
+
+    return index;
+}
+
 int input_character_at(int packed, int index) {
     if (index == 0) {
         return packed / 16777216;
@@ -49,11 +97,11 @@ int input_character_at(int packed, int index) {
 }
 
 int is_decimal_digit(int value) {
-    if (value < 48) {
+    if (value < '0') {
         return 0;
     }
 
-    if (value > 57) {
+    if (value > '9') {
         return 0;
     }
 
@@ -61,18 +109,12 @@ int is_decimal_digit(int value) {
 }
 
 int parse_decimal_input(int packed, int *value) {
-    int index;
-    int current;
-    int sign;
-    int has_digit;
+    int index = 0;
+    int current = input_character_at(packed, 0);
+    int sign = 1;
+    int has_digit = 0;
     int decimal_digit;
-
-    sign = 1;
-    has_digit = 0;
-    index = 0;
-
-    current = input_character_at(packed, 0);
-    if (current == 45) {
+    if (current == '-') {
         sign = -1;
         index = 1;
     }
@@ -84,7 +126,7 @@ int parse_decimal_input(int packed, int *value) {
         if (decimal_digit == 0) {
             index = 4;
         } else {
-            *value = (*value * 10) + (current - 48);
+            *value = (*value * 10) + (current - '0');
             has_digit = 1;
             index = index + 1;
         }
@@ -99,60 +141,56 @@ int parse_decimal_input(int packed, int *value) {
 }
 
 int next_printf_argument(int argument_index) {
-    int *base;
-    int slot;
-
-    base = (int *)frame_base();
-    slot = argument_index + 3;
+    int *base = (int *)frame_base();
+    int slot = argument_index + 2;
+    debug;
     return *(base - slot);
 }
 
-int printf(char *format) {
-    int index;
+int printf(char *format, ...) {
+    char buffer[256];
+    int index = 0;
+    int buffer_index = 0;
     int current;
-    int argument_index;
+    int argument_index = 0;
     int argument_value;
-
-    index = 0;
-    argument_index = 0;
 
     while (format[index] != 0) {
         current = format[index];
 
-        if (current == 37) {
+        if (current == '%') {
             index = index + 1;
             current = format[index];
 
-            if (current == 100) {
+            if (current == 'd') {
                 argument_value = next_printf_argument(argument_index);
-                uart_print_integer(argument_value);
+                buffer_index = append_decimal(buffer, buffer_index, argument_value);
                 argument_index = argument_index + 1;
             } else {
-                if (current == 99) {
+                if (current == 'c') {
                     argument_value = next_printf_argument(argument_index);
-                    uart_print_character(argument_value);
+                    buffer_index = append_character(buffer, buffer_index, argument_value);
                     argument_index = argument_index + 1;
                 } else {
-                    if (current == 37) {
-                        uart_print_character(37);
+                    if (current == '%') {
+                        buffer_index = append_character(buffer, buffer_index, '%');
                     }
                 }
             }
         } else {
-            uart_print_character(current);
+            buffer_index = append_character(buffer, buffer_index, current);
         }
 
         index = index + 1;
     }
 
+    buffer[buffer_index] = 0;
+    uart_print_string(buffer);
     return 0;
 }
 
 int scanf(char *format, int *value) {
-    int packed;
-    int current;
-
-    if (format[0] != 37) {
+    if (format[0] != '%') {
         return 0;
     }
 
@@ -160,15 +198,15 @@ int scanf(char *format, int *value) {
         return 0;
     }
 
-    current = format[1];
-    packed = uart_read_word();
+    int current = format[1];
+    int packed = uart_read_word();
 
-    if (current == 99) {
+    if (current == 'c') {
         *value = input_character_at(packed, 0);
         return 1;
     }
 
-    if (current == 100) {
+    if (current == 'd') {
         *value = 0;
         return parse_decimal_input(packed, value);
     }

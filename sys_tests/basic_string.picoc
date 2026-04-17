@@ -1,0 +1,19 @@
+// in:
+// expected:whatever
+
+#include "../lib/malloc/malloc.h"
+#include "../lib/malloc/malloc.picoc"
+#include "../lib/stdio/stdio.h"
+#include "../lib/stdio/stdio.picoc"
+#include "../lib/string/string.h"
+#include "../lib/string/string.picoc"
+
+int main() {
+  init_heap();
+
+  char *heap_str = (char *)malloc(10);
+  strcpy(heap_str, "whatever");
+  printf(heap_str);
+
+  return 0;
+}

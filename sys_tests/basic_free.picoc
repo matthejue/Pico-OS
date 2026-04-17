@@ -1,7 +1,8 @@
 // in:
 // expected:12 42
 
-#include "./include/malloc.h"
+#include "../lib/malloc/malloc.h"
+#include "../lib/malloc/malloc.picoc"
 
 int main() {
     init_heap();

@@ -1,7 +1,8 @@
 // in:
 // expected:42 84
 
-#include "./include/mutex.h"
+#include "../lib/mutex/mutex.h"
+#include "../lib/mutex/mutex.picoc"
 
 int main() {
     struct mutex m;

@@ -1,2 +1,3 @@
-LOADI ACC 0
+# wakeup(wait_queue*)
+# Wake one BLOCKED process from the wait queue and move it to the READY queue.
 RTI

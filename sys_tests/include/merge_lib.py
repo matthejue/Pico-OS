@@ -3,22 +3,34 @@
 from pathlib import Path
 import sys
 
+PROJECT_ROOT = Path("/home/areo/Documents/Studium/Pico-OS")
+OUTPUT_DIR = PROJECT_ROOT / "sys_tests" / "include"
 
 MODES = {
     "1": {
-        "picoc": Path("/home/areo/Documents/Studium/Pico-OS/lib/malloc/malloc.picoc"),
-        "header": Path("/home/areo/Documents/Studium/Pico-OS/lib/malloc/malloc.h"),
-        "output": Path("/home/areo/Documents/Studium/PicoC-Compiler/sys_tests/include/malloc.h"),
+        "picoc": PROJECT_ROOT / "lib" / "malloc" / "malloc.picoc",
+        "header": PROJECT_ROOT / "lib" / "malloc" / "malloc.h",
+        "output": OUTPUT_DIR / "malloc.h",
     },
     "2": {
-        "picoc": Path("/home/areo/Documents/Studium/Pico-OS/lib/mutex/mutex.picoc"),
-        "header": Path("/home/areo/Documents/Studium/Pico-OS/lib/mutex/mutex.h"),
-        "output": Path("/home/areo/Documents/Studium/PicoC-Compiler/sys_tests/include/mutex.h"),
+        "picoc": PROJECT_ROOT / "lib" / "mutex" / "mutex.picoc",
+        "header": PROJECT_ROOT / "lib" / "mutex" / "mutex.h",
+        "output": OUTPUT_DIR / "mutex.h",
     },
     "3": {
-        "picoc": Path("/home/areo/Documents/Studium/Pico-OS/lib/stdio/stdio.picoc"),
-        "header": Path("/home/areo/Documents/Studium/Pico-OS/lib/stdio/stdio.h"),
-        "output": Path("/home/areo/Documents/Studium/PicoC-Compiler/sys_tests/include/stdio.h"),
+        "picoc": PROJECT_ROOT / "lib" / "stdio" / "stdio.picoc",
+        "header": PROJECT_ROOT / "lib" / "stdio" / "stdio.h",
+        "output": OUTPUT_DIR / "stdio.h",
+    },
+    "4": {
+        "picoc": PROJECT_ROOT / "lib" / "unistd" / "unistd.picoc",
+        "header": PROJECT_ROOT / "lib" / "unistd" / "unistd.h",
+        "output": OUTPUT_DIR / "unistd.h",
+    },
+    "5": {
+        "picoc": PROJECT_ROOT / "lib" / "string" / "string.picoc",
+        "header": PROJECT_ROOT / "lib" / "string" / "string.h",
+        "output": OUTPUT_DIR / "string.h",
     },
 }
 
@@ -47,7 +59,7 @@ def main() -> int:
     mode = sys.argv[1] if len(sys.argv) > 1 else "1"
     config = MODES.get(mode)
     if config is None:
-        print("usage: merge_lib.py [1|2|3]", file=sys.stderr)
+        print("usage: merge_lib.py [1|2|3|4|5]", file=sys.stderr)
         return 1
 
     try:

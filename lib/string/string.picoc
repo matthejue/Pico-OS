@@ -37,6 +37,24 @@ char *strcpy(char *destination, char *source) {
     return destination;
 }
 
+char *strcat(char *destination, char *source) {
+    int destination_index = 0;
+    int source_index = 0;
+
+    while (destination[destination_index] != 0) {
+        destination_index = destination_index + 1;
+    }
+
+    while (source[source_index] != 0) {
+        destination[destination_index] = source[source_index];
+        destination_index = destination_index + 1;
+        source_index = source_index + 1;
+    }
+
+    destination[destination_index] = 0;
+    return destination;
+}
+
 int strlen(char *string) {
     int index = 0;
 
