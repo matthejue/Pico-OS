@@ -47,7 +47,8 @@ clean:
 		-o -name '*.json' \
 		-o -name '*.picoc_shrink' \
 		-o -name '*.picoc_blocks' \
-		-o -name '*.picoc_patch' \
+		-o -name '*.picoc_symbol' \
+		-o -name '*.picoc_typing' \
 		-o -name '*.picoc_anf' \
 		-o -name '*.reti_blocks' \
 		-o -name '*.reti_patch' \
