@@ -9,7 +9,7 @@ trap cleanup SIGINT
 
 MAX_EMULATOR_DURATION_SECONDS=5
 
-./extract_input_and_expected.sh $2
+./extract_input_and_expected.sh "$2"
 
 num_tests=0;
 failing=();

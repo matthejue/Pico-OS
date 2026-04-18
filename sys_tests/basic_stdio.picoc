@@ -1,8 +1,8 @@
 // in:1234
 // expected:ok 42 Z
+// dependencies: ../lib/stdio/stdio.picoc
 
 #include "../lib/stdio/stdio.h"
-#include "../lib/stdio/stdio.picoc"
 
 int main() {
     int value;
