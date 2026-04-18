@@ -41,7 +41,6 @@ struct scheduler {
 struct scheduler *os_scheduler();
 struct process *scheduler_current_process();
 
-void wait_queue_init(struct wait_queue *wq);
 void scheduler_init();
 struct process *process_create(void *entry_point, int stack_words);
 void process_destroy(struct process *process);

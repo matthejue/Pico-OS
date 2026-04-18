@@ -1,8 +1,9 @@
 // in:
 // expected:42 84
-// dependencies: ../lib/mutex/mutex.picoc
+// dependencies: ../lib/mutex/mutex.picoc ../lib/unistd/unistd.picoc
 
 #include "../lib/mutex/mutex.h"
+
 
 int main() {
     struct mutex m;

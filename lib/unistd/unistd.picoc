@@ -1,5 +1,10 @@
 #include "unistd.h"
 
+void wait_queue_init(struct wait_queue *wq) {
+    wq->head = 0;
+    wq->tail = 0;
+}
+
 void sleep(struct wait_queue *wq) {
     if (wq == 0) {
         return;

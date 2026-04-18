@@ -7,8 +7,14 @@ struct wait_queue {
     struct process *tail;
 };
 
+void wait_queue_init(struct wait_queue *wq);
 void sleep(struct wait_queue *wq);
 void wakeup(struct wait_queue *wq);
+
+void wait_queue_init(struct wait_queue *wq) {
+    wq->head = 0;
+    wq->tail = 0;
+}
 
 void sleep(struct wait_queue *wq) {
     if (wq == 0) {

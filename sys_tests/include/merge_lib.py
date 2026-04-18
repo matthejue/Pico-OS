@@ -46,6 +46,12 @@ def merge_files(picoc_path: Path, header_path: Path, output_path: Path) -> None:
         raise ValueError(f'Could not find {include_line!r} in {picoc_path}')
 
     merged_text = picoc_text.replace(include_line, header_text, 1)
+    if output_path.name == "mutex.h":
+        merged_text = merged_text.replace(
+            '#include "../unistd/unistd.h"',
+            '#include "./unistd.h"',
+            1,
+        )
     if output_path.name == "malloc.h":
         merged_text = merged_text.replace(
             "#define HEAP_SIZE  (1024 * 256)     // heap size in words",
