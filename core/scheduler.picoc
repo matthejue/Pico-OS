@@ -11,11 +11,6 @@ struct process *scheduler_current_process() {
     return os_scheduler()->current;
 }
 
-void wait_queue_init(struct wait_queue *wq) {
-    wq->head = 0;
-    wq->tail = 0;
-}
-
 void wait_queue_push(struct wait_queue *wq, struct process *process) {
     process->next = 0;
 

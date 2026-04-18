@@ -14,6 +14,7 @@ void mutex_unlock(struct mutex *m);
 
 int testset(int *lock_addr) {
     int old;
+
     asm("LOADIN BAF IN2 -2");
     asm("TSL IN2 ACC 0");
     asm("STOREIN BAF ACC -3");

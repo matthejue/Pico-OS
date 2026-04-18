@@ -24,6 +24,7 @@ README.txt
 *.reti_blocks
 *.reti_patch
 *.reti
+sys_tests/*.reti
 *.picoc_typing
 *.picoc_symbol
 *.error
