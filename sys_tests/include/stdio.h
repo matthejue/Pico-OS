@@ -166,16 +166,12 @@ int printf(char *format, ...) {
                 argument_value = next_printf_argument(argument_index);
                 buffer_index = append_decimal(buffer, buffer_index, argument_value);
                 argument_index = argument_index + 1;
-            } else {
-                if (current == 'c') {
-                    argument_value = next_printf_argument(argument_index);
-                    buffer_index = append_character(buffer, buffer_index, argument_value);
-                    argument_index = argument_index + 1;
-                } else {
-                    if (current == '%') {
-                        buffer_index = append_character(buffer, buffer_index, '%');
-                    }
-                }
+            } else if (current == 'c') {
+                argument_value = next_printf_argument(argument_index);
+                buffer_index = append_character(buffer, buffer_index, argument_value);
+                argument_index = argument_index + 1;
+            } else if (current == '%') {
+                buffer_index = append_character(buffer, buffer_index, '%');
             }
         } else {
             buffer_index = append_character(buffer, buffer_index, current);
