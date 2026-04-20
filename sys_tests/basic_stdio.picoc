@@ -5,9 +5,10 @@
 #include "../lib/stdio/stdio.h"
 
 int main() {
-    int value;
+    int value = 10;
 
-    scanf("%d", &value);
+    // scanf("%d", &value);
+    debug;
     printf("ok %d %c", value, 'Z');
 
     return 0;
