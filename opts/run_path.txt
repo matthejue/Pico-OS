@@ -1,1 +1,1 @@
-./sys_tests/basic_stdio.picoc
+./sys_tests/basic_string.picoc
