@@ -9,17 +9,17 @@
 int main() {
   init_heap();
 
-  print(1);
-  debug;
+  // print(1);
+  // debug;
   char *heap_str = (char *)malloc(10);
-  print(2);
-  debug;
+  // print(2);
+  // debug;
   strcpy(heap_str, "whatever");
-  print(3);
-  debug;
+  // print(3);
+  // debug;
   printf(heap_str);
-  print(4);
-  debug;
+  // print(4);
+  // debug;
 
   return 0;
 }
