@@ -1,14 +1,13 @@
-// in:1234
+// in: 42
 // expected:ok 42 Z
 // dependencies: ../lib/stdio/stdio.picoc
 
 #include "../lib/stdio/stdio.h"
 
 int main() {
-    int value = 10;
+    int value;
 
-    // scanf("%d", &value);
-    debug;
+    scanf("%d", &value);
     printf("ok %d %c", value, 'Z');
 
     return 0;

@@ -1,20 +1,22 @@
 #include "stdio.h"
 
-int uart_print_integer(int value) {
-    asm("LOADIN BAF ACC -2");
+void uart_print_integer(int value) {
+    asm("LOADIN BAF ACC 1");
     asm("INT 0");
-    return 0;
+    return;
 }
 
-int uart_print_string(char *value) {
-    asm("LOADIN BAF ACC -2");
+void uart_print_string(char *value) {
+    asm("LOADIN BAF ACC 1");
     asm("INT 1");
-    return 0;
+    return;
 }
 
-int uart_read_word() {
+int uart_read_integer() {
+    int value;
     asm("INT 2");
-    return 0;
+    asm("STOREIN BAF ACC -2");
+    return value;
 }
 
 int uart_print_character(int value) {
@@ -76,18 +78,10 @@ int append_decimal(char *buffer, int index, int value) {
 
 int input_character_at(int packed, int index) {
     if (index == 0) {
-        return packed / 16777216;
+        return packed;
     }
 
-    if (index == 1) {
-        return (packed / 65536) & 255;
-    }
-
-    if (index == 2) {
-        return (packed / 256) & 255;
-    }
-
-    return packed & 255;
+    return 0;
 }
 
 int is_decimal_digit(int value) {
@@ -102,55 +96,19 @@ int is_decimal_digit(int value) {
     return 1;
 }
 
-int parse_decimal_input(int packed, int *value) {
-    int index = 0;
-    int current = input_character_at(packed, 0);
-    int sign = 1;
-    int has_digit = 0;
-    int decimal_digit;
-    if (current == '-') {
-        sign = -1;
-        index = 1;
-    }
-
-    while (index < 4) {
-        current = input_character_at(packed, index);
-        decimal_digit = is_decimal_digit(current);
-
-        if (decimal_digit == 0) {
-            index = 4;
-        } else {
-            *value = (*value * 10) + (current - '0');
-            has_digit = 1;
-            index = index + 1;
-        }
-    }
-
-    if (has_digit == 0) {
-        return 0;
-    }
-
-    *value = (*value) * sign;
-    return 1;
+int *frame_base() {
+    int base;
+    asm("LOADIN BAF IN1 0");
+    asm("STOREIN BAF IN1 -2");
+    return base;
 }
 
-int frame_base() {
-    debug;
-    asm("MOVE BAF ACC");
-    return 0;
-}
-
-int next_printf_argument(int argument_index) {
-    debug;
-    int *base = (int *)frame_base();
-    int slot = argument_index + 1;
-    debug;
-    return *(base + slot);
+static inline int next_printf_argument(int argument_index) {
+    return *((int *)(frame_base() + argument_index + 2);
 }
 
 int printf(char *format, ...) {
-    debug;
-    char buffer[256];
+    char buffer[8];
     int index = 0;
     int buffer_index = 0;
     int current;
@@ -165,7 +123,6 @@ int printf(char *format, ...) {
             current = format[index];
 
             if (current == 'd') {
-                debug;
                 argument_value = next_printf_argument(argument_index);
                 buffer_index = append_decimal(buffer, buffer_index, argument_value);
                 argument_index = argument_index + 1;
@@ -197,18 +154,10 @@ int scanf(char *format, int *value) {
         return 0;
     }
 
-    int current = format[1];
-    int packed = uart_read_word();
-
-    if (current == 'c') {
-        *value = input_character_at(packed, 0);
-        return 1;
+    if (format[1] != 'c' && format[1] != 'd') {
+        return 0;
     }
 
-    if (current == 'd') {
-        *value = 0;
-        return parse_decimal_input(packed, value);
-    }
-
-    return 0;
+    *value = uart_read_integer();
+    return 1;
 }
