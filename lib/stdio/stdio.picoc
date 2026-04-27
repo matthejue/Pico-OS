@@ -164,11 +164,9 @@ void unread(int value) {
 
 void skip_whitespace() {
     int current = read_input();
-    int whitespace = is_whitespace(current);
 
-    while (whitespace != 0) {
+    while (is_whitespace(current)) {
         current = read_input();
-        whitespace = is_whitespace(current);
     }
 
     unread(current);
@@ -179,12 +177,11 @@ int read_decimal(int *target) {
     int sign = 1;
     int value = 0;
     int read_any_digit = 0;
-    int digit;
 
     skip_whitespace();
     current = read_input();
 
-    if (is_decimal_digit(current) == 0 && current != '-' && current != '+') {
+    if (!is_decimal_digit(current) && current != '-' && current != '+') {
         *target = current;
         return 1;
     }
@@ -197,13 +194,10 @@ int read_decimal(int *target) {
         current = read_input();
     }
 
-    digit = is_decimal_digit(current);
-
-    while (digit != 0) {
+    while (is_decimal_digit(current)) {
         value = (value * 10) + (current - '0');
         read_any_digit = 1;
         current = read_input();
-        digit = is_decimal_digit(current);
     }
 
     unread(current);
@@ -281,7 +275,7 @@ int scanf(char *format, ...) {
 
             if (current == 'd') {
                 target = (int *)next_argument(argument_index);
-                if (read_decimal(target) == 0) {
+                if (!read_decimal(target)) {
                     return assigned_count;
                 }
                 argument_index++;
@@ -300,8 +294,8 @@ int scanf(char *format, ...) {
             } else if (current != '%') {
                 return assigned_count;
             }
-        } else if (is_whitespace(current) != 0) {
-            while (is_whitespace(format[index + 1]) != 0) {
+        } else if (is_whitespace(current)) {
+            while (is_whitespace(format[index + 1])) {
                 index++;
             }
 
