@@ -1,0 +1,33 @@
+// in: 42 X 99 42 X 99
+// expected:Case 1: scanf("%d%c%d") Enter: integer character integer without spaces Example: 42X99 You entered: a = 42 c = 'X' b = 99 Case 2: scanf(" %d %c %d") Enter: integer character integer with optional spaces Example: 42 X 99 You entered: a = 42 c = 'X' b = 99
+// dependencies: ../lib/stdio/stdio.picoc
+
+#include "../lib/stdio/stdio.h"
+
+int main() {
+    int a;
+    int b;
+    int c;
+
+    printf("Case 1: scanf(\"%%d%%c%%d\")\n");
+    printf("Enter: integer character integer without spaces\n");
+    printf("Example: 42X99\n\n");
+
+    scanf("%d%c%d", &a, &c, &b);
+    printf("You entered:\n");
+    printf("a = %d\n", a);
+    printf("c = '%c'\n", c);
+    printf("b = %d\n\n", b);
+
+    printf("Case 2: scanf(\" %%d %%c %%d\")\n");
+    printf("Enter: integer character integer with optional spaces\n");
+    printf("Example: 42 X 99\n\n");
+
+    scanf(" %d %c %d", &a, &c, &b);
+    printf("You entered:\n");
+    printf("a = %d\n", a);
+    printf("c = '%c'\n", c);
+    printf("b = %d", b);
+
+    return 0;
+}
