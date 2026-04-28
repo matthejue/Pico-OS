@@ -1,4 +1,4 @@
-#include "../core/scheduler.h"
+#include "../core/scheduler.header"
 
 void handle_wakeup_system_call(struct wait_queue *wq) {
     scheduler_wake_one(wq);

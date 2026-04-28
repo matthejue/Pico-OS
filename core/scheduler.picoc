@@ -1,5 +1,5 @@
-#include "scheduler.h"
-#include "dispatcher.h"
+#include "scheduler.header"
+#include "dispatcher.header"
 
 struct scheduler os_scheduler_state;
 

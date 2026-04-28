@@ -2,7 +2,7 @@
 // expected:12 42
 // dependencies: ../lib/malloc/malloc.picoc
 
-#include "../lib/malloc/malloc.h"
+#include "../lib/malloc/malloc.header"
 
 int main() {
     init_heap();

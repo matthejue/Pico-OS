@@ -1,4 +1,4 @@
-#include "stdio.h"
+#include "stdio.header"
 
 #define PRINTF_BUFFER_CAPACITY 10
 
@@ -272,8 +272,12 @@ int scanf(char *format, ...) {
         if (current == '%') {
             index++;
             current = format[index];
+            print(1);
+            debug;
 
             if (current == 'd') {
+                print(10);
+                debug;
                 target = (int *)next_argument(argument_index);
                 if (!read_decimal(target)) {
                     return assigned_count;
@@ -281,11 +285,15 @@ int scanf(char *format, ...) {
                 argument_index++;
                 assigned_count++;
             } else if (current == 'c') {
+                print(11);
+                debug;
                 target = (int *)next_argument(argument_index);
                 *target = read_input();
                 argument_index++;
                 assigned_count++;
             } else if (current == '%') {
+                print(12);
+                debug;
                 input = read_input();
                 if (input != '%') {
                     unread(input);
@@ -295,6 +303,8 @@ int scanf(char *format, ...) {
                 return assigned_count;
             }
         } else if (is_whitespace(current)) {
+            print(2);
+            debug;
             while (is_whitespace(format[index + 1])) {
                 index++;
             }
@@ -302,6 +312,8 @@ int scanf(char *format, ...) {
             skip_whitespace();
         } else {
             input = read_input();
+            print(3);
+            debug;
             if (input != current) {
                 unread(input);
                 return assigned_count;

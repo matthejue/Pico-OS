@@ -2,9 +2,9 @@
 // expected:whatever
 // dependencies: ../lib/malloc/malloc.picoc ../lib/stdio/stdio.picoc ../lib/string/string.picoc
 
-#include "../lib/malloc/malloc.h"
-#include "../lib/stdio/stdio.h"
-#include "../lib/string/string.h"
+#include "../lib/malloc/malloc.header"
+#include "../lib/stdio/stdio.header"
+#include "../lib/string/string.header"
 
 int main() {
   init_heap();

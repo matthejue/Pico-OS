@@ -1,5 +1,5 @@
-#include "../core/scheduler.h"
-#include "../core/dispatcher.h"
+#include "../core/scheduler.header"
+#include "../core/dispatcher.header"
 
 void handle_sleep_system_call(
     struct wait_queue *wq,

@@ -2,7 +2,7 @@
 // expected:42X99  42 X 99
 // dependencies: ../lib/stdio/stdio.picoc
 
-#include "../lib/stdio/stdio.h"
+#include "../lib/stdio/stdio.header"
 
 int main() {
     int a;
@@ -10,10 +10,10 @@ int main() {
     int c;
 
     scanf("%d%c%d", &a, &b, &c);
-    printf("%d%c%d", a, b, c);
+    // printf("%d%c%d", a, b, c);
 
-    scanf(" %d %c %d", &a, &b, &c);
-    printf(" %d %c %d", a, b, c);
+    // scanf(" %d %c %d", &a, &b, &c);
+    // printf(" %d %c %d", a, b, c);
 
     return 0;
 }
