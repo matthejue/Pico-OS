@@ -1,5 +1,5 @@
-#include "../core/scheduler.h"
-#include "../core/dispatcher.h"
+#include "../core/scheduler.header"
+#include "../core/dispatcher.header"
 
 void handle_timer_interrupt(
     int *stack_pointer,

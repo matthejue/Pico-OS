@@ -1,4 +1,4 @@
-#include "mutex.h"
+#include "mutex.header"
 
 int testset(int *lock_addr) {
     int old;

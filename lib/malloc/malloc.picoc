@@ -1,4 +1,4 @@
-#include "malloc.h"
+#include "malloc.header"
 
 int heap[HEAP_SIZE];                  // fixed-size heap memory
 struct BlockHeader *block_list = NULL; // head of the block list (free + used)

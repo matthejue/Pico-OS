@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../lib/malloc/malloc.h"
-#include "../lib/unistd/unistd.h"
+#include "../lib/malloc/malloc.header"
+#include "../lib/unistd/unistd.header"
 
 #define MAX_PROCESSES 8
 #define DEFAULT_STACK_WORDS 64

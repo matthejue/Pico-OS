@@ -2,7 +2,7 @@
 // expected:42 84
 // dependencies: ../lib/mutex/mutex.picoc ../lib/unistd/unistd.picoc
 
-#include "../lib/mutex/mutex.h"
+#include "../lib/mutex/mutex.header"
 
 
 int main() {
