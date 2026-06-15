@@ -7,13 +7,13 @@ dist_old_3/
 build/
 pico_c_compiler.spec
 README.txt
+*.pre
 *.tokens
 *.rtokens
 *.dt
 *.rdt
 *.ast
 *.rast
-*.st_mon
 *.json
 *.picoc_shrink
 *.picoc_blocks
