@@ -7,6 +7,9 @@ else
 fi
 
 for test in "${paths[@]}"; do
+  input=$(sed -n '1p' "$test" | sed -e 's/^\/\/ in://')
+  echo "$input" | tr '\n' ' ' > "${test%.picoc}.input"
+
   expected=$(sed -n '2p' "$test" | sed -e 's/^\/\/ expected://')
   if [[ "$expected" == '' ]]; then
     echo -n '' > "${test%.picoc}.expected_output"

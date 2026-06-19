@@ -32,6 +32,9 @@ sys_tests/*.reti
 *.c_output
 *.reti_tokens
 *.reti_ast
+*.ps
+*.st
+*.sections
 *.input
 *.output
 *.expected_output
@@ -44,3 +47,15 @@ sys_tests/*.reti
 *.venv/
 .virtualenv/
 .codex
+.bak/dispatcher.header
+.bak/dispatcher.picoc
+.bak/isrs.picoc
+.bak/scheduler.header
+.bak/scheduler.picoc
+.bak/interrupt_service_routines/004_sleep.picoc
+.bak/interrupt_service_routines/005_wakeup.picoc
+.bak/interrupt_service_routines/006_switch_to_scheduler_INTTIMER_1.picoc
+.bak/interrupt_service_routines/build_isrs.py
+.bak/interrupt_service_routines/README.md
+.bak/Makefile.bak
+.bak/run_sys_tests.sh.bak

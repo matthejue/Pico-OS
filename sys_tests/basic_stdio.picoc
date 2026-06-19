@@ -1,4 +1,4 @@
-// in: 42
+// in: 42 X
 // expected:ok 42 Z
 // dependencies: ../lib/stdio/stdio.picoc
 

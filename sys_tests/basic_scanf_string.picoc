@@ -1,0 +1,15 @@
+// in: hello world
+// expected:hello world
+// dependencies: ../lib/stdio/stdio.picoc
+
+#include "../lib/stdio/stdio.header"
+
+int main() {
+    char first[16];
+    char second[16];
+
+    scanf("%s %s", first, second);
+    printf("%s %s", first, second);
+
+    return 0;
+}

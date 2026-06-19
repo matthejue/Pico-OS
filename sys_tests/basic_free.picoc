@@ -1,7 +1,8 @@
 // in:
 // expected:12 42
-// dependencies: ../lib/malloc/malloc.picoc
+// dependencies: ../lib/malloc/malloc.picoc ../lib/stdio/stdio.picoc
 
+#include "../lib/stdio/stdio.header"
 #include "../lib/malloc/malloc.header"
 
 int main() {
@@ -21,8 +22,8 @@ int main() {
     c[0] = 21;
     c[7] = 2;
 
-    print(b[0] * b[5]);
-    print(c[0] * c[7]);
+    printf("%d ", b[0] * b[5]);
+    printf("%d ", c[0] * c[7]);
 
     return 0;
 }

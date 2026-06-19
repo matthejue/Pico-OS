@@ -1,35 +1,46 @@
 #include "stdio.header"
 
+#define false 0
+#define true 1
 #define PRINTF_BUFFER_CAPACITY 10
 
 int has_unread_input = 0;
 int unread_input = 0;
 
+int append_decimal(char *buffer, int index, int value);
+void uart_print_string(char *value);
+int uart_print_character(int value);
+
 void uart_print_integer(int value) {
-    asm("LOADIN BAF ACC 1");
-    asm("INT 0");
+    char buffer[12];
+    int index = append_decimal(buffer, 0, value);
+
+    buffer[index] = 0;
+    uart_print_string(buffer);
     return;
 }
 
 void uart_print_string(char *value) {
-    asm("LOADIN BAF ACC 1");
-    asm("INT 1");
+    int index = 0;
+
+    while (value[index] != 0) {
+        uart_print_character(value[index]);
+        index = index + 1;
+    }
+
     return;
 }
 
-int uart_read_value() {
-    int value;
-    asm("INT 2");
-    asm("STOREIN BAF ACC -2");
+int uart_read_value(void) {
+    int value = 0;
+    asm("INT 1");
+    asm("STOREIN BAF ACC 0");
     return value;
 }
 
 int uart_print_character(int value) {
-    char character[2];
-
-    character[0] = value;
-    character[1] = 0;
-    uart_print_string(character);
+    asm("LOADIN BAF ACC 3");
+    asm("INT 0");
     return 0;
 }
 
@@ -54,20 +65,28 @@ int append_decimal(char *buffer, int index, int value) {
     char digits[12];
     int digit_count = 0;
     int current = value;
+    int negative = value < 0;
+    int digit;
 
     if (current == 0) {
         buffer[index] = '0';
         return index + 1;
     }
 
-    if (current < 0) {
+    if (negative) {
         buffer[index] = '-';
         index = index + 1;
-        current = 0 - current;
     }
 
     while (current != 0) {
-        digits[digit_count] = (current % 10) + '0';
+        digit = current % 10;
+        if (digit < 0) {
+            digit = -digit;
+        } else if (negative && digit != 0) {
+            digit = 10 - digit;
+        }
+
+        digits[digit_count] = digit + '0';
         current = current / 10;
         digit_count = digit_count + 1;
     }
@@ -104,18 +123,26 @@ int append_decimal_buffered(char *buffer, int buffer_index, int value) {
     char digits[12];
     int digit_count = 0;
     int current = value;
+    int negative = value < 0;
+    int digit;
 
     if (current == 0) {
         return append_character_buffered(buffer, buffer_index, '0');
     }
 
-    if (current < 0) {
+    if (negative) {
         buffer_index = append_character_buffered(buffer, buffer_index, '-');
-        current = 0 - current;
     }
 
     while (current != 0) {
-        digits[digit_count] = (current % 10) + '0';
+        digit = current % 10;
+        if (digit < 0) {
+            digit = -digit;
+        } else if (negative && digit != 0) {
+            digit = 10 - digit;
+        }
+
+        digits[digit_count] = digit + '0';
         current = current / 10;
         digit_count = digit_count + 1;
     }
@@ -128,27 +155,14 @@ int append_decimal_buffered(char *buffer, int buffer_index, int value) {
     return buffer_index;
 }
 
-int is_decimal_digit(int value) {
-    if (value < '0') {
-        return 0;
-    }
-
-    if (value > '9') {
-        return 0;
-    }
-
-    return 1;
-}
+int is_decimal_digit(int value) { return value >= '0' && value <= '9'; }
 
 int is_whitespace(int value) {
-    if (value == ' ' || value == '\n' || value == '\r' || value == '\t') {
-        return 1;
-    }
-
-    return 0;
+    return value == ' ' || value == '\n' ||
+           value == '\r' || value == '\t';
 }
 
-int read_input() {
+int read_input(void) {
     if (has_unread_input) {
         has_unread_input = 0;
         return unread_input;
@@ -162,7 +176,7 @@ void unread(int value) {
     unread_input = value;
 }
 
-void skip_whitespace() {
+void skip_whitespace(void) {
     int current = read_input();
 
     while (is_whitespace(current)) {
@@ -176,14 +190,14 @@ int read_decimal(int *target) {
     int current;
     int sign = 1;
     int value = 0;
-    int read_any_digit = 0;
+    int read_any_digit = false;
 
     skip_whitespace();
     current = read_input();
 
     if (!is_decimal_digit(current) && current != '-' && current != '+') {
-        *target = current;
-        return 1;
+        unread(current);
+        return 0;
     }
 
     if (current == '-' || current == '+') {
@@ -192,6 +206,11 @@ int read_decimal(int *target) {
         }
 
         current = read_input();
+
+        if (!is_decimal_digit(current)) {
+            unread(current);
+            return 0;
+        }
     }
 
     while (is_decimal_digit(current)) {
@@ -210,15 +229,37 @@ int read_decimal(int *target) {
     return 1;
 }
 
-int *frame_base() {
-    int base;
-    asm("LOADIN BAF IN1 0");
-    asm("STOREIN BAF IN1 -2");
-    return base;
+int read_string(char *target) {
+    int index = 0;
+    int current;
+
+    skip_whitespace();
+    current = read_input();
+
+    if (is_whitespace(current)) {
+        unread(current);
+        target[0] = 0;
+        return 0;
+    }
+
+    while (current != 0 && !is_whitespace(current)) {
+        target[index] = current;
+        index++;
+        current = read_input();
+    }
+
+    unread(current);
+    target[index] = 0;
+    return index != 0;
 }
 
-static inline int next_argument(int argument_index) {
-    return *((int *)(frame_base() + argument_index + 2);
+int next_argument(int argument_index) {
+    int base = 0;
+
+    asm("LOADIN BAF IN1 1");
+    asm("STOREIN BAF IN1 0");
+    // 4 and not 3 because first argument is the format string
+    return *((int *)(base + argument_index + 4));
 }
 
 int printf(char *format, ...) {
@@ -243,6 +284,11 @@ int printf(char *format, ...) {
             } else if (current == 'c') {
                 argument_value = next_argument(argument_index);
                 buffer_index = append_character_buffered(buffer, buffer_index, argument_value);
+                argument_index = argument_index + 1;
+            } else if (current == 's') {
+                argument_value = next_argument(argument_index);
+                flush_printf_buffer(buffer, &buffer_index);
+                uart_print_string((char *)argument_value);
                 argument_index = argument_index + 1;
             } else if (current == '%') {
                 buffer_index = append_character_buffered(buffer, buffer_index, '%');
@@ -272,12 +318,8 @@ int scanf(char *format, ...) {
         if (current == '%') {
             index++;
             current = format[index];
-            print(1);
-            debug;
 
             if (current == 'd') {
-                print(10);
-                debug;
                 target = (int *)next_argument(argument_index);
                 if (!read_decimal(target)) {
                     return assigned_count;
@@ -285,15 +327,18 @@ int scanf(char *format, ...) {
                 argument_index++;
                 assigned_count++;
             } else if (current == 'c') {
-                print(11);
-                debug;
                 target = (int *)next_argument(argument_index);
                 *target = read_input();
                 argument_index++;
                 assigned_count++;
+            } else if (current == 's') {
+                target = (int *)next_argument(argument_index);
+                if (!read_string((char *)target)) {
+                    return assigned_count;
+                }
+                argument_index++;
+                assigned_count++;
             } else if (current == '%') {
-                print(12);
-                debug;
                 input = read_input();
                 if (input != '%') {
                     unread(input);
@@ -303,8 +348,6 @@ int scanf(char *format, ...) {
                 return assigned_count;
             }
         } else if (is_whitespace(current)) {
-            print(2);
-            debug;
             while (is_whitespace(format[index + 1])) {
                 index++;
             }
@@ -312,8 +355,6 @@ int scanf(char *format, ...) {
             skip_whitespace();
         } else {
             input = read_input();
-            print(3);
-            debug;
             if (input != current) {
                 unread(input);
                 return assigned_count;

@@ -5,13 +5,22 @@ RUN_PATH ?= $(shell cat ./opts/run_path.txt)
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
 
-.PHONY: help run run_send_keypresses test test-all clean
+.PHONY: help run run_send_keypresses test test-all test_not_passed clean
 
 help:
 	@echo "Targets:"
 	@echo "  make test                       Run sys tests using TEST_PATTERN"
 	@echo "  make test-all                   Run all sys tests"
+	@echo "  make test_not_passed            Run paths from ./opts/not_passed_tests.txt"
 	@echo "  make clean                      Remove generated sys-test files"
+	@echo ""
+	@echo "Variables:"
+	@echo "  TEST_PATTERN=<pattern>          Override the configured test pattern"
+	@echo "  EXTRA_CPL_ARGS='<arguments>'    Additional compiler arguments"
+	@echo "  EXTRA_EMU_ARGS='<arguments>'    Additional emulator arguments"
+	@echo ""
+	@echo "Each sys test is stopped automatically if the emulator exceeds"
+	@echo "the timeout configured in ./run_sys_tests.sh."
 
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
@@ -28,11 +37,15 @@ run_send_keypresses:
 
 test:
 	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh $${COLUMNS} "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run_sys_tests.sh "$${COLUMNS}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test-all:
 	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh $${COLUMNS} "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run_sys_tests.sh "$${COLUMNS}" "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+
+test_not_passed:
+	./export_environment_vars_for_makefile.sh;\
+	./run_sys_tests.sh --not-passed "$${COLUMNS}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 clean:
 	find . -type f \
@@ -40,6 +53,10 @@ clean:
 		\( -name '*.tokens' \
 		-o -name '*.rtokens' \
 		-o -name '*.dt' \
+		-o -name '*.pre' \
+		-o -name '*.ps' \
+		-o -name '*.st' \
+		-o -name '*.sections' \
 		-o -name '*.rdt' \
 		-o -name '*.dt_simple' \
 		-o -name '*.ast' \
