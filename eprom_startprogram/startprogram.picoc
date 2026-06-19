@@ -1,0 +1,139 @@
+#include "../interrupt_service_routines/isrs.header"
+
+#define SRAM_BASE (-2147483647 - 1)
+#define SRAM_SIZE 65536
+
+__attribute__((naked))
+void _start(void) {
+    asm("LOADI32 SP -2147418113");
+    asm("MOVE SP BAF");
+    asm("LOADI32 ACC boot_main");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+void send_load_command(void) {
+    handle_send_byte_over_uart_interrupt('l');
+    handle_send_byte_over_uart_interrupt('o');
+    handle_send_byte_over_uart_interrupt('a');
+    handle_send_byte_over_uart_interrupt('d');
+    handle_send_byte_over_uart_interrupt(' ');
+    handle_send_byte_over_uart_interrupt('.');
+    handle_send_byte_over_uart_interrupt('/');
+    handle_send_byte_over_uart_interrupt('k');
+    handle_send_byte_over_uart_interrupt('e');
+    handle_send_byte_over_uart_interrupt('r');
+    handle_send_byte_over_uart_interrupt('n');
+    handle_send_byte_over_uart_interrupt('e');
+    handle_send_byte_over_uart_interrupt('l');
+    handle_send_byte_over_uart_interrupt('.');
+    handle_send_byte_over_uart_interrupt('b');
+    handle_send_byte_over_uart_interrupt('i');
+    handle_send_byte_over_uart_interrupt('n');
+    handle_send_byte_over_uart_interrupt('\n');
+}
+
+int receive_word(void) {
+    int word;
+    word = handle_receive_byte_over_uart_interrupt();
+    if (word >= 128) {
+        word = word - 256;
+    }
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    return word;
+}
+
+void receive_kernel_words(int stack_start) {
+    int word;
+    int addr;
+    int load_end;
+
+    load_end = stack_start;
+    if (stack_start == -1) {
+        load_end = SRAM_SIZE;
+    }
+
+    addr = 0;
+    while (addr < load_end) {
+        word = receive_word();
+        *((int *)(SRAM_BASE + addr)) = word;
+        addr = addr + 1;
+    }
+}
+
+__attribute__((naked))
+void start_loaded_kernel(void) {
+    asm("LOADIN BAF ACC 0");
+    asm("LOADIN BAF IN1 -1");
+    asm("LOADIN BAF IN2 -2");
+
+    asm("LOADI32 CS -2147483648");
+    asm("ADD CS ACC");
+    asm("MOVE CS DS");
+    asm("ADD DS IN1");
+
+    asm("LOADI32 SP -2147483648");
+    asm("ADD SP IN2");
+    asm("MOVE SP BAF");
+
+    asm("MOVE CS PC");
+}
+
+void boot_main(void) {
+    int code_start;
+    int data_start;
+    int stack_start;
+
+    send_load_command();
+
+    code_start = receive_word();
+    data_start = receive_word();
+    stack_start = receive_word();
+
+    receive_kernel_words(stack_start);
+    asm("LOADI32 ACC start_loaded_kernel");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+void handle_send_byte_over_uart_interrupt(int value) {
+    // switch to periphery address space
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+
+    // UART send procedure, copied from interrupt_service_routines/isrs.picoc.
+    asm("LOADIN BAF ACC 3");
+    asm("ANDI ACC 255");
+    asm("STORE ACC 0");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -2");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 1");
+    asm("JUMP== -2");
+    asm("LOADIN BAF DS 0");
+}
+
+int handle_receive_byte_over_uart_interrupt(void) {
+    int value;
+    // switch to periphery address space
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+
+    // UART receive procedure, copied from interrupt_service_routines/isrs.picoc.
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -3");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 2");
+    asm("JUMP== -2");
+    asm("LOAD ACC 1");
+    asm("ANDI ACC 255");
+    asm("STOREIN BAF ACC 0");
+    asm("LOADIN BAF DS 0");
+    return value;
+}

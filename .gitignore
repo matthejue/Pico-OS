@@ -35,6 +35,7 @@ sys_tests/*.reti
 *.ps
 *.st
 *.sections
+*.bin
 *.input
 *.output
 *.expected_output
