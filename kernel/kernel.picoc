@@ -1,0 +1,46 @@
+#include "kernel.header"
+#include "interrupt_controller.header"
+#include "../interrupt_service_routines/isrs.header"
+
+int receive_word(void) {
+    int word;
+
+    word = handle_receive_byte_over_uart_interrupt();
+    if (word >= 128) {
+        word = word - 256;
+    }
+
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    word = word * 256 + handle_receive_byte_over_uart_interrupt();
+    return word;
+}
+
+int kernel_should_shutdown(int word) {
+    return word == KERNEL_COMMAND_QUIT || word == KERNEL_COMMAND_EXIT;
+}
+
+void kernel_shutdown(void) {
+    asm("JUMP 0");
+}
+
+void kernel_wait_for_shutdown_command(void) {
+    int word;
+
+    word = receive_word();
+    if (kernel_should_shutdown(word)) {
+        kernel_shutdown();
+    }
+}
+
+void kernel_main_loop(void) {
+    while (1) {
+        kernel_wait_for_shutdown_command();
+    }
+}
+
+int main(void) {
+    interrupt_controller_initialize();
+    kernel_main_loop();
+    return 0;
+}

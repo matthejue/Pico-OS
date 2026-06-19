@@ -3,14 +3,14 @@
 
 int interrupt_vector_devices[INTERRUPT_VECTOR_COUNT] = {
     INTERRUPT_DEVICE_NONE,
-    INTERRUPT_DEVICE_NONE,
+    INTERRUPT_DEVICE_KEYPRESS,
     INTERRUPT_DEVICE_NONE,
     INTERRUPT_DEVICE_NONE
 };
 
 int interrupt_vector_priorities[INTERRUPT_VECTOR_COUNT] = {
     0,
-    0,
+    1,
     0,
     0
 };
@@ -50,6 +50,28 @@ void interrupt_controller_assign_timer(int interrupt_index, int priority) {
         INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER,
         priority
     );
+}
+
+void interrupt_controller_initialize(void) {
+    int interrupt_index = 0;
+    int device;
+    int priority;
+
+    interrupt_controller_disable_timer();
+    interrupt_controller_disable_custom();
+
+    while (interrupt_index < INTERRUPT_VECTOR_COUNT) {
+        device = interrupt_vector_devices[interrupt_index];
+        priority = interrupt_vector_priorities[interrupt_index];
+
+        if (device == INTERRUPT_DEVICE_INTTIMER) {
+            interrupt_controller_assign_timer(interrupt_index, priority);
+        } else if (device == INTERRUPT_DEVICE_KEYPRESS) {
+            interrupt_controller_assign_custom(interrupt_index, priority);
+        }
+
+        interrupt_index = interrupt_index + 1;
+    }
 }
 
 void interrupt_controller_assign_custom(int interrupt_index, int priority) {

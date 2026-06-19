@@ -1,0 +1,7 @@
+#pragma once
+
+#define KERNEL_COMMAND_QUIT 1903520116
+#define KERNEL_COMMAND_EXIT 1702390132
+
+int receive_word(void);
+void kernel_main_loop(void);
