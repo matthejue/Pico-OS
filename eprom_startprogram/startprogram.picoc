@@ -1,7 +1,6 @@
 #include "../interrupt_service_routines/isrs.header"
 
 #define SRAM_BASE (-2147483647 - 1)
-#define SRAM_SIZE 65536
 
 __attribute__((naked))
 void _start(void) {
@@ -18,8 +17,6 @@ void send_load_command(void) {
     handle_send_byte_over_uart_interrupt('a');
     handle_send_byte_over_uart_interrupt('d');
     handle_send_byte_over_uart_interrupt(' ');
-    handle_send_byte_over_uart_interrupt('.');
-    handle_send_byte_over_uart_interrupt('/');
     handle_send_byte_over_uart_interrupt('k');
     handle_send_byte_over_uart_interrupt('e');
     handle_send_byte_over_uart_interrupt('r');
@@ -45,18 +42,12 @@ int receive_word(void) {
     return word;
 }
 
-void receive_kernel_words(int stack_start) {
+void receive_kernel_words(int word_count) {
     int word;
     int addr;
-    int load_end;
-
-    load_end = stack_start;
-    if (stack_start == -1) {
-        load_end = SRAM_SIZE;
-    }
 
     addr = 0;
-    while (addr < load_end) {
+    while (addr < word_count) {
         word = receive_word();
         *((int *)(SRAM_BASE + addr)) = word;
         addr = addr + 1;
@@ -85,14 +76,18 @@ void boot_main(void) {
     int code_start;
     int data_start;
     int stack_start;
+    int word_count;
+    int kernel_word_count;
 
     send_load_command();
 
+    word_count = receive_word();
     code_start = receive_word();
     data_start = receive_word();
     stack_start = receive_word();
 
-    receive_kernel_words(stack_start);
+    kernel_word_count = word_count - 3;
+    receive_kernel_words(kernel_word_count);
     asm("LOADI32 ACC start_loaded_kernel");
     asm("ADD ACC CS");
     asm("MOVE ACC PC");
