@@ -18,3 +18,4 @@ void interrupt_controller_disable_timer(void);
 void interrupt_controller_disable_custom(void);
 void interrupt_controller_assign_timer(int interrupt_index, int priority);
 void interrupt_controller_assign_custom(int interrupt_index, int priority);
+void interrupt_controller_initialize(void);
