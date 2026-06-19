@@ -1,0 +1,21 @@
+#pragma once
+
+// #include "../core/interrupt_controller.header"
+
+#define INTERRUPT_VECTOR_COUNT 4
+#define PERIPHERY_BASE 1073741824
+
+#define UART_BASE PERIPHERY_BASE
+#define UART_SEND_REGISTER 0
+#define UART_RECEIVE_REGISTER 1
+#define UART_STATUS_REGISTER 2
+#define UART_SEND_READY_BIT 1
+#define UART_RECEIVE_READY_BIT 2
+
+#define SEND_BYTE_OVER_UART_INTERRUPT_INDEX 0
+#define RECEIVE_BYTE_OVER_UART_INTERRUPT_INDEX 1
+#define RESERVED_EMULATOR_INTERRUPT_INDEX 3
+#define NEXT_AVAILABLE_INTERRUPT_INDEX 2
+
+void handle_send_byte_over_uart_interrupt(int value);
+int handle_receive_byte_over_uart_interrupt(void);

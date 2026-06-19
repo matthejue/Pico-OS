@@ -1,0 +1,120 @@
+#include "isrs.header"
+
+void send_byte_over_uart_interrupt(void);
+void receive_byte_over_uart_interrupt(void);
+
+__attribute__((section("interrupt_vector_table")))
+void (*interrupt_vector_table[INTERRUPT_VECTOR_COUNT])(void) = {
+    send_byte_over_uart_interrupt,
+    receive_byte_over_uart_interrupt,
+    0,
+    0
+};
+
+__attribute__((section("interrupt_vector_table")))
+__attribute__((naked))
+void send_byte_over_uart_interrupt(void) {
+    asm("SUBI SP 5");
+    asm("STOREIN SP DS 1");
+    asm("STOREIN SP IN1 2");
+    asm("STOREIN SP IN2 3");
+    asm("STOREIN SP ACC 4");
+    asm("STOREIN SP CS 5");
+    asm("LOADI CS -2097152");
+    asm("MULTI CS 1024");
+    asm("SUBI SP 1");
+    asm("STOREIN SP ACC 1");
+    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("SUBI SP 1");
+    asm("STOREIN SP ACC 1");
+    asm("LOADI32 ACC handle_send_byte_over_uart_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((section("interrupt_vector_table")))
+__attribute__((naked))
+void send_byte_over_uart_interrupt_return(void) {
+    asm("ADDI SP 1");
+    asm("LOADIN SP DS 1");
+    asm("LOADIN SP IN1 2");
+    asm("LOADIN SP IN2 3");
+    asm("LOADIN SP ACC 4");
+    asm("LOADIN SP CS 5");
+    asm("ADDI SP 5");
+    asm("RTI");
+}
+
+__attribute__((section("interrupt_vector_table")))
+__attribute__((naked))
+void receive_byte_over_uart_interrupt(void) {
+    asm("SUBI SP 4");
+    asm("STOREIN SP DS 1");
+    asm("STOREIN SP IN1 2");
+    asm("STOREIN SP IN2 3");
+    asm("STOREIN SP CS 4");
+    asm("LOADI CS -2097152");
+    asm("MULTI CS 1024");
+    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("SUBI SP 1");
+    asm("STOREIN SP ACC 1");
+    asm("LOADI32 ACC handle_receive_byte_over_uart_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((section("interrupt_vector_table")))
+__attribute__((naked))
+void receive_byte_over_uart_interrupt_return(void) {
+    asm("MOVE IN2 ACC");
+    asm("LOADIN SP DS 1");
+    asm("LOADIN SP IN1 2");
+    asm("LOADIN SP IN2 3");
+    asm("LOADIN SP CS 4");
+    asm("ADDI SP 4");
+    asm("RTI");
+}
+
+__attribute__((section("interrupt_vector_table")))
+void handle_send_byte_over_uart_interrupt(int value) {
+    // switch to periphery address space
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+
+    // UART send procedure
+    asm("LOADIN BAF ACC 3");
+    asm("ANDI ACC 255");
+    asm("STORE ACC 0");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -2");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 1");
+    asm("JUMP== -2");
+    asm("LOADIN BAF DS 0");
+}
+
+__attribute__((section("interrupt_vector_table")))
+int handle_receive_byte_over_uart_interrupt(void) {
+    int value;
+    // switch to periphery address space
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+
+    // UART receive procedure
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -3");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 2");
+    asm("JUMP== -2");
+    asm("LOAD ACC 1");
+    asm("ANDI ACC 255");
+    asm("STOREIN BAF ACC 0");
+    asm("LOADIN BAF DS 0");
+    return value;
+}

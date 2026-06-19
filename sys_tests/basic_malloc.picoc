@@ -1,22 +1,27 @@
-// in:8 6
-// expected:12 42
-// dependencies: ../lib/malloc/malloc.picoc
+// in: 8 6
+// expected: 12 42
+// dependencies: ../lib/malloc/malloc.picoc ../lib/stdio/stdio.picoc
 
+#include "../lib/stdio/stdio.header"
 #include "../lib/malloc/malloc.header"
 
 int main() {
     init_heap();
-
-    int *a = (int *)malloc(input());
+ 
+    int __picoc_input_0;
+    scanf(" %d", &__picoc_input_0);
+    int *a = (int *)malloc(__picoc_input_0);
     a[0] = 3;
     a[7] = 4;
 
-    int *b = (int *)malloc(input());
+    int __picoc_input_1;
+    scanf(" %d", &__picoc_input_1);
+    int *b = (int *)malloc(__picoc_input_1);
     b[0] = 21;
     b[5] = 2;
 
-    print(a[0] * a[7]);
-    print(b[0] * b[5]);
+    printf(" %d", a[0] * a[7]);
+    printf(" %d", b[0] * b[5]);
 
     return 0;
 }

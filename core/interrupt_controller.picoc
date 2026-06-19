@@ -1,0 +1,64 @@
+#include "interrupt_controller.header"
+#include "../interrupt_service_routines/isrs.header"
+
+int interrupt_vector_devices[INTERRUPT_VECTOR_COUNT] = {
+    INTERRUPT_DEVICE_NONE,
+    INTERRUPT_DEVICE_NONE,
+    INTERRUPT_DEVICE_NONE,
+    INTERRUPT_DEVICE_NONE
+};
+
+int interrupt_vector_priorities[INTERRUPT_VECTOR_COUNT] = {
+    0,
+    0,
+    0,
+    0
+};
+
+void interrupt_controller_write_register(int register_index, int value) {
+    int *interrupt_controller_register = (int *)(PERIPHERY_BASE + register_index);
+
+    // switch to periphery address space
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+
+    *interrupt_controller_register = value;
+    asm("LOADIN BAF DS 0");
+}
+
+void interrupt_controller_disable_timer(void) {
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER,
+        INTERRUPT_CONTROLLER_DISABLED
+    );
+}
+
+void interrupt_controller_disable_custom(void) {
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER,
+        INTERRUPT_CONTROLLER_DISABLED
+    );
+}
+
+void interrupt_controller_assign_timer(int interrupt_index, int priority) {
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER,
+        interrupt_index
+    );
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER,
+        priority
+    );
+}
+
+void interrupt_controller_assign_custom(int interrupt_index, int priority) {
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER,
+        interrupt_index
+    );
+    interrupt_controller_write_register(
+        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_PRIORITY_REGISTER,
+        priority
+    );
+}

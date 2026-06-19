@@ -1,0 +1,20 @@
+#pragma once
+
+// #define INTERRUPT_VECTOR_COUNT 4
+
+// #define PERIPHERY_BASE 1073741824
+
+#define INTERRUPT_DEVICE_NONE 0
+#define INTERRUPT_DEVICE_KEYPRESS 1
+#define INTERRUPT_DEVICE_INTTIMER 2
+
+#define INTERRUPT_CONTROLLER_DISABLED 255
+#define INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER 3
+#define INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER 4
+#define INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER 5
+#define INTERRUPT_CONTROLLER_CUSTOM_DEVICE_PRIORITY_REGISTER 6
+
+void interrupt_controller_disable_timer(void);
+void interrupt_controller_disable_custom(void);
+void interrupt_controller_assign_timer(int interrupt_index, int priority);
+void interrupt_controller_assign_custom(int interrupt_index, int priority);
