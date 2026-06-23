@@ -3,7 +3,7 @@
 void send_byte_over_uart_interrupt(void);
 void receive_byte_over_uart_interrupt(void);
 
-__attribute__((section("interrupt_vector_table")))
+__attribute__((section("ivt")))
 void (*interrupt_vector_table[INTERRUPT_VECTOR_COUNT])(void) = {
     send_byte_over_uart_interrupt,
     receive_byte_over_uart_interrupt,

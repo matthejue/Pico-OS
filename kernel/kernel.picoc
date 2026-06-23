@@ -35,7 +35,6 @@ void kernel_wait_for_shutdown_command(void) {
 
 void kernel_main_loop(void) {
     while (1) {
-        debug;
         kernel_wait_for_shutdown_command();
     }
 }
