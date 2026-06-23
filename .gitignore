@@ -64,3 +64,4 @@ sys_tests/*.reti
 .bak/compile.sh
 .bak/e_compile.sh
 .bak/i_compile.sh
+*.debuginfo
