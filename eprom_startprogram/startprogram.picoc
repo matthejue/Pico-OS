@@ -1,10 +1,12 @@
 #include "../interrupt_service_routines/isrs.header"
 
 #define SRAM_BASE (-2147483647 - 1)
+// Highest SRAM address: 2^18 - 1.
+#define SRAM_LAST_ADDRESS 262143
 
 __attribute__((naked))
 void _start(void) {
-    asm("LOADI32 SP -2147418113");
+    asm("LOADI32 SP -2147221505");
     asm("MOVE SP BAF");
     asm("LOADI32 ACC boot_main");
     asm("ADD ACC CS");
@@ -61,11 +63,13 @@ void start_loaded_kernel(void) {
     asm("LOADIN BAF IN2 -2");
 
     asm("LOADI32 CS -2147483648");
-    asm("ADD CS ACC");
     asm("MOVE CS DS");
+    asm("MOVE CS SP");
+
+    asm("ADD CS ACC");
+
     asm("ADD DS IN1");
 
-    asm("LOADI32 SP -2147483648");
     asm("ADD SP IN2");
     asm("MOVE SP BAF");
 
@@ -85,6 +89,9 @@ void boot_main(void) {
     code_start = receive_word();
     data_start = receive_word();
     stack_start = receive_word();
+    if (stack_start == -1) {
+        stack_start = SRAM_LAST_ADDRESS;
+    }
 
     kernel_word_count = word_count - 3;
     receive_kernel_words(kernel_word_count);
