@@ -60,3 +60,7 @@ sys_tests/*.reti
 .bak/interrupt_service_routines/README.md
 .bak/Makefile.bak
 .bak/run_sys_tests.sh.bak
+.bak/bootload.sh
+.bak/compile.sh
+.bak/e_compile.sh
+.bak/i_compile.sh

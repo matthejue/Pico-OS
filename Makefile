@@ -1,26 +1,61 @@
 SHELL := /bin/bash
 
+# ----------------------------------------------------------------------
+# Normal test and program-run configuration
+# ----------------------------------------------------------------------
+
 TEST_PATTERN ?= $(shell cat ./opts/test_pattern.txt)
 RUN_PATH ?= $(shell cat ./opts/run_path.txt)
+
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
 
-.PHONY: help run run_send_keypresses test test-all test_not_passed clean
+
+# ----------------------------------------------------------------------
+# Phony targets
+# ----------------------------------------------------------------------
+
+.PHONY: help
+.PHONY: run run_send_keypresses
+.PHONY: test test-all test_not_passed
+.PHONY: bootload run-kernel firmware eprom kernel isrs clean-firmware rebuild-firmware
+.PHONY: clean
+
+
+# ----------------------------------------------------------------------
+# Help
+# ----------------------------------------------------------------------
 
 help:
 	@echo "Targets:"
+	@echo "  make run                        Run configured program using RUN_PATH"
+	@echo "  make run_send_keypresses        Run configured program and send keypresses"
 	@echo "  make test                       Run sys tests using TEST_PATTERN"
 	@echo "  make test-all                   Run all sys tests"
 	@echo "  make test_not_passed            Run paths from ./opts/not_passed_tests.txt"
-	@echo "  make clean                      Remove generated sys-test files"
+	@echo "  make firmware                   Build bootloader and kernel artifacts"
+	@echo "  make bootload                   Build firmware and boot through startprogram.reti"
+	@echo "  make run-kernel                 Build and run kernel.reti directly"
+	@echo "  make eprom                      Build eprom_startprogram/startprogram.reti"
+	@echo "  make kernel                     Build kernel.bin"
+	@echo "  make isrs                       Build interrupt_service_routines/isrs.reti"
+	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
+	@echo "  make clean-firmware             Remove generated firmware files only"
+	@echo "  make clean                      Remove generated test and firmware files"
 	@echo ""
 	@echo "Variables:"
 	@echo "  TEST_PATTERN=<pattern>          Override the configured test pattern"
-	@echo "  EXTRA_CPL_ARGS='<arguments>'    Additional compiler arguments"
-	@echo "  EXTRA_EMU_ARGS='<arguments>'    Additional emulator arguments"
+	@echo "  RUN_PATH=<path>                 Override configured run path"
+	@echo "  EXTRA_CPL_ARGS='<arguments>'    Additional compiler arguments for normal runs/tests"
+	@echo "  EXTRA_EMU_ARGS='<arguments>'    Additional emulator arguments for normal runs/tests"
 	@echo ""
 	@echo "Each sys test is stopped automatically if the emulator exceeds"
 	@echo "the timeout configured in ./run_sys_tests.sh."
+
+
+# ----------------------------------------------------------------------
+# Normal program running
+# ----------------------------------------------------------------------
 
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
@@ -35,6 +70,11 @@ run_send_keypresses:
 	fi; \
 	./send_keypresses.py --input ./opts/input.txt reti_emulator $$(cat ./opts/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
 
+
+# ----------------------------------------------------------------------
+# Tests
+# ----------------------------------------------------------------------
+
 test:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh "$${COLUMNS}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
@@ -47,9 +87,67 @@ test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh --not-passed "$${COLUMNS}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-clean:
+
+# ----------------------------------------------------------------------
+# Firmware build
+# ----------------------------------------------------------------------
+
+firmware: eprom_startprogram/startprogram.reti kernel.bin
+
+eprom: eprom_startprogram/startprogram.reti
+
+kernel: kernel.bin
+
+isrs: interrupt_service_routines/isrs.reti
+
+interrupt_service_routines/isrs.reti: interrupt_service_routines/isrs.picoc
+	cd interrupt_service_routines && picoc_compiler isrs.picoc -O1 -i -w -s -o isrs.reti
+
+eprom_startprogram/startprogram.reti: eprom_startprogram/startprogram.picoc
+	cd eprom_startprogram && picoc_compiler startprogram.picoc -O1 -i -w -s -o startprogram.reti
+
+kernel.reti: interrupt_service_routines/isrs.picoc kernel/kernel.picoc kernel/interrupt_controller.picoc
+	picoc_compiler \
+		interrupt_service_routines/isrs.picoc \
+		kernel/kernel.picoc \
+		kernel/interrupt_controller.picoc \
+		-O1 -i -w -s -g -v \
+		-o kernel.reti
+
+kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
+	reti_emulator -a kernel.reti
+	hexyl kernel.bin
+
+
+# ----------------------------------------------------------------------
+# Firmware bootload and direct kernel run
+# ----------------------------------------------------------------------
+
+run-kernel: kernel.reti
+	reti_emulator kernel.reti -c -d
+
+bootload: firmware
+	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -f /tmp -r 262144 -S kernel.sections -D kernel.debuginfo
+
+
+# ----------------------------------------------------------------------
+# Cleaning
+# ----------------------------------------------------------------------
+
+rebuild-firmware: clean-firmware firmware
+
+clean-firmware:
+	find eprom_startprogram interrupt_service_routines kernel -type f \
+		! -name '*.picoc' \
+		! -name '*.header' \
+		-delete
+	rm -f kernel.reti kernel.bin kernel.sections kernel.debuginfo
+
+clean: clean-firmware
 	find . -type f \
-		! -path './interrupt_service_routines/*.reti' \
+		! -path './eprom_startprogram/*' \
+		! -path './interrupt_service_routines/*' \
+		! -path './kernel/*' \
 		\( -name '*.tokens' \
 		-o -name '*.rtokens' \
 		-o -name '*.dt' \
@@ -83,4 +181,5 @@ clean:
 		-o -name '*.eprom' \
 		-o -name '*.res' \
 		-o -name 'sram.bin' \
+		-o -name 'kernel.bin' \
 		\) -delete

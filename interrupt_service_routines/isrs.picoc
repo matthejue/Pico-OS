@@ -11,7 +11,6 @@ void (*interrupt_vector_table[INTERRUPT_VECTOR_COUNT])(void) = {
     0
 };
 
-__attribute__((section("interrupt_vector_table")))
 __attribute__((naked))
 void send_byte_over_uart_interrupt(void) {
     asm("SUBI SP 5");
@@ -33,7 +32,6 @@ void send_byte_over_uart_interrupt(void) {
     asm("MOVE ACC PC");
 }
 
-__attribute__((section("interrupt_vector_table")))
 __attribute__((naked))
 void send_byte_over_uart_interrupt_return(void) {
     asm("ADDI SP 1");
@@ -46,7 +44,6 @@ void send_byte_over_uart_interrupt_return(void) {
     asm("RTI");
 }
 
-__attribute__((section("interrupt_vector_table")))
 __attribute__((naked))
 void receive_byte_over_uart_interrupt(void) {
     asm("SUBI SP 4");
@@ -65,7 +62,6 @@ void receive_byte_over_uart_interrupt(void) {
     asm("MOVE ACC PC");
 }
 
-__attribute__((section("interrupt_vector_table")))
 __attribute__((naked))
 void receive_byte_over_uart_interrupt_return(void) {
     asm("MOVE IN2 ACC");
@@ -77,7 +73,6 @@ void receive_byte_over_uart_interrupt_return(void) {
     asm("RTI");
 }
 
-__attribute__((section("interrupt_vector_table")))
 void handle_send_byte_over_uart_interrupt(int value) {
     // switch to periphery address space
     asm("STOREIN BAF DS 0");
@@ -97,7 +92,6 @@ void handle_send_byte_over_uart_interrupt(int value) {
     asm("LOADIN BAF DS 0");
 }
 
-__attribute__((section("interrupt_vector_table")))
 int handle_receive_byte_over_uart_interrupt(void) {
     int value;
     // switch to periphery address space
