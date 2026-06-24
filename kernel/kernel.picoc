@@ -40,6 +40,7 @@ void kernel_main_loop(void) {
 }
 
 int main(void) {
+    debug;
     interrupt_controller_initialize();
     kernel_main_loop();
     return 0;

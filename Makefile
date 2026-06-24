@@ -101,10 +101,10 @@ kernel: kernel.bin
 isrs: interrupt_service_routines/isrs.reti
 
 interrupt_service_routines/isrs.reti: interrupt_service_routines/isrs.picoc
-	cd interrupt_service_routines && picoc_compiler isrs.picoc -O1 -i -w -s -o isrs.reti
+	cd interrupt_service_routines && picoc_compiler isrs.picoc -O1 -i -w -s -v -o isrs.reti
 
 eprom_startprogram/startprogram.reti: eprom_startprogram/startprogram.picoc
-	cd eprom_startprogram && picoc_compiler startprogram.picoc -O1 -i -w -s -o startprogram.reti
+	cd eprom_startprogram && picoc_compiler startprogram.picoc -O1 -i -w -s -v -o startprogram.reti
 
 kernel.reti: interrupt_service_routines/isrs.picoc kernel/kernel.picoc kernel/interrupt_controller.picoc
 	picoc_compiler \
@@ -127,7 +127,7 @@ run-kernel: kernel.reti
 	reti_emulator kernel.reti -c -d
 
 bootload: firmware
-	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -f /tmp -r 262144 -S kernel.sections -D kernel.debuginfo
+	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -f /tmp -r 262144 -S kernel.sections -D kernel.debuginfo
 
 
 # ----------------------------------------------------------------------
