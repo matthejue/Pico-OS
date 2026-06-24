@@ -18,13 +18,7 @@ int interrupt_vector_priorities[INTERRUPT_VECTOR_COUNT] = {
 void interrupt_controller_write_register(int register_index, int value) {
     int *interrupt_controller_register = (int *)(PERIPHERY_BASE + register_index);
 
-    // switch to periphery address space
-    asm("STOREIN BAF DS 0");
-    asm("LOADI DS 1048576");
-    asm("MULTI DS 1024");
-
     *interrupt_controller_register = value;
-    asm("LOADIN BAF DS 0");
 }
 
 void interrupt_controller_disable_timer(void) {
@@ -53,7 +47,6 @@ void interrupt_controller_assign_timer(int interrupt_index, int priority) {
 }
 
 void interrupt_controller_initialize(void) {
-    debug;
     int interrupt_index = 0;
     int device;
     int priority;
