@@ -1,13 +1,13 @@
 // in:
 // expected:whatever
-// dependencies: ../lib/malloc/malloc.picoc ../lib/stdio/stdio.picoc ../lib/string/string.picoc
+// dependencies: ../lib/malloc/libmalloc.picoc ../lib/stdio/libstdio.picoc ../lib/string/libstring.picoc
 
 #include "../lib/malloc/malloc.header"
 #include "../lib/stdio/stdio.header"
 #include "../lib/string/string.header"
 
 int main() {
-  init_heap();
+  init_process_heap();
 
   char *heap_str = (char *)malloc(10);
   strcpy(heap_str, "whatever");

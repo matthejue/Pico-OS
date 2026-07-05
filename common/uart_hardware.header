@@ -1,0 +1,4 @@
+#pragma once
+
+void send_byte_over_uart(int value);
+int receive_byte_over_uart(void);

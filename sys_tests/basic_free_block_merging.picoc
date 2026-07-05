@@ -1,12 +1,12 @@
 // in:
 // expected:12 42
-// dependencies: ../lib/malloc/malloc.picoc ../lib/stdio/stdio.picoc
+// dependencies: ../lib/malloc/libmalloc.picoc ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdio/stdio.header"
 #include "../lib/malloc/malloc.header"
 
 int main() {
-    init_heap();
+    init_process_heap();
 
     int *a = (int *)malloc(4);
     int *b = (int *)malloc(4);

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../common/stddef.header"
+
 struct process;
 
 struct wait_queue {

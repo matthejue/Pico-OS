@@ -1,6 +1,6 @@
 // in:42X99 42 X 99
 // expected:42X99 42 X 99
-// dependencies: ../lib/stdio/stdio.picoc
+// dependencies: ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdio/stdio.header"
 

@@ -1,141 +1,61 @@
-#include "../interrupt_service_routines/isrs.header"
-
-#define SRAM_BASE (-2147483647 - 1)
-// Highest SRAM address: 2^18 - 1.
-#define SRAM_LAST_ADDRESS 262143
+#include "memory_constants.header"
+#include "../common/sram_loader.header"
+#include "../common/uart_protocol.header"
 
 __attribute__((naked))
 void _start(void) {
-    asm("LOADI32 SP -2147221505");
-    asm("MOVE SP BAF");
-    asm("LOADI32 ACC boot_main");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-void send_load_command(void) {
-    handle_send_byte_over_uart_interrupt('l');
-    handle_send_byte_over_uart_interrupt('o');
-    handle_send_byte_over_uart_interrupt('a');
-    handle_send_byte_over_uart_interrupt('d');
-    handle_send_byte_over_uart_interrupt(' ');
-    handle_send_byte_over_uart_interrupt('k');
-    handle_send_byte_over_uart_interrupt('e');
-    handle_send_byte_over_uart_interrupt('r');
-    handle_send_byte_over_uart_interrupt('n');
-    handle_send_byte_over_uart_interrupt('e');
-    handle_send_byte_over_uart_interrupt('l');
-    handle_send_byte_over_uart_interrupt('.');
-    handle_send_byte_over_uart_interrupt('b');
-    handle_send_byte_over_uart_interrupt('i');
-    handle_send_byte_over_uart_interrupt('n');
-    handle_send_byte_over_uart_interrupt('\n');
-}
-
-int receive_word(void) {
-    int word;
-    word = handle_receive_byte_over_uart_interrupt();
-    if (word >= 128) {
-        word = word - 256;
-    }
-    word = word * 256 + handle_receive_byte_over_uart_interrupt();
-    word = word * 256 + handle_receive_byte_over_uart_interrupt();
-    word = word * 256 + handle_receive_byte_over_uart_interrupt();
-    return word;
-}
-
-void receive_kernel_words(int word_count) {
-    int word;
-    int addr;
-
-    addr = 0;
-    while (addr < word_count) {
-        word = receive_word();
-        *((int *)(SRAM_BASE + addr)) = word;
-        addr = addr + 1;
-    }
+    asm(EPROM_STACK_START_ASM); // LOADI32 SP eprom_stack_start
+    asm("MOVE SP BAF"); // BAF = eprom_stack_start
+    asm(EPROM_DS_START_ASM); // LOADI32 DS eprom_ds_start
+    asm("ADD DS CS"); // DS = CS + eprom_ds_start
+    asm("LOADI32 ACC boot_main"); // ACC = boot_main in EPROM
+    asm("ADD ACC CS"); // ACC = CS + boot_main
+    asm("MOVE ACC PC"); // JUMP to boot_main in EPROM
 }
 
 __attribute__((naked))
 void start_loaded_kernel(void) {
-    asm("LOADIN BAF ACC 0");
-    asm("LOADIN BAF IN1 -1");
-    asm("LOADIN BAF IN2 -2");
+    // BAF points behind the kernel metadata.
+    asm("LOADIN BAF ACC 0"); // ACC = code_start
+    asm("LOADIN BAF IN1 -1"); // IN1 = data_start
+    asm("LOADIN BAF IN2 -2"); // IN2 = stack_start
 
-    asm("LOADI32 CS -2147483648");
-    asm("MOVE CS DS");
-    asm("MOVE CS SP");
+    asm("LOADI32 CS -2147483648"); // -2^31, SRAM base
+    asm("MOVE CS DS"); // DS = SRAM base
+    asm("MOVE CS SP"); // SP = SRAM base
 
-    asm("ADD CS ACC");
+    asm("ADD CS ACC"); // CS = SRAM base + code_start
 
-    asm("ADD DS IN1");
+    asm("ADD DS IN1"); // DS = SRAM base + data_start
 
-    asm("ADD SP IN2");
-    asm("MOVE SP BAF");
+    asm("ADD SP IN2"); // SP = SRAM base + stack_start
+    asm("MOVE SP BAF"); // BAF = SP
 
-    asm("MOVE CS PC");
+    asm("MOVE CS PC"); // JUMP to CS
 }
 
 void boot_main(void) {
     int code_start;
     int data_start;
     int stack_start;
+    int heap_start;
     int word_count;
     int kernel_word_count;
 
-    send_load_command();
+    uart_send_load_command("kernel.bin");
 
     word_count = receive_word();
     code_start = receive_word();
     data_start = receive_word();
+    heap_start = receive_word();
     stack_start = receive_word();
     if (stack_start == -1) {
-        stack_start = SRAM_LAST_ADDRESS;
+        stack_start = SRAM_MAX_ADDRESS;
     }
 
-    kernel_word_count = word_count - 3;
-    receive_kernel_words(kernel_word_count);
-    asm("LOADI32 ACC start_loaded_kernel");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-void handle_send_byte_over_uart_interrupt(int value) {
-    // switch to periphery address space
-    asm("STOREIN BAF DS 0");
-    asm("LOADI DS 1048576");
-    asm("MULTI DS 1024");
-
-    // UART send procedure, copied from interrupt_service_routines/isrs.picoc.
-    asm("LOADIN BAF ACC 3");
-    asm("ANDI ACC 255");
-    asm("STORE ACC 0");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC -2");
-    asm("STORE ACC 2");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC 1");
-    asm("JUMP== -2");
-    asm("LOADIN BAF DS 0");
-}
-
-int handle_receive_byte_over_uart_interrupt(void) {
-    int value;
-    // switch to periphery address space
-    asm("STOREIN BAF DS 0");
-    asm("LOADI DS 1048576");
-    asm("MULTI DS 1024");
-
-    // UART receive procedure, copied from interrupt_service_routines/isrs.picoc.
-    asm("LOAD ACC 2");
-    asm("ANDI ACC -3");
-    asm("STORE ACC 2");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC 2");
-    asm("JUMP== -2");
-    asm("LOAD ACC 1");
-    asm("ANDI ACC 255");
-    asm("STOREIN BAF ACC 0");
-    asm("LOADIN BAF DS 0");
-    return value;
+    kernel_word_count = word_count - 4;
+    receive_words_to_sram(0, kernel_word_count);
+    asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
+    asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in SRAM
+    asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in SRAM
 }

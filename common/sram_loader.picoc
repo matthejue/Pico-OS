@@ -1,0 +1,14 @@
+#include "sram_loader.header"
+#include "uart_protocol.header"
+#include "../kernel/memory_constants.header"
+
+void receive_words_to_sram(int base_address, int word_count) {
+    int index = 0;
+    int word;
+
+    while (index < word_count) {
+        word = receive_word();
+        *((int *)(SRAM_BASE + base_address + index)) = word;
+        index = index + 1;
+    }
+}
