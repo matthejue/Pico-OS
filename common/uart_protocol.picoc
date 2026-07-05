@@ -1,0 +1,87 @@
+#include "uart_protocol.header"
+#include "uart_hardware.header"
+
+int receive_word(void) {
+    int word;
+
+    word = receive_byte_over_uart();
+    if (word >= 128) {
+        word = word - 256;
+    }
+
+    word = word * 256 + receive_byte_over_uart();
+    word = word * 256 + receive_byte_over_uart();
+    word = word * 256 + receive_byte_over_uart();
+    return word;
+}
+
+int uart_print_character(int value) {
+    send_byte_over_uart(value);
+    return 0;
+}
+
+int uart_append_decimal(char *buffer, int index, int value) {
+    char digits[12];
+    int digit_count = 0;
+    int current = value;
+    int negative = value < 0;
+    int digit;
+
+    if (current == 0) {
+        buffer[index] = '0';
+        return index + 1;
+    }
+
+    if (negative) {
+        buffer[index] = '-';
+        index = index + 1;
+    }
+
+    while (current != 0) {
+        digit = current % 10;
+        if (digit < 0) {
+            digit = -digit;
+        } else if (negative && digit != 0) {
+            digit = 10 - digit;
+        }
+
+        digits[digit_count] = digit + '0';
+        current = current / 10;
+        digit_count = digit_count + 1;
+    }
+
+    while (digit_count != 0) {
+        digit_count = digit_count - 1;
+        buffer[index] = digits[digit_count];
+        index = index + 1;
+    }
+
+    return index;
+}
+
+void uart_print_integer(int value) {
+    char buffer[12];
+    int index = uart_append_decimal(buffer, 0, value);
+
+    buffer[index] = 0;
+    uart_print_string(buffer);
+}
+
+void uart_print_string(char *value) {
+    int index = 0;
+
+    while (value[index] != 0) {
+        uart_print_character(value[index]);
+        index = index + 1;
+    }
+}
+
+void uart_send_load_command(char *path) {
+    uart_print_character('l');
+    uart_print_character('o');
+    uart_print_character('a');
+    uart_print_character('d');
+    uart_print_character(' ');
+    uart_print_string(path);
+    uart_print_character('\n');
+}

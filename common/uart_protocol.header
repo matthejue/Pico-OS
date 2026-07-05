@@ -1,0 +1,8 @@
+#pragma once
+
+int receive_word(void);
+int uart_append_decimal(char *buffer, int index, int value);
+void uart_print_integer(int value);
+int uart_print_character(int value);
+void uart_print_string(char *value);
+void uart_send_load_command(char *path);
