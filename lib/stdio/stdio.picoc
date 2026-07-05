@@ -1,104 +1,11 @@
 #include "stdio.header"
+#include "../../common/stddef.header"
+#include "../../common/uart_protocol.header"
 
-#define false 0
-#define true 1
 #define PRINTF_BUFFER_CAPACITY 10
 
-int has_unread_input = 0;
+int has_unread_input = false;
 int unread_input = 0;
-
-int append_decimal(char *buffer, int index, int value);
-void uart_print_string(char *value);
-int uart_print_character(int value);
-
-void uart_print_integer(int value) {
-    char buffer[12];
-    int index = append_decimal(buffer, 0, value);
-
-    buffer[index] = 0;
-    uart_print_string(buffer);
-    return;
-}
-
-void uart_print_string(char *value) {
-    int index = 0;
-
-    while (value[index] != 0) {
-        uart_print_character(value[index]);
-        index = index + 1;
-    }
-
-    return;
-}
-
-int uart_read_value(void) {
-    int value = 0;
-    asm("INT 1");
-    asm("STOREIN BAF ACC 0");
-    return value;
-}
-
-int uart_print_character(int value) {
-    asm("LOADIN BAF ACC 3");
-    asm("INT 0");
-    return 0;
-}
-
-int append_character(char *buffer, int index, int value) {
-    buffer[index] = value;
-    return index + 1;
-}
-
-int append_string(char *buffer, int index, char *value) {
-    int string_index = 0;
-
-    while (value[string_index] != 0) {
-        buffer[index] = value[string_index];
-        index = index + 1;
-        string_index = string_index + 1;
-    }
-
-    return index;
-}
-
-int append_decimal(char *buffer, int index, int value) {
-    char digits[12];
-    int digit_count = 0;
-    int current = value;
-    int negative = value < 0;
-    int digit;
-
-    if (current == 0) {
-        buffer[index] = '0';
-        return index + 1;
-    }
-
-    if (negative) {
-        buffer[index] = '-';
-        index = index + 1;
-    }
-
-    while (current != 0) {
-        digit = current % 10;
-        if (digit < 0) {
-            digit = -digit;
-        } else if (negative && digit != 0) {
-            digit = 10 - digit;
-        }
-
-        digits[digit_count] = digit + '0';
-        current = current / 10;
-        digit_count = digit_count + 1;
-    }
-
-    while (digit_count != 0) {
-        digit_count = digit_count - 1;
-        buffer[index] = digits[digit_count];
-        index = index + 1;
-    }
-
-   return index;
-}
 
 void flush_printf_buffer(char *buffer, int *buffer_index) {
     if (*buffer_index == 0) {
@@ -121,35 +28,12 @@ int append_character_buffered(char *buffer, int buffer_index, int value) {
 
 int append_decimal_buffered(char *buffer, int buffer_index, int value) {
     char digits[12];
-    int digit_count = 0;
-    int current = value;
-    int negative = value < 0;
-    int digit;
+    int index = 0;
+    int digit_count = uart_append_decimal(digits, 0, value);
 
-    if (current == 0) {
-        return append_character_buffered(buffer, buffer_index, '0');
-    }
-
-    if (negative) {
-        buffer_index = append_character_buffered(buffer, buffer_index, '-');
-    }
-
-    while (current != 0) {
-        digit = current % 10;
-        if (digit < 0) {
-            digit = -digit;
-        } else if (negative && digit != 0) {
-            digit = 10 - digit;
-        }
-
-        digits[digit_count] = digit + '0';
-        current = current / 10;
-        digit_count = digit_count + 1;
-    }
-
-    while (digit_count != 0) {
-        digit_count = digit_count - 1;
-        buffer_index = append_character_buffered(buffer, buffer_index, digits[digit_count]);
+    while (index != digit_count) {
+        buffer_index = append_character_buffered(buffer, buffer_index, digits[index]);
+        index = index + 1;
     }
 
     return buffer_index;
@@ -164,15 +48,15 @@ int is_whitespace(int value) {
 
 int read_input(void) {
     if (has_unread_input) {
-        has_unread_input = 0;
+        has_unread_input = false;
         return unread_input;
     }
 
-    return uart_read_value();
+    return receive_byte_over_uart();
 }
 
 void unread(int value) {
-    has_unread_input = 1;
+    has_unread_input = true;
     unread_input = value;
 }
 
@@ -215,7 +99,7 @@ int read_decimal(int *target) {
 
     while (is_decimal_digit(current)) {
         value = (value * 10) + (current - '0');
-        read_any_digit = 1;
+        read_any_digit = true;
         current = read_input();
     }
 

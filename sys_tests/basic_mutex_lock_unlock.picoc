@@ -1,6 +1,6 @@
 // in:
 // expected:42 84
-// dependencies: ../lib/mutex/mutex.picoc ../lib/unistd/unistd.picoc ../lib/stdio/stdio.picoc
+// dependencies: ../lib/mutex/libmutex.picoc ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdio/stdio.header"
 #include "../lib/mutex/mutex.header"

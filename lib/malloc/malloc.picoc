@@ -1,68 +1,28 @@
+// dependencies: ../../common/heap.picoc
+
 #include "malloc.header"
 
-int heap[HEAP_SIZE];                  // fixed-size heap memory
-struct BlockHeader *block_list = NULL; // head of the block list (free + used)
+void init_process_heap(void) {
+    int heap_start;
+    int heap_size;
 
-// Merge adjacent free blocks
-void merge_free_blocks() {
-    struct BlockHeader *current = block_list;
+    // SYSCALL_PROCESS_HEAP_START
+    asm("LOADI ACC 6");
+    asm("INT 4");
+    asm("STOREIN BAF ACC 0");
 
-    while (current != NULL && current->next != NULL) {
-        if (current->free == 1 && current->next->free == 1) {
-            // Merge them (always contiguous in this model)
-            current->size = current->size + sizeof(struct BlockHeader) + current->next->size;
-            current->next = current->next->next;
-        } else {
-            current = current->next;
-        }
-    }
+    // SYSCALL_PROCESS_HEAP_SIZE
+    asm("LOADI ACC 7");
+    asm("INT 4");
+    asm("STOREIN BAF ACC -1");
+
+    heap_init_at((void *)heap_start, heap_size);
 }
 
-// Initialize heap: one large free block
-void init_heap() {
-    block_list = (struct BlockHeader *)heap;
-    block_list->size = HEAP_SIZE - sizeof(struct BlockHeader);
-    block_list->free = 1;
-    block_list->next = NULL;
-}
-
-// Allocate memory
 void *malloc(int size) {
-    struct BlockHeader *current = block_list;
-
-    while (current != NULL) {
-        if (current->free == 1 && current->size >= size) {
-
-            // Split if there’s enough room for another block
-            if (current->size >= size + sizeof(struct BlockHeader) + 1) {
-                struct BlockHeader *new_block =
-                    (struct BlockHeader *)((int *)(current + 1) + size);
-
-                new_block->size = current->size - size - sizeof(struct BlockHeader);
-                new_block->free = 1;
-                new_block->next = current->next;
-
-                current->size = size;
-                current->next = new_block;
-            }
-
-            current->free = 0;
-            return (void *)(current + 1);
-        }
-
-        current = current->next;
-    }
-
-    return NULL;
+    return heap_alloc(size);
 }
 
-// Free a block and merge neighbors
 void free(void *ptr) {
-    if (ptr == NULL)
-        return;
-
-    struct BlockHeader *header = (struct BlockHeader *)ptr - 1;
-    header->free = 1;
-
-    merge_free_blocks();
+    heap_free(ptr);
 }

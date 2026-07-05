@@ -1,99 +1,39 @@
-#include "isrs.header"
+#include "../common/stddef.header"
+#include "../common/uart_hardware_ivt.header"
+
+#define TEST_INTERRUPT_VECTOR_COUNT 5
 
 void send_byte_over_uart_interrupt(void);
 void receive_byte_over_uart_interrupt(void);
+void timer_interrupt(void);
+void syscall_interrupt(void);
 
 __attribute__((section("ivt")))
-void (*interrupt_vector_table[INTERRUPT_VECTOR_COUNT])(void) = {
+void (*interrupt_vector_table[TEST_INTERRUPT_VECTOR_COUNT])(void) = {
     send_byte_over_uart_interrupt,
     receive_byte_over_uart_interrupt,
+    timer_interrupt,
     0,
-    0
+    syscall_interrupt
 };
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void send_byte_over_uart_interrupt(void) {
-    asm("PUSH IN1");
-    asm("PUSH ACC");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC handle_send_byte_over_uart_interrupt");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-__attribute__((section("ivt")))
-void send_byte_over_uart_interrupt_return(void) {
-    asm("POP ACC");
-    asm("POP ACC");
-    asm("POP IN1");
+void timer_interrupt(void) {
     asm("RTI");
 }
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void receive_byte_over_uart_interrupt(void) {
-    asm("PUSH IN1");
-    asm("PUSH IN2");
-    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC handle_receive_byte_over_uart_interrupt");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-__attribute__((section("ivt")))
-void receive_byte_over_uart_interrupt_return(void) {
-    asm("MOVE IN2 ACC");
-    asm("POP IN2");
-    asm("POP IN1");
+void syscall_interrupt(void) {
+    asm("SUBI ACC 6");
+    asm("JUMP== 5");
+    asm("SUBI ACC 1");
+    asm("JUMP== 7");
+    asm("LOADI ACC 0");
     asm("RTI");
-}
-
-__attribute__((section("ivt")))
-void handle_send_byte_over_uart_interrupt(int value) {
-    // switch to periphery address space
-    asm("STOREIN BAF DS 0");
-    asm("LOADI DS 1048576");
-    asm("MULTI DS 1024");
-
-    // UART send procedure
-    asm("LOADIN BAF ACC 3");
-    asm("ANDI ACC 255");
-    asm("STORE ACC 0");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC -2");
-    asm("STORE ACC 2");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC 1");
-    asm("JUMP== -2");
-    asm("LOADIN BAF DS 0");
-}
-
-__attribute__((section("ivt")))
-int handle_receive_byte_over_uart_interrupt(void) {
-    int value;
-    // switch to periphery address space
-    asm("STOREIN BAF DS 0");
-    asm("LOADI DS 1048576");
-    asm("MULTI DS 1024");
-
-    // UART receive procedure
-    asm("LOAD ACC 2");
-    asm("ANDI ACC -3");
-    asm("STORE ACC 2");
-    asm("LOAD ACC 2");
-    asm("ANDI ACC 2");
-    asm("JUMP== -2");
-    asm("LOAD ACC 1");
-    asm("ANDI ACC 255");
-    asm("LOADIN BAF DS 0");
-    asm("STOREIN BAF ACC 0");
-    return value;
+    asm("LOADI32 ACC -2147450880");
+    asm("RTI");
+    asm("LOADI ACC 16000");
+    asm("RTI");
 }
