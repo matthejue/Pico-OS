@@ -2,6 +2,8 @@
 
 #include "malloc.header"
 
+struct Heap process_heap;
+
 void init_process_heap(void) {
     int heap_start;
     int heap_size;
@@ -16,13 +18,13 @@ void init_process_heap(void) {
     asm("INT 4");
     asm("STOREIN BAF ACC -1");
 
-    heap_init_at((void *)heap_start, heap_size);
+    heap_init_region(&process_heap, (void *)heap_start, heap_size);
 }
 
 void *malloc(int size) {
-    return heap_alloc(size);
+    return heap_alloc_from(&process_heap, size);
 }
 
 void free(void *ptr) {
-    heap_free(ptr);
+    heap_free_from(&process_heap, ptr);
 }

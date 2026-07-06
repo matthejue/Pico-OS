@@ -1,0 +1,37 @@
+// dependencies: ../common/heap.picoc
+
+#include "pmalloc.header"
+#include "kernel.header"
+#include "memory_constants.header"
+#include "../common/heap.header"
+
+struct Heap process_memory_heap;
+
+void init_pmalloc(void) {
+    int first_process_address = PROCESS_MEMORY_START;
+    int last_sram_address = SRAM_MAX_ADDRESS_IN_MEMORY_MAP;
+
+    heap_init_region(
+        &process_memory_heap,
+        (void *)first_process_address,
+        last_sram_address - first_process_address + 1
+    );
+}
+
+int pmalloc(int size) {
+    void *memory = heap_alloc_from(&process_memory_heap, size);
+
+    if (memory == NULL) {
+        return PMALLOC_INVALID_START;
+    }
+
+    return (int)memory - SRAM_BASE;
+}
+
+void pfree(int start) {
+    if (start == PMALLOC_INVALID_START) {
+        return;
+    }
+
+    heap_free_from(&process_memory_heap, (void *)(SRAM_BASE + start));
+}

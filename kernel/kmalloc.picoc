@@ -1,0 +1,21 @@
+// dependencies: ../common/heap.picoc
+
+#include "kmalloc.header"
+#include "kernel.header"
+#include "memory_constants.header"
+
+struct Heap kernel_heap;
+
+void init_kernel_heap(void) {
+    int heap_start = KERNEL_HEAP_START;
+
+    heap_init_region(&kernel_heap, (void *)heap_start, DEFAULT_KERNEL_HEAP_CELLS);
+}
+
+void *kmalloc(int size) {
+    return heap_alloc_from(&kernel_heap, size);
+}
+
+void kfree(void *ptr) {
+    heap_free_from(&kernel_heap, ptr);
+}
