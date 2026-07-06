@@ -1,0 +1,7 @@
+#pragma once
+
+#define PMALLOC_INVALID_START -1
+
+void init_pmalloc(void);
+int pmalloc(int size);
+void pfree(int start);

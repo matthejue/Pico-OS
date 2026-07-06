@@ -1,0 +1,9 @@
+#pragma once
+
+#include "../common/heap.header"
+
+#define DEFAULT_KERNEL_HEAP_CELLS 1000
+
+void init_kernel_heap(void);
+void *kmalloc(int size);
+void kfree(void *ptr);

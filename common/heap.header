@@ -1,0 +1,17 @@
+#pragma once
+
+#include "stddef.header"
+
+struct BlockHeader {
+    int size;
+    int free;
+    struct BlockHeader *next;
+};
+
+struct Heap {
+    struct BlockHeader *first_block;
+};
+
+void heap_init_region(struct Heap *heap, void *start, int cell_count);
+void *heap_alloc_from(struct Heap *heap, int size);
+void heap_free_from(struct Heap *heap, void *ptr);
