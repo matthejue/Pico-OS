@@ -1,0 +1,82 @@
+#include "heap.header"
+
+void heap_merge_free_blocks(struct Heap *heap) {
+    struct BlockHeader *current;
+
+    if (heap == NULL) {
+        return;
+    }
+
+    current = heap->first_block;
+
+    while (current != NULL && current->next != NULL) {
+        if (current->free == true && current->next->free == true) {
+            current->size = current->size + sizeof(struct BlockHeader) + current->next->size;
+            current->next = current->next->next;
+        } else {
+            current = current->next;
+        }
+    }
+}
+
+void heap_init_region(struct Heap *heap, void *start, int cell_count) {
+    if (heap == NULL) {
+        return;
+    }
+
+    if (start == NULL || cell_count <= sizeof(struct BlockHeader)) {
+        heap->first_block = NULL;
+        return;
+    }
+
+    heap->first_block = (struct BlockHeader *)start;
+    heap->first_block->size = cell_count - sizeof(struct BlockHeader);
+    heap->first_block->free = true;
+    heap->first_block->next = NULL;
+}
+
+void *heap_alloc_from(struct Heap *heap, int size) {
+    struct BlockHeader *current;
+    struct BlockHeader *new_block;
+
+    if (heap == NULL) {
+        return NULL;
+    }
+
+    current = heap->first_block;
+
+    while (current != NULL) {
+        if (current->free == true && current->size >= size) {
+            if (current->size >= size + sizeof(struct BlockHeader) + 1) {
+                new_block = (struct BlockHeader *)((int *)(current + 1) + size);
+
+                new_block->size = current->size - size - sizeof(struct BlockHeader);
+                new_block->free = true;
+                new_block->next = current->next;
+
+                current->size = size;
+                current->next = new_block;
+            }
+
+            current->free = false;
+            return (void *)(current + 1);
+        }
+
+        current = current->next;
+    }
+
+    return NULL;
+}
+
+void heap_free_from(struct Heap *heap, void *ptr) {
+    struct BlockHeader *header;
+
+    if (heap == NULL || ptr == NULL) {
+        return;
+    }
+
+    header = (struct BlockHeader *)ptr - 1;
+    header->free = true;
+
+    heap_merge_free_blocks(heap);
+}
