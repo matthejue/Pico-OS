@@ -1,5 +1,32 @@
 #include "heap.header"
 
+void heap_copy_cells(void *destination, void *source, int count) {
+    int *destination_cells = (int *)destination;
+    int *source_cells = (int *)source;
+    int index = 0;
+
+    while (index < count) {
+        destination_cells[index] = source_cells[index];
+        index = index + 1;
+    }
+}
+
+void heap_split_block(struct BlockHeader *block, int size) {
+    struct BlockHeader *new_block;
+
+    // Keep the requested part and turn the remaining cells into a free block.
+    if (block->size >= size + sizeof(struct BlockHeader) + 1) {
+        new_block = (struct BlockHeader *)((int *)(block + 1) + size);
+
+        new_block->size = block->size - size - sizeof(struct BlockHeader);
+        new_block->free = true;
+        new_block->next = block->next;
+
+        block->size = size;
+        block->next = new_block;
+    }
+}
+
 void heap_merge_free_blocks(struct Heap *heap) {
     struct BlockHeader *current;
 
@@ -37,9 +64,8 @@ void heap_init_region(struct Heap *heap, void *start, int cell_count) {
 
 void *heap_alloc_from(struct Heap *heap, int size) {
     struct BlockHeader *current;
-    struct BlockHeader *new_block;
 
-    if (heap == NULL) {
+    if (heap == NULL || size <= 0) {
         return NULL;
     }
 
@@ -47,17 +73,7 @@ void *heap_alloc_from(struct Heap *heap, int size) {
 
     while (current != NULL) {
         if (current->free == true && current->size >= size) {
-            if (current->size >= size + sizeof(struct BlockHeader) + 1) {
-                new_block = (struct BlockHeader *)((int *)(current + 1) + size);
-
-                new_block->size = current->size - size - sizeof(struct BlockHeader);
-                new_block->free = true;
-                new_block->next = current->next;
-
-                current->size = size;
-                current->next = new_block;
-            }
-
+            heap_split_block(current, size);
             current->free = false;
             return (void *)(current + 1);
         }
@@ -66,6 +82,65 @@ void *heap_alloc_from(struct Heap *heap, int size) {
     }
 
     return NULL;
+}
+
+void *heap_realloc_from(struct Heap *heap, void *ptr, int size) {
+    struct BlockHeader *header;
+    void *new_ptr;
+    int copy_size;
+
+    if (heap == NULL) {
+        return NULL;
+    }
+
+    // realloc(ptr, 0) frees the block.
+    if (size <= 0) {
+        heap_free_from(heap, ptr);
+        return NULL;
+    }
+
+    // realloc(NULL, size) behaves like malloc(size).
+    if (ptr == NULL) {
+        return heap_alloc_from(heap, size);
+    }
+
+    header = (struct BlockHeader *)ptr - 1;
+
+    // Shrink in place and release any useful tail space.
+    if (header->size >= size) {
+        heap_split_block(header, size);
+        heap_merge_free_blocks(heap);
+        return ptr;
+    }
+
+    // Grow in place when the following block is free and large enough.
+    if (header->next != NULL && header->next->free == true) {
+        if (header->size + sizeof(struct BlockHeader) + header->next->size >= size) {
+            header->size = header->size + sizeof(struct BlockHeader) + header->next->size;
+            header->next = header->next->next;
+
+            heap_split_block(header, size);
+            return ptr;
+        }
+    }
+
+    // Fallback: allocate a new block, copy the old cells, then free the old block.
+    new_ptr = heap_alloc_from(heap, size);
+
+    if (new_ptr == NULL) {
+        return NULL;
+    }
+
+    // Copy only the overlap between the old block and the new requested size.
+    copy_size = header->size;
+    if (size < copy_size) {
+        copy_size = size;
+    }
+
+    heap_copy_cells(new_ptr, ptr, copy_size);
+    heap_free_from(heap, ptr);
+
+    return new_ptr;
 }
 
 void heap_free_from(struct Heap *heap, void *ptr) {

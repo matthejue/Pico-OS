@@ -25,6 +25,10 @@ void *malloc(int size) {
     return heap_alloc_from(&process_heap, size);
 }
 
+void *realloc(void *ptr, int size) {
+    return heap_realloc_from(&process_heap, ptr, size);
+}
+
 void free(void *ptr) {
     heap_free_from(&process_heap, ptr);
 }

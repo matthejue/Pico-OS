@@ -4,4 +4,5 @@
 
 void init_pmalloc(void);
 int pmalloc(int size);
+int prealloc(int start, int size);
 void pfree(int start);
