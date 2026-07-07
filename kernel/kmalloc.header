@@ -6,4 +6,5 @@
 
 void init_kernel_heap(void);
 void *kmalloc(int size);
+void *krealloc(void *ptr, int size);
 void kfree(void *ptr);
