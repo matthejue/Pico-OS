@@ -1,0 +1,94 @@
+#include "dispatcher.header"
+#include "process.header"
+#include "scheduler.header"
+
+void dispatcher_save_current(
+    int saved_sp,
+    int saved_ds,
+    int saved_cs,
+    int saved_baf,
+    int saved_in2,
+    int saved_in1,
+    int saved_acc
+) {
+    if (process_current() == NULL) {
+        return;
+    }
+
+    process_current()->activation.sp = saved_sp;
+    process_current()->activation.ds = saved_ds;
+    process_current()->activation.cs = saved_cs;
+    process_current()->activation.baf = saved_baf;
+    process_current()->activation.in2 = saved_in2;
+    process_current()->activation.in1 = saved_in1;
+    process_current()->activation.acc = saved_acc;
+
+    if (process_current()->state == PROCESS_STATE_RUNNING) {
+        process_current()->state = PROCESS_STATE_READY;
+    }
+}
+
+struct Process *dispatcher_tick(
+    int saved_sp,
+    int saved_ds,
+    int saved_cs,
+    int saved_baf,
+    int saved_in2,
+    int saved_in1,
+    int saved_acc
+) {
+    struct Process *next_process;
+
+    dispatcher_save_current(
+        saved_sp,
+        saved_ds,
+        saved_cs,
+        saved_baf,
+        saved_in2,
+        saved_in1,
+        saved_acc
+    );
+
+    next_process = scheduler_next_process();
+    if (next_process == NULL) {
+        return process_current();
+    }
+
+    process_set_current(next_process);
+    process_current()->state = PROCESS_STATE_RUNNING;
+    return process_current();
+}
+
+__attribute__((naked))
+void dispatcher_jump_to_process(struct Process *process) {
+    asm("LOADIN SP BAF 2");
+    asm("LOADIN BAF SP 14");
+    asm("LOADIN BAF CS 16");
+    asm("LOADIN BAF DS 17");
+    asm("LOADIN BAF IN1 11");
+    asm("LOADIN BAF IN2 12");
+    asm("LOADIN BAF ACC 13");
+    asm("LOADIN BAF BAF 15");
+    asm("RTI");
+}
+
+void dispatcher_switch_to_process(struct Process *process) {
+    if (process_current() != NULL && process_current()->state == PROCESS_STATE_RUNNING) {
+        process_current()->state = PROCESS_STATE_READY;
+    }
+
+    process_set_current(process);
+    process_current()->state = PROCESS_STATE_RUNNING;
+
+    dispatcher_jump_to_process(process_current());
+}
+
+void dispatcher_start_next_process(void) {
+    struct Process *next_process = scheduler_next_process();
+
+    if (next_process == NULL) {
+        return;
+    }
+
+    dispatcher_switch_to_process(next_process);
+}
