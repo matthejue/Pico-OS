@@ -1,24 +1,19 @@
 __attribute__((naked))
 __attribute__((section("ivt")))
 void send_byte_over_uart_interrupt(void) {
-    // Save caller scratch regs and call the shared UART send routine.
     asm("PUSH IN1");
-    asm("PUSH ACC");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC send_byte_over_uart");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-__attribute__((section("ivt")))
-void send_byte_over_uart_interrupt_return(void) {
-    // Restore caller regs after UART send completes.
-    asm("POP ACC");
-    asm("POP ACC");
+    asm("PUSH DS");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+    asm("ANDI ACC 255");
+    asm("STORE ACC 0");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -2");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 1");
+    asm("JUMP== -2");
+    asm("POP DS");
     asm("POP IN1");
     asm("RTI");
 }
@@ -26,23 +21,19 @@ void send_byte_over_uart_interrupt_return(void) {
 __attribute__((naked))
 __attribute__((section("ivt")))
 void receive_byte_over_uart_interrupt(void) {
-    // Save caller scratch regs and call the shared UART receive routine.
     asm("PUSH IN1");
-    asm("PUSH IN2");
-    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC receive_byte_over_uart");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-__attribute__((section("ivt")))
-void receive_byte_over_uart_interrupt_return(void) {
-    // Return received byte in ACC, then restore caller regs.
-    asm("MOVE IN2 ACC");
-    asm("POP IN2");
+    asm("PUSH DS");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC -3");
+    asm("STORE ACC 2");
+    asm("LOAD ACC 2");
+    asm("ANDI ACC 2");
+    asm("JUMP== -2");
+    asm("LOAD ACC 1");
+    asm("ANDI ACC 255");
+    asm("POP DS");
     asm("POP IN1");
     asm("RTI");
 }
