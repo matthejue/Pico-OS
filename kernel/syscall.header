@@ -1,0 +1,5 @@
+#pragma once
+
+#include "../system/syscall.header"
+
+int kernel_syscall_handle(int syscall_number, int argument);

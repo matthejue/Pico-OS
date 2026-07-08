@@ -1,0 +1,33 @@
+#pragma once
+
+#define SYSCALL_SHUTDOWN 1
+#define SYSCALL_LOAD_PROCESS 2
+#define SYSCALL_RUN_PROCESS 3
+#define SYSCALL_LIST_PROCESSES 4
+#define SYSCALL_UNLOAD_PROCESS 5
+#define SYSCALL_PROCESS_HEAP_START 6
+#define SYSCALL_PROCESS_HEAP_SIZE 7
+#define SYSCALL_RUN_PROCESS_WITH_ARGUMENTS 8
+#define SYSCALL_EXIT 9
+#define SYSCALL_WAIT_PROCESS 10
+
+struct RunProcessRequest {
+    int pid;
+    char *arguments;
+};
+
+struct WaitProcessRequest {
+    int pid;
+    int *status;
+};
+
+int syscall_load_process(char *path);
+int syscall_run_process(int pid);
+int syscall_run_process_with_arguments(int pid, char *arguments);
+void syscall_list_processes(void);
+int syscall_unload_process(int pid);
+int syscall_process_heap_start(void);
+int syscall_process_heap_size(void);
+int syscall_exit(int status);
+int syscall_wait_process(int pid, int *status);
+void syscall_shutdown(void);
