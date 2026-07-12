@@ -1,0 +1,91 @@
+#include "process_loader.header"
+#include "process.header"
+#include "memory_constants.header"
+#include "pmalloc.header"
+#include "../common/uart_protocol.header"
+#include "../common/sram_loader.header"
+
+int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
+    if (stack_start == -1) {
+        return heap_start + heap_size + DEFAULT_PROCESS_STACK_CELLS;
+    }
+
+    if (stack_start < heap_start + heap_size) {
+        return PMALLOC_INVALID_START;
+    }
+
+    return stack_start;
+}
+
+void drain_process_words(int payload_word_count) {
+    int index = 0;
+
+    while (index < payload_word_count) {
+        receive_word();
+        index = index + 1;
+    }
+}
+
+int kernel_load_process(char *path) {
+    int word_count;
+    int code_start;
+    int data_start;
+    int heap_start;
+    int heap_size;
+    int stack_start;
+    int effective_stack_start;
+    int payload_word_count;
+    int process_size;
+    int base_address;
+    struct Process *process;
+
+    uart_send_load_command(path);
+
+    word_count = receive_word();
+    code_start = receive_word();
+    data_start = receive_word();
+    heap_start = receive_word();
+    stack_start = receive_word();
+    heap_size = DEFAULT_PROCESS_HEAP_CELLS;
+
+    payload_word_count = word_count - 4;
+    effective_stack_start = loaded_process_stack_start(
+        heap_start,
+        heap_size,
+        stack_start
+    );
+    if (effective_stack_start == PMALLOC_INVALID_START) {
+        drain_process_words(payload_word_count);
+        uart_print_string("error: invalid process stack start\n");
+        return 0;
+    }
+    process_size = effective_stack_start + 1;
+    base_address = pmalloc(process_size);
+
+    if (base_address == PMALLOC_INVALID_START) {
+        drain_process_words(payload_word_count);
+        uart_print_string("error: not enough process memory\n");
+        return 0;
+    }
+
+    receive_words_to_sram(base_address, payload_word_count);
+    process = process_create(
+        base_address,
+        process_size,
+        code_start,
+        data_start,
+        heap_start,
+        heap_size,
+        effective_stack_start,
+        word_count,
+        path
+    );
+
+    if (process == NULL) {
+        pfree(base_address);
+        uart_print_string("error: could not create process\n");
+        return 0;
+    }
+
+    return process->pid;
+}

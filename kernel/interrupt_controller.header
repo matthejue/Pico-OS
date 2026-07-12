@@ -1,17 +1,20 @@
 #pragma once
 
-#define INTERRUPT_DEVICE_NONE 0
+#include "periphery.header"
+
+#define INTERRUPT_DEVICE_COUNT 2
+#define INTERRUPT_DEVICE_INTTIMER 0
 #define INTERRUPT_DEVICE_KEYPRESS 1
-#define INTERRUPT_DEVICE_INTTIMER 2
 
 #define INTERRUPT_CONTROLLER_DISABLED 255
 #define INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER 3
 #define INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER 4
 #define INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER 5
 #define INTERRUPT_CONTROLLER_CUSTOM_DEVICE_PRIORITY_REGISTER 6
+#define INTERRUPT_CONTROLLER_TIMER_INTERVAL_REGISTER 7
+#define INTERRUPT_CONTROLLER_TIMER_INTERVAL 1000
 
-void interrupt_controller_disable_timer(void);
-void interrupt_controller_disable_custom(void);
-void interrupt_controller_assign_timer(int interrupt_index, int priority);
-void interrupt_controller_assign_custom(int interrupt_index, int priority);
+void interrupt_controller_disable_device(int device);
+void interrupt_controller_assign_device(int device, int interrupt_index, int priority);
+void interrupt_controller_activate_timer(void);
 void interrupt_controller_initialize(void);

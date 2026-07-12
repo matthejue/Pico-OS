@@ -1,5 +1,4 @@
 #include "syscall.header"
-#include "kernel.header"
 #include "memory_constants.header"
 #include "process.header"
 #include "process_arguments.header"
@@ -7,6 +6,10 @@
 #include "pmalloc.header"
 #include "dispatcher.header"
 #include "../common/uart_protocol.header"
+
+void kernel_shutdown(void) {
+    asm("JUMP 0");
+}
 
 void kernel_syscall_list_processes(void) {
     struct Process *process = process_first();
@@ -43,31 +46,15 @@ int kernel_syscall_process_heap_size(void) {
 }
 
 void kernel_syscall_exit(int status) {
-    process_terminate(process_current(), status);
+    process_terminate(process_current());
     dispatcher_start_next_process();
+    // Reached if the dispatcher returns because no runnable process remains.
+    // Normally impossible because init stays runnable in an infinite loop.
     kernel_shutdown();
 }
 
-int kernel_syscall_wait_process(struct WaitProcessRequest *request) {
-    struct Process *process;
-
-    if (request == NULL) {
-        return -1;
-    }
-
-    process = process_find_by_pid(request->pid);
-    if (process == NULL) {
-        return -1;
-    }
-
-    if (process->state != PROCESS_STATE_TERMINATED) {
-        return 0;
-    }
-
-    if (request->status != NULL) {
-        *(request->status) = process->exit_status;
-    }
-    return 1;
+int kernel_syscall_wait_process(int pid) {
+    return process_wait_for_pid(pid);
 }
 
 int kernel_syscall_handle(int syscall_number, int argument) {
@@ -93,7 +80,7 @@ int kernel_syscall_handle(int syscall_number, int argument) {
         kernel_syscall_exit(argument);
         return 1;
     } else if (syscall_number == SYSCALL_WAIT_PROCESS) {
-        return kernel_syscall_wait_process((struct WaitProcessRequest *)argument);
+        return kernel_syscall_wait_process(argument);
     }
 
     return 0;

@@ -1,0 +1,15 @@
+#include "periphery.header"
+
+#define PERIPHERY_BASE 1073741824
+
+int periphery_read_register(int register_index) {
+    int *periphery_register = (int *)(PERIPHERY_BASE + register_index);
+
+    return *periphery_register;
+}
+
+void periphery_write_register(int register_index, int value) {
+    int *periphery_register = (int *)(PERIPHERY_BASE + register_index);
+
+    *periphery_register = value;
+}

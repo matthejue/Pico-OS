@@ -1,0 +1,165 @@
+#include "process_arguments.header"
+#include "memory_constants.header"
+#include "../common/stddef.header"
+
+int process_argument_is_space(int value) {
+    return value == ' ' || value == '\t';
+}
+
+int process_argument_count(char *arguments) {
+    // Current position in the input argument string.
+    int index = 0;
+    // Number of whitespace-separated arguments found so far.
+    int count = 0;
+
+    if (arguments == NULL) {
+        return 0;
+    }
+
+    while (arguments[index] != 0) {
+        // Ignore separators before the next argument.
+        while (process_argument_is_space(arguments[index])) {
+            index = index + 1;
+        }
+
+        if (arguments[index] != 0) {
+            count = count + 1;
+        }
+
+        while (arguments[index] != 0 &&
+               !process_argument_is_space(arguments[index])) {
+            // Move past the current argument before looking for the next one.
+            index = index + 1;
+        }
+    }
+
+    return count;
+}
+
+int process_argument_character_cells(char *arguments) {
+    // Current position in the input argument string.
+    int index = 0;
+    // Number of cells needed for the separated argument strings.
+    int cells = 0;
+
+    if (arguments == NULL) {
+        return 0;
+    }
+
+    while (arguments[index] != 0) {
+        // Ignore separators before the next argument.
+        while (process_argument_is_space(arguments[index])) {
+            index = index + 1;
+        }
+
+        if (arguments[index] != 0) {
+            // Count the characters that will be copied into this argument.
+            while (arguments[index] != 0 &&
+                   !process_argument_is_space(arguments[index])) {
+                cells = cells + 1;
+                index = index + 1;
+            }
+            // Each copied argument needs a trailing '\0' character.
+            cells = cells + 1;
+        }
+    }
+
+    return cells;
+}
+
+int process_store_arguments(struct Process *process, char *arguments) {
+    // Number of whitespace-separated arguments.
+    int argc;
+    // Cells for argc, argv, argv's NULL entry, and all argument strings.
+    int required_cells;
+    // Process-relative offset where the argument data will begin.
+    int argument_base_offset;
+    int argument_base;
+    int argv;
+    // Next cell where a copied argument character will be stored.
+    int string_target;
+    // Index of the next argv entry to point at a copied argument string.
+    int argument_index = 0;
+    // Current position in the original argument string.
+    int source_index = 0;
+
+    argc = process_argument_count(arguments);
+    // Layout: [argc][argv][argv entries ...][NULL][argument strings ...]
+    required_cells = 2 + argc + 1 + process_argument_character_cells(arguments);
+    argument_base_offset = process->size - required_cells;
+
+    // Leave two cells below the arguments for the initial stack setup.
+    if (argument_base_offset - 2 < process->heap_start + process->heap_size) {
+        return 0;
+    }
+
+    // [argc][argv pointer][argv[0] ... argv[argc - 1]][NULL][argument strings ...]
+    // ^ argument_base     ^ argv                            ^ string_target
+    argument_base = SRAM_BASE + process->base_address + argument_base_offset;
+    argv = argument_base + 2;
+    string_target = argv + argc + 1;
+
+    *((int *)argument_base) = argc;
+    *((int *)(argument_base + 1)) = argv;
+    *((int *)(argv + argc)) = NULL;
+
+    while (arguments != NULL && arguments[source_index] != 0) {
+        // Ignore separators before the next argument.
+        while (process_argument_is_space(arguments[source_index])) {
+            source_index = source_index + 1;
+        }
+
+        if (arguments[source_index] != 0) {
+            // argv points to the separately stored copy of this argument.
+            *((int *)(argv + argument_index)) = string_target;
+            argument_index = argument_index + 1;
+
+            // Copy one whitespace-separated argument into process memory.
+            while (arguments[source_index] != 0 &&
+                   !process_argument_is_space(arguments[source_index])) {
+                *((char *)string_target) = arguments[source_index];
+                string_target = string_target + 1;
+                source_index = source_index + 1;
+            }
+
+            // Terminate the copied argument as a C string.
+            *((char *)string_target) = 0;
+            string_target = string_target + 1;
+        }
+    }
+
+    // The dispatcher restores these to enter the process with its arguments.
+    process->activation.baf = argument_base;
+    process->activation.sp = argument_base - 1;
+    return 1;
+}
+
+int process_mark_ready_with_arguments(struct RunProcessRequest *request) {
+    struct Process *process;
+
+    // The syscall may be invoked without a request structure.
+    if (request == NULL) {
+        return 0;
+    }
+
+    // Only an existing process that is not waiting for another process can run.
+    process = process_find_by_pid(request->pid);
+    if (process == NULL ||
+        process->state == PROCESS_STATE_BLOCKED) {
+        return 0;
+    }
+
+    // Arguments must be placed on the process stack before its first start.
+    // Do not replace them when an already-ready or running process is requested again.
+    if (process->state == PROCESS_STATE_NEW) {
+        // Keep the process NEW if its initial argument stack cannot be created.
+        if (!process_store_arguments(process, request->arguments)) {
+            return 0;
+        }
+
+        // This makes the process eligible for scheduling.
+        process->state = PROCESS_STATE_READY;
+    }
+
+    return 1;
+}

@@ -1,0 +1,53 @@
+#pragma once
+
+#include "../common/stddef.header"
+
+#define PROCESS_STATE_NEW 0
+#define PROCESS_STATE_READY 1
+#define PROCESS_STATE_RUNNING 2
+#define PROCESS_STATE_BLOCKED 3
+
+struct ActivationRecord {
+    int in1;
+    int in2;
+    int acc;
+    int sp;
+    int baf;
+    int cs;
+    int ds;
+};
+
+struct Process {
+    int pid;
+    int state;
+    int base_address;
+    int size;
+    int heap_start;
+    int heap_size;
+    int word_count;
+    char *binary_path;
+    struct ActivationRecord activation;
+    int waiting_for_pid;
+    struct Process *next;
+};
+
+void process_table_initialize(void);
+struct Process *process_create(
+    int base_address,
+    int size,
+    int code_start,
+    int data_start,
+    int heap_start,
+    int heap_size,
+    int stack_start,
+    int word_count,
+    char *binary_path
+);
+int process_mark_ready_by_pid(int pid);
+void process_terminate(struct Process *process);
+int process_unload_by_pid(int pid);
+int process_wait_for_pid(int pid);
+struct Process *process_first(void);
+struct Process *process_current(void);
+struct Process *process_find_by_pid(int pid);
+void process_set_current(struct Process *process);

@@ -1,7 +1,6 @@
 // dependencies: ../common/heap.picoc
 
 #include "kmalloc.header"
-#include "kernel.header"
 #include "memory_constants.header"
 
 struct Heap kernel_heap;

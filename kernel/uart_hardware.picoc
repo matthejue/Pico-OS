@@ -1,5 +1,3 @@
-#include "uart_hardware.header"
-
 static inline void switch_to_periphery_address_space(void) {
     asm("STOREIN BAF DS 0"); // save DS before switching address spaces
     asm("LOADI DS 1048576"); // 2^20
@@ -7,10 +5,8 @@ static inline void switch_to_periphery_address_space(void) {
 }
 
 void send_byte_over_uart(int value) {
-    // switch to periphery address space
     switch_to_periphery_address_space();
 
-    // UART send procedure
     asm("LOADIN BAF ACC 3");
     asm("ANDI ACC 255");
     asm("STORE ACC 0");
@@ -26,10 +22,8 @@ void send_byte_over_uart(int value) {
 int receive_byte_over_uart(void) {
     int value;
 
-    // switch to periphery address space
     switch_to_periphery_address_space();
 
-    // UART receive procedure
     asm("LOAD ACC 2");
     asm("ANDI ACC -3");
     asm("STORE ACC 2");

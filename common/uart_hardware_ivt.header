@@ -1,7 +1,0 @@
-#pragma once
-
-__attribute__((section("ivt")))
-void send_byte_over_uart(int value);
-
-__attribute__((section("ivt")))
-int receive_byte_over_uart(void);
