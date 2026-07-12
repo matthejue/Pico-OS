@@ -1,81 +1,64 @@
 #include "interrupt_controller.header"
-#include "../interrupt_service_routines/isrs.header"
 
-int interrupt_vector_devices[INTERRUPT_VECTOR_COUNT] = {
-    INTERRUPT_DEVICE_NONE,
-    INTERRUPT_DEVICE_KEYPRESS,
-    INTERRUPT_DEVICE_NONE,
-    INTERRUPT_DEVICE_NONE
+int interrupt_device_isrs[INTERRUPT_DEVICE_COUNT] = {
+    2,
+    1
 };
 
-int interrupt_vector_priorities[INTERRUPT_VECTOR_COUNT] = {
-    0,
+int interrupt_device_priorities[INTERRUPT_DEVICE_COUNT] = {
     1,
-    0,
-    0
+    2
 };
 
-void interrupt_controller_write_register(int register_index, int value) {
-    int *interrupt_controller_register = (int *)(PERIPHERY_BASE + register_index);
-
-    *interrupt_controller_register = value;
+int interrupt_controller_device_to_isr_register(int device) {
+    return INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER + device;
 }
 
-void interrupt_controller_disable_timer(void) {
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER,
+int interrupt_controller_device_to_priority_register(int device) {
+    return INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER + device;
+}
+
+void interrupt_controller_disable_device(int device) {
+    periphery_write_register(
+        interrupt_controller_device_to_isr_register(device),
         INTERRUPT_CONTROLLER_DISABLED
     );
-}
-
-void interrupt_controller_disable_custom(void) {
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER,
-        INTERRUPT_CONTROLLER_DISABLED
+    periphery_write_register(
+        interrupt_controller_device_to_priority_register(device),
+        0
     );
 }
 
-void interrupt_controller_assign_timer(int interrupt_index, int priority) {
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_TIMER_DEVICE_TO_ISR_REGISTER,
-        interrupt_index
-    );
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_TIMER_DEVICE_PRIORITY_REGISTER,
-        priority
+void interrupt_controller_activate_timer(void) {
+    periphery_write_register(
+        INTERRUPT_CONTROLLER_TIMER_INTERVAL_REGISTER,
+        INTERRUPT_CONTROLLER_TIMER_INTERVAL
     );
 }
 
 void interrupt_controller_initialize(void) {
-    int interrupt_index = 0;
-    int device;
+    int device = 0;
+    int interrupt_index;
     int priority;
 
-    interrupt_controller_disable_timer();
-    interrupt_controller_disable_custom();
+    while (device < INTERRUPT_DEVICE_COUNT) {
+        interrupt_controller_disable_device(device);
+        interrupt_index = interrupt_device_isrs[device];
+        priority = interrupt_device_priorities[device];
 
-    while (interrupt_index < INTERRUPT_VECTOR_COUNT) {
-        device = interrupt_vector_devices[interrupt_index];
-        priority = interrupt_vector_priorities[interrupt_index];
+        interrupt_controller_assign_device(device, interrupt_index, priority);
 
-        if (device == INTERRUPT_DEVICE_INTTIMER) {
-            interrupt_controller_assign_timer(interrupt_index, priority);
-        } else if (device == INTERRUPT_DEVICE_KEYPRESS) {
-            interrupt_controller_assign_custom(interrupt_index, priority);
-        }
-
-        interrupt_index = interrupt_index + 1;
+        device = device + 1;
     }
-    debug;
 }
 
-void interrupt_controller_assign_custom(int interrupt_index, int priority) {
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_TO_ISR_REGISTER,
+void interrupt_controller_assign_device(int device, int interrupt_index, int priority) {
+    periphery_write_register(
+        interrupt_controller_device_to_isr_register(device),
         interrupt_index
     );
-    interrupt_controller_write_register(
-        INTERRUPT_CONTROLLER_CUSTOM_DEVICE_PRIORITY_REGISTER,
+    periphery_write_register(
+        interrupt_controller_device_to_priority_register(device),
         priority
     );
 }

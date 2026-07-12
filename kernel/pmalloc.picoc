@@ -1,13 +1,12 @@
 // dependencies: ../common/heap.picoc
 
 #include "pmalloc.header"
-#include "kernel.header"
 #include "memory_constants.header"
 #include "../common/heap.header"
 
 struct Heap process_memory_heap;
 
-void init_pmalloc(void) {
+void init_process_memory_heap(void) {
     int first_process_address = PROCESS_MEMORY_START;
     int last_sram_address = SRAM_MAX_ADDRESS_IN_MEMORY_MAP;
 

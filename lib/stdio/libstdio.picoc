@@ -1,3 +1,2 @@
 #include "stdio.picoc"
-#include "../../common/uart_hardware.picoc"
 #include "../../common/uart_protocol.picoc"

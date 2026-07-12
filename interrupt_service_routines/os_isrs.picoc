@@ -2,29 +2,19 @@
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
 #include "../kernel/interrupt_controller.header"
-#include "../kernel/kernel.header"
 #include "../kernel/syscall.header"
-#include "../common/uart_hardware.header"
 
 #define OS_INTERRUPT_VECTOR_COUNT 5
 
-static inline void load_kernel_context(void) {
-    // Keeps the interrupted SP: BAF may point into an arbitrary caller frame
-    // with a variable number of locals below the current stack top.
-    asm(KERNEL_CS_START_ASM); // LOADI32 CS kernel_cs_start
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS kernel_ds_start
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP kernel_stack_start
-}
-
-void send_byte_over_uart_interrupt(void);
-void receive_byte_over_uart_interrupt(void);
+void send_byte_over_uart_interrupt_stub(void);
+void receive_byte_over_uart_interrupt_stub(void);
 void timer_interrupt(void);
 void syscall_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
-    send_byte_over_uart_interrupt,
-    receive_byte_over_uart_interrupt,
+    send_byte_over_uart_interrupt_stub,
+    receive_byte_over_uart_interrupt_stub,
     timer_interrupt,
     NULL,
     syscall_interrupt
@@ -32,8 +22,63 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
 
 __attribute__((naked))
 __attribute__((section("ivt")))
+void send_byte_over_uart_interrupt_stub(void) {
+    // The interrupt argument is in ACC; kernel functions receive arguments on
+    // the stack and return through IN1. The interrupted process may use a
+    // different CS, so run the handler in the kernel code segment.
+    asm("PUSH IN1");
+    asm("PUSH CS");
+    asm("PUSH ACC");
+    asm(KERNEL_CS_START_ASM);
+    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC send_byte_over_uart");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void send_byte_over_uart_interrupt_return(void) {
+    asm("POP ACC"); // remove the kernel function argument
+    asm("POP CS");
+    asm("POP IN1");
+    asm("RTI");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void receive_byte_over_uart_interrupt_stub(void) {
+    // The kernel ABI returns values in IN2; the interrupted caller expects ACC.
+    asm("PUSH IN1");
+    asm("PUSH CS");
+    asm(KERNEL_CS_START_ASM);
+    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC receive_byte_over_uart");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void receive_byte_over_uart_interrupt_return(void) {
+    asm("MOVE IN2 ACC");
+    asm("POP CS");
+    asm("POP IN1");
+    asm("RTI");
+}
+
+static inline void load_kernel_context(void) {
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+    asm(KERNEL_SP_START_ASM);
+}
+
+__attribute__((naked))
 void timer_interrupt(void) {
-    // Saves the interrupted context before deciding whether to enter the scheduler.
     asm("PUSH ACC");
     asm("PUSH IN1");
     asm("PUSH IN2");
@@ -41,11 +86,10 @@ void timer_interrupt(void) {
     asm("PUSH CS");
     asm("PUSH DS");
 
-    // Restores kernel regs and returns if CS == kernel_cs_start.
-    asm(KERNEL_CS_ACC_ASM); // LOADI32 ACC kernel_cs_start
+    asm(KERNEL_CS_ACC_ASM);
     asm("SUB ACC CS");
-    asm("JUMP!= 14"); // CS != kernel_cs_start enters the scheduler path.
-    asm("POP DS"); 
+    asm("JUMP!= 14");
+    asm("POP DS");
     asm("POP CS");
     asm("POP BAF");
     asm("POP IN2");
@@ -53,11 +97,9 @@ void timer_interrupt(void) {
     asm("POP ACC");
     asm("RTI");
 
-    // Saves the old SP in BAF, then loads kernel CS, DS and SP.
     asm("MOVE SP BAF");
     load_kernel_context();
 
-    // Copies the interrupted context onto the kernel stack for dispatcher_tick.
     asm("LOADIN BAF IN1 6");
     asm("PUSH IN1");
     asm("LOADIN BAF IN1 5");
@@ -70,11 +112,9 @@ void timer_interrupt(void) {
     asm("PUSH IN1");
     asm("LOADIN BAF IN1 1");
     asm("PUSH IN1");
-    // Passes saved_sp: the interrupted SP above the six saved context words.
     asm("ADDI BAF 6");
-    asm("PUSH BAF"); // saved_sp
+    asm("PUSH BAF");
 
-    // Calls dispatcher_tick and returns through timer_interrupt_return.
     asm("LOADI32 ACC timer_interrupt_return");
     asm("ADD ACC CS");
     asm("PUSH ACC");
@@ -84,12 +124,7 @@ void timer_interrupt(void) {
 }
 
 __attribute__((naked))
-__attribute__((section("ivt")))
 void timer_interrupt_return(void) {
-    // ADDI SP 7 is not needed: SP is replaced by the selected process' saved SP.
-
-    // dispatcher_tick returns the selected Process* in IN2. The following loads
-    // restore that process' saved activation record before returning from interrupt.
     asm("MOVE IN2 BAF");
     asm("LOADIN BAF SP 14");
     asm("LOADIN BAF CS 16");
@@ -102,28 +137,21 @@ void timer_interrupt_return(void) {
 }
 
 __attribute__((naked))
-__attribute__((section("ivt")))
 void syscall_interrupt(void) {
-    // Saves caller context before entering the kernel syscall handler.
-    asm("PUSH IN1"); // syscall argument
+    asm("PUSH IN1");
     asm("PUSH BAF");
     asm("PUSH CS");
     asm("PUSH DS");
-    asm("PUSH ACC"); // syscall number
-    // IN2 is not saved because it carries the kernel syscall return value.
-
-    // Saves the old SP in BAF, then loads kernel CS, DS and SP.
+    asm("PUSH ACC");
     asm("MOVE SP BAF");
     load_kernel_context();
 
-    // Passes saved caller state and syscall id to kernel_syscall_handle.
-    asm("PUSH BAF"); // recovered by *LOADIN SP BAF 1* in syscall_interrupt_return
-    asm("LOADIN BAF IN2 5"); // syscall argument
+    asm("PUSH BAF");
+    asm("LOADIN BAF IN2 5");
     asm("PUSH IN2");
-    asm("LOADIN BAF IN2 1"); // syscall number
+    asm("LOADIN BAF IN2 1");
     asm("PUSH IN2");
 
-    // Calls kernel_syscall_handle and returns through syscall_interrupt_return.
     asm("LOADI32 ACC syscall_interrupt_return");
     asm("ADD ACC CS");
     asm("PUSH ACC");
@@ -133,15 +161,10 @@ void syscall_interrupt(void) {
 }
 
 __attribute__((naked))
-__attribute__((section("ivt")))
 void syscall_interrupt_return(void) {
-    // Removes syscall handler arguments and recovers the saved caller frame pointer.
     asm("ADDI SP 2");
     asm("LOADIN SP BAF 1");
     asm("ADDI SP 1");
-
-    // Restores the interrupted syscall caller context. IN2 holds the syscall
-    // return value and is copied into ACC after popping the saved registers.
     asm("MOVE BAF SP");
     asm("ADDI SP 1");
     asm("POP DS");
