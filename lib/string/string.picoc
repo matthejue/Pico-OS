@@ -55,6 +55,32 @@ char *strcat(char *destination, char *source) {
     return destination;
 }
 
+int strcmp(char *left, char *right) {
+    int index = 0;
+
+    while (left[index] != 0 && left[index] == right[index]) {
+        index = index + 1;
+    }
+
+    return left[index] - right[index];
+}
+
+int strncmp(char *left, char *right, int count) {
+    int index = 0;
+
+    while (index < count &&
+           left[index] != 0 &&
+           left[index] == right[index]) {
+        index = index + 1;
+    }
+
+    if (index == count) {
+        return 0;
+    }
+
+    return left[index] - right[index];
+}
+
 int strlen(char *string) {
     int index = 0;
 

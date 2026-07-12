@@ -1,0 +1,53 @@
+#include "scheduler.header"
+
+int scheduler_can_run(struct Process *process) {
+    return process != NULL &&
+           (process->state == PROCESS_STATE_READY ||
+            // A still-current RUNNING process may be the only runnable process
+            // when scheduler_next_process() wraps around to it.
+            process->state == PROCESS_STATE_RUNNING);
+}
+
+struct Process *scheduler_next_process(void) {
+    struct Process *start;
+    struct Process *candidate;
+
+    // Without any known process, the scheduler has no valid process to return.
+    if (process_first() == NULL) {
+        return NULL;
+    }
+
+    // Start after the current process to give other processes a chance to run.
+    // If there is no current process, or the current process is already the
+    // last one, wrap the search back to the first process.
+    if (process_current() == NULL || process_current()->next == NULL) {
+        start = process_first();
+    } else {
+        start = process_current()->next;
+    }
+
+    // First search from the chosen start point to the end of the process list.
+    // This keeps normal round-robin order without jumping back too early.
+    candidate = start;
+    while (candidate != NULL) {
+        if (scheduler_can_run(candidate)) {
+            return candidate;
+        }
+
+        candidate = candidate->next;
+    }
+
+    // If nothing runnable was found after start, wrap around and search the
+    // earlier part of the list. Stop at start so every process is checked once.
+    candidate = process_first();
+    while (candidate != start) {
+        if (scheduler_can_run(candidate)) {
+            return candidate;
+        }
+
+        candidate = candidate->next;
+    }
+
+    // There are processes, but none of them can run right now.
+    return NULL;
+}

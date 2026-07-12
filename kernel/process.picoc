@@ -1,0 +1,215 @@
+#include "process.header"
+#include "kmalloc.header"
+#include "memory_constants.header"
+#include "pmalloc.header"
+
+struct Process *process_list_head = NULL;
+struct Process *process_list_tail = NULL;
+struct Process *current_process = NULL;
+int next_process_id = 1;
+
+void process_table_initialize(void) {
+    process_list_head = NULL;
+    process_list_tail = NULL;
+    current_process = NULL;
+    next_process_id = 1;
+}
+
+struct Process *process_first(void) {
+    return process_list_head;
+}
+
+struct Process *process_current(void) {
+    return current_process;
+}
+
+void process_set_current(struct Process *process) {
+    current_process = process;
+}
+
+char *process_copy_path(char *path) {
+    int length = 0;
+    int index = 0;
+    char *copy;
+
+    while (path[length] != 0) {
+        length = length + 1;
+    }
+
+    copy = (char *)kmalloc(length + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    while (index < length) {
+        copy[index] = path[index];
+        index = index + 1;
+    }
+    copy[index] = 0;
+    return copy;
+}
+
+struct Process *process_create(
+    int base_address,
+    int size,
+    int code_start,
+    int data_start,
+    int heap_start,
+    int heap_size,
+    int stack_start,
+    int word_count,
+    char *binary_path
+) {
+    struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
+    int stack_pointer = SRAM_BASE + base_address + stack_start;
+
+    if (process == NULL) {
+        return NULL;
+    }
+
+    process->pid = next_process_id;
+    next_process_id = next_process_id + 1;
+    process->state = PROCESS_STATE_NEW;
+    process->base_address = base_address;
+    process->size = size;
+    process->heap_start = heap_start;
+    process->heap_size = heap_size;
+    process->word_count = word_count;
+    process->binary_path = process_copy_path(binary_path);
+    if (process->binary_path == NULL) {
+        kfree(process);
+        return NULL;
+    }
+
+    process->activation.in1 = 0;
+    process->activation.in2 = 0;
+    process->activation.acc = 0;
+    /*
+     * dispatcher_jump_to_process() restores this SP and finishes with RTI, which
+     * loads PC from memory[SP + 1] on the restored process stack. Thus SP has to
+     * be kept one cell below the stored entry point. At this point BAF is just
+     * for optics: it represents an imaginary outer stack frame, so the first
+     * generated function prologue saves that instead of a random register value.
+     */
+    process->activation.sp = stack_pointer - 1;
+    process->activation.baf = stack_pointer;
+    process->activation.cs = SRAM_BASE + base_address + code_start;
+    process->activation.ds = SRAM_BASE + base_address + data_start;
+    process->waiting_for_pid = 0;
+    *((int *)stack_pointer) = process->activation.cs;
+
+    process->next = NULL;
+    if (process_list_head == NULL) {
+        process_list_head = process;
+        process_list_tail = process;
+    } else {
+        process_list_tail->next = process;
+        process_list_tail = process;
+    }
+
+    return process;
+}
+
+int process_mark_ready_by_pid(int pid) {
+    struct Process *process = process_find_by_pid(pid);
+
+    if (process == NULL ||
+        process->state == PROCESS_STATE_BLOCKED) {
+        return 0;
+    }
+
+    if (process->state == PROCESS_STATE_NEW) {
+        process->state = PROCESS_STATE_READY;
+    }
+
+    return 1;
+}
+
+struct Process *process_find_by_pid(int pid) {
+    struct Process *process = process_list_head;
+
+    while (process != NULL) {
+        if (process->pid == pid) {
+            return process;
+        }
+
+        process = process->next;
+    }
+
+    return NULL;
+}
+
+void process_remove(struct Process *process) {
+    struct Process *previous = NULL;
+    struct Process *candidate = process_list_head;
+    struct Process *waiting_process;
+
+    while (candidate != NULL && candidate != process) {
+        previous = candidate;
+        candidate = candidate->next;
+    }
+
+    if (candidate == NULL) {
+        return;
+    }
+
+    waiting_process = process_list_head;
+    while (waiting_process != NULL) {
+        if (waiting_process->state == PROCESS_STATE_BLOCKED &&
+            waiting_process->waiting_for_pid == candidate->pid) {
+            waiting_process->waiting_for_pid = 0;
+            waiting_process->state = PROCESS_STATE_READY;
+        }
+
+        waiting_process = waiting_process->next;
+    }
+
+    if (previous == NULL) {
+        process_list_head = candidate->next;
+    } else {
+        previous->next = candidate->next;
+    }
+
+    if (process_list_tail == candidate) {
+        process_list_tail = previous;
+    }
+
+    if (current_process == candidate) {
+        current_process = previous;
+    }
+
+    pfree(candidate->base_address);
+    kfree(candidate->binary_path);
+    kfree(candidate);
+}
+
+void process_terminate(struct Process *process) {
+    process_remove(process);
+}
+
+int process_unload_by_pid(int pid) {
+    struct Process *process = process_list_head;
+
+    while (process != NULL && process->pid != pid) {
+        process = process->next;
+    }
+
+    if (process == NULL || process == current_process) {
+        return 0;
+    }
+
+    process_remove(process);
+    return 1;
+}
+
+int process_wait_for_pid(int pid) {
+    struct Process *process = process_current();
+
+    if (process == NULL || process_find_by_pid(pid) == NULL) {
+        return 1;
+    }
+
+    process->waiting_for_pid = pid;
+    process->state = PROCESS_STATE_BLOCKED;
+    return 0;
+}

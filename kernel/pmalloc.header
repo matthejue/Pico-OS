@@ -2,7 +2,7 @@
 
 #define PMALLOC_INVALID_START -1
 
-void init_pmalloc(void);
+void init_process_memory_heap(void);
 int pmalloc(int size);
 int prealloc(int start, int size);
 void pfree(int start);

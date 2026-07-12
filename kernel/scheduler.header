@@ -1,0 +1,5 @@
+#pragma once
+
+#include "process.header"
+
+struct Process *scheduler_next_process(void);

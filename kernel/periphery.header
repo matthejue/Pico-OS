@@ -1,0 +1,4 @@
+#pragma once
+
+int periphery_read_register(int register_index);
+void periphery_write_register(int register_index, int value);

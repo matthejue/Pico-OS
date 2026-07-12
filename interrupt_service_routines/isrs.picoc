@@ -1,21 +1,70 @@
 #include "../common/stddef.header"
-#include "../common/uart_hardware_ivt.header"
 
 #define TEST_INTERRUPT_VECTOR_COUNT 5
 
-void send_byte_over_uart_interrupt(void);
-void receive_byte_over_uart_interrupt(void);
+__attribute__((section("ivt")))
+void send_byte_over_uart(int value);
+
+__attribute__((section("ivt")))
+int receive_byte_over_uart(void);
+
+void send_byte_over_uart_interrupt_stub(void);
+void receive_byte_over_uart_interrupt_stub(void);
 void timer_interrupt(void);
 void syscall_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[TEST_INTERRUPT_VECTOR_COUNT])(void) = {
-    send_byte_over_uart_interrupt,
-    receive_byte_over_uart_interrupt,
+    send_byte_over_uart_interrupt_stub,
+    receive_byte_over_uart_interrupt_stub,
     timer_interrupt,
     0,
     syscall_interrupt
 };
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void send_byte_over_uart_interrupt_stub(void) {
+    // The interrupt argument is in ACC; kernel functions receive arguments on
+    // the stack and return through IN1.
+    asm("PUSH IN1");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC send_byte_over_uart");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void send_byte_over_uart_interrupt_return(void) {
+    asm("POP ACC"); // remove the kernel function argument
+    asm("POP IN1");
+    asm("RTI");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void receive_byte_over_uart_interrupt_stub(void) {
+    // The kernel ABI returns values in IN2; the interrupted caller expects ACC.
+    asm("PUSH IN1");
+    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC receive_byte_over_uart");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+__attribute__((section("ivt")))
+void receive_byte_over_uart_interrupt_return(void) {
+    asm("MOVE IN2 ACC");
+    asm("POP IN1");
+    asm("RTI");
+}
 
 __attribute__((naked))
 __attribute__((section("ivt")))
