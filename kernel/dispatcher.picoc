@@ -11,20 +11,20 @@ void dispatcher_save_current(
     int saved_in1,
     int saved_acc
 ) {
-    if (process_current() == NULL) {
+    if (current_process() == NULL) {
         return;
     }
 
-    process_current()->activation.sp = saved_sp;
-    process_current()->activation.ds = saved_ds;
-    process_current()->activation.cs = saved_cs;
-    process_current()->activation.baf = saved_baf;
-    process_current()->activation.in2 = saved_in2;
-    process_current()->activation.in1 = saved_in1;
-    process_current()->activation.acc = saved_acc;
+    current_process()->activation.sp = saved_sp;
+    current_process()->activation.ds = saved_ds;
+    current_process()->activation.cs = saved_cs;
+    current_process()->activation.baf = saved_baf;
+    current_process()->activation.in2 = saved_in2;
+    current_process()->activation.in1 = saved_in1;
+    current_process()->activation.acc = saved_acc;
 
-    if (process_current()->state == PROCESS_STATE_RUNNING) {
-        process_current()->state = PROCESS_STATE_READY;
+    if (current_process()->state == PROCESS_STATE_RUNNING) {
+        current_process()->state = PROCESS_STATE_READY;
     }
 }
 
@@ -51,12 +51,12 @@ struct Process *dispatcher_tick(
 
     next_process = scheduler_next_process();
     if (next_process == NULL) {
-        return process_current();
+        return current_process();
     }
 
-    process_set_current(next_process);
-    process_current()->state = PROCESS_STATE_RUNNING;
-    return process_current();
+    set_current_process(next_process);
+    current_process()->state = PROCESS_STATE_RUNNING;
+    return current_process();
 }
 
 __attribute__((naked))
@@ -73,14 +73,14 @@ void dispatcher_jump_to_process(struct Process *process) {
 }
 
 void dispatcher_switch_to_process(struct Process *process) {
-    if (process_current() != NULL && process_current()->state == PROCESS_STATE_RUNNING) {
-        process_current()->state = PROCESS_STATE_READY;
+    if (current_process() != NULL && current_process()->state == PROCESS_STATE_RUNNING) {
+        current_process()->state = PROCESS_STATE_READY;
     }
 
-    process_set_current(process);
-    process_current()->state = PROCESS_STATE_RUNNING;
+    set_current_process(process);
+    current_process()->state = PROCESS_STATE_RUNNING;
 
-    dispatcher_jump_to_process(process_current());
+    dispatcher_jump_to_process(current_process());
 }
 
 void dispatcher_start_next_process(void) {

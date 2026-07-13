@@ -28,11 +28,12 @@ struct Process {
     char *binary_path;
     struct ActivationRecord activation;
     int waiting_for_pid;
+    int *waiting_status;
     struct Process *next;
 };
 
-void process_table_initialize(void);
-struct Process *process_create(
+void initialize_process_table(void);
+struct Process *create_process(
     int base_address,
     int size,
     int code_start,
@@ -43,11 +44,15 @@ struct Process *process_create(
     int word_count,
     char *binary_path
 );
-int process_mark_ready_by_pid(int pid);
-void process_terminate(struct Process *process);
-int process_unload_by_pid(int pid);
-int process_wait_for_pid(int pid);
-struct Process *process_first(void);
-struct Process *process_current(void);
-struct Process *process_find_by_pid(int pid);
-void process_set_current(struct Process *process);
+int mark_process_ready_by_pid(int pid);
+void terminate_process(struct Process *process, int status);
+int unload_process_by_pid(int pid);
+int wait_for_process_by_pid(int pid, int *status);
+int process_heap_start(void);
+int process_heap_size(void);
+void exit_process(int status);
+void list_processes(void);
+struct Process *first_process(void);
+struct Process *current_process(void);
+struct Process *find_process_by_pid(int pid);
+void set_current_process(struct Process *process);

@@ -15,3 +15,8 @@ struct RunProcessRequest {
     int pid;
     char *arguments;
 };
+
+struct WaitProcessRequest {
+    int pid;
+    int *status;
+};

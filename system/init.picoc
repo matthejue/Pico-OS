@@ -1,21 +1,9 @@
-#include "syscall.header"
-#include "../common/uart_hardware.header"
+#include "../lib/process/process.header"
+#include "../lib/stdio/stdio.header"
+#include "../lib/string/string.header"
+#include "../common/uart_protocol.header"
 
 #define INIT_COMMAND_BUFFER_CAPACITY 80
-
-int uart_print_character(int value) {
-    send_byte_over_uart(value);
-    return 0;
-}
-
-void uart_print_string(char *value) {
-    int index = 0;
-
-    while (value[index] != 0) {
-        uart_print_character(value[index]);
-        index = index + 1;
-    }
-}
 
 int init_read_line(char *buffer, int capacity) {
     int index = 0;
@@ -32,58 +20,6 @@ int init_read_line(char *buffer, int capacity) {
 
     buffer[index] = 0;
     return index;
-}
-
-int init_command_is_quit(char *command) {
-    return command[0] == 'q' &&
-           command[1] == 'u' &&
-           command[2] == 'i' &&
-           command[3] == 't' &&
-           command[4] == 0;
-}
-
-int init_command_is_exit(char *command) {
-    return command[0] == 'e' &&
-           command[1] == 'x' &&
-           command[2] == 'i' &&
-           command[3] == 't' &&
-           command[4] == 0;
-}
-
-int init_command_is_list(char *command) {
-    return command[0] == 'l' &&
-           command[1] == 'i' &&
-           command[2] == 's' &&
-           command[3] == 't' &&
-           command[4] == 0;
-}
-
-int init_command_is_load(char *command) {
-    return command[0] == 'l' &&
-           command[1] == 'o' &&
-           command[2] == 'a' &&
-           command[3] == 'd' &&
-           command[4] == ' ' &&
-           command[5] != 0;
-}
-
-int init_command_is_run(char *command) {
-    return command[0] == 'r' &&
-           command[1] == 'u' &&
-           command[2] == 'n' &&
-           command[3] == ' ' &&
-           command[4] != 0;
-}
-
-int init_command_is_unload(char *command) {
-    return command[0] == 'u' &&
-           command[1] == 'n' &&
-           command[2] == 'l' &&
-           command[3] == 'o' &&
-           command[4] == 'a' &&
-           command[5] == 'd' &&
-           command[6] == ' ' &&
-           command[7] != 0;
 }
 
 int init_parse_process_id(char *value) {
@@ -112,89 +48,34 @@ char *init_run_arguments(char *command) {
     return command + index;
 }
 
-void init_print_unknown_command(void) {
-    uart_print_string("error: unknown command");
-    uart_print_character('\n');
-}
-
-void init_print_process_not_found(void) {
-    uart_print_string("error: process not found");
-    uart_print_character('\n');
-}
-
-void init_print_integer(int value) {
-    char digits[12];
-    int digit_count = 0;
-    int current = value;
-    int negative = value < 0;
-    int digit;
-
-    if (current == 0) {
-        uart_print_character('0');
-        return;
-    }
-
-    if (negative) {
-        uart_print_character('-');
-    }
-
-    while (current != 0) {
-        digit = current % 10;
-        if (digit < 0) {
-            digit = -digit;
-        }
-
-        digits[digit_count] = digit + '0';
-        current = current / 10;
-        digit_count = digit_count + 1;
-    }
-
-    while (digit_count != 0) {
-        digit_count = digit_count - 1;
-        uart_print_character(digits[digit_count]);
-    }
-}
-
-void init_wait_and_print_exit_status(int pid) {
-    int status = 0;
-    int wait_result = syscall_wait_process(pid, &status);
-
-    while (wait_result == 0) {
-        wait_result = syscall_wait_process(pid, &status);
-    }
-
-    if (wait_result < 0) {
-        init_print_process_not_found();
-    } else {
-        uart_print_string("exit status: ");
-        init_print_integer(status);
-        uart_print_character('\n');
-    }
+void init_shutdown(void) {
+    asm("LOADI ACC 1");
+    asm("INT 4");
 }
 
 void init_handle_command(char *command) {
     int pid;
 
-    if (init_command_is_quit(command) || init_command_is_exit(command)) {
-        syscall_shutdown();
-    } else if (init_command_is_load(command)) {
-        syscall_load_process(command + 5);
-    } else if (init_command_is_run(command)) {
+    if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
+        init_shutdown();
+    } else if (strncmp(command, "load ", 5) == 0 && command[5] != 0) {
+        load(command + 5);
+    } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
         pid = init_parse_process_id(command + 4);
-        if (!syscall_run_process_with_arguments(pid, init_run_arguments(command))) {
-            init_print_process_not_found();
+        if (!run_with_arguments(pid, init_run_arguments(command))) {
+            printf("error: process not found%c", '\n');
         } else {
-            init_wait_and_print_exit_status(pid);
+            printf("exit status: %d%c", wait(pid), '\n');
         }
-    } else if (init_command_is_unload(command)) {
+    } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
         pid = init_parse_process_id(command + 7);
-        if (!syscall_unload_process(pid)) {
-            init_print_process_not_found();
+        if (!unload(pid)) {
+            printf("error: process not found%c", '\n');
         }
-    } else if (init_command_is_list(command)) {
-        syscall_list_processes();
+    } else if (strcmp(command, "list") == 0) {
+        list();
     } else {
-        init_print_unknown_command();
+        printf("error: unknown command%c", '\n');
     }
 }
 
