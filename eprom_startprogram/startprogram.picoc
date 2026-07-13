@@ -40,7 +40,7 @@ void boot_main(void) {
     int stack_start;
     int heap_start;
     int word_count;
-    int kernel_word_count;
+    int payload_word_count;
 
     uart_send_load_command("kernel.bin");
 
@@ -53,8 +53,8 @@ void boot_main(void) {
         stack_start = SRAM_MAX_ADDRESS;
     }
 
-    kernel_word_count = word_count - 4;
-    receive_words_to_sram(0, kernel_word_count);
+    payload_word_count = word_count - 4;
+    receive_words_to_sram(0, payload_word_count);
     asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
     asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in SRAM
     asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in SRAM

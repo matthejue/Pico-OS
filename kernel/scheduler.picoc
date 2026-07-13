@@ -13,17 +13,17 @@ struct Process *scheduler_next_process(void) {
     struct Process *candidate;
 
     // Without any known process, the scheduler has no valid process to return.
-    if (process_first() == NULL) {
+    if (first_process() == NULL) {
         return NULL;
     }
 
     // Start after the current process to give other processes a chance to run.
     // If there is no current process, or the current process is already the
     // last one, wrap the search back to the first process.
-    if (process_current() == NULL || process_current()->next == NULL) {
-        start = process_first();
+    if (current_process() == NULL || current_process()->next == NULL) {
+        start = first_process();
     } else {
-        start = process_current()->next;
+        start = current_process()->next;
     }
 
     // First search from the chosen start point to the end of the process list.
@@ -39,7 +39,7 @@ struct Process *scheduler_next_process(void) {
 
     // If nothing runnable was found after start, wrap around and search the
     // earlier part of the list. Stop at start so every process is checked once.
-    candidate = process_first();
+    candidate = first_process();
     while (candidate != start) {
         if (scheduler_can_run(candidate)) {
             return candidate;

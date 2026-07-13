@@ -1,3 +1,4 @@
+#include "kernel.header"
 #include "dispatcher.header"
 #include "interrupt_controller.header"
 #include "process.header"
@@ -7,16 +8,20 @@
 
 #define INIT_BINARY_PATH "system/init.bin"
 
+void shutdown(void) {
+    asm("JUMP 0");
+}
+
 int main(void) {
     int init_pid;
 
     debug;
     init_kernel_heap();
-    process_table_initialize();
+    initialize_process_table();
     init_process_memory_heap();
     interrupt_controller_initialize();
-    init_pid = kernel_load_process(INIT_BINARY_PATH);
-    if (process_mark_ready_by_pid(init_pid)) {
+    init_pid = load_process(INIT_BINARY_PATH);
+    if (mark_process_ready_by_pid(init_pid)) {
         interrupt_controller_activate_timer();
         dispatcher_start_next_process();
     }

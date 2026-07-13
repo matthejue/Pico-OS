@@ -1,33 +1,50 @@
 #include "process.header"
+#include "kernel.header"
 #include "kmalloc.header"
 #include "memory_constants.header"
 #include "pmalloc.header"
+#include "dispatcher.header"
+#include "../common/uart_protocol.header"
 
 struct Process *process_list_head = NULL;
 struct Process *process_list_tail = NULL;
-struct Process *current_process = NULL;
+struct Process *active_process = NULL;
 int next_process_id = 1;
 
-void process_table_initialize(void) {
+void initialize_process_table(void) {
     process_list_head = NULL;
     process_list_tail = NULL;
-    current_process = NULL;
+    active_process = NULL;
     next_process_id = 1;
 }
 
-struct Process *process_first(void) {
+struct Process *first_process(void) {
     return process_list_head;
 }
 
-struct Process *process_current(void) {
-    return current_process;
+void list_processes(void) {
+    struct Process *process = first_process();
+
+    while (process != NULL) {
+        uart_print_integer(process->pid);
+        uart_print_character(' ');
+        if (process->binary_path != NULL) {
+            uart_print_string(process->binary_path);
+        }
+        uart_print_character('\n');
+        process = process->next;
+    }
 }
 
-void process_set_current(struct Process *process) {
-    current_process = process;
+struct Process *current_process(void) {
+    return active_process;
 }
 
-char *process_copy_path(char *path) {
+void set_current_process(struct Process *process) {
+    active_process = process;
+}
+
+char *copy_process_path(char *path) {
     int length = 0;
     int index = 0;
     char *copy;
@@ -49,7 +66,7 @@ char *process_copy_path(char *path) {
     return copy;
 }
 
-struct Process *process_create(
+struct Process *create_process(
     int base_address,
     int size,
     int code_start,
@@ -75,7 +92,7 @@ struct Process *process_create(
     process->heap_start = heap_start;
     process->heap_size = heap_size;
     process->word_count = word_count;
-    process->binary_path = process_copy_path(binary_path);
+    process->binary_path = copy_process_path(binary_path);
     if (process->binary_path == NULL) {
         kfree(process);
         return NULL;
@@ -96,6 +113,7 @@ struct Process *process_create(
     process->activation.cs = SRAM_BASE + base_address + code_start;
     process->activation.ds = SRAM_BASE + base_address + data_start;
     process->waiting_for_pid = 0;
+    process->waiting_status = NULL;
     *((int *)stack_pointer) = process->activation.cs;
 
     process->next = NULL;
@@ -110,22 +128,20 @@ struct Process *process_create(
     return process;
 }
 
-int process_mark_ready_by_pid(int pid) {
-    struct Process *process = process_find_by_pid(pid);
+int mark_process_ready_by_pid(int pid) {
+    struct Process *process = find_process_by_pid(pid);
 
     if (process == NULL ||
-        process->state == PROCESS_STATE_BLOCKED) {
+        process->state != PROCESS_STATE_NEW) {
         return 0;
     }
 
-    if (process->state == PROCESS_STATE_NEW) {
-        process->state = PROCESS_STATE_READY;
-    }
+    process->state = PROCESS_STATE_READY;
 
     return 1;
 }
 
-struct Process *process_find_by_pid(int pid) {
+struct Process *find_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 
     while (process != NULL) {
@@ -139,7 +155,7 @@ struct Process *process_find_by_pid(int pid) {
     return NULL;
 }
 
-void process_remove(struct Process *process) {
+void remove_process(struct Process *process, int status) {
     struct Process *previous = NULL;
     struct Process *candidate = process_list_head;
     struct Process *waiting_process;
@@ -157,7 +173,11 @@ void process_remove(struct Process *process) {
     while (waiting_process != NULL) {
         if (waiting_process->state == PROCESS_STATE_BLOCKED &&
             waiting_process->waiting_for_pid == candidate->pid) {
+            if (waiting_process->waiting_status != NULL) {
+                *(waiting_process->waiting_status) = status;
+            }
             waiting_process->waiting_for_pid = 0;
+            waiting_process->waiting_status = NULL;
             waiting_process->state = PROCESS_STATE_READY;
         }
 
@@ -174,8 +194,8 @@ void process_remove(struct Process *process) {
         process_list_tail = previous;
     }
 
-    if (current_process == candidate) {
-        current_process = previous;
+    if (active_process == candidate) {
+        active_process = previous;
     }
 
     pfree(candidate->base_address);
@@ -183,33 +203,60 @@ void process_remove(struct Process *process) {
     kfree(candidate);
 }
 
-void process_terminate(struct Process *process) {
-    process_remove(process);
+void terminate_process(struct Process *process, int status) {
+    remove_process(process, status);
 }
 
-int process_unload_by_pid(int pid) {
+int unload_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 
     while (process != NULL && process->pid != pid) {
         process = process->next;
     }
 
-    if (process == NULL || process == current_process) {
+    if (process == NULL || process == active_process) {
         return 0;
     }
 
-    process_remove(process);
+    remove_process(process, 0);
     return 1;
 }
 
-int process_wait_for_pid(int pid) {
-    struct Process *process = process_current();
+int wait_for_process_by_pid(int pid, int *status) {
+    struct Process *process = current_process();
 
-    if (process == NULL || process_find_by_pid(pid) == NULL) {
+    if (process == NULL || find_process_by_pid(pid) == NULL) {
         return 1;
     }
 
     process->waiting_for_pid = pid;
+    process->waiting_status = status;
     process->state = PROCESS_STATE_BLOCKED;
     return 0;
+}
+
+int process_heap_start(void) {
+    struct Process *process = current_process();
+
+    if (process == NULL) {
+        return 0;
+    }
+
+    return SRAM_BASE + process->base_address + process->heap_start;
+}
+
+int process_heap_size(void) {
+    struct Process *process = current_process();
+
+    if (process == NULL) {
+        return 0;
+    }
+
+    return process->heap_size;
+}
+
+void exit_process(int status) {
+    terminate_process(current_process(), status);
+    dispatcher_start_next_process();
+    shutdown();
 }

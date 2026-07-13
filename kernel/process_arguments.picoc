@@ -67,7 +67,7 @@ int process_argument_character_cells(char *arguments) {
     return cells;
 }
 
-int process_store_arguments(struct Process *process, char *arguments) {
+int store_process_arguments(struct Process *process, char *arguments) {
     // Number of whitespace-separated arguments.
     int argc;
     // Cells for argc, argv, argv's NULL entry, and all argument strings.
@@ -134,7 +134,7 @@ int process_store_arguments(struct Process *process, char *arguments) {
     return 1;
 }
 
-int process_mark_ready_with_arguments(struct RunProcessRequest *request) {
+int mark_process_ready_with_arguments(struct RunProcessRequest *request) {
     struct Process *process;
 
     // The syscall may be invoked without a request structure.
@@ -142,24 +142,20 @@ int process_mark_ready_with_arguments(struct RunProcessRequest *request) {
         return 0;
     }
 
-    // Only an existing process that is not waiting for another process can run.
-    process = process_find_by_pid(request->pid);
+    // Only a newly created process can be started.
+    process = find_process_by_pid(request->pid);
     if (process == NULL ||
-        process->state == PROCESS_STATE_BLOCKED) {
+        process->state != PROCESS_STATE_NEW) {
         return 0;
     }
 
     // Arguments must be placed on the process stack before its first start.
-    // Do not replace them when an already-ready or running process is requested again.
-    if (process->state == PROCESS_STATE_NEW) {
-        // Keep the process NEW if its initial argument stack cannot be created.
-        if (!process_store_arguments(process, request->arguments)) {
-            return 0;
-        }
-
-        // This makes the process eligible for scheduling.
-        process->state = PROCESS_STATE_READY;
+    // Keep the process NEW if its initial argument stack cannot be created.
+    if (!store_process_arguments(process, request->arguments)) {
+        return 0;
     }
 
+    // This makes the process eligible for scheduling.
+    process->state = PROCESS_STATE_READY;
     return 1;
 }
