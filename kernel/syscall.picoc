@@ -1,86 +1,38 @@
 #include "syscall.header"
-#include "memory_constants.header"
+#include "kernel.header"
 #include "process.header"
 #include "process_arguments.header"
 #include "process_loader.header"
-#include "pmalloc.header"
-#include "dispatcher.header"
-#include "../common/uart_protocol.header"
 
-void kernel_shutdown(void) {
-    asm("JUMP 0");
-}
-
-void kernel_syscall_list_processes(void) {
-    struct Process *process = process_first();
-
-    while (process != NULL) {
-        uart_print_integer(process->pid);
-        uart_print_character(' ');
-        if (process->binary_path != NULL) {
-            uart_print_string(process->binary_path);
-        }
-        uart_print_character('\n');
-        process = process->next;
-    }
-}
-
-int kernel_syscall_process_heap_start(void) {
-    struct Process *process = process_current();
-
-    if (process == NULL) {
-        return 0;
-    }
-
-    return SRAM_BASE + process->base_address + process->heap_start;
-}
-
-int kernel_syscall_process_heap_size(void) {
-    struct Process *process = process_current();
-
-    if (process == NULL) {
-        return 0;
-    }
-
-    return process->heap_size;
-}
-
-void kernel_syscall_exit(int status) {
-    process_terminate(process_current());
-    dispatcher_start_next_process();
-    // Reached if the dispatcher returns because no runnable process remains.
-    // Normally impossible because init stays runnable in an infinite loop.
-    kernel_shutdown();
-}
-
-int kernel_syscall_wait_process(int pid) {
-    return process_wait_for_pid(pid);
-}
-
-int kernel_syscall_handle(int syscall_number, int argument) {
+int handle_syscall(int syscall_number, int argument) {
     if (syscall_number == SYSCALL_SHUTDOWN) {
-        kernel_shutdown();
+        shutdown();
         return 1;
     } else if (syscall_number == SYSCALL_LOAD_PROCESS) {
-        return kernel_load_process((char *)argument);
+        return load_process((char *)argument);
     } else if (syscall_number == SYSCALL_RUN_PROCESS) {
-        return process_mark_ready_by_pid(argument);
+        return mark_process_ready_by_pid(argument);
     } else if (syscall_number == SYSCALL_RUN_PROCESS_WITH_ARGUMENTS) {
-        return process_mark_ready_with_arguments((struct RunProcessRequest *)argument);
+        return mark_process_ready_with_arguments((struct RunProcessRequest *)argument);
     } else if (syscall_number == SYSCALL_LIST_PROCESSES) {
-        kernel_syscall_list_processes();
+        list_processes();
         return 1;
     } else if (syscall_number == SYSCALL_UNLOAD_PROCESS) {
-        return process_unload_by_pid(argument);
+        return unload_process_by_pid(argument);
     } else if (syscall_number == SYSCALL_PROCESS_HEAP_START) {
-        return kernel_syscall_process_heap_start();
+        return process_heap_start();
     } else if (syscall_number == SYSCALL_PROCESS_HEAP_SIZE) {
-        return kernel_syscall_process_heap_size();
+        return process_heap_size();
     } else if (syscall_number == SYSCALL_EXIT) {
-        kernel_syscall_exit(argument);
+        exit_process(argument);
         return 1;
     } else if (syscall_number == SYSCALL_WAIT_PROCESS) {
-        return kernel_syscall_wait_process(argument);
+        struct WaitProcessRequest *request = (struct WaitProcessRequest *)argument;
+
+        if (request == NULL) {
+            return 0;
+        }
+        return wait_for_process_by_pid(request->pid, request->status);
     }
 
     return 0;

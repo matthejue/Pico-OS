@@ -5,4 +5,4 @@
 #define DEFAULT_PROCESS_HEAP_CELLS 1000
 #define DEFAULT_PROCESS_STACK_CELLS 1000
 
-int kernel_load_process(char *path);
+int load_process(char *path);

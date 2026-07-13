@@ -1,0 +1,8 @@
+#pragma once
+
+int load(char *path);
+int run(int pid);
+int run_with_arguments(int pid, char *arguments);
+int unload(int pid);
+void list(void);
+int wait(int pid);

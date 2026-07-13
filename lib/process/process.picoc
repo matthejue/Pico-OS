@@ -1,0 +1,47 @@
+#include "process.header"
+#include "../../common/syscall.header"
+
+int invoke_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 4");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+int load(char *path) {
+    return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)path);
+}
+
+int run(int pid) {
+    return invoke_syscall(SYSCALL_RUN_PROCESS, pid);
+}
+
+int run_with_arguments(int pid, char *arguments) {
+    struct RunProcessRequest request;
+
+    request.pid = pid;
+    request.arguments = arguments;
+    return invoke_syscall(SYSCALL_RUN_PROCESS_WITH_ARGUMENTS, (int)&request);
+}
+
+int unload(int pid) {
+    return invoke_syscall(SYSCALL_UNLOAD_PROCESS, pid);
+}
+
+void list(void) {
+    invoke_syscall(SYSCALL_LIST_PROCESSES, 0);
+}
+
+int wait(int pid) {
+    int status = 0;
+    struct WaitProcessRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_syscall(SYSCALL_WAIT_PROCESS, (int)&request)) {
+    }
+    return status;
+}

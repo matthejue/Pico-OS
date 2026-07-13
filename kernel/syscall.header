@@ -2,4 +2,4 @@
 
 #include "../common/syscall.header"
 
-int kernel_syscall_handle(int syscall_number, int argument);
+int handle_syscall(int syscall_number, int argument);
