@@ -79,11 +79,7 @@ void uart_print_string(char *value) {
 }
 
 void uart_send_load_command(char *path) {
-    uart_print_character('l');
-    uart_print_character('o');
-    uart_print_character('a');
-    uart_print_character('d');
-    uart_print_character(' ');
+    uart_print_string("load ");
     uart_print_string(path);
     uart_print_character('\n');
 }

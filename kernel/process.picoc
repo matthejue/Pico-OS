@@ -28,9 +28,7 @@ void list_processes(void) {
     while (process != NULL) {
         uart_print_integer(process->pid);
         uart_print_character(' ');
-        if (process->binary_path != NULL) {
-            uart_print_string(process->binary_path);
-        }
+        uart_print_string(process->binary_path);
         uart_print_character('\n');
         process = process->next;
     }
@@ -53,6 +51,7 @@ char *copy_process_path(char *path) {
         length = length + 1;
     }
 
+    // The loader's path buffer need not outlive the process, so the PCB owns a copy
     copy = (char *)kmalloc(length + 1);
     if (copy == NULL) {
         return NULL;
@@ -106,14 +105,17 @@ struct Process *create_process(
      * loads PC from memory[SP + 1] on the restored process stack. Thus SP has to
      * be kept one cell below the stored entry point. At this point BAF is just
      * for optics: it represents an imaginary outer stack frame, so the first
-     * generated function prologue saves that instead of a random register value.
+     * generated function prologue saves that instead of a random register value
      */
     process->activation.sp = stack_pointer - 1;
     process->activation.baf = stack_pointer;
     process->activation.cs = SRAM_BASE + base_address + code_start;
     process->activation.ds = SRAM_BASE + base_address + data_start;
-    process->waiting_for_pid = 0;
-    process->waiting_status = NULL;
+    process->waiting_status_ptr = NULL;
+    process->waiters.head = NULL;
+    process->waiters.tail = NULL;
+    process->waiting_queue_ptr = NULL;
+    process->wait_next = NULL;
     *((int *)stack_pointer) = process->activation.cs;
 
     process->next = NULL;
@@ -155,6 +157,39 @@ struct Process *find_process_by_pid(int pid) {
     return NULL;
 }
 
+void remove_from_wait_queue(struct Process *process) {
+    if (process->waiting_queue_ptr == NULL) {
+        return;
+    }
+
+    struct wait_queue *queue = process->waiting_queue_ptr;
+    struct Process *previous = NULL;
+    struct Process *candidate = queue->head;
+
+    // A wait queue is intrusive: a process can be on only one queue at a time
+    while (candidate != NULL && candidate != process) {
+        previous = candidate;
+        candidate = candidate->wait_next;
+    }
+
+    if (candidate == NULL) {
+        return;
+    }
+
+    if (previous == NULL) {
+        queue->head = candidate->wait_next;
+    } else {
+        previous->wait_next = candidate->wait_next;
+    }
+
+    if (queue->tail == candidate) {
+        queue->tail = previous;
+    }
+
+    candidate->waiting_queue_ptr = NULL;
+    candidate->wait_next = NULL;
+}
+
 void remove_process(struct Process *process, int status) {
     struct Process *previous = NULL;
     struct Process *candidate = process_list_head;
@@ -169,19 +204,19 @@ void remove_process(struct Process *process, int status) {
         return;
     }
 
-    waiting_process = process_list_head;
-    while (waiting_process != NULL) {
-        if (waiting_process->state == PROCESS_STATE_BLOCKED &&
-            waiting_process->waiting_for_pid == candidate->pid) {
-            if (waiting_process->waiting_status != NULL) {
-                *(waiting_process->waiting_status) = status;
-            }
-            waiting_process->waiting_for_pid = 0;
-            waiting_process->waiting_status = NULL;
-            waiting_process->state = PROCESS_STATE_READY;
-        }
+    // A blocked process must be unlinked before its PCB is freed; otherwise a
+    // later wakeup would follow a dangling queue entry
+    remove_from_wait_queue(candidate);
 
-        waiting_process = waiting_process->next;
+    // Store the status before waking each waiter, whose execution may resume
+    // as soon as the scheduler next selects it
+    while (candidate->waiters.head != NULL) {
+        waiting_process = candidate->waiters.head;
+        if (waiting_process->waiting_status_ptr != NULL) {
+            *(waiting_process->waiting_status_ptr) = status;
+        }
+        waiting_process->waiting_status_ptr = NULL;
+        wakeup_wait_queue(&(candidate->waiters));
     }
 
     if (previous == NULL) {
@@ -203,10 +238,6 @@ void remove_process(struct Process *process, int status) {
     kfree(candidate);
 }
 
-void terminate_process(struct Process *process, int status) {
-    remove_process(process, status);
-}
-
 int unload_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 
@@ -214,33 +245,67 @@ int unload_process_by_pid(int pid) {
         process = process->next;
     }
 
+    // Removing the running process requires the exit path to switch context
     if (process == NULL || process == active_process) {
         return 0;
     }
 
-    remove_process(process, 0);
+    remove_process(process, PROCESS_EXIT_STATUS_SUCCESS);
     return 1;
 }
 
-int wait_for_process_by_pid(int pid, int *status) {
+int wait_for_process_by_pid(struct WaitProcessRequest *request) {
     struct Process *process = current_process();
+    struct Process *waited_process;
 
-    if (process == NULL || find_process_by_pid(pid) == NULL) {
+    waited_process = find_process_by_pid(request->pid);
+    if (waited_process == NULL) {
         return 1;
     }
 
-    process->waiting_for_pid = pid;
-    process->waiting_status = status;
-    process->state = PROCESS_STATE_BLOCKED;
+    // wait() stores a pointer to its stack-local return status in request->status.
+    // When the target exits, it writes its status back through this pointer
+    process->waiting_status_ptr = request->status;
+    sleep_on_wait_queue(&(waited_process->waiters));
     return 0;
+}
+
+void sleep_on_wait_queue(struct wait_queue *queue) {
+    struct Process *process = current_process();
+
+    // wait_next is shared by all wait queues
+    process->wait_next = NULL;
+    process->waiting_queue_ptr = queue;
+    if (queue->tail == NULL) {
+        queue->head = process;
+    } else {
+        queue->tail->wait_next = process;
+    }
+    queue->tail = process;
+    process->state = PROCESS_STATE_BLOCKED;
+}
+
+int wakeup_wait_queue(struct wait_queue *queue) {
+    struct Process *process;
+
+    if (queue->head == NULL) {
+        return 0;
+    }
+
+    process = queue->head;
+    queue->head = process->wait_next;
+    if (queue->head == NULL) {
+        queue->tail = NULL;
+    }
+
+    process->wait_next = NULL;
+    process->waiting_queue_ptr = NULL;
+    process->state = PROCESS_STATE_READY;
+    return 1;
 }
 
 int process_heap_start(void) {
     struct Process *process = current_process();
-
-    if (process == NULL) {
-        return 0;
-    }
 
     return SRAM_BASE + process->base_address + process->heap_start;
 }
@@ -248,15 +313,12 @@ int process_heap_start(void) {
 int process_heap_size(void) {
     struct Process *process = current_process();
 
-    if (process == NULL) {
-        return 0;
-    }
-
     return process->heap_size;
 }
 
 void exit_process(int status) {
-    terminate_process(current_process(), status);
+    remove_process(current_process(), status);
     dispatcher_start_next_process();
+    // Switching to a next process returns via RTI; shutdown is only reached when none remain
     shutdown();
 }

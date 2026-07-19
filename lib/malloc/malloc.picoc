@@ -1,6 +1,7 @@
 // dependencies: ../../common/heap.picoc
 
 #include "malloc.header"
+#include "../../common/syscall.header"
 
 struct Heap process_heap;
 
@@ -9,13 +10,13 @@ void init_process_heap(void) {
     int heap_size;
 
     // SYSCALL_PROCESS_HEAP_START
-    asm("LOADI ACC 6");
-    asm("INT 4");
+    asm("LOADI ACC 7");
+    asm("INT 0");
     asm("STOREIN BAF ACC 0");
 
     // SYSCALL_PROCESS_HEAP_SIZE
-    asm("LOADI ACC 7");
-    asm("INT 4");
+    asm("LOADI ACC 8");
+    asm("INT 0");
     asm("STOREIN BAF ACC -1");
 
     heap_init_region(&process_heap, (void *)heap_start, heap_size);
