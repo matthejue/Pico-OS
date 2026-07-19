@@ -1,5 +1,6 @@
 #include "stdio.header"
 #include "../../common/stddef.header"
+#include "../../common/syscall.header"
 #include "../../common/uart_protocol.header"
 
 #define PRINTF_BUFFER_CAPACITY 10
@@ -8,14 +9,16 @@ int has_unread_input = false;
 int unread_input = 0;
 
 void send_byte_over_uart(int value) {
-    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 3");
+    asm("LOADI ACC 0"); // SYSCALL_SEND_BYTE_OVER_UART
     asm("INT 0");
 }
 
 int receive_byte_over_uart(void) {
     int value = 0;
 
-    asm("INT 1");
+    asm("LOADI ACC 1"); // SYSCALL_RECEIVE_BYTE_OVER_UART
+    asm("INT 0");
     asm("STOREIN BAF ACC 0");
     return value;
 }

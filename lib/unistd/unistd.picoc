@@ -1,4 +1,5 @@
 #include "unistd.header"
+#include "../../common/syscall.header"
 
 void wait_queue_init(struct wait_queue *wq) {
     wq->head = NULL;
@@ -11,7 +12,9 @@ void sleep(struct wait_queue *wq) {
     }
 
     asm("LOADIN BAF ACC -2");
-    asm("INT 4");
+    asm("MOVE ACC IN1");
+    asm("LOADI ACC 12"); // SYSCALL_SLEEP
+    asm("INT 0");
 }
 
 void wakeup(struct wait_queue *wq) {
@@ -20,5 +23,7 @@ void wakeup(struct wait_queue *wq) {
     }
 
     asm("LOADIN BAF ACC -2");
-    asm("INT 5");
+    asm("MOVE ACC IN1");
+    asm("LOADI ACC 13"); // SYSCALL_WAKEUP
+    asm("INT 0");
 }

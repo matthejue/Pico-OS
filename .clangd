@@ -1,0 +1,10 @@
+CompileFlags:
+  CompilationDatabase: .
+  Add:
+    - -x
+    - c
+    - -std=gnu11
+    - -fno-builtin
+    - -I.
+    - "-Dasm(...)="
+    - -Ddebug=

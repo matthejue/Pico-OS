@@ -2,10 +2,11 @@
 #include "../lib/stdio/stdio.header"
 #include "../lib/string/string.header"
 #include "../common/uart_protocol.header"
+#include "../common/syscall.header"
 
 #define INIT_COMMAND_BUFFER_CAPACITY 80
 
-int init_read_line(char *buffer, int capacity) {
+int read_line(char *buffer, int capacity) {
     int index = 0;
     int value = receive_byte_over_uart();
 
@@ -22,7 +23,7 @@ int init_read_line(char *buffer, int capacity) {
     return index;
 }
 
-int init_parse_process_id(char *value) {
+int parse_process_id(char *value) {
     int index = 0;
     int result = 0;
 
@@ -34,7 +35,7 @@ int init_parse_process_id(char *value) {
     return result;
 }
 
-char *init_run_arguments(char *command) {
+char *run_arguments(char *command) {
     int index = 4;
 
     while (command[index] >= '0' && command[index] <= '9') {
@@ -45,30 +46,57 @@ char *init_run_arguments(char *command) {
         index = index + 1;
     }
 
+    if (command[index] == 0) {
+        return (char *)0;
+    }
+
     return command + index;
 }
 
-void init_shutdown(void) {
-    asm("LOADI ACC 1");
-    asm("INT 4");
+int strip_background_operator(char *command) {
+    int index = strlen(command);
+
+    while (index > 0 &&
+           (command[index - 1] == ' ' || command[index - 1] == '\t')) {
+        index = index - 1;
+    }
+
+    if (index == 0 || command[index - 1] != '&') {
+        return 0;
+    }
+
+    index = index - 1;
+    while (index > 0 &&
+           (command[index - 1] == ' ' || command[index - 1] == '\t')) {
+        index = index - 1;
+    }
+    command[index] = 0;
+    return 1;
 }
 
-void init_handle_command(char *command) {
+void shutdown(void) {
+    asm("LOADI ACC 2"); // SYSCALL_SHUTDOWN
+    asm("INT 0");
+}
+
+void handle_command(char *command) {
     int pid;
+    int background;
 
     if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
-        init_shutdown();
+        shutdown();
     } else if (strncmp(command, "load ", 5) == 0 && command[5] != 0) {
         load(command + 5);
     } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
-        pid = init_parse_process_id(command + 4);
-        if (!run_with_arguments(pid, init_run_arguments(command))) {
+        background = strip_background_operator(command);
+        pid = parse_process_id(command + 4);
+        if (!run(pid, run_arguments(command))) {
             printf("error: process not found%c", '\n');
-        } else {
-            printf("exit status: %d%c", wait(pid), '\n');
+        } else if (!background) {
+            wait(pid);
         }
     } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
-        pid = init_parse_process_id(command + 7);
+        pid = parse_process_id(command + 7);
         if (!unload(pid)) {
             printf("error: process not found%c", '\n');
         }
@@ -83,8 +111,8 @@ int main(void) {
     char command[INIT_COMMAND_BUFFER_CAPACITY];
 
     while (1) {
-        init_read_line(command, INIT_COMMAND_BUFFER_CAPACITY);
-        init_handle_command(command);
+        read_line(command, INIT_COMMAND_BUFFER_CAPACITY);
+        handle_command(command);
     }
 
     return 0;

@@ -62,13 +62,13 @@ struct Process *dispatcher_tick(
 __attribute__((naked))
 void dispatcher_jump_to_process(struct Process *process) {
     asm("LOADIN SP BAF 2");
-    asm("LOADIN BAF SP 14");
-    asm("LOADIN BAF CS 16");
-    asm("LOADIN BAF DS 17");
-    asm("LOADIN BAF IN1 11");
-    asm("LOADIN BAF IN2 12");
-    asm("LOADIN BAF ACC 13");
-    asm("LOADIN BAF BAF 15");
+    asm("LOADIN BAF SP 11");
+    asm("LOADIN BAF CS 13");
+    asm("LOADIN BAF DS 14");
+    asm("LOADIN BAF IN1 8");
+    asm("LOADIN BAF IN2 9");
+    asm("LOADIN BAF ACC 10");
+    asm("LOADIN BAF BAF 12");
     asm("RTI");
 }
 
