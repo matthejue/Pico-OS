@@ -1,7 +1,7 @@
 #include "args.header"
 #include "../../common/stddef.header"
 
-// Stores the caller's BAF in the first local variable of an args helper.
+// Stores the caller's BAF in the first local variable of an args helper
 static inline void load_main_frame(void) {
     asm("LOADIN BAF IN1 1");
     asm("STOREIN BAF IN1 0");
@@ -38,7 +38,7 @@ char *args_get(int index) {
 }
 
 int atoi(char *text) {
-    int index = 0; // Current character position in text.
+    int index = 0; // Current character position in text
     int value = 0;
     int negative = false;
 
@@ -53,7 +53,7 @@ int atoi(char *text) {
 
     while (text[index] != 0) {
         if (negative) {
-            // Accumulate negatives directly so -2147483648 remains representable.
+            // Accumulate negatives directly so -2147483648 remains representable
             value = (value * 10) - (text[index] - '0');
         } else {
             value = (value * 10) + (text[index] - '0');

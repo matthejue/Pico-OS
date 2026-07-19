@@ -1,11 +1,14 @@
 #pragma once
 
 #include "../common/stddef.header"
+#include "../common/syscall.header"
+#include "../common/wait_queue.header"
 
 #define PROCESS_STATE_NEW 0
 #define PROCESS_STATE_READY 1
 #define PROCESS_STATE_RUNNING 2
 #define PROCESS_STATE_BLOCKED 3
+#define PROCESS_EXIT_STATUS_SUCCESS 0
 
 struct ActivationRecord {
     int in1;
@@ -27,8 +30,16 @@ struct Process {
     int word_count;
     char *binary_path;
     struct ActivationRecord activation;
-    int waiting_for_pid;
-    int *waiting_status;
+    // Pointer to the exit-status storage supplied by this process's wait() call
+    int *waiting_status_ptr;
+    // Queue of processes waiting for this process to exit and receive its status
+    struct wait_queue waiters;
+    // Pointer to the wait queue containing this process while it is blocked
+    struct wait_queue *waiting_queue_ptr;
+    // A process can be blocked on only one wait queue at a time, so this
+    // intrusive link is sufficient to connect it to its queue successor
+    struct Process *wait_next;
+    // Link to this process's successor in the global process list
     struct Process *next;
 };
 
@@ -45,9 +56,10 @@ struct Process *create_process(
     char *binary_path
 );
 int mark_process_ready_by_pid(int pid);
-void terminate_process(struct Process *process, int status);
 int unload_process_by_pid(int pid);
-int wait_for_process_by_pid(int pid, int *status);
+int wait_for_process_by_pid(struct WaitProcessRequest *request);
+void sleep_on_wait_queue(struct wait_queue *queue);
+int wakeup_wait_queue(struct wait_queue *queue);
 int process_heap_start(void);
 int process_heap_size(void);
 void exit_process(int status);

@@ -4,8 +4,16 @@
 #include "process_arguments.header"
 #include "process_loader.header"
 
+void send_byte_over_uart(int value);
+int receive_byte_over_uart(void);
+
 int handle_syscall(int syscall_number, int argument) {
-    if (syscall_number == SYSCALL_SHUTDOWN) {
+    if (syscall_number == SYSCALL_SEND_BYTE_OVER_UART) {
+        send_byte_over_uart(argument);
+        return 1;
+    } else if (syscall_number == SYSCALL_RECEIVE_BYTE_OVER_UART) {
+        return receive_byte_over_uart();
+    } else if (syscall_number == SYSCALL_SHUTDOWN) {
         shutdown();
         return 1;
     } else if (syscall_number == SYSCALL_LOAD_PROCESS) {
@@ -27,12 +35,12 @@ int handle_syscall(int syscall_number, int argument) {
         exit_process(argument);
         return 1;
     } else if (syscall_number == SYSCALL_WAIT_PROCESS) {
-        struct WaitProcessRequest *request = (struct WaitProcessRequest *)argument;
-
-        if (request == NULL) {
-            return 0;
-        }
-        return wait_for_process_by_pid(request->pid, request->status);
+        return wait_for_process_by_pid((struct WaitProcessRequest *)argument);
+    } else if (syscall_number == SYSCALL_SLEEP) {
+        sleep_on_wait_queue((struct wait_queue *)argument);
+        return 1;
+    } else if (syscall_number == SYSCALL_WAKEUP) {
+        return wakeup_wait_queue((struct wait_queue *)argument);
     }
 
     return 0;

@@ -15,7 +15,7 @@ void _start(void) {
 
 __attribute__((naked))
 void start_loaded_kernel(void) {
-    // BAF points behind the kernel metadata.
+    // BAF points behind the kernel metadata
     asm("LOADIN BAF ACC 0"); // ACC = code_start
     asm("LOADIN BAF IN1 -1"); // IN1 = data_start
     asm("LOADIN BAF IN2 -2"); // IN2 = stack_start

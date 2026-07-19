@@ -14,7 +14,7 @@ void heap_copy_cells(void *destination, void *source, int count) {
 void heap_split_block(struct BlockHeader *block, int size) {
     struct BlockHeader *new_block;
 
-    // Keep the requested part and turn the remaining cells into a free block.
+    // Keep the requested part and turn the remaining cells into a free block
     if (block->size >= size + sizeof(struct BlockHeader) + 1) {
         new_block = (struct BlockHeader *)((int *)(block + 1) + size);
 
@@ -93,27 +93,27 @@ void *heap_realloc_from(struct Heap *heap, void *ptr, int size) {
         return NULL;
     }
 
-    // realloc(ptr, 0) frees the block.
+    // realloc(ptr, 0) frees the block
     if (size <= 0) {
         heap_free_from(heap, ptr);
         return NULL;
     }
 
-    // realloc(NULL, size) behaves like malloc(size).
+    // realloc(NULL, size) behaves like malloc(size)
     if (ptr == NULL) {
         return heap_alloc_from(heap, size);
     }
 
     header = (struct BlockHeader *)ptr - 1;
 
-    // Shrink in place and release any useful tail space.
+    // Shrink in place and release any useful tail space
     if (header->size >= size) {
         heap_split_block(header, size);
         heap_merge_free_blocks(heap);
         return ptr;
     }
 
-    // Grow in place when the following block is free and large enough.
+    // Grow in place when the following block is free and large enough
     if (header->next != NULL && header->next->free == true) {
         if (header->size + sizeof(struct BlockHeader) + header->next->size >= size) {
             header->size = header->size + sizeof(struct BlockHeader) + header->next->size;
@@ -124,14 +124,14 @@ void *heap_realloc_from(struct Heap *heap, void *ptr, int size) {
         }
     }
 
-    // Fallback: allocate a new block, copy the old cells, then free the old block.
+    // Fallback: allocate a new block, copy the old cells, then free the old block
     new_ptr = heap_alloc_from(heap, size);
 
     if (new_ptr == NULL) {
         return NULL;
     }
 
-    // Copy only the overlap between the old block and the new requested size.
+    // Copy only the overlap between the old block and the new requested size
     copy_size = header->size;
     if (size < copy_size) {
         copy_size = size;

@@ -1,6 +1,6 @@
 #include "../common/stddef.header"
 
-#define TEST_INTERRUPT_VECTOR_COUNT 5
+#define TEST_INTERRUPT_VECTOR_COUNT 2
 
 __attribute__((section("ivt")))
 void send_byte_over_uart(int value);
@@ -8,28 +8,25 @@ void send_byte_over_uart(int value);
 __attribute__((section("ivt")))
 int receive_byte_over_uart(void);
 
-void send_byte_over_uart_interrupt_stub(void);
-void receive_byte_over_uart_interrupt_stub(void);
+void send_byte_over_uart_syscall(void);
+void receive_byte_over_uart_syscall(void);
 void timer_interrupt(void);
 void syscall_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[TEST_INTERRUPT_VECTOR_COUNT])(void) = {
-    send_byte_over_uart_interrupt_stub,
-    receive_byte_over_uart_interrupt_stub,
-    timer_interrupt,
-    0,
-    syscall_interrupt
+    syscall_interrupt,
+    timer_interrupt
 };
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void send_byte_over_uart_interrupt_stub(void) {
-    // The interrupt argument is in ACC; kernel functions receive arguments on
-    // the stack and return through IN1.
+void send_byte_over_uart_syscall(void) {
+    // The syscall argument is in IN1. Build a normal PicoC call frame for
+    // send_byte_over_uart and preserve the caller's IN1 register
     asm("PUSH IN1");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC send_byte_over_uart_interrupt_return");
+    asm("PUSH IN1");
+    asm("LOADI32 ACC send_byte_over_uart_syscall_return");
     asm("ADD ACC CS");
     asm("PUSH ACC");
     asm("LOADI32 ACC send_byte_over_uart");
@@ -39,18 +36,19 @@ void send_byte_over_uart_interrupt_stub(void) {
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void send_byte_over_uart_interrupt_return(void) {
-    asm("POP ACC"); // remove the kernel function argument
+void send_byte_over_uart_syscall_return(void) {
+    asm("POP ACC");
     asm("POP IN1");
+    asm("LOADI ACC 1");
     asm("RTI");
 }
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void receive_byte_over_uart_interrupt_stub(void) {
-    // The kernel ABI returns values in IN2; the interrupted caller expects ACC.
-    asm("PUSH IN1");
-    asm("LOADI32 ACC receive_byte_over_uart_interrupt_return");
+void receive_byte_over_uart_syscall(void) {
+    // receive_byte_over_uart returns in IN2, while syscalls return in ACC
+    asm("PUSH IN1"); // Preserve the interrupted program's IN1 register
+    asm("LOADI32 ACC receive_byte_over_uart_syscall_return");
     asm("ADD ACC CS");
     asm("PUSH ACC");
     asm("LOADI32 ACC receive_byte_over_uart");
@@ -60,8 +58,8 @@ void receive_byte_over_uart_interrupt_stub(void) {
 
 __attribute__((naked))
 __attribute__((section("ivt")))
-void receive_byte_over_uart_interrupt_return(void) {
-    asm("MOVE IN2 ACC");
+void receive_byte_over_uart_syscall_return(void) {
+    asm("MOVE IN2 ACC"); // Move PicoC's return value into the interrupt's ACC result
     asm("POP IN1");
     asm("RTI");
 }
@@ -75,12 +73,23 @@ void timer_interrupt(void) {
 __attribute__((naked))
 __attribute__((section("ivt")))
 void syscall_interrupt(void) {
-    asm("SUBI ACC 6");
-    asm("JUMP== 5");
+    // These test syscalls use ACC for both the selector and the return value.
+    // The UART cases tail-jump to the call-frame adapters above
+    asm("JUMP== 9");
     asm("SUBI ACC 1");
-    asm("JUMP== 7");
+    asm("JUMP== 12");
+    asm("SUBI ACC 6");
+    asm("JUMP== 15");
+    asm("SUBI ACC 1");
+    asm("JUMP== 17");
     asm("LOADI ACC 0");
     asm("RTI");
+    asm("LOADI32 ACC send_byte_over_uart_syscall");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+    asm("LOADI32 ACC receive_byte_over_uart_syscall");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
     asm("LOADI32 ACC -2147450880");
     asm("RTI");
     asm("LOADI ACC 16000");

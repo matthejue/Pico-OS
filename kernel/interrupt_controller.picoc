@@ -1,13 +1,13 @@
 #include "interrupt_controller.header"
 
 int interrupt_device_isrs[INTERRUPT_DEVICE_COUNT] = {
-    2,
-    1
+    1,                            // INTERRUPT_DEVICE_INTTIMER (index 0)
+    INTERRUPT_CONTROLLER_DISABLED  // INTERRUPT_DEVICE_KEYPRESS (index 1)
 };
 
 int interrupt_device_priorities[INTERRUPT_DEVICE_COUNT] = {
-    1,
-    2
+    1,  // INTERRUPT_DEVICE_INTTIMER (index 0)
+    0   // INTERRUPT_DEVICE_KEYPRESS (index 1)
 };
 
 int interrupt_controller_device_to_isr_register(int device) {
@@ -46,7 +46,9 @@ void interrupt_controller_initialize(void) {
         interrupt_index = interrupt_device_isrs[device];
         priority = interrupt_device_priorities[device];
 
-        interrupt_controller_assign_device(device, interrupt_index, priority);
+        if (interrupt_index != INTERRUPT_CONTROLLER_DISABLED) {
+            interrupt_controller_assign_device(device, interrupt_index, priority);
+        }
 
         device = device + 1;
     }
