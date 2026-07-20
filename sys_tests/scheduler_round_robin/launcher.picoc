@@ -1,0 +1,26 @@
+// dependencies: ../../lib/process/libprocess.picoc ../../lib/stdio/libstdio.picoc
+
+#include "../../lib/process/process.header"
+#include "../../common/stddef.header"
+#include "../../lib/stdio/stdio.header"
+
+int main(void) {
+    int worker_a;
+    int worker_b;
+    int worker_c;
+
+    worker_a = load("sys_tests/scheduler_round_robin/worker_a.bin");
+    worker_b = load("sys_tests/scheduler_round_robin/worker_b.bin");
+    worker_c = load("sys_tests/scheduler_round_robin/worker_c.bin");
+
+    run(worker_a, NULL);
+    run(worker_b, NULL);
+    run(worker_c, NULL);
+
+    wait(worker_a);
+    wait(worker_b);
+    wait(worker_c);
+    printf("\n");
+
+    return 0;
+}

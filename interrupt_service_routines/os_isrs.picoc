@@ -111,7 +111,8 @@ void syscall_interrupt(void) {
     load_kernel_context();
 
     // Moves the syscall arguments to the kernel stack for handle_syscall
-    asm("PUSH BAF"); // old_sp, recovered in syscall_interrupt_return
+    // Arguments are pushed in reverse order, so the saved frame is the third one
+    asm("PUSH BAF"); // old_sp (caller_context), recovered in syscall_interrupt_return
     asm("LOADIN BAF IN2 5");
     asm("PUSH IN2"); // syscall number for handle_syscall
     asm("LOADIN BAF IN2 1");
