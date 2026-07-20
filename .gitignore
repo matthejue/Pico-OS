@@ -65,3 +65,5 @@ sys_tests/*.reti
 .bak/e_compile.sh
 .bak/i_compile.sh
 *.debuginfo
+source_files_os.pdf
+git_diff_workspace_20260719_111438.pdf
