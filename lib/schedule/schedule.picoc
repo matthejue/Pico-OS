@@ -1,4 +1,4 @@
-#include "unistd.header"
+#include "schedule.header"
 #include "../../common/syscall.header"
 
 void wait_queue_init(struct wait_queue *wq) {
@@ -23,5 +23,11 @@ void wakeup(struct wait_queue *wq) {
 
     asm("LOADIN BAF IN1 3");
     asm("LOADI ACC 13"); // SYSCALL_WAKEUP
+    asm("INT 0");
+}
+
+void yield(void) {
+    asm("LOADI IN1 0");
+    asm("LOADI ACC 14"); // SYSCALL_YIELD
     asm("INT 0");
 }
