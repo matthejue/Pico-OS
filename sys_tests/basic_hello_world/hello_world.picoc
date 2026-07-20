@@ -1,0 +1,8 @@
+// dependencies: ../../lib/stdio/libstdio.picoc
+
+#include "../../lib/stdio/stdio.header"
+
+int main(void) {
+    printf("hello world");
+    return 0;
+}

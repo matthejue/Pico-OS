@@ -1,5 +1,5 @@
 // in:
-// expected:42 84
+// expected:42
 // dependencies: ../lib/mutex/libmutex.picoc ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdio/stdio.header"

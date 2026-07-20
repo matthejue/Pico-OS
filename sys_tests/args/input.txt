@@ -1,0 +1,3 @@
+load sys_tests/args/launcher.bin
+run 2
+exit
