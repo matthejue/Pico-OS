@@ -11,8 +11,7 @@ void sleep(struct wait_queue *wq) {
         return;
     }
 
-    asm("LOADIN BAF ACC -2");
-    asm("MOVE ACC IN1");
+    asm("LOADIN BAF IN1 3");
     asm("LOADI ACC 12"); // SYSCALL_SLEEP
     asm("INT 0");
 }
@@ -22,8 +21,7 @@ void wakeup(struct wait_queue *wq) {
         return;
     }
 
-    asm("LOADIN BAF ACC -2");
-    asm("MOVE ACC IN1");
+    asm("LOADIN BAF IN1 3");
     asm("LOADI ACC 13"); // SYSCALL_WAKEUP
     asm("INT 0");
 }

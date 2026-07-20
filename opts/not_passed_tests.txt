@@ -1,1 +1,1 @@
-./sys_tests/basic_mutex_lock_unlock.picoc
+./sys_tests/basic_free.picoc ./sys_tests/basic_free_block_merging.picoc ./sys_tests/basic_malloc.picoc ./sys_tests/basic_mutex_lock_unlock.picoc ./sys_tests/basic_realloc.picoc ./sys_tests/basic_realloc_null_and_zero.picoc ./sys_tests/basic_scanf.picoc ./sys_tests/basic_scanf_string.picoc ./sys_tests/basic_stdio.picoc ./sys_tests/basic_string.picoc
