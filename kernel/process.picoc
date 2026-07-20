@@ -254,7 +254,7 @@ int unload_process_by_pid(int pid) {
     return 1;
 }
 
-int wait_for_process_by_pid(struct WaitProcessRequest *request) {
+int wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context) {
     struct Process *process = current_process();
     struct Process *waited_process;
 
@@ -266,11 +266,26 @@ int wait_for_process_by_pid(struct WaitProcessRequest *request) {
     // wait() stores a pointer to its stack-local return status in request->status.
     // When the target exits, it writes its status back through this pointer
     process->waiting_status_ptr = request->status;
-    sleep_on_wait_queue(&(waited_process->waiters));
+    sleep_on_wait_queue(&(waited_process->waiters), caller_context);
     return 0;
 }
 
-void sleep_on_wait_queue(struct wait_queue *queue) {
+void switch_process_from_syscall(int *caller_context) {
+    dispatcher_save_current(
+        // syscall_interrupt captures this frame base with "MOVE SP BAF"
+        // After "MOVE BAF SP", syscall_interrupt_return's ADDI and four POPs advance SP to caller_context + 5
+        (int)(caller_context + 5),
+        caller_context[2],
+        caller_context[3],
+        caller_context[4],
+        1, // Restores IN2 as handle_syscall's successful return value
+        caller_context[5],
+        1 // Restores ACC as syscall_interrupt_return would copy IN2 into it
+    );
+    dispatcher_start_next_process();
+}
+
+void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
     struct Process *process = current_process();
 
     // wait_next is shared by all wait queues
@@ -283,6 +298,7 @@ void sleep_on_wait_queue(struct wait_queue *queue) {
     }
     queue->tail = process;
     process->state = PROCESS_STATE_BLOCKED;
+    switch_process_from_syscall(caller_context);
 }
 
 int wakeup_wait_queue(struct wait_queue *queue) {
