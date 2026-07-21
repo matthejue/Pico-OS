@@ -1,9 +1,9 @@
 // in:
 // expected:12 42
-// dependencies: ../lib/malloc/libmalloc.picoc ../lib/stdio/libstdio.picoc
+// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdio/stdio.header"
-#include "../lib/malloc/malloc.header"
+#include "../lib/stdlib/stdlib.header"
 
 int main() {
     init_process_heap();

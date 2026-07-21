@@ -1,0 +1,63 @@
+// dependencies: ../../common/heap.picoc
+
+#include "stdlib.header"
+#include "../../common/syscall.header"
+#include "../../common/stddef.header"
+
+struct Heap process_heap;
+
+void init_process_heap(void) {
+    int heap_start;
+    int heap_size;
+
+    // SYSCALL_PROCESS_HEAP_START
+    asm("LOADI ACC 7");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+
+    // SYSCALL_PROCESS_HEAP_SIZE
+    asm("LOADI ACC 8");
+    asm("INT 0");
+    asm("STOREIN BAF ACC -1");
+
+    heap_init_region(&process_heap, (void *)heap_start, heap_size);
+}
+
+void *malloc(int size) {
+    return heap_alloc_from(&process_heap, size);
+}
+
+void *realloc(void *ptr, int size) {
+    return heap_realloc_from(&process_heap, ptr, size);
+}
+
+void free(void *ptr) {
+    heap_free_from(&process_heap, ptr);
+}
+
+int atoi(char *text) {
+    int index = 0;
+    int value = 0;
+    int negative = false;
+
+    if (text == NULL) {
+        return 0;
+    }
+
+    if (text[index] == '-' || text[index] == '+') {
+        negative = text[index] == '-';
+        index = index + 1;
+    }
+
+    while (text[index] != 0) {
+        if (negative) {
+            // Accumulate negatives directly so -2147483648 remains representable
+            value = (value * 10) - (text[index] - '0');
+        } else {
+            value = (value * 10) + (text[index] - '0');
+        }
+        index = index + 1;
+    }
+
+    return value;
+}

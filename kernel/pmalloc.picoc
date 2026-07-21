@@ -24,7 +24,7 @@ int pmalloc(int size) {
         return PMALLOC_INVALID_START;
     }
 
-    return (int)memory - SRAM_BASE;
+    return (int)memory;
 }
 
 int prealloc(int start, int size) {
@@ -33,14 +33,14 @@ int prealloc(int start, int size) {
     if (start == PMALLOC_INVALID_START) {
         memory = heap_realloc_from(&process_memory_heap, NULL, size);
     } else {
-        memory = heap_realloc_from(&process_memory_heap, (void *)(SRAM_BASE + start), size);
+        memory = heap_realloc_from(&process_memory_heap, (void *)start, size);
     }
 
     if (memory == NULL) {
         return PMALLOC_INVALID_START;
     }
 
-    return (int)memory - SRAM_BASE;
+    return (int)memory;
 }
 
 void pfree(int start) {
@@ -48,5 +48,5 @@ void pfree(int start) {
         return;
     }
 
-    heap_free_from(&process_memory_heap, (void *)(SRAM_BASE + start));
+    heap_free_from(&process_memory_heap, (void *)start);
 }

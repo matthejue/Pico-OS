@@ -1,1 +1,7 @@
 load system/init.bin
+
+UART input (empty = newline): load sys_tests/basic_hello_world/launcher.bin
+
+UART input (empty = newline): load sys_tests/basic_hello_world/hello_world.bin
+hello world
+UART input (empty = newline): 
