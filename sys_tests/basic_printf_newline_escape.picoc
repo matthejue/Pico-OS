@@ -1,0 +1,10 @@
+// in:
+// expected:newline\n
+// dependencies: ../lib/stdio/libstdio.picoc
+
+#include "../lib/stdio/stdio.header"
+
+int main() {
+    printf("newline\n");
+    return 0;
+}

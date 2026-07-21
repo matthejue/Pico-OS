@@ -2,63 +2,6 @@
 #include "process.header"
 #include "scheduler.header"
 
-void dispatcher_save_current(
-    int saved_sp,
-    int saved_ds,
-    int saved_cs,
-    int saved_baf,
-    int saved_in2,
-    int saved_in1,
-    int saved_acc
-) {
-    if (current_process() == NULL) {
-        return;
-    }
-
-    current_process()->activation.sp = saved_sp;
-    current_process()->activation.ds = saved_ds;
-    current_process()->activation.cs = saved_cs;
-    current_process()->activation.baf = saved_baf;
-    current_process()->activation.in2 = saved_in2;
-    current_process()->activation.in1 = saved_in1;
-    current_process()->activation.acc = saved_acc;
-
-    if (current_process()->state == PROCESS_STATE_RUNNING) {
-        current_process()->state = PROCESS_STATE_READY;
-    }
-}
-
-struct Process *dispatcher_tick(
-    int saved_sp,
-    int saved_ds,
-    int saved_cs,
-    int saved_baf,
-    int saved_in2,
-    int saved_in1,
-    int saved_acc
-) {
-    struct Process *next_process;
-
-    dispatcher_save_current(
-        saved_sp,
-        saved_ds,
-        saved_cs,
-        saved_baf,
-        saved_in2,
-        saved_in1,
-        saved_acc
-    );
-
-    next_process = scheduler_next_process();
-    if (next_process == NULL) {
-        return current_process();
-    }
-
-    set_current_process(next_process);
-    current_process()->state = PROCESS_STATE_RUNNING;
-    return current_process();
-}
-
 __attribute__((naked))
 void dispatcher_jump_to_process(struct Process *process) {
     asm("LOADIN SP BAF 2");
@@ -91,4 +34,24 @@ void dispatcher_start_next_process(void) {
     }
 
     dispatcher_switch_to_process(next_process);
+}
+
+void dispatcher_switch_from_context(int *caller_context) {
+    struct Process *process = current_process();
+
+    if (process != NULL) {
+        process->activation.sp = (int)(caller_context + 6);
+        process->activation.ds = caller_context[1];
+        process->activation.cs = caller_context[2];
+        process->activation.baf = caller_context[3];
+        process->activation.in2 = caller_context[4];
+        process->activation.in1 = caller_context[5];
+        process->activation.acc = caller_context[6];
+
+        if (process->state == PROCESS_STATE_RUNNING) {
+            process->state = PROCESS_STATE_READY;
+        }
+    }
+
+    dispatcher_start_next_process();
 }

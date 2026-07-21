@@ -1,6 +1,0 @@
-#pragma once
-
-int args_argc(void);
-char **args_argv(void);
-char *args_get(int index);
-int atoi(char *text);

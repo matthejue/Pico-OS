@@ -14,10 +14,22 @@ OS_RUN_CPL_OPTS ?= $(shell cat ./opts/os_run_cpl_opts.txt)
 OS_RUN_EMU_OPTS ?= $(shell cat ./opts/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
 KERNEL_STACK_START ?= 15000
-START_EXIT_SYSCALL ?= 10
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
+
+USER_STARTUP_SOURCE := lib/start/libstart.picoc
+USER_STARTUP_DEPENDENCIES := \
+	$(USER_STARTUP_SOURCE) \
+	lib/start/start.picoc \
+	lib/stdlib/libstdlib.picoc \
+	lib/stdlib/stdlib.picoc \
+	lib/stdlib/stdlib.header \
+	common/heap.picoc \
+	common/heap.header
+USER_RUNTIME_SOURCES := \
+	lib/process/libprocess.picoc
+USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 
 
 # ----------------------------------------------------------------------
@@ -27,7 +39,7 @@ EXTRA_EMU_ARGS ?=
 .PHONY: help
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-all test_not_passed test-os
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -52,6 +64,7 @@ help:
 	@echo "  make kernel                     Build kernel.bin"
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
+	@echo "  make user                       Build user programs"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -81,7 +94,7 @@ run:
 
 run-os: kernel.reti system/init.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS)" "$(OS_RUN_EMU_OPTS) $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) $(EXTRA_EMU_ARGS)"
 
 run_send_keypresses:
 	@set -e; \
@@ -112,7 +125,7 @@ test_not_passed:
 
 test-os: kernel.reti system/init.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS)" "$(OS_TEST_EMU_OPTS) $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------
@@ -127,7 +140,14 @@ kernel: kernel.bin
 
 isrs: opts/isrs.reti
 
-system: system/init.bin
+SYSTEM_PROGRAM_SOURCES := $(wildcard system/*.picoc)
+SYSTEM_PROGRAM_BINARIES := $(SYSTEM_PROGRAM_SOURCES:.picoc=.bin)
+USER_PROGRAM_SOURCES := $(wildcard user/*.picoc)
+USER_PROGRAM_BINARIES := $(USER_PROGRAM_SOURCES:.picoc=.bin)
+
+system: $(SYSTEM_PROGRAM_BINARIES)
+
+user: $(USER_PROGRAM_BINARIES)
 
 ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
@@ -169,22 +189,41 @@ eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) eprom_startprogram/
 
 SYSTEM_PICOC_SOURCES := \
 	system/init.picoc \
-	lib/process/libprocess.picoc \
+	$(USER_RUNTIME_SOURCES) \
 	lib/stdio/stdio.picoc \
 	lib/string/libstring.picoc \
 	common/uart_protocol.picoc
 
-system/init.reti: $(SYSTEM_PICOC_SOURCES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header patch_start_exit_syscall.py
+system/init.reti: $(SYSTEM_PICOC_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
 	picoc_compiler \
 		$(SYSTEM_PICOC_SOURCES) \
+		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
 		-o system/init.reti
-	python3 patch_start_exit_syscall.py $(START_EXIT_SYSCALL) system/init.reti
-	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": 8000/' system/init.sections
 
 system/init.bin: system/init.reti
 	reti_emulator -f /tmp -a system/init.reti
 	hexyl system/init.bin
+
+system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_SOURCES)
+	picoc_compiler \
+		$< $(USER_PROGRAM_CPL_ARGS) \
+		-O1 -i -w -s -g -v \
+		-o $@
+
+system/%.bin: system/%.reti
+	reti_emulator -f /tmp -a $<
+	hexyl $@
+
+user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_SOURCES)
+	picoc_compiler \
+		$< $(USER_PROGRAM_CPL_ARGS) \
+		-O1 -i -w -s -g -v \
+		-o $@
+
+user/%.bin: user/%.reti
+	reti_emulator -f /tmp -a $<
+	hexyl $@
 
 KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \

@@ -1,4 +1,5 @@
 #include "syscall.header"
+#include "dispatcher.header"
 #include "kernel.header"
 #include "process.header"
 #include "process_arguments.header"
@@ -45,7 +46,7 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
     } else if (syscall_number == SYSCALL_WAKEUP) {
         return wakeup_wait_queue((struct wait_queue *)argument);
     } else if (syscall_number == SYSCALL_YIELD) {
-        switch_process_from_syscall(caller_context);
+        dispatcher_switch_from_context(caller_context);
         return 1;
     }
 

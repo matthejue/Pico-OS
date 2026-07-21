@@ -2,22 +2,5 @@
 
 struct Process;
 
-struct Process *dispatcher_tick(
-    int saved_sp,
-    int saved_ds,
-    int saved_cs,
-    int saved_baf,
-    int saved_in2,
-    int saved_in1,
-    int saved_acc
-);
-void dispatcher_save_current(
-    int saved_sp,
-    int saved_ds,
-    int saved_cs,
-    int saved_baf,
-    int saved_in2,
-    int saved_in1,
-    int saved_acc
-);
+void dispatcher_switch_from_context(int *caller_context);
 void dispatcher_start_next_process(void);

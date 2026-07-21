@@ -8,7 +8,7 @@ from pathlib import Path
 
 RESULT_FILE = Path("sys_tests/os_tests.res")
 NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
-MAX_EMULATOR_DURATION_SECONDS = 60
+MAX_EMULATOR_DURATION_SECONDS = 10
 
 
 def parse_args():
@@ -97,13 +97,6 @@ def compile_and_assemble(picoc_file, extra_cpl_args):
         return False
     if not reti_file.is_file():
         print(f"Compilation did not produce an output file for {picoc_file}")
-        return False
-
-    patch_cmd = [sys.executable, "patch_start_exit_syscall.py", "10", str(reti_file)]
-    result = run_command(patch_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if result.returncode != 0:
-        print_process_output(result)
-        print(f"Failed to patch _start exit for {reti_file}")
         return False
 
     assemble_cmd = ["reti_emulator", "-f", "/tmp", "-a", str(reti_file)]
