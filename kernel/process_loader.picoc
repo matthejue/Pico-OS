@@ -1,6 +1,5 @@
 #include "process_loader.header"
 #include "process.header"
-#include "memory_constants.header"
 #include "pmalloc.header"
 #include "../common/uart_protocol.header"
 #include "../common/sram_loader.header"
@@ -76,7 +75,6 @@ int load_process(char *path) {
         data_start,
         heap_start,
         heap_size,
-        effective_stack_start,
         word_count,
         path
     );

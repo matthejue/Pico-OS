@@ -1,4 +1,5 @@
 #include "memory_constants.header"
+#include "../kernel/memory_constants.header"
 #include "../common/sram_loader.header"
 #include "../common/uart_protocol.header"
 
@@ -54,7 +55,7 @@ void boot_main(void) {
     }
 
     payload_word_count = word_count - 4;
-    receive_words_to_sram(0, payload_word_count);
+    receive_words_to_sram(SRAM_BASE, payload_word_count);
     asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
     asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in SRAM
     asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in SRAM

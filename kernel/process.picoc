@@ -1,7 +1,7 @@
 #include "process.header"
+#include "process_arguments.header"
 #include "kernel.header"
 #include "kmalloc.header"
-#include "memory_constants.header"
 #include "pmalloc.header"
 #include "dispatcher.header"
 #include "../common/uart_protocol.header"
@@ -72,12 +72,11 @@ struct Process *create_process(
     int data_start,
     int heap_start,
     int heap_size,
-    int stack_start,
     int word_count,
     char *binary_path
 ) {
     struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
-    int stack_pointer = SRAM_BASE + base_address + stack_start;
+    int stack_pointer = base_address + size - 1;
 
     if (process == NULL) {
         return NULL;
@@ -101,22 +100,20 @@ struct Process *create_process(
     process->activation.in2 = 0;
     process->activation.acc = 0;
     /*
-     * dispatcher_jump_to_process() restores this SP and finishes with RTI, which
-     * loads PC from memory[SP + 1] on the restored process stack. Thus SP has to
-     * be kept one cell below the stored entry point. At this point BAF is just
-     * for optics: it represents an imaginary outer stack frame, so the first
-     * generated function prologue saves that instead of a random register value
+     * RTI loads PC from memory[SP + 1], increments SP, and then advances PC.
+     * Store CS - 1 so a new process starts at the first instruction of _start.
+     * BAF represents an imaginary outer stack frame
      */
     process->activation.sp = stack_pointer - 1;
     process->activation.baf = stack_pointer;
-    process->activation.cs = SRAM_BASE + base_address + code_start;
-    process->activation.ds = SRAM_BASE + base_address + data_start;
+    process->activation.cs = base_address + code_start;
+    process->activation.ds = base_address + data_start;
     process->waiting_status_ptr = NULL;
     process->waiters.head = NULL;
     process->waiters.tail = NULL;
     process->waiting_queue_ptr = NULL;
     process->wait_next = NULL;
-    *((int *)stack_pointer) = process->activation.cs;
+    *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
     if (process_list_head == NULL) {
@@ -138,6 +135,7 @@ int mark_process_ready_by_pid(int pid) {
         return 0;
     }
 
+    store_process_arguments(process, "");
     process->state = PROCESS_STATE_READY;
 
     return 1;
@@ -270,21 +268,6 @@ int wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_cont
     return 0;
 }
 
-void switch_process_from_syscall(int *caller_context) {
-    dispatcher_save_current(
-        // syscall_interrupt captures this frame base with "MOVE SP BAF"
-        // After "MOVE BAF SP", syscall_interrupt_return's ADDI and four POPs advance SP to caller_context + 5
-        (int)(caller_context + 5),
-        caller_context[2],
-        caller_context[3],
-        caller_context[4],
-        1, // Restores IN2 as handle_syscall's successful return value
-        caller_context[5],
-        1 // Restores ACC as syscall_interrupt_return would copy IN2 into it
-    );
-    dispatcher_start_next_process();
-}
-
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
     struct Process *process = current_process();
 
@@ -298,7 +281,7 @@ void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
     }
     queue->tail = process;
     process->state = PROCESS_STATE_BLOCKED;
-    switch_process_from_syscall(caller_context);
+    dispatcher_switch_from_context(caller_context);
 }
 
 int wakeup_wait_queue(struct wait_queue *queue) {
@@ -323,7 +306,7 @@ int wakeup_wait_queue(struct wait_queue *queue) {
 int process_heap_start(void) {
     struct Process *process = current_process();
 
-    return SRAM_BASE + process->base_address + process->heap_start;
+    return process->base_address + process->heap_start;
 }
 
 int process_heap_size(void) {

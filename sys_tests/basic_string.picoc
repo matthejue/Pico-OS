@@ -1,8 +1,8 @@
 // in:
 // expected:whatever
-// dependencies: ../lib/malloc/libmalloc.picoc ../lib/stdio/libstdio.picoc ../lib/string/libstring.picoc
+// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc ../lib/string/libstring.picoc
 
-#include "../lib/malloc/malloc.header"
+#include "../lib/stdlib/stdlib.header"
 #include "../lib/stdio/stdio.header"
 #include "../lib/string/string.header"
 

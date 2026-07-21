@@ -51,7 +51,6 @@ struct Process *create_process(
     int data_start,
     int heap_start,
     int heap_size,
-    int stack_start,
     int word_count,
     char *binary_path
 );
@@ -60,7 +59,6 @@ int unload_process_by_pid(int pid);
 int wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context);
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
 int wakeup_wait_queue(struct wait_queue *queue);
-void switch_process_from_syscall(int *caller_context);
 int process_heap_start(void);
 int process_heap_size(void);
 void exit_process(int status);

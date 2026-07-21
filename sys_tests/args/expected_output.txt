@@ -3,6 +3,5 @@ arg0=sys_tests/args/args.bin
 arg1=42
 arg2=beta
 arg3=gamma
-helper=4
-helper1=42
+argv_end=NULL
 number=42
