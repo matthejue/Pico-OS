@@ -1,0 +1,67 @@
+// dependencies: ../../lib/process/libprocess.picoc ../../lib/stdio/libstdio.picoc
+
+#include "../../common/stddef.header"
+#include "../../lib/process/process.header"
+#include "../../lib/stdio/stdio.header"
+
+int main(void) {
+    int worker_1;
+    int worker_2;
+    int worker_3;
+    int worker_4;
+    int worker_5;
+    int worker_6;
+    int worker_7;
+    int worker_8;
+    int address_1;
+    int address_4;
+    int address_6;
+    int address_7;
+    int address_8;
+    int first_fit_1;
+    int first_fit_2;
+    int first_fit_3;
+    int first_fit_4;
+    int first_fit_5;
+
+    worker_1 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_2 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_3 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_4 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_5 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_6 = load("sys_tests/process_memory_first_fit/worker.bin");
+
+    unload(worker_2);
+    unload(worker_3);
+    unload(worker_5);
+
+    worker_7 = load("sys_tests/process_memory_first_fit/worker.bin");
+    worker_8 = load("sys_tests/process_memory_first_fit/worker.bin");
+
+    run(worker_1, NULL);
+    address_1 = wait(worker_1);
+    run(worker_7, NULL);
+    address_7 = wait(worker_7);
+    run(worker_8, NULL);
+    address_8 = wait(worker_8);
+    run(worker_4, NULL);
+    address_4 = wait(worker_4);
+    run(worker_6, NULL);
+    address_6 = wait(worker_6);
+
+    first_fit_1 = address_1 < address_7;
+    first_fit_2 = address_7 < address_8;
+    first_fit_3 = address_8 < address_4;
+    first_fit_4 = address_4 < address_6;
+    first_fit_5 = address_8 < address_6;
+
+    printf(
+        "%d %d %d %d %d\n",
+        first_fit_1,
+        first_fit_2,
+        first_fit_3,
+        first_fit_4,
+        first_fit_5
+    );
+    return 0;
+}

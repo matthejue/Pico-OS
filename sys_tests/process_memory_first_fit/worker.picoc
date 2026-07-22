@@ -1,0 +1,5 @@
+int worker_global;
+
+int main(void) {
+    return (int)&worker_global;
+}
