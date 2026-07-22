@@ -1,26 +1,34 @@
-// dependencies: ../../lib/process/libprocess.picoc ../../lib/stdio/libstdio.picoc
+// dependencies: ../../lib/process/libprocess.picoc
 
 #include "../../lib/process/process.header"
-#include "../../common/stddef.header"
-#include "../../lib/stdio/stdio.header"
+
+void deactivate_timer_interrupt(void) {
+    asm("STOREIN BAF DS 0"); // Save DS before switching address spaces
+    asm("LOADI DS 1048576"); // 2^20
+    asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADI ACC 0");
+    asm("STORE ACC 7"); // Timer interval register
+    asm("LOADIN BAF DS 0"); // Restore DS after periphery access
+}
 
 int main(void) {
-    int worker_a;
-    int worker_b;
-    int worker_c;
+    int red_worker;
+    int green_worker;
+    int blue_worker;
 
-    worker_a = load("sys_tests/scheduler_round_robin/worker_a.bin");
-    worker_b = load("sys_tests/scheduler_round_robin/worker_b.bin");
-    worker_c = load("sys_tests/scheduler_round_robin/worker_c.bin");
+    deactivate_timer_interrupt();
 
-    run(worker_a, NULL);
-    run(worker_b, NULL);
-    run(worker_c, NULL);
+    red_worker = load("sys_tests/scheduler_round_robin/worker.bin");
+    green_worker = load("sys_tests/scheduler_round_robin/worker.bin");
+    blue_worker = load("sys_tests/scheduler_round_robin/worker.bin");
 
-    wait(worker_a);
-    wait(worker_b);
-    wait(worker_c);
-    printf("\n");
+    run(red_worker, "red");
+    run(green_worker, "green");
+    run(blue_worker, "blue");
+
+    wait(red_worker);
+    wait(green_worker);
+    wait(blue_worker);
 
     return 0;
 }

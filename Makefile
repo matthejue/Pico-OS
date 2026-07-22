@@ -342,6 +342,8 @@ clean: clean-firmware
 		-o -name '*.eprom' \
 		-o -name '*.bin' \
 		-o -name '*.res' \
+		-o -name 'output.txt' \
+		-o -name 'raw_output.txt' \
 		-o -name 'sram.bin' \
 		-o -name 'kernel.bin' \
 		\) -delete
