@@ -3,11 +3,11 @@
 #include "../../lib/stdio/stdio.header"
 #include "../../lib/schedule/schedule.header"
 
-int main(void) {
+int main(int argc, char **argv) {
     int count = 0;
 
-    while (count < 5) {
-        printf("B");
+    while (count < 4) {
+        printf("%s\n", argv[1]);
         yield();
         count = count + 1;
     }
