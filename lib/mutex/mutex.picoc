@@ -1,6 +1,6 @@
 #include "mutex.header"
 
-int testset(int *lock_addr) {
+bool testset(bool *lock_addr) {
     int old;
 
     asm("LOADIN BAF IN2 -2");
@@ -10,7 +10,7 @@ int testset(int *lock_addr) {
 }
 
 void mutex_init(struct mutex *m) {
-    m->lock = 0;
+    m->lock = false;
     wait_queue_init(&(m->waiters));
     return;
 }

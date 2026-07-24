@@ -5,7 +5,7 @@
 
 #define PRINTF_BUFFER_CAPACITY 10
 
-int has_unread_input = false;
+bool has_unread_input = false;
 int unread_input = 0;
 
 void send_byte_over_uart(int value) {
@@ -55,9 +55,9 @@ int append_decimal_buffered(char *buffer, int buffer_index, int value) {
     return buffer_index;
 }
 
-int is_decimal_digit(int value) { return value >= '0' && value <= '9'; }
+bool is_decimal_digit(int value) { return value >= '0' && value <= '9'; }
 
-int is_whitespace(int value) {
+bool is_whitespace(int value) {
     return value == ' ' || value == '\n' ||
            value == '\r' || value == '\t';
 }
@@ -86,18 +86,18 @@ void skip_whitespace(void) {
     unread(current);
 }
 
-int read_decimal(int *target) {
+bool read_decimal(int *target) {
     int current;
     int sign = 1;
     int value = 0;
-    int read_any_digit = false;
+    bool read_any_digit = false;
 
     skip_whitespace();
     current = read_input();
 
     if (!is_decimal_digit(current) && current != '-' && current != '+') {
         unread(current);
-        return 0;
+        return false;
     }
 
     if (current == '-' || current == '+') {
@@ -109,7 +109,7 @@ int read_decimal(int *target) {
 
         if (!is_decimal_digit(current)) {
             unread(current);
-            return 0;
+            return false;
         }
     }
 
@@ -122,14 +122,14 @@ int read_decimal(int *target) {
     unread(current);
 
     if (!read_any_digit) {
-        return 0;
+        return false;
     }
 
     *target = value * sign;
-    return 1;
+    return true;
 }
 
-int read_string(char *target) {
+bool read_string(char *target) {
     int index = 0;
     int current;
 
@@ -139,7 +139,7 @@ int read_string(char *target) {
     if (is_whitespace(current)) {
         unread(current);
         target[0] = 0;
-        return 0;
+        return false;
     }
 
     while (current != 0 && !is_whitespace(current)) {

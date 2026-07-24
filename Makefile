@@ -39,7 +39,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 .PHONY: help
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-all test_not_passed test-os
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user echo.bin echo.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -65,6 +65,7 @@ help:
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
+	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -94,7 +95,7 @@ run:
 
 run-os: kernel.reti system/init.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 run_send_keypresses:
 	@set -e; \
@@ -111,7 +112,7 @@ run_send_keypresses:
 # Tests
 # ----------------------------------------------------------------------
 
-test:
+test: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh "$${COLUMNS}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
@@ -123,9 +124,9 @@ test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh --not-passed "$${COLUMNS}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-test-os: kernel.reti system/init.bin
+test-os: kernel.reti system/init.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------
@@ -148,6 +149,12 @@ USER_PROGRAM_BINARIES := $(USER_PROGRAM_SOURCES:.picoc=.bin)
 system: $(SYSTEM_PROGRAM_BINARIES)
 
 user: $(USER_PROGRAM_BINARIES)
+
+user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/stdio.header common/uart_protocol.picoc common/uart_protocol.header
+
+echo.reti: user/echo.reti
+
+echo.bin: user/echo.bin
 
 ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
@@ -266,10 +273,10 @@ kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
 # ----------------------------------------------------------------------
 
 run-firmware: kernel.reti system/init.bin
-	reti_emulator kernel.reti -d -c -r $(SRAM_SIZE) -f /tmp
+	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
 
 bootload: firmware
-	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
@@ -285,7 +292,7 @@ bootload-debug:
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 	reti_emulator -f /tmp -a kernel.reti
 	hexyl kernel.bin
-	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 
 # ----------------------------------------------------------------------

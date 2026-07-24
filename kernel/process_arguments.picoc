@@ -1,7 +1,7 @@
 #include "process_arguments.header"
 #include "../common/stddef.header"
 
-int process_argument_is_space(int value) {
+bool process_argument_is_space(int value) {
     return value == ' ' || value == '\t';
 }
 
@@ -158,14 +158,14 @@ void store_process_arguments(struct Process *process, char *arguments) {
     process->activation.sp = (int)entry_pc_cell - 1;
 }
 
-int mark_process_ready_with_arguments(struct RunProcessRequest *request) {
+bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
     struct Process *process;
 
     // Only a newly created process can be started
     process = find_process_by_pid(request->pid);
     if (process == NULL ||
         process->state != PROCESS_STATE_NEW) {
-        return 0;
+        return false;
     }
 
     // Arguments must be placed on the process stack before its first start
@@ -173,5 +173,5 @@ int mark_process_ready_with_arguments(struct RunProcessRequest *request) {
 
     // This makes the process eligible for scheduling
     process->state = PROCESS_STATE_READY;
-    return 1;
+    return true;
 }

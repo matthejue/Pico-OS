@@ -4,7 +4,7 @@
 
 struct BlockHeader {
     int size;
-    int free;
+    bool free;
     struct BlockHeader *next;
 };
 

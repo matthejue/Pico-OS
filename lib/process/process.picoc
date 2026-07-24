@@ -16,7 +16,7 @@ int load(char *path) {
     return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)path);
 }
 
-int run(int pid, char *arguments) {
+bool run(int pid, char *arguments) {
     struct RunProcessRequest request;
 
     if (arguments == NULL) {
@@ -28,7 +28,7 @@ int run(int pid, char *arguments) {
     return invoke_syscall(SYSCALL_RUN_PROCESS_WITH_ARGUMENTS, (int)&request);
 }
 
-int unload(int pid) {
+bool unload(int pid) {
     return invoke_syscall(SYSCALL_UNLOAD_PROCESS, pid);
 }
 

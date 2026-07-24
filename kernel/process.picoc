@@ -127,18 +127,18 @@ struct Process *create_process(
     return process;
 }
 
-int mark_process_ready_by_pid(int pid) {
+bool mark_process_ready_by_pid(int pid) {
     struct Process *process = find_process_by_pid(pid);
 
     if (process == NULL ||
         process->state != PROCESS_STATE_NEW) {
-        return 0;
+        return false;
     }
 
     store_process_arguments(process, "");
     process->state = PROCESS_STATE_READY;
 
-    return 1;
+    return true;
 }
 
 struct Process *find_process_by_pid(int pid) {
@@ -236,7 +236,7 @@ void remove_process(struct Process *process, int status) {
     kfree(candidate);
 }
 
-int unload_process_by_pid(int pid) {
+bool unload_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 
     while (process != NULL && process->pid != pid) {
@@ -245,27 +245,27 @@ int unload_process_by_pid(int pid) {
 
     // Removing the running process requires the exit path to switch context
     if (process == NULL || process == active_process) {
-        return 0;
+        return false;
     }
 
     remove_process(process, PROCESS_EXIT_STATUS_SUCCESS);
-    return 1;
+    return true;
 }
 
-int wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context) {
+bool wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context) {
     struct Process *process = current_process();
     struct Process *waited_process;
 
     waited_process = find_process_by_pid(request->pid);
     if (waited_process == NULL) {
-        return 1;
+        return true;
     }
 
     // wait() stores a pointer to its stack-local return status in request->status.
     // When the target exits, it writes its status back through this pointer
     process->waiting_status_ptr = request->status;
     sleep_on_wait_queue(&(waited_process->waiters), caller_context);
-    return 0;
+    return false;
 }
 
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
@@ -284,11 +284,11 @@ void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
     dispatcher_switch_from_context(caller_context);
 }
 
-int wakeup_wait_queue(struct wait_queue *queue) {
+bool wakeup_wait_queue(struct wait_queue *queue) {
     struct Process *process;
 
     if (queue->head == NULL) {
-        return 0;
+        return false;
     }
 
     process = queue->head;
@@ -300,7 +300,7 @@ int wakeup_wait_queue(struct wait_queue *queue) {
     process->wait_next = NULL;
     process->waiting_queue_ptr = NULL;
     process->state = PROCESS_STATE_READY;
-    return 1;
+    return true;
 }
 
 int process_heap_start(void) {
