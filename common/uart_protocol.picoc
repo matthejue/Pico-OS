@@ -1,4 +1,5 @@
 #include "uart_protocol.header"
+#include "stddef.header"
 
 void send_byte_over_uart(int value);
 int receive_byte_over_uart(void);
@@ -26,7 +27,7 @@ int uart_append_decimal(char *buffer, int index, int value) {
     char digits[12];
     int digit_count = 0;
     int current = value;
-    int negative = value < 0;
+    bool negative = value < 0;
     int digit;
 
     if (current == 0) {

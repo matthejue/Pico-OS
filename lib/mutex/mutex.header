@@ -1,13 +1,14 @@
 #pragma once
 
 #include "../schedule/schedule.header"
+#include "../../common/stddef.header"
 
 struct mutex {
-    int lock;
+    bool lock;
     struct wait_queue waiters;
 };
 
-int testset(int *lock_addr);
+bool testset(bool *lock_addr);
 void mutex_init(struct mutex *m);
 void mutex_lock(struct mutex *m);
 void mutex_unlock(struct mutex *m);

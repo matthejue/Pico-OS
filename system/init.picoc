@@ -5,73 +5,151 @@
 #include "../common/syscall.header"
 
 #define INIT_COMMAND_BUFFER_CAPACITY 80
+// 10 characters are needed for 2147483647, plus one character for the terminating '\0'
+#define INIT_STATUS_BUFFER_CAPACITY 11
+
+int last_foreground_exit_status = 0;
+
+int is_line_whitespace(char value) {
+    return value == ' ' || value == '\t';
+}
 
 int read_line(char *buffer, int capacity) {
-    int index = 0;
-    int value = receive_byte_over_uart();
+    int length = 0;
+    int character = receive_byte_over_uart();
 
-    while (value != '\n' && value != '\r') {
-        if (index < capacity - 1) {
-            buffer[index] = value;
-            index = index + 1;
+    while (character != '\n' && character != '\r') {
+        if (length < capacity - 1) {
+            buffer[length] = character;
+            length++;
         }
 
-        value = receive_byte_over_uart();
+        // If the buffer is full, remaining characters are discarded
+        // until the end of the line is reached.
+        character = receive_byte_over_uart();
     }
 
-    buffer[index] = 0;
-    return index;
+    // Leave the buffer as a valid null-terminated C string.
+    buffer[length] = '\0';
+
+    return length;
 }
 
+// Reusing atoi would not make much sense: parses an unsigned digit prefix,
+// while atoi handles signed numbers
 int parse_process_id(char *value) {
+    int process_id = 0;
     int index = 0;
-    int result = 0;
 
     while (value[index] >= '0' && value[index] <= '9') {
-        result = result * 10 + value[index] - '0';
-        index = index + 1;
+        int digit = value[index] - '0';
+        process_id = process_id * 10 + digit;
+        index++;
     }
 
-    return result;
+    // An empty string or a string starting with a non-digit produces 0.
+    // Overflow is not checked because process IDs are expected to be small.
+    return process_id;
 }
 
-char *run_arguments(char *command) {
-    int index = 4;
+char *command_arguments(char *command) {
+    int index = 0;
 
-    while (command[index] >= '0' && command[index] <= '9') {
-        index = index + 1;
+    // Finds the end of the command name:
+    // "print   hello world"
+    //       ^ index == 5
+    while (command[index] != '\0' &&
+           !is_line_whitespace(command[index])) {
+        index++;
     }
 
-    while (command[index] == ' ' || command[index] == '\t') {
-        index = index + 1;
+    // Terminates the command name and skips separating whitespace:
+    // "print\0\0\0hello world"
+    //             ^ index == 8
+    while (is_line_whitespace(command[index])) {
+        command[index] = '\0';
+        index++;
     }
 
-    if (command[index] == 0) {
-        return (char *)0;
+    // Returns null when the command has no arguments
+    if (command[index] == '\0') {
+        return NULL;
     }
 
+    // Returns the beginning of the argument string
     return command + index;
 }
 
-int strip_background_operator(char *command) {
-    int index = strlen(command);
+char *expand_last_exit_status(char *arguments, char *result, int capacity) {
+    char status[INIT_STATUS_BUFFER_CAPACITY]; // Provides storage for the exit status as string
+    int argument_index = 0;
+    int result_index = 0;
+    int status_index;
+    int status_length;
 
-    while (index > 0 &&
-           (command[index - 1] == ' ' || command[index - 1] == '\t')) {
-        index = index - 1;
+    // Returns early when there are no arguments to expand
+    if (arguments == NULL) {
+        return NULL;
     }
 
-    if (index == 0 || command[index - 1] != '&') {
-        return 0;
+    // Formats the last foreground exit status as decimal text
+    status_length = uart_append_decimal(status, 0,
+                                        last_foreground_exit_status);
+
+    // Copies arguments while reserving one result position for the terminating '\0'
+    while (arguments[argument_index] != '\0' &&
+           result_index < capacity - 1) {
+        // Replaces the next "$?" sequence with the formatted exit status
+        if (strncmp(arguments + argument_index, "$?", 2) == 0) {
+            status_index = 0;
+
+            while (status_index < status_length) {
+                result[result_index] = status[status_index];
+                result_index++;
+                status_index++;
+            }
+
+            // Advances past both characters of the expanded "$?" sequence
+            argument_index = argument_index + 2;
+        } else {
+            // Copies any other character unchanged and advances both indices
+            result[result_index] = arguments[argument_index];
+            result_index++;
+            argument_index++;
+        }
     }
 
-    index = index - 1;
-    while (index > 0 &&
-           (command[index - 1] == ' ' || command[index - 1] == '\t')) {
-        index = index - 1;
+    // Terminates the possibly truncated result
+    result[result_index] = '\0';
+    return result;
+}
+
+bool strip_background_operator(char *command) {
+    int end = strlen(command);
+
+    // Skips trailing whitespace and leaves end after the last non-whitespace character
+    while (end > 0 && is_line_whitespace(command[end - 1])) {
+        end--;
     }
-    command[index] = 0;
-    return 1;
+
+    // Leaves commands without '&' unchanged, reports there's no '&', and avoids command[-1]
+    if (end == 0 || command[end - 1] != '&') {
+        return false;
+    }
+
+    // Moves before the background operator
+    end--;
+
+    // Skips whitespace before the background operator and leaves end at the first trailing whitespace
+    while (end > 0 && is_line_whitespace(command[end - 1])) {
+        end--;
+    }
+
+    // Terminates the command before the removed operator
+    command[end] = '\0';
+
+    // Reports a trailing '&'
+    return true;
 }
 
 void shutdown(void) {
@@ -79,7 +157,19 @@ void shutdown(void) {
     asm("INT 0");
 }
 
+void run_process(int pid, char *arguments, int background) {
+    char expanded_arguments[INIT_COMMAND_BUFFER_CAPACITY];
+
+    if (!run(pid, expand_last_exit_status(arguments, expanded_arguments,
+                                           INIT_COMMAND_BUFFER_CAPACITY))) {
+        printf("error: process not found%c", '\n');
+    } else if (!background) {
+        last_foreground_exit_status = wait(pid);
+    }
+}
+
 void handle_command(char *command) {
+    char *raw_arguments;
     int pid;
     int background;
 
@@ -90,11 +180,7 @@ void handle_command(char *command) {
     } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
         background = strip_background_operator(command);
         pid = parse_process_id(command + 4);
-        if (!run(pid, run_arguments(command))) {
-            printf("error: process not found%c", '\n');
-        } else if (!background) {
-            wait(pid);
-        }
+        run_process(pid, command_arguments(command + 4), background);
     } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
         pid = parse_process_id(command + 7);
         if (!unload(pid)) {
@@ -102,6 +188,13 @@ void handle_command(char *command) {
         }
     } else if (strcmp(command, "list") == 0) {
         list();
+    } else if (strncmp(command, "./", 2) == 0 && command[2] != 0) {
+        background = strip_background_operator(command);
+        raw_arguments = command_arguments(command);
+        pid = load(command);
+        if (pid != 0) {
+            run_process(pid, raw_arguments, background);
+       }
     } else {
         printf("error: unknown command%c", '\n');
     }

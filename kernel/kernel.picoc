@@ -6,8 +6,6 @@
 #include "kmalloc.header"
 #include "pmalloc.header"
 
-#define INIT_BINARY_PATH "system/init.bin"
-
 void shutdown(void) {
     asm("JUMP 0");
 }
@@ -20,7 +18,7 @@ int main(void) {
     initialize_process_table();
     init_process_memory_heap();
     interrupt_controller_initialize();
-    init_pid = load_process(INIT_BINARY_PATH);
+    init_pid = load_process("system/init.bin");
     if (mark_process_ready_by_pid(init_pid)) {
         interrupt_controller_activate_timer();
         dispatcher_start_next_process();

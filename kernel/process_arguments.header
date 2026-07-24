@@ -4,4 +4,4 @@
 #include "../common/syscall.header"
 
 void store_process_arguments(struct Process *process, char *arguments);
-int mark_process_ready_with_arguments(struct RunProcessRequest *request);
+bool mark_process_ready_with_arguments(struct RunProcessRequest *request);

@@ -38,7 +38,7 @@ void free(void *ptr) {
 int atoi(char *text) {
     int index = 0;
     int value = 0;
-    int negative = false;
+    bool negative = false;
 
     if (text == NULL) {
         return 0;
