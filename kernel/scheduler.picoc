@@ -1,6 +1,7 @@
 #include "scheduler.header"
+#include "../common/stddef.header"
 
-int scheduler_can_run(struct Process *process) {
+bool scheduler_can_run(struct Process *process) {
     return process != NULL &&
            (process->state == PROCESS_STATE_READY ||
             // A still-current RUNNING process may be the only runnable process

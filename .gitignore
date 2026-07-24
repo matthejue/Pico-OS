@@ -68,3 +68,5 @@ sys_tests/*.reti
 source_files_os.pdf
 git_diff_workspace_*.pdf
 .bak/
+output.txt
+raw_output.txt

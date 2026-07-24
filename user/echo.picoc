@@ -1,0 +1,17 @@
+// dependencies: ../lib/stdio/libstdio.picoc
+
+#include "../lib/stdio/stdio.header"
+
+int main(int argc, char **argv) {
+    int index = 1;
+
+    while (index < argc) {
+        printf("%s", argv[index]);
+        if (index + 1 < argc) {
+            printf(" ");
+        }
+        index = index + 1;
+    }
+    printf("%c", '\n');
+    return 0;
+}
