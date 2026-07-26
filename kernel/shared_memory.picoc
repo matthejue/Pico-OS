@@ -1,0 +1,209 @@
+#include "shared_memory.header"
+#include "kmalloc.header"
+#include "pmalloc.header"
+#include "process.header"
+
+struct SharedMemoryEntry *shared_memory_list_head = NULL;
+int next_shared_memory_id = 1;
+
+void initialize_shared_memory(void) {
+    shared_memory_list_head = NULL;
+    next_shared_memory_id = 1;
+}
+
+bool shared_memory_names_equal(char *left, char *right) {
+    int index = 0;
+
+    if (left == NULL || right == NULL) {
+        return false;
+    }
+
+    while (left[index] != 0 && left[index] == right[index]) {
+        index = index + 1;
+    }
+    return left[index] == right[index];
+}
+
+char *copy_shared_memory_name(char *name) {
+    int length = 0;
+    int index = 0;
+    char *copy;
+
+    while (name[length] != 0) {
+        length = length + 1;
+    }
+
+    copy = (char *)kmalloc(length + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    while (index < length) {
+        copy[index] = name[index];
+        index = index + 1;
+    }
+    copy[index] = 0;
+    return copy;
+}
+
+struct SharedMemoryEntry *find_shared_memory_by_name(char *name) {
+    struct SharedMemoryEntry *entry = shared_memory_list_head;
+
+    while (entry != NULL) {
+        if (shared_memory_names_equal(entry->name, name)) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+struct SharedMemoryEntry *find_shared_memory_by_id(int shared_memory_id) {
+    struct SharedMemoryEntry *entry = shared_memory_list_head;
+
+    while (entry != NULL) {
+        if (entry->id == shared_memory_id) {
+            return entry;
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+void destroy_shared_memory_entry(struct SharedMemoryEntry *entry) {
+    struct SharedMemoryEntry *previous = NULL;
+    struct SharedMemoryEntry *candidate = shared_memory_list_head;
+
+    while (candidate != NULL && candidate != entry) {
+        previous = candidate;
+        candidate = candidate->next;
+    }
+    if (candidate == NULL) {
+        return;
+    }
+
+    if (previous == NULL) {
+        shared_memory_list_head = candidate->next;
+    } else {
+        previous->next = candidate->next;
+    }
+
+    pfree((int)candidate->address);
+    kfree(candidate->name);
+    kfree(candidate);
+}
+
+int open_shared_memory(struct ShmOpenRequest *request) {
+    struct SharedMemoryEntry *entry;
+    int address;
+
+    if (request == NULL || request->name == NULL) {
+        return -1;
+    }
+
+    entry = find_shared_memory_by_name(request->name);
+    if (entry != NULL) {
+        return entry->id;
+    }
+    if (request->size <= 0) {
+        return -1;
+    }
+
+    entry = (struct SharedMemoryEntry *)kmalloc(
+        sizeof(struct SharedMemoryEntry)
+    );
+    if (entry == NULL) {
+        return -1;
+    }
+
+    entry->name = copy_shared_memory_name(request->name);
+    if (entry->name == NULL) {
+        kfree(entry);
+        return -1;
+    }
+
+    address = pmalloc(request->size);
+    if (address == PMALLOC_INVALID_START) {
+        kfree(entry->name);
+        kfree(entry);
+        return -1;
+    }
+
+    entry->id = next_shared_memory_id;
+    next_shared_memory_id = next_shared_memory_id + 1;
+    entry->address = (void *)address;
+    entry->size = request->size;
+    entry->reference_count = 0;
+    entry->unlink_requested = false;
+    entry->next = shared_memory_list_head;
+    shared_memory_list_head = entry;
+    return entry->id;
+}
+
+void *map_shared_memory(int shared_memory_id) {
+    struct SharedMemoryEntry *entry;
+    struct SharedMemoryAttachment *attachment;
+    struct Process *process = current_process();
+
+    entry = find_shared_memory_by_id(shared_memory_id);
+    if (entry == NULL || process == NULL) {
+        return NULL;
+    }
+
+    attachment = (struct SharedMemoryAttachment *)kmalloc(
+        sizeof(struct SharedMemoryAttachment)
+    );
+    if (attachment == NULL) {
+        return NULL;
+    }
+
+    attachment->entry = entry;
+    attachment->next = process->shared_memory_attachments;
+    process->shared_memory_attachments = attachment;
+    entry->reference_count = entry->reference_count + 1;
+    return entry->address;
+}
+
+int unlink_shared_memory(char *name) {
+    struct SharedMemoryEntry *entry;
+
+    if (name == NULL) {
+        return -1;
+    }
+
+    entry = find_shared_memory_by_name(name);
+    if (entry == NULL) {
+        return -1;
+    }
+
+    kfree(entry->name);
+    entry->name = NULL;
+    entry->unlink_requested = true;
+    if (entry->reference_count == 0) {
+        destroy_shared_memory_entry(entry);
+    }
+    return 0;
+}
+
+void release_process_shared_memory(struct Process *process) {
+    struct SharedMemoryAttachment *attachment;
+    struct SharedMemoryAttachment *next;
+    struct SharedMemoryEntry *entry;
+
+    if (process == NULL) {
+        return;
+    }
+
+    attachment = process->shared_memory_attachments;
+    process->shared_memory_attachments = NULL;
+    while (attachment != NULL) {
+        next = attachment->next;
+        entry = attachment->entry;
+        entry->reference_count = entry->reference_count - 1;
+        kfree(attachment);
+        if (entry->unlink_requested && entry->reference_count == 0) {
+            destroy_shared_memory_entry(entry);
+        }
+        attachment = next;
+    }
+}

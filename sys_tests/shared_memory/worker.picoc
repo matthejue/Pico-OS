@@ -1,0 +1,23 @@
+// dependencies: ../../lib/sys/mman/libmman.picoc
+
+#include "../../lib/sys/mman/mman.header"
+#include "../../lib/stdlib/stdlib.header"
+
+int main(int argc, char **argv) {
+    int shared_memory_id;
+    int *shared_values;
+    int index = atoi(argv[2]);
+
+    shared_memory_id = shm_open(argv[1], 3);
+    if (shared_memory_id < 0) {
+        return 1;
+    }
+
+    shared_values = (int *)mmap(shared_memory_id);
+    if (shared_values == NULL) {
+        return 1;
+    }
+
+    shared_values[index] = (index + 1) * 10;
+    return 0;
+}

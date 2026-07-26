@@ -1,0 +1,29 @@
+#include "mman.header"
+#include "../../../common/syscall.header"
+
+int invoke_mman_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+// Uses writable API definitions because PicoC cannot access const pointer parameters in function bodies
+int shm_open(char *name, size_t size) {
+    struct ShmOpenRequest request;
+
+    request.name = name;
+    request.size = size;
+    return invoke_mman_syscall(SYSCALL_SHM_OPEN, (int)&request);
+}
+
+void *mmap(int shared_memory_id) {
+    return (void *)invoke_mman_syscall(SYSCALL_MMAP, shared_memory_id);
+}
+
+int shm_unlink(char *name) {
+    return invoke_mman_syscall(SYSCALL_SHM_UNLINK, (int)name);
+}

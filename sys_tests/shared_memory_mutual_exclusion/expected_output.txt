@@ -1,0 +1,12 @@
+launcher: shared value = 0
+worker 1: trying to lock mutex
+worker 1: acquired mutex
+worker 1: shared value = 1
+worker 1: yielding while holding mutex
+worker 2: trying to lock mutex
+worker 1: resumed
+worker 1: unlocked mutex
+worker 2: acquired mutex
+worker 2: shared value = 2
+worker 2: unlocked mutex
+launcher: final shared value = 2
