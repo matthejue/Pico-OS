@@ -1,6 +1,6 @@
-// dependencies: ../../lib/process/libprocess.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc
 
-#include "../../lib/process/process.header"
+#include "../../lib/unistd/unistd.header"
 
 void deactivate_timer_interrupt(void) {
     asm("STOREIN BAF DS 0"); // Save DS before switching address spaces

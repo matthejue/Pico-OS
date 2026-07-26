@@ -1,4 +1,4 @@
-#include "process.header"
+#include "unistd.header"
 #include "../stdlib/stdlib.header"
 #include "../../common/syscall.header"
 #include "../../common/stddef.header"
@@ -36,15 +36,4 @@ bool unload(int pid) {
 
 void list(void) {
     invoke_syscall(SYSCALL_LIST_PROCESSES, 0);
-}
-
-int wait(int pid) {
-    int status = 0;
-    struct WaitProcessRequest request;
-
-    request.pid = pid;
-    request.status = &status;
-    while (!invoke_syscall(SYSCALL_WAIT_PROCESS, (int)&request)) {
-    }
-    return status;
 }

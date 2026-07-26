@@ -31,7 +31,15 @@ USER_STARTUP_DEPENDENCIES := \
 	common/heap.picoc \
 	common/heap.header
 USER_RUNTIME_SOURCES := \
-	lib/process/libprocess.picoc
+	lib/unistd/libunistd.picoc
+USER_RUNTIME_DEPENDENCIES := \
+	$(USER_RUNTIME_SOURCES) \
+	lib/unistd/process.picoc \
+	lib/unistd/blocking.picoc \
+	lib/unistd/unistd.header \
+	common/syscall.header \
+	common/stddef.header \
+	common/wait_queue.header
 USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 
 
@@ -208,7 +216,7 @@ SYSTEM_LIBRARY_SOURCES := \
 	lib/string/libstring.picoc \
 	common/uart_protocol.picoc
 
-system/init.reti: system/init.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
+system/init.reti: system/init.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
 		system/init.picoc $(SYSTEM_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
@@ -219,14 +227,14 @@ system/init.bin: system/init.reti
 	reti_emulator -f /tmp -a system/init.reti
 	hexyl system/init.bin
 
-system/shell.reti: system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
+system/shell.reti: system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
 		system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
 		-o system/shell.reti
 
-system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_SOURCES)
+system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES)
 	picoc_compiler \
 		$< $(USER_PROGRAM_CPL_ARGS) \
 		-O1 -i -w -s -g -v \
@@ -236,7 +244,7 @@ system/%.bin: system/%.reti
 	reti_emulator -f /tmp -a $<
 	hexyl $@
 
-user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_SOURCES)
+user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES)
 	picoc_compiler \
 		$< $(USER_PROGRAM_CPL_ARGS) \
 		-O1 -i -w -s -g -v \

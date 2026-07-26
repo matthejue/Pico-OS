@@ -1,9 +1,13 @@
 #pragma once
 
 #include "../../common/stddef.header"
+#include "../../common/wait_queue.header"
 
 int load(char *path);
 bool run(int pid, char *arguments, char **environment);
 bool unload(int pid);
 void list(void);
+void wait_queue_init(struct wait_queue *wq);
+void sleep(struct wait_queue *wq);
+void wakeup(struct wait_queue *wq);
 int wait(int pid);

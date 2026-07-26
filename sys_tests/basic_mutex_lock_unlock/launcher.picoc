@@ -1,6 +1,6 @@
-// dependencies: ../../lib/process/libprocess.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc
 
-#include "../../lib/process/process.header"
+#include "../../lib/unistd/unistd.header"
 #include "../../common/stddef.header"
 
 int main(void) {
