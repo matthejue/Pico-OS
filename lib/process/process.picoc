@@ -17,12 +17,16 @@ int load(char *path) {
     return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)path);
 }
 
-bool run(int pid, char *arguments) {
+bool run(int pid, char *arguments, char **environment) {
     struct RunProcessRequest request;
 
     request.pid = pid;
     request.arguments = arguments;
-    request.environment = environ;
+    if (environment == NULL) {
+        request.environment = environ;
+    } else {
+        request.environment = environment;
+    }
     return invoke_syscall(SYSCALL_RUN_PROCESS_WITH_ARGUMENTS, (int)&request);
 }
 
@@ -32,10 +36,6 @@ bool unload(int pid) {
 
 void list(void) {
     invoke_syscall(SYSCALL_LIST_PROCESSES, 0);
-}
-
-void exit(int status) {
-    invoke_syscall(SYSCALL_EXIT, status);
 }
 
 int wait(int pid) {

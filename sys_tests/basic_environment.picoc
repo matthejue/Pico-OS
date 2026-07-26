@@ -1,5 +1,5 @@
 // in:
-// expected:1 one one two other
+// expected:1 one one two other 1 other three 1 1
 // dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
 
 #include "../lib/stdlib/stdlib.header"
@@ -21,7 +21,16 @@ int main() {
 
     setenv("VALUE", "two", true);
     setenv("OTHER", "other", true);
-    printf("%s %s", getenv("VALUE"), getenv("OTHER"));
+    printf("%s %s ", getenv("VALUE"), getenv("OTHER"));
+
+    unsetenv("VALUE");
+    printf("%d %s ", getenv("VALUE") == NULL, getenv("OTHER"));
+
+    putenv("VALUE=three");
+    printf("%s ", getenv("VALUE"));
+
+    clearenv();
+    printf("%d %d", getenv("VALUE") == NULL, getenv("OTHER") == NULL);
 
     return 0;
 }

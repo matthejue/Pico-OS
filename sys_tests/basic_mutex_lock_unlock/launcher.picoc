@@ -6,7 +6,7 @@
 int main(void) {
     int pid = load("sys_tests/basic_mutex_lock_unlock/mutex_lock_unlock.bin");
 
-    run(pid, NULL);
+    run(pid, NULL, NULL);
     wait(pid);
     return 0;
 }

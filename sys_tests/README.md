@@ -149,6 +149,14 @@ processes inherit a copy of that environment through their initial stack.
 The shell reads `PATH` with `getenv()` and searches its colon-separated
 directories when a command does not begin with `./`. For example, the default
 `PATH=./user` entry allows `echo.bin hello` to execute `./user/echo.bin`.
+`export NAME="value"` updates the shell environment, and `$NAME` in command
+arguments expands to its value.
+
+## Process Environments
+
+`run(pid, arguments, NULL)` copies the calling process's environment to the
+child. Passing a custom null-terminated environment array as the third
+argument uses that environment instead.
 
 ## Results
 

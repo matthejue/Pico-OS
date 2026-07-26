@@ -5,7 +5,7 @@
 int main(void) {
     int pid = load("sys_tests/args/args.bin");
 
-    run(pid, "42 beta gamma");
+    run(pid, "42 beta gamma", NULL);
     wait(pid);
     return 0;
 }
