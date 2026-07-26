@@ -58,7 +58,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 .PHONY: help code-index
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-all test_not_passed test-os
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti echo.bin echo.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -85,6 +85,7 @@ help:
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
 	@echo "  make shell.bin                  Build the shell system program binary"
+	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
@@ -122,7 +123,7 @@ code-index:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin system/shell.bin
+run-os: kernel.reti system/init.bin system/shell.bin user/cat.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
@@ -153,7 +154,7 @@ test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh --not-passed "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-test-os: kernel.reti system/init.bin system/shell.bin user/echo.bin
+test-os: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
@@ -180,6 +181,10 @@ system: $(SYSTEM_PROGRAM_BINARIES)
 user: $(USER_PROGRAM_BINARIES)
 
 user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/scanf.picoc lib/stdio/stdio.header common/decimal.picoc common/decimal.header
+
+cat.reti: user/cat.reti
+
+cat.bin: user/cat.bin
 
 echo.reti: user/echo.reti
 
