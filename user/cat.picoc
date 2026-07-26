@@ -1,0 +1,52 @@
+// dependencies: ../lib/fcntl/libfcntl.picoc ../lib/unistd/libunistd.picoc
+
+#include "../lib/fcntl/fcntl.header"
+#include "../lib/unistd/unistd.header"
+
+#define CAT_BUFFER_SIZE 64
+
+int print_file(char *path) {
+    char buffer[CAT_BUFFER_SIZE];
+    int file_descriptor = open(path, O_RDONLY);
+    int count;
+    int written;
+    int result;
+
+    if (file_descriptor < 0) {
+        return 1;
+    }
+
+    count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);
+    while (count > 0) {
+        written = 0;
+        while (written < count) {
+            result = write(
+                STDOUT_FILENO,
+                buffer + written,
+                count - written
+            );
+            if (result <= 0) {
+                close(file_descriptor);
+                return 1;
+            }
+            written = written + result;
+        }
+        count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);
+    }
+
+    close(file_descriptor);
+    return count < 0;
+}
+
+int main(int argc, char **argv) {
+    int index = 1;
+    int status = 0;
+
+    while (index < argc) {
+        if (print_file(argv[index]) != 0) {
+            status = 1;
+        }
+        index = index + 1;
+    }
+    return status;
+}
