@@ -1,0 +1,13 @@
+#pragma once
+
+#include "stddef.header"
+
+#define LOADING_BAR_ENVIRONMENT_VARIABLE "PICOOS_LOADING_BAR"
+
+void uart_print_loading_bar_label(
+    bool show_loading_bar,
+    char *operation,
+    char *path
+);
+int uart_start_loading_bar(bool show_loading_bar, int total);
+int uart_update_loading_bar(int current, int total);

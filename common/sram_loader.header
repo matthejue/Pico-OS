@@ -1,3 +1,9 @@
 #pragma once
 
-void receive_words_to_sram(int base_address, int word_count);
+#include "stddef.header"
+
+void receive_words_to_sram(
+    int base_address,
+    int word_count,
+    bool show_loading_bar
+);

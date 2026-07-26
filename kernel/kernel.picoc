@@ -22,7 +22,7 @@ int main(void) {
     init_process_memory_heap();
     initialize_shared_memory();
     interrupt_controller_initialize();
-    init_pid = load_process("system/init.bin");
+    init_pid = load_process("system/init.bin", false);
     init_request.pid = init_pid;
     init_request.arguments = NULL;
     init_request.environment = NULL;

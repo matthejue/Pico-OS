@@ -27,6 +27,11 @@
 #define SYSCALL_MMAP 22
 #define SYSCALL_SHM_UNLINK 23
 
+struct LoadProcessRequest {
+    char *path;
+    bool show_loading_bar;
+};
+
 struct RunProcessRequest {
     int pid;
     char *arguments;

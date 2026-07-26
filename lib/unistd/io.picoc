@@ -1,4 +1,6 @@
 #include "unistd.header"
+#include "../stdlib/stdlib.header"
+#include "../../common/loading_bar.header"
 #include "../../common/syscall.header"
 
 int read(int file_descriptor, void *buffer, int count) {
@@ -7,6 +9,8 @@ int read(int file_descriptor, void *buffer, int count) {
     request.file_descriptor = file_descriptor;
     request.buffer = (char *)buffer;
     request.count = count;
+    request.show_loading_bar =
+        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
     return invoke_syscall(SYSCALL_READ, (int)&request);
 }
 
@@ -16,6 +20,7 @@ int write(int file_descriptor, void *buffer, int count) {
     request.file_descriptor = file_descriptor;
     request.buffer = (char *)buffer;
     request.count = count;
+    request.show_loading_bar = false;
     return invoke_syscall(SYSCALL_WRITE, (int)&request);
 }
 
@@ -29,5 +34,7 @@ int lseek(int file_descriptor, int offset, int origin) {
     request.file_descriptor = file_descriptor;
     request.offset = offset;
     request.origin = origin;
+    request.show_loading_bar =
+        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
     return invoke_syscall(SYSCALL_LSEEK, (int)&request);
 }

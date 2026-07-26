@@ -1,13 +1,25 @@
 #include "sram_loader.header"
+#include "loading_bar.header"
 #include "uart_protocol.header"
 
-void receive_words_to_sram(int base_address, int word_count) {
+void receive_words_to_sram(
+    int base_address,
+    int word_count,
+    bool show_loading_bar
+) {
     int index = 0;
+    int loading_bar_update = uart_start_loading_bar(
+        show_loading_bar,
+        word_count
+    );
     int word;
 
     while (index < word_count) {
         word = receive_word();
         *((int *)(base_address + index)) = word;
         index = index + 1;
+        if (index == loading_bar_update) {
+            loading_bar_update = uart_update_loading_bar(index, word_count);
+        }
     }
 }
