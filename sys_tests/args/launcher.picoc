@@ -1,11 +1,13 @@
-// dependencies: ../../lib/unistd/libunistd.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/stdio/libstdio.picoc
 
 #include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/wait/wait.header"
+#include "../../lib/stdio/stdio.header"
 
 int main(void) {
     int pid = load("sys_tests/args/args.bin");
 
     run(pid, "42 beta gamma", NULL);
-    wait(pid);
+    printf("getpid matches loaded pid=%d%c", waitpid(pid) == pid, '\n');
     return 0;
 }

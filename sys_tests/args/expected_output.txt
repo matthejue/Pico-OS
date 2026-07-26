@@ -5,3 +5,4 @@ arg2=beta
 arg3=gamma
 argv_end=NULL
 number=42
+getpid matches loaded pid=1

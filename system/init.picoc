@@ -1,4 +1,5 @@
 #include "../lib/unistd/unistd.header"
+#include "../lib/sys/wait/wait.header"
 #include "../lib/stdlib/stdlib.header"
 #include "../common/uart_protocol.header"
 
@@ -74,6 +75,6 @@ int main(void) {
         return 1;
     }
 
-    wait(shell_pid);
+    waitpid(shell_pid);
     return 0;
 }
