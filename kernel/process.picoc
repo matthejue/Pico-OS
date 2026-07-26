@@ -249,6 +249,22 @@ bool unload_process_by_pid(int pid) {
     return true;
 }
 
+void remove_test_processes(void) {
+    struct Process *process = process_list_head;
+    struct Process *next_process;
+
+    while (process != NULL) {
+        next_process = process->next;
+        // Init, the shell, and the syscall caller keep the test session alive
+        if (process->pid != 1 &&
+            process->pid != 2 &&
+            process != active_process) {
+            remove_process(process, PROCESS_EXIT_STATUS_SUCCESS);
+        }
+        process = next_process;
+    }
+}
+
 bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context) {
     struct Process *process = current_process();
     struct Process *waited_process;

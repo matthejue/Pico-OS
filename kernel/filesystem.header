@@ -33,11 +33,15 @@ struct FileDescriptorTable {
 };
 
 struct FileDescriptorTable *create_file_descriptor_table(void);
+struct FileDescriptorTable *inherit_standard_file_descriptors(
+    struct FileDescriptorTable *source
+);
 void destroy_file_descriptor_table(struct FileDescriptorTable *table);
 int open_file_descriptor(struct OpenRequest *request);
 int read_file_descriptor(struct IoRequest *request, int *caller_context);
 int write_file_descriptor(struct IoRequest *request);
 int close_file_descriptor(int file_descriptor);
 int seek_file_descriptor(struct SeekRequest *request);
+int duplicate_file_descriptor(struct Dup2Request *request);
 int read_stdin_character(int *caller_context);
 void handle_uart_interrupt(void);

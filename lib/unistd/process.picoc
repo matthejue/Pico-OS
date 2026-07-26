@@ -47,3 +47,7 @@ void list(void) {
 int getpid(void) {
     return invoke_syscall(SYSCALL_GETPID, 0);
 }
+
+void reset_processes(void) {
+    invoke_syscall(SYSCALL_RESET_PROCESSES, 0);
+}

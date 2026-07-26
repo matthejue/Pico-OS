@@ -58,7 +58,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 
 .PHONY: help code-index
 .PHONY: run run_send_keypresses run-os
-.PHONY: test test-all test_not_passed test-os
+.PHONY: test test-all test_not_passed test-os test-os-fast
 .PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
@@ -76,6 +76,7 @@ help:
 	@echo "  make test-all                   Run all sys tests"
 	@echo "  make test_not_passed            Run paths from ./opts/not_passed_tests.txt"
 	@echo "  make test-os                    Run OS integration tests from sys_tests/*/"
+	@echo "  make test-os-fast               Run launcher-based OS tests with one OS boot"
 	@echo "  make firmware                   Build bootloader and kernel artifacts"
 	@echo "  make bootload                   Build firmware and boot through startprogram.reti"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
@@ -158,6 +159,10 @@ test_not_passed:
 test-os: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+
+test-os-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+	./export_environment_vars_for_makefile.sh;\
+	./run_os_tests_fast.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------

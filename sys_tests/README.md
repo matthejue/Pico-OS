@@ -92,6 +92,17 @@ hello world
 `make test-os` compares `output.txt` against this file. Trailing whitespace is
 ignored for the comparison.
 
+The shell redirects a started process's standard output with a trailing
+`> path`:
+
+```text
+echo.bin hello > ./sys_tests/example/output.txt
+```
+
+It opens and truncates the target, uses `dup2()` for standard output, and
+passes the resulting standard descriptors to the process when it is started.
+Processes subsequently started by that process inherit the same redirection.
+
 ## Running OS Tests
 
 Run all configured OS tests:
@@ -99,6 +110,25 @@ Run all configured OS tests:
 ```sh
 make test-os
 ```
+
+Run launcher-based tests through one shared OS boot:
+
+```sh
+make test-os-fast
+```
+
+`system/fast_os_test_launcher.picoc` reads the selected test directories from
+a generated manifest. It starts each available `launcher.bin` in sequence,
+redirects its inherited standard output directly to that test's `output.txt`,
+and removes leftover test processes before continuing. The launcher removes
+`PICOOS_LOADING_BAR` from its environment first, so test launchers and their
+workers do not inherit loader UI output.
+
+Tests whose expected behavior depends on interactive shell input still use the
+normal isolated OS runner. This includes tests without a `launcher.picoc` and
+tests whose `input.txt` does more than load and run that launcher. Their
+results are included in the same final summary, so `test-os-fast` covers the
+same selected test directories as `test-os`.
 
 Run one configured OS test without comparing `expected_output.txt`:
 
