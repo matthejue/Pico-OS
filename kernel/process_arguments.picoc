@@ -12,8 +12,12 @@ int process_argument_token_count(char *arguments) {
     // Number of whitespace-separated arguments found so far
     int token_count = 0;
 
+    if (arguments == NULL) {
+        return 0;
+    }
+
     while (arguments[index] != 0) {
-        // Ignore separators before the next argument
+        // Ignores separators before the next argument
         while (process_argument_is_space(arguments[index])) {
             index = index + 1;
         }
@@ -24,7 +28,7 @@ int process_argument_token_count(char *arguments) {
 
         while (arguments[index] != 0 &&
                !process_argument_is_space(arguments[index])) {
-            // Move past the current argument before looking for the next one
+            // Moves past the current argument before looking for the next one
             index = index + 1;
         }
     }
@@ -39,14 +43,18 @@ int process_argument_string_cell_count(char *arguments) {
     // Number of cells needed for the separated argument strings
     int string_cells = 0;
 
+    if (arguments == NULL) {
+        return 0;
+    }
+
     while (arguments[index] != 0) {
-        // Ignore separators before the next argument
+        // Ignores separators before the next argument
         while (process_argument_is_space(arguments[index])) {
             index = index + 1;
         }
 
         if (arguments[index] != 0) {
-            // Count the characters that will be copied into this argument
+            // Counts the characters copied into this argument
             while (arguments[index] != 0 &&
                    !process_argument_is_space(arguments[index])) {
                 string_cells = string_cells + 1;
@@ -60,78 +68,114 @@ int process_argument_string_cell_count(char *arguments) {
     return string_cells;
 }
 
-void store_process_arguments(struct Process *process, char *arguments) {
+int process_environment_count(char **environment) {
+    int count = 0;
+
+    if (environment == NULL) {
+        return 0;
+    }
+
+    while (environment[count] != NULL) {
+        count = count + 1;
+    }
+
+    return count;
+}
+
+int process_string_cell_count(char *value) {
+    int count = 1;
+
+    while (value[count - 1] != 0) {
+        count = count + 1;
+    }
+
+    return count;
+}
+
+char *copy_process_string(char *target, char *source) {
+    int index = 0;
+
+    while (source[index] != 0) {
+        target[index] = source[index];
+        index = index + 1;
+    }
+
+    target[index] = 0;
+    return target + index + 1;
+}
+
+void store_process_arguments(
+    struct Process *process,
+    char *arguments,
+    char **environment
+) {
     // Number of arguments, including the binary path in argv[0]
-    int argc;
-    // Cells for the entry PC, argc, argv, entries, and strings
+    int argc = process_argument_token_count(arguments) + 1;
+    int environment_count = process_environment_count(environment);
+    // Cells for the entry PC, argc, argv, envp, their sentinels, and strings
     int required_cells;
-    // Process-relative offset where the argument data will begin
+    // Process-relative offset where the argument data begins
     int argument_base_offset;
     // Pointers into the process's initial stack layout
     int *entry_pc_cell;
     int *argc_cell;
     char **argv;
-    // Next character where a copied argument will be stored
+    char **envp;
+    // Next character where a copied argument or environment string is stored
     char *string_target;
     // Index of the next argv entry to point at a copied argument string
     int argument_index = 1;
-    int path_index = 0;
+    int environment_index = 0;
+    int path_cells;
+    int environment_string_cells = 0;
     // Current position in the original argument string
     int source_index = 0;
 
-    // Counts the arguments, calculates the memory cells needed for the initial
-    // process argument layout, and determines its starting offset
-    // Adds one for argv[0], which stores the path used to load the process
-    argc = process_argument_token_count(arguments) + 1;
-    // The argv table has one extra entry for the required NULL sentinel
-    required_cells = 1 + 2 + argc + 1 +
-                     process_argument_string_cell_count(arguments);
-    // Counts the cells needed to store the binary path in argv[0]
-    while (process->binary_path[path_index] != 0) {
-        required_cells = required_cells + 1;
-        path_index = path_index + 1;
+    // Counts the arguments, environment strings, and cells needed for the
+    // initial process argument layout
+    path_cells = process_string_cell_count(process->binary_path);
+    while (environment_index < environment_count) {
+        environment_string_cells = environment_string_cells +
+            process_string_cell_count(environment[environment_index]);
+        environment_index = environment_index + 1;
     }
-    // Includes the trailing '\0' for argv[0]
-    required_cells = required_cells + 1;
+
+    // Reserves the RTI entry PC before the standard argc/argv/envp layout
+    // Both pointer tables include a required NULL sentinel
+    required_cells = 1 + 1 + argc + 1 + environment_count + 1 +
+                     path_cells +
+                     process_argument_string_cell_count(arguments) +
+                     environment_string_cells;
     argument_base_offset = process->size - required_cells;
 
-    // Calculates the addresses of the process entry data, argv table, and
-    // string storage within the reserved memory area
-    // [entry PC][argc][argv][entries ...][NULL][strings ...]
+    // Calculates pointers into [entry PC][argc][argv][NULL][envp][NULL][strings]
     entry_pc_cell = (int *)(process->base_address + argument_base_offset);
     argc_cell = entry_pc_cell + 1;
-    argv = (char **)(argc_cell + 2);
-    string_target = (char *)(argv + argc + 1);
+    argv = (char **)(argc_cell + 1);
+    envp = argv + argc + 1;
+    string_target = (char *)(envp + environment_count + 1);
 
-    // Initializes the entry PC, argc, and argv pointer
+    // Initializes the entry PC, argc, and argv/envp sentinels
     *entry_pc_cell = process->activation.cs - 1;
     *argc_cell = argc;
-    *(argc_cell + 1) = (int)argv;
     argv[argc] = NULL;
+    envp[environment_count] = NULL;
 
     // Stores argv[0] and copies the process binary path into the string area
-    // argv[0] always contains the path used to load the process
     argv[0] = string_target;
-    path_index = 0;
-    while (process->binary_path[path_index] != 0) {
-        *string_target = process->binary_path[path_index];
-        string_target = string_target + 1;
-        path_index = path_index + 1;
-    }
-
-    // Terminates the copied path as a C string and advances to the next string
-    *string_target = 0;
-    string_target = string_target + 1;
+    string_target = copy_process_string(
+        string_target,
+        process->binary_path
+    );
 
     // Parses each whitespace-separated argument and copies it into process
-    // memory while adding a pointer to it in the argv table.
-    while (arguments[source_index] != 0) {
+    // memory while adding a pointer to it in the argv table
+    while (arguments != NULL && arguments[source_index] != 0) {
         // Skips separators before the next argument
         while (process_argument_is_space(arguments[source_index])) {
             source_index = source_index + 1;
         }
 
-        // Ignores trailing whitespace: 0 marks the end of the input C string
         if (arguments[source_index] != 0) {
             // Stores a pointer to the separately stored copy of this argument
             argv[argument_index] = string_target;
@@ -151,10 +195,19 @@ void store_process_arguments(struct Process *process, char *arguments) {
         }
     }
 
+    environment_index = 0;
+    while (environment_index < environment_count) {
+        envp[environment_index] = string_target;
+        string_target = copy_process_string(
+            string_target,
+            environment[environment_index]
+        );
+        environment_index = environment_index + 1;
+    }
+
     // Saves the initial base address and stack pointer used by the dispatcher
-    // to enter the process with its arguments
     // Naked _start uses BAF + 3 and BAF + 4 for argc and argv
-    process->activation.baf = (int)entry_pc_cell - 2;
+    process->activation.baf = (int)argc_cell - 3;
     process->activation.sp = (int)entry_pc_cell - 1;
 }
 
@@ -168,8 +221,12 @@ bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
         return false;
     }
 
-    // Arguments must be placed on the process stack before its first start
-    store_process_arguments(process, request->arguments);
+    // Arguments and environment must be placed on the process stack first
+    store_process_arguments(
+        process,
+        request->arguments,
+        request->environment
+    );
 
     // This makes the process eligible for scheduling
     process->state = PROCESS_STATE_READY;

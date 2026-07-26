@@ -38,9 +38,13 @@ int load_process(char *path) {
     int base_address;
     struct Process *process;
 
-    uart_send_load_command(path);
+    uart_send_file_command("load ", path);
 
     word_count = receive_word();
+    if (word_count == 0) {
+        return 0;
+    }
+
     code_start = receive_word();
     data_start = receive_word();
     heap_start = receive_word();

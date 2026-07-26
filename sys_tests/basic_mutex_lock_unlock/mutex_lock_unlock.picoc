@@ -1,0 +1,20 @@
+// dependencies: ../../lib/mutex/libmutex.picoc ../../lib/stdio/libstdio.picoc
+
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/mutex/mutex.header"
+
+int main(void) {
+    struct mutex m;
+
+    mutex_init(&m);
+
+    mutex_lock(&m);
+    printf("%d ", 42);
+    mutex_unlock(&m);
+
+    mutex_lock(&m);
+    printf("%d ", 84);
+    mutex_unlock(&m);
+
+    return 0;
+}

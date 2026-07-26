@@ -1,0 +1,11 @@
+// in:
+// expected:newline:\n carriage-return:\r delete:\d127
+// dependencies: ../lib/stdio/libstdio.picoc
+
+#include "../lib/stdio/stdio.header"
+
+int main() {
+    printf("newline:\n carriage-return:\r delete:%c", 127);
+
+    return 0;
+}

@@ -2,6 +2,7 @@
 #include "dispatcher.header"
 #include "interrupt_controller.header"
 #include "process.header"
+#include "process_arguments.header"
 #include "process_loader.header"
 #include "kmalloc.header"
 #include "pmalloc.header"
@@ -12,6 +13,7 @@ void shutdown(void) {
 
 int main(void) {
     int init_pid;
+    struct RunProcessRequest init_request;
 
     debug;
     init_kernel_heap();
@@ -19,7 +21,10 @@ int main(void) {
     init_process_memory_heap();
     interrupt_controller_initialize();
     init_pid = load_process("system/init.bin");
-    if (mark_process_ready_by_pid(init_pid)) {
+    init_request.pid = init_pid;
+    init_request.arguments = NULL;
+    init_request.environment = NULL;
+    if (mark_process_ready_with_arguments(&init_request)) {
         interrupt_controller_activate_timer();
         dispatcher_start_next_process();
     }

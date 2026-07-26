@@ -2,9 +2,15 @@
 #include "../process/process.header"
 
 int main(int argc, char **argv);
+void initialize_environment(char **environment);
+
+void start_process(int argc, char **argv) {
+    init_process_heap();
+    initialize_environment(argv + argc + 1);
+    exit(main(argc, argv));
+}
 
 __attribute__((naked))
-void _start(int argc, char **argv) {
-    init_process_heap();
-    exit(main(argc, argv));
+void _start(int argc, char *first_argument) {
+    start_process(argc, (char **)&first_argument);
 }

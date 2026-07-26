@@ -1,0 +1,27 @@
+// in:
+// expected:1 one one two other
+// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
+
+#include "../lib/stdlib/stdlib.header"
+#include "../lib/stdio/stdio.header"
+
+void initialize_environment(char **environment);
+
+int main() {
+    init_process_heap();
+    initialize_environment(NULL);
+
+    printf("%d ", getenv("VALUE") == NULL);
+
+    setenv("VALUE", "one", true);
+    printf("%s ", getenv("VALUE"));
+
+    setenv("VALUE", "ignored", false);
+    printf("%s ", getenv("VALUE"));
+
+    setenv("VALUE", "two", true);
+    setenv("OTHER", "other", true);
+    printf("%s %s", getenv("VALUE"), getenv("OTHER"));
+
+    return 0;
+}

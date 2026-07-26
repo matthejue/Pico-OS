@@ -1,0 +1,268 @@
+#include "../lib/process/process.header"
+#include "../lib/stdio/stdio.header"
+#include "../lib/stdlib/stdlib.header"
+#include "../lib/string/string.header"
+#include "../common/uart_protocol.header"
+#include "../common/syscall.header"
+
+#define SHELL_COMMAND_BUFFER_CAPACITY 80
+#define SHELL_EXECUTABLE_PATH_CAPACITY 160
+// 10 characters are needed for 2147483647, plus one character for the terminating '\0'
+#define SHELL_STATUS_BUFFER_CAPACITY 11
+
+int last_foreground_exit_status = 0;
+char *executable_search_path = NULL;
+
+int is_line_whitespace(char value) {
+    return value == ' ' || value == '\t';
+}
+
+int read_line(char *buffer, int capacity) {
+    int length = 0;
+    int character = receive_byte_over_uart();
+
+    while (character != '\n' && character != '\r') {
+        if (length < capacity - 1) {
+            buffer[length] = character;
+            length++;
+        }
+
+        // If the buffer is full, remaining characters are discarded
+        // until the end of the line is reached.
+        character = receive_byte_over_uart();
+    }
+
+    // Leave the buffer as a valid null-terminated C string.
+    buffer[length] = '\0';
+
+    return length;
+}
+
+// Reusing atoi would not make much sense: parses an unsigned digit prefix,
+// while atoi handles signed numbers
+int parse_process_id(char *value) {
+    int process_id = 0;
+    int index = 0;
+
+    while (value[index] >= '0' && value[index] <= '9') {
+        int digit = value[index] - '0';
+        process_id = process_id * 10 + digit;
+        index++;
+    }
+
+    // An empty string or a string starting with a non-digit produces 0.
+    // Overflow is not checked because process IDs are expected to be small.
+    return process_id;
+}
+
+char *command_arguments(char *command) {
+    int index = 0;
+
+    // Finds the end of the command name:
+    // "print   hello world"
+    //       ^ index == 5
+    while (command[index] != '\0' &&
+           !is_line_whitespace(command[index])) {
+        index++;
+    }
+
+    // Terminates the command name and skips separating whitespace:
+    // "print\0\0\0hello world"
+    //             ^ index == 8
+    while (is_line_whitespace(command[index])) {
+        command[index] = '\0';
+        index++;
+    }
+
+    // Returns null when the command has no arguments
+    if (command[index] == '\0') {
+        return NULL;
+    }
+
+    // Returns the beginning of the argument string
+    return command + index;
+}
+
+char *expand_last_exit_status(char *arguments, char *result, int capacity) {
+    char status[SHELL_STATUS_BUFFER_CAPACITY]; // Provides storage for the exit status as string
+    int argument_index = 0;
+    int result_index = 0;
+    int status_index;
+    int status_length;
+
+    // Returns early when there are no arguments to expand
+    if (arguments == NULL) {
+        return NULL;
+    }
+
+    // Formats the last foreground exit status as decimal text
+    status_length = uart_append_decimal(status, 0,
+                                        last_foreground_exit_status);
+
+    // Copies arguments while reserving one result position for the terminating '\0'
+    while (arguments[argument_index] != '\0' &&
+           result_index < capacity - 1) {
+        // Replaces the next "$?" sequence with the formatted exit status
+        if (strncmp(arguments + argument_index, "$?", 2) == 0) {
+            status_index = 0;
+
+            while (status_index < status_length &&
+                   result_index < capacity - 1) {
+                result[result_index] = status[status_index];
+                result_index++;
+                status_index++;
+            }
+
+            // Advances past both characters of the expanded "$?" sequence
+            argument_index = argument_index + 2;
+        } else {
+            // Copies any other character unchanged and advances both indices
+            result[result_index] = arguments[argument_index];
+            result_index++;
+            argument_index++;
+        }
+    }
+
+    // Terminates the possibly truncated result
+    result[result_index] = '\0';
+    return result;
+}
+
+bool strip_background_operator(char *command) {
+    int end = strlen(command);
+
+    // Skips trailing whitespace and leaves end after the last non-whitespace character
+    while (end > 0 && is_line_whitespace(command[end - 1])) {
+        end--;
+    }
+
+    // Leaves commands without '&' unchanged, reports there's no '&', and avoids command[-1]
+    if (end == 0 || command[end - 1] != '&') {
+        return false;
+    }
+
+    // Moves before the background operator
+    end--;
+
+    // Skips whitespace before the background operator and leaves end at the first trailing whitespace
+    while (end > 0 && is_line_whitespace(command[end - 1])) {
+        end--;
+    }
+
+    // Terminates the command before the removed operator
+    command[end] = '\0';
+
+    // Reports a trailing '&'
+    return true;
+}
+
+void shutdown(void) {
+    asm("LOADI ACC 2"); // SYSCALL_SHUTDOWN
+    asm("INT 0");
+}
+
+void run_process(int pid, char *arguments, bool background) {
+    char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
+
+    if (!run(pid, expand_last_exit_status(
+                      arguments,
+                      expanded_arguments,
+                      SHELL_COMMAND_BUFFER_CAPACITY))) {
+        printf("error: process not found%c", '\n');
+    } else if (!background) {
+        last_foreground_exit_status = wait(pid);
+    }
+}
+
+void build_executable_path(char *directory, char *name, char *result) {
+    // Builds the same directory/name form used by direct process loading
+    strcpy(result, directory);
+    strcat(result, "/");
+    strcat(result, name);
+}
+
+int load_from_path(char *name) {
+    char executable_path[SHELL_EXECUTABLE_PATH_CAPACITY];
+    int directory_start = 0;
+    int path_index = 0;
+    char separator;
+    int pid;
+
+    while (1) {
+        // Finds the end of the next directory in the colon-separated PATH
+        while (executable_search_path[path_index] != 0 &&
+               executable_search_path[path_index] != ':') {
+            path_index = path_index + 1;
+        }
+
+        // Temporarily terminates this entry so normal string helpers can use it
+        separator = executable_search_path[path_index];
+        executable_search_path[path_index] = 0;
+        build_executable_path(
+            executable_search_path + directory_start,
+            name,
+            executable_path
+        );
+        executable_search_path[path_index] = separator;
+
+        // Returns the first process found in PATH order
+        pid = load(executable_path);
+        if (pid != 0 || separator == 0) {
+            return pid;
+        }
+
+        path_index = path_index + 1;
+        directory_start = path_index;
+    }
+}
+
+void handle_command(char *command) {
+    char *raw_arguments;
+    int pid;
+    bool background;
+
+    if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
+        shutdown();
+    } else if (strncmp(command, "load ", 5) == 0 && command[5] != 0) {
+        load(command + 5);
+    } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
+        background = strip_background_operator(command);
+        pid = parse_process_id(command + 4);
+        run_process(pid, command_arguments(command + 4), background);
+    } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
+        pid = parse_process_id(command + 7);
+        if (!unload(pid)) {
+            printf("error: process not found%c", '\n');
+        }
+    } else if (strcmp(command, "list") == 0) {
+        list();
+    } else {
+        background = strip_background_operator(command);
+        raw_arguments = command_arguments(command);
+
+        if (strncmp(command, "./", 2) == 0 && command[2] != 0) {
+            pid = load(command);
+        } else {
+            pid = load_from_path(command);
+        }
+
+        if (pid == 0) {
+            printf("error: unknown command%c", '\n');
+        } else {
+            run_process(pid, raw_arguments, background);
+        }
+    }
+}
+
+int main(int argc, char **argv) {
+    char command[SHELL_COMMAND_BUFFER_CAPACITY];
+
+    executable_search_path = getenv("PATH");
+
+    while (1) {
+        read_line(command, SHELL_COMMAND_BUFFER_CAPACITY);
+        handle_command(command);
+    }
+
+    return 0;
+}
