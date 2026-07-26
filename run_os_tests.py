@@ -151,14 +151,34 @@ def render_terminal_output(output):
     return "\n".join("".join(line) for line in lines)
 
 
+def is_loading_bar_line(line):
+    return (
+        len(line) >= 15
+        and line[0] == "["
+        and line[11:13] == "] "
+        and line[-1] == "%"
+        and all(character in "# " for character in line[1:11])
+        and line[13:-1].isdigit()
+    )
+
+
 def normalize_os_output(output):
     rendered = render_terminal_output(output)
+    rendered_lines = rendered.splitlines()
     lines = []
-    for line in rendered.splitlines():
+    for index, line in enumerate(rendered_lines):
         prompt_index = line.find(SHELL_PROMPT)
         if prompt_index >= 0:
             line = line[:prompt_index]
-        if line:
+        next_line_is_loading_bar = (
+            index + 1 < len(rendered_lines)
+            and is_loading_bar_line(rendered_lines[index + 1])
+        )
+        is_loading_label = (
+            (line.startswith("load ") or line.startswith("read "))
+            and next_line_is_loading_bar
+        )
+        if line and not is_loading_bar_line(line) and not is_loading_label:
             lines.append(line)
     return "\n".join(lines)
 

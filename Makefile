@@ -46,6 +46,7 @@ USER_RUNTIME_DEPENDENCIES := \
 	lib/sys/wait/wait.header \
 	common/syscall.header \
 	common/file.header \
+	common/loading_bar.header \
 	common/stddef.header \
 	common/wait_queue.header
 USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
@@ -206,11 +207,16 @@ opts/isrs.reti: $(ISRS_PICOC_SOURCES)
 
 EPROM_PICOC_SOURCES := \
 	eprom_startprogram/startprogram.picoc \
+	common/loading_bar.picoc \
 	common/sram_loader.picoc \
 	kernel/uart_hardware.picoc \
 	common/uart_protocol.picoc
 
-eprom_startprogram/memory_constants.header: $(EPROM_PICOC_SOURCES) kernel/memory_constants.header
+EPROM_HEADERS := \
+	opts/config.header \
+	common/loading_bar.header
+
+eprom_startprogram/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) kernel/memory_constants.header
 	# The -k build creates memory_constants.header if none exists.
 	# This earlier placeholder is only needed because preprocessing
 	# startprogram.picoc requires the include before -k can compute addresses.
@@ -226,7 +232,7 @@ eprom_startprogram/memory_constants.header: $(EPROM_PICOC_SOURCES) kernel/memory
 		-O1 -s -k eprom \
 		-o eprom_startprogram/memory_constants.header
 
-eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) eprom_startprogram/memory_constants.header kernel/memory_constants.header
+eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) eprom_startprogram/memory_constants.header kernel/memory_constants.header
 	picoc_compiler \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
@@ -239,7 +245,7 @@ SHELL_LIBRARY_SOURCES := \
 	$(SYSTEM_LIBRARY_SOURCES) \
 	common/decimal.picoc
 
-system/init.reti: system/init.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
+system/init.reti: system/init.picoc opts/config.header common/loading_bar.header $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
 		system/init.picoc $(SYSTEM_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
@@ -279,6 +285,7 @@ user/%.bin: user/%.reti
 
 KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \
+	common/loading_bar.picoc \
 	common/sram_loader.picoc \
 	kernel/uart_hardware.picoc \
 	common/uart_protocol.picoc \

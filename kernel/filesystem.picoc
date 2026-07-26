@@ -2,6 +2,7 @@
 #include "kmalloc.header"
 #include "periphery.header"
 #include "process.header"
+#include "../common/loading_bar.header"
 #include "../common/uart_protocol.header"
 
 #define UART_RECEIVE_REGISTER 1
@@ -139,10 +140,23 @@ int receive_file_size(char *path) {
     return receive_word();
 }
 
-void discard_uart_bytes(int count) {
+void discard_uart_bytes(int count, bool show_loading_bar) {
+    int discarded = 0;
+    int loading_bar_update = uart_start_loading_bar(
+        show_loading_bar,
+        count
+    );
+
     while (count > 0) {
         receive_byte_over_uart();
         count = count - 1;
+        discarded = discarded + 1;
+        if (discarded == loading_bar_update) {
+            loading_bar_update = uart_update_loading_bar(
+                discarded,
+                discarded + count
+            );
+        }
     }
 }
 
@@ -152,7 +166,7 @@ bool file_exists(char *path) {
     if (size < 0) {
         return false;
     }
-    discard_uart_bytes(size);
+    discard_uart_bytes(size, false);
     return true;
 }
 
@@ -280,16 +294,27 @@ int read_stdin_character(int *caller_context) {
 int read_regular_file(
     struct FileDescriptor *descriptor,
     char *buffer,
-    int count
+    int count,
+    bool show_loading_bar
 ) {
     int file_size = receive_file_size(descriptor->path);
     int file_index = 0;
     int copied = 0;
+    int loading_bar_update;
     int value;
 
     if (file_size < 0) {
         return -1;
     }
+    uart_print_loading_bar_label(
+        show_loading_bar,
+        "read ",
+        descriptor->path
+    );
+    loading_bar_update = uart_start_loading_bar(
+        show_loading_bar,
+        file_size
+    );
 
     while (file_index < file_size) {
         value = receive_byte_over_uart();
@@ -298,6 +323,12 @@ int read_regular_file(
             copied = copied + 1;
         }
         file_index = file_index + 1;
+        if (file_index == loading_bar_update) {
+            loading_bar_update = uart_update_loading_bar(
+                file_index,
+                file_size
+            );
+        }
     }
     descriptor->offset = descriptor->offset + copied;
     return copied;
@@ -331,7 +362,12 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
         );
     }
     if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
-        return read_regular_file(descriptor, request->buffer, request->count);
+        return read_regular_file(
+            descriptor,
+            request->buffer,
+            request->count,
+            request->show_loading_bar
+        );
     }
     return -1;
 }
@@ -419,7 +455,12 @@ int seek_file_descriptor(struct SeekRequest *request) {
         if (offset < 0) {
             return -1;
         }
-        discard_uart_bytes(offset);
+        uart_print_loading_bar_label(
+            request->show_loading_bar,
+            "read ",
+            descriptor->path
+        );
+        discard_uart_bytes(offset, request->show_loading_bar);
         offset = offset + request->offset;
     } else {
         return -1;

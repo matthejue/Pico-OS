@@ -2,6 +2,8 @@
 #include "../lib/fcntl/fcntl.header"
 #include "../lib/sys/wait/wait.header"
 #include "../lib/stdlib/stdlib.header"
+#include "../common/loading_bar.header"
+#include "../opts/config.header"
 
 #define INIT_ENVIRONMENT_CAPACITY 256
 
@@ -72,6 +74,15 @@ int main(void) {
 
     if (!read_environment()) {
         return 1;
+    }
+    if (loading_bar_enabled) {
+        if (setenv(
+                LOADING_BAR_ENVIRONMENT_VARIABLE,
+                "true",
+                true
+            ) != 0) {
+            return 1;
+        }
     }
 
     shell_pid = load("./system/shell.bin");
