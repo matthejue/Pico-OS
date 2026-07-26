@@ -6,9 +6,9 @@ This directory contains two different kinds of tests:
   `sys_tests/`
 - operating-system integration tests as subdirectories below `sys_tests/`
 
-The OS tests are run through the Pico-OS kernel and init process. They are meant
-to test commands implemented by `system/init.picoc`, such as `load`, `run`,
-`unload`, `list`, `quit`, and `exit`.
+The OS tests are run through the Pico-OS kernel, init process, and shell. They
+are meant to test commands implemented by `system/shell.picoc`, such as `load`,
+`run`, `unload`, `list`, `quit`, and `exit`.
 
 ## OS Test Directory Layout
 
@@ -39,8 +39,9 @@ raw_output.txt
 ```
 
 `raw_output.txt` is the complete emulator stdout stream. `output.txt` is the
-normalized output used for comparison; loader protocol lines such as
-`load system/init.bin` and `load .../*.bin` are removed from it.
+normalized output used for comparison. Loader requests use
+`<esc>load <path><esc>/`, where `<esc>` is ASCII byte 27; the emulator consumes
+these control frames instead of writing them to stdout.
 
 ## PicoC Programs
 
@@ -70,12 +71,12 @@ Example:
 
 ```text
 load sys_tests/basic_hello_world/launcher.bin
-run 2
+run 3
 exit
 ```
 
-PID `1` is normally `system/init.bin`, so the first program loaded by init is
-usually PID `2`.
+PID `1` is normally `system/init.bin` and PID `2` is `system/shell.bin`, so the
+first program loaded by the shell is usually PID `3`.
 
 ## expected_output.txt
 
@@ -140,6 +141,14 @@ Additional options can be appended with the shared variables:
 make test-os EXTRA_CPL_ARGS='...' EXTRA_EMU_ARGS='...'
 make run-os EXTRA_CPL_ARGS='...' EXTRA_EMU_ARGS='...'
 ```
+
+## Shell PATH Configuration
+
+At startup, init reads `opts/environment.txt` into its environment. Child
+processes inherit a copy of that environment through their initial stack.
+The shell reads `PATH` with `getenv()` and searches its colon-separated
+directories when a command does not begin with `./`. For example, the default
+`PATH=./user` entry allows `echo.bin hello` to execute `./user/echo.bin`.
 
 ## Results
 

@@ -112,23 +112,13 @@ def compile_and_assemble(picoc_file, extra_cpl_args):
     return True
 
 
-def strip_loader_protocol(output):
-    filtered = []
-    for line in output.splitlines(keepends=True):
-        stripped = line.rstrip("\n")
-        if stripped.startswith("load ") and stripped.endswith(".bin"):
-            continue
-        filtered.append(line)
-    return "".join(filtered)
-
-
 def normalize_os_output(output):
     output = output.replace("\r\n", "\n")
     output = output.replace("\r", "\n")
     output = output.replace("\nUART input (empty = newline): ", "")
     if output.startswith("UART input (empty = newline): "):
         output = output[len("UART input (empty = newline): "):]
-    return strip_loader_protocol(output)
+    return output
 
 
 def emulator_args_request_debug(extra_emu_args):

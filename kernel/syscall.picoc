@@ -19,8 +19,6 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
         return 1;
     } else if (syscall_number == SYSCALL_LOAD_PROCESS) {
         return load_process((char *)argument);
-    } else if (syscall_number == SYSCALL_RUN_PROCESS) {
-        return mark_process_ready_by_pid(argument);
     } else if (syscall_number == SYSCALL_RUN_PROCESS_WITH_ARGUMENTS) {
         return mark_process_ready_with_arguments((struct RunProcessRequest *)argument);
     } else if (syscall_number == SYSCALL_LIST_PROCESSES) {

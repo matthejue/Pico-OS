@@ -1,4 +1,5 @@
 #include "process.header"
+#include "../stdlib/stdlib.header"
 #include "../../common/syscall.header"
 #include "../../common/stddef.header"
 
@@ -19,12 +20,9 @@ int load(char *path) {
 bool run(int pid, char *arguments) {
     struct RunProcessRequest request;
 
-    if (arguments == NULL) {
-        return invoke_syscall(SYSCALL_RUN_PROCESS, pid);
-    }
-
     request.pid = pid;
     request.arguments = arguments;
+    request.environment = environ;
     return invoke_syscall(SYSCALL_RUN_PROCESS_WITH_ARGUMENTS, (int)&request);
 }
 

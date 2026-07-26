@@ -135,7 +135,12 @@ if [[ "$use_not_passed_tests" == true ]]; then
     fi
   done
 else
-  if ! ./extract_input_and_expected.sh "$test_pattern"; then
+  extraction_pattern="$test_pattern"
+  if [[ "$test_pattern" == "all" ]]; then
+    extraction_pattern=""
+  fi
+
+  if ! ./extract_input_and_expected.sh "$extraction_pattern"; then
     echo "Failed to extract input and expected output." >&2
     exit 1
   fi

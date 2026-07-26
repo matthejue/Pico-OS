@@ -127,20 +127,6 @@ struct Process *create_process(
     return process;
 }
 
-bool mark_process_ready_by_pid(int pid) {
-    struct Process *process = find_process_by_pid(pid);
-
-    if (process == NULL ||
-        process->state != PROCESS_STATE_NEW) {
-        return false;
-    }
-
-    store_process_arguments(process, "");
-    process->state = PROCESS_STATE_READY;
-
-    return true;
-}
-
 struct Process *find_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 

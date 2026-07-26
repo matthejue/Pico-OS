@@ -54,7 +54,6 @@ struct Process *create_process(
     int word_count,
     char *binary_path
 );
-bool mark_process_ready_by_pid(int pid);
 bool unload_process_by_pid(int pid);
 bool wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context);
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
