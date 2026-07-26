@@ -2,17 +2,20 @@
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
 #include "../kernel/interrupt_controller.header"
+#include "../kernel/filesystem.header"
 #include "../kernel/syscall.header"
 
-#define OS_INTERRUPT_VECTOR_COUNT 2
+#define OS_INTERRUPT_VECTOR_COUNT 3
 
 void timer_interrupt(void);
 void syscall_interrupt(void);
+void uart_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
     syscall_interrupt,
-    timer_interrupt
+    timer_interrupt,
+    uart_interrupt
 };
 
 static inline void load_kernel_context(void) {
@@ -110,5 +113,43 @@ void syscall_interrupt_return(void) {
     asm("POP IN1");
     asm("ADDI SP 1"); // Skip saved ACC
     asm("MOVE IN2 ACC");
+    asm("RTI");
+}
+
+__attribute__((naked))
+void uart_interrupt(void) {
+    // Saves the interrupted context while the kernel transfers one input byte
+    asm("PUSH ACC");
+    asm("PUSH IN1");
+    asm("PUSH IN2");
+    asm("PUSH BAF");
+    asm("PUSH CS");
+    asm("PUSH DS");
+
+    // BAF keeps the interrupted stack while the handler uses kernel segments
+    // Keeping SP avoids overwriting a suspended kernel call frame when all
+    // processes are blocked and the dispatcher is waiting for an interrupt
+    asm("MOVE SP BAF");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+
+    asm("LOADI32 ACC uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC handle_uart_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void uart_interrupt_return(void) {
+    // Restores the context that was active before the UART interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
     asm("RTI");
 }

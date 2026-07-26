@@ -1,7 +1,7 @@
 #include "../lib/unistd/unistd.header"
+#include "../lib/fcntl/fcntl.header"
 #include "../lib/sys/wait/wait.header"
 #include "../lib/stdlib/stdlib.header"
-#include "../common/uart_protocol.header"
 
 #define INIT_ENVIRONMENT_CAPACITY 256
 
@@ -9,6 +9,7 @@ bool read_environment(void) {
     char *contents;
     char *name;
     char *value;
+    int file_descriptor;
     int length;
     int index = 0;
 
@@ -17,15 +18,22 @@ bool read_environment(void) {
         return false;
     }
 
-    length = uart_read_file(
-        "./opts/environment.txt",
+    file_descriptor = open("./opts/environment.txt", O_RDONLY);
+    if (file_descriptor < 0) {
+        free(contents);
+        return false;
+    }
+    length = read(
+        file_descriptor,
         contents,
-        INIT_ENVIRONMENT_CAPACITY
+        INIT_ENVIRONMENT_CAPACITY - 1
     );
+    close(file_descriptor);
     if (length < 0) {
         free(contents);
         return false;
     }
+    contents[length] = 0;
 
     while (index < length) {
         name = contents + index;

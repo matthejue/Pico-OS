@@ -15,6 +15,12 @@
 #define SYSCALL_WAKEUP 12
 #define SYSCALL_YIELD 13
 #define SYSCALL_GETPID 14
+#define SYSCALL_OPEN 15
+#define SYSCALL_READ 16
+#define SYSCALL_WRITE 17
+#define SYSCALL_CLOSE 18
+#define SYSCALL_LSEEK 19
+#define SYSCALL_FILE_DESCRIPTORS_AVAILABLE 20
 
 struct RunProcessRequest {
     int pid;

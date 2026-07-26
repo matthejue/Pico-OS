@@ -29,11 +29,15 @@ void dispatcher_switch_to_process(struct Process *process) {
 void dispatcher_start_next_process(void) {
     struct Process *next_process = scheduler_next_process();
 
-    if (next_process == NULL) {
-        return;
+    // Waits in kernel context when every process is blocked. A hardware
+    // interrupt can make one of them runnable without a separate idle process
+    while (next_process == NULL && first_process() != NULL) {
+        next_process = scheduler_next_process();
     }
 
-    dispatcher_switch_to_process(next_process);
+    if (next_process != NULL) {
+        dispatcher_switch_to_process(next_process);
+    }
 }
 
 void dispatcher_switch_from_context(int *caller_context) {

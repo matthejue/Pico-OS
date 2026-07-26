@@ -13,7 +13,7 @@ OS_TEST_EMU_OPTS ?= $(shell cat ./opts/os_test_emu_opts.txt)
 OS_RUN_CPL_OPTS ?= $(shell cat ./opts/os_run_cpl_opts.txt)
 OS_RUN_EMU_OPTS ?= $(shell cat ./opts/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
-KERNEL_STACK_START ?= 15000
+KERNEL_STACK_START ?= 30000
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
@@ -32,15 +32,20 @@ USER_STARTUP_DEPENDENCIES := \
 	common/heap.header
 USER_RUNTIME_SOURCES := \
 	lib/unistd/libunistd.picoc \
+	lib/fcntl/libfcntl.picoc \
 	lib/sys/wait/libwait.picoc
 USER_RUNTIME_DEPENDENCIES := \
 	$(USER_RUNTIME_SOURCES) \
 	lib/unistd/process.picoc \
+	lib/unistd/io.picoc \
 	lib/unistd/blocking.picoc \
 	lib/unistd/unistd.header \
+	lib/fcntl/fcntl.picoc \
+	lib/fcntl/fcntl.header \
 	lib/sys/wait/wait.picoc \
 	lib/sys/wait/wait.header \
 	common/syscall.header \
+	common/file.header \
 	common/stddef.header \
 	common/wait_queue.header
 USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
@@ -119,7 +124,7 @@ run:
 
 run-os: kernel.reti system/init.bin system/shell.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
 run_send_keypresses:
 	@set -e; \
@@ -138,19 +143,19 @@ run_send_keypresses:
 
 test: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh "$${COLUMNS}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run_sys_tests.sh "$${COLUMNS:-120}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test-all: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh "$${COLUMNS}" "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run_sys_tests.sh "$${COLUMNS:-120}" "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh --not-passed "$${COLUMNS}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run_sys_tests.sh --not-passed "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test-os: kernel.reti system/init.bin system/shell.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------
@@ -174,7 +179,7 @@ system: $(SYSTEM_PROGRAM_BINARIES)
 
 user: $(USER_PROGRAM_BINARIES)
 
-user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/stdio.header common/uart_protocol.picoc common/uart_protocol.header
+user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/scanf.picoc lib/stdio/stdio.header common/decimal.picoc common/decimal.header
 
 echo.reti: user/echo.reti
 
@@ -224,9 +229,10 @@ eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) eprom_startprogram/
 
 SYSTEM_LIBRARY_SOURCES := \
 	$(USER_RUNTIME_SOURCES) \
-	lib/stdio/stdio.picoc \
-	lib/string/libstring.picoc \
-	common/uart_protocol.picoc
+	lib/string/libstring.picoc
+SHELL_LIBRARY_SOURCES := \
+	$(SYSTEM_LIBRARY_SOURCES) \
+	common/decimal.picoc
 
 system/init.reti: system/init.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
@@ -239,9 +245,9 @@ system/init.bin: system/init.reti
 	reti_emulator -f /tmp -a system/init.reti
 	hexyl system/init.bin
 
-system/shell.reti: system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
+system/shell.reti: system/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
-		system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) \
+		system/shell.picoc $(SHELL_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
 		-o system/shell.reti
@@ -278,19 +284,32 @@ KERNEL_PICOC_SOURCES := \
 	kernel/kmalloc.picoc \
 	kernel/pmalloc.picoc \
 	kernel/process.picoc \
+	kernel/filesystem.picoc \
 	kernel/process_arguments.picoc \
 	kernel/scheduler.picoc \
 	kernel/dispatcher.picoc \
 	kernel/process_loader.picoc \
 	kernel/syscall.picoc
 
-kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) common/syscall.header
+KERNEL_HEADERS := \
+	$(filter-out kernel/memory_constants.header,$(wildcard kernel/*.header)) \
+	$(wildcard common/*.header)
+
+kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefile
 	picoc_compiler \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -s -k sram \
 		-o kernel/memory_constants.header
+	@stack_address=$$((-2147483648 + $(KERNEL_STACK_START))); \
+	process_memory_start=$$((stack_address + 1)); \
+	sed -i -E \
+		"s/^#define PROCESS_MEMORY_START .*/#define PROCESS_MEMORY_START $$process_memory_start \\/\\/ -2^31 + stack_start + 1/" \
+		kernel/memory_constants.header; \
+	sed -i -E \
+		"s/^#define KERNEL_SP_START_ASM .*/#define KERNEL_SP_START_ASM \\\"LOADI32 SP $$stack_address\\\" \\/\\/ -2^31 + stack_start/" \
+		kernel/memory_constants.header
 
-kernel.reti: $(KERNEL_PICOC_SOURCES) common/syscall.header kernel/memory_constants.header
+kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.header Makefile
 	picoc_compiler \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \

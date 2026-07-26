@@ -1,0 +1,15 @@
+#include "fcntl.header"
+#include "../unistd/unistd.header"
+#include "../../common/syscall.header"
+
+int open(char *path, int flags, ...) {
+    struct OpenRequest request;
+
+    request.path = path;
+    request.flags = flags;
+    return invoke_syscall(SYSCALL_OPEN, (int)&request);
+}
+
+int creat(char *path, int mode) {
+    return open(path, O_WRONLY | O_CREAT | O_TRUNC);
+}

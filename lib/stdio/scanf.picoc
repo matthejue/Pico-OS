@@ -1,0 +1,186 @@
+#include "stdio.header"
+#include "../../common/stddef.header"
+
+bool has_unread_input = false;
+int unread_input = 0;
+
+bool is_decimal_digit(int value) {
+    return value >= '0' && value <= '9';
+}
+
+bool is_whitespace(int value) {
+    return value == ' ' || value == '\n' ||
+           value == '\r' || value == '\t';
+}
+
+int read_input(void) {
+    if (has_unread_input) {
+        has_unread_input = false;
+        return unread_input;
+    }
+
+    return receive_byte_over_uart();
+}
+
+void unread(int value) {
+    has_unread_input = true;
+    unread_input = value;
+}
+
+void skip_whitespace(void) {
+    int current = read_input();
+
+    while (is_whitespace(current)) {
+        current = read_input();
+    }
+
+    unread(current);
+}
+
+bool read_decimal(int *target) {
+    int current;
+    int sign = 1;
+    int value = 0;
+    bool read_any_digit = false;
+
+    skip_whitespace();
+    current = read_input();
+
+    if (!is_decimal_digit(current) && current != '-' && current != '+') {
+        unread(current);
+        return false;
+    }
+
+    if (current == '-' || current == '+') {
+        if (current == '-') {
+            sign = -1;
+        }
+
+        current = read_input();
+
+        if (!is_decimal_digit(current)) {
+            unread(current);
+            return false;
+        }
+    }
+
+    while (is_decimal_digit(current)) {
+        value = (value * 10) + (current - '0');
+        read_any_digit = true;
+        current = read_input();
+    }
+
+    unread(current);
+
+    if (!read_any_digit) {
+        return false;
+    }
+
+    *target = value * sign;
+    return true;
+}
+
+bool read_string(char *target) {
+    int index = 0;
+    int current;
+
+    skip_whitespace();
+    current = read_input();
+
+    if (is_whitespace(current)) {
+        unread(current);
+        target[0] = 0;
+        return false;
+    }
+
+    while (current != 0 && !is_whitespace(current)) {
+        target[index] = current;
+        index = index + 1;
+        current = read_input();
+    }
+
+    unread(current);
+    target[index] = 0;
+    return index != 0;
+}
+
+int scan_argument(int argument_base, int argument_index) {
+    // 4 and not 3 because the first argument is the format string
+    return *((int *)(argument_base + argument_index + 4));
+}
+
+int scanf(char *format, ...) {
+    int argument_base;
+    int index = 0;
+    int current;
+    int argument_index = 0;
+    int assigned_count = 0;
+    int *target;
+    int input;
+
+    asm("MOVE BAF IN1");
+    asm("STOREIN BAF IN1 0");
+
+    while (format[index] != 0) {
+        current = format[index];
+
+        if (current == '%') {
+            index = index + 1;
+            current = format[index];
+
+            if (current == 'd') {
+                target = (int *)scan_argument(
+                    argument_base,
+                    argument_index
+                );
+                if (!read_decimal(target)) {
+                    return assigned_count;
+                }
+                argument_index = argument_index + 1;
+                assigned_count = assigned_count + 1;
+            } else if (current == 'c') {
+                target = (int *)scan_argument(
+                    argument_base,
+                    argument_index
+                );
+                *target = read_input();
+                argument_index = argument_index + 1;
+                assigned_count = assigned_count + 1;
+            } else if (current == 's') {
+                target = (int *)scan_argument(
+                    argument_base,
+                    argument_index
+                );
+                if (!read_string((char *)target)) {
+                    return assigned_count;
+                }
+                argument_index = argument_index + 1;
+                assigned_count = assigned_count + 1;
+            } else if (current == '%') {
+                input = read_input();
+                if (input != '%') {
+                    unread(input);
+                    return assigned_count;
+                }
+            } else if (current != '%') {
+                return assigned_count;
+            }
+        } else if (is_whitespace(current)) {
+            while (is_whitespace(format[index + 1])) {
+                index = index + 1;
+            }
+
+            skip_whitespace();
+        } else {
+            input = read_input();
+            if (input != current) {
+                unread(input);
+                return assigned_count;
+            }
+        }
+
+        index = index + 1;
+    }
+
+    return assigned_count;
+}
