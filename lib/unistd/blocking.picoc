@@ -25,14 +25,3 @@ void wakeup(struct wait_queue *wq) {
     asm("LOADI ACC 12"); // SYSCALL_WAKEUP
     asm("INT 0");
 }
-
-int wait(int pid) {
-    int status = 0;
-    struct WaitProcessRequest request;
-
-    request.pid = pid;
-    request.status = &status;
-    while (!invoke_syscall(SYSCALL_WAIT_PROCESS, (int)&request)) {
-    }
-    return status;
-}

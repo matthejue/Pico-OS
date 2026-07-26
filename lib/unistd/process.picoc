@@ -37,3 +37,7 @@ bool unload(int pid) {
 void list(void) {
     invoke_syscall(SYSCALL_LIST_PROCESSES, 0);
 }
+
+int getpid(void) {
+    return invoke_syscall(SYSCALL_GETPID, 0);
+}

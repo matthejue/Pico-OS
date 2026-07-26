@@ -1,12 +1,12 @@
 # Waiting For a Process
 
-This diagram focuses only on how `wait(pid)` queues the waiting process and
+This diagram focuses only on how `waitpid(pid)` queues the waiting process and
 how the exiting process delivers its status.
 
 ```mermaid
 sequenceDiagram
     participant W as Waiting process W
-    participant WS as W wait() stack frame
+    participant WS as W waitpid() stack frame
     participant WP as W Process PCB
     participant K as Kernel wait handling
     participant TP as Target process T PCB
@@ -28,13 +28,13 @@ sequenceDiagram
     WP->>WS: remove_process writes status through waiting_status_ptr
     TP->>TQ: remove_process calls wakeup_wait_queue with T waiters queue pointer
     TQ->>WP: wakeup_wait_queue removes W and clears queue links
-    WP->>W: W becomes READY and wait() returns status
+    WP->>W: W becomes READY and waitpid() returns status
 ```
 
-`status` and `request` belong to W's suspended `wait()` stack frame.
+`status` and `request` belong to W's suspended `waitpid()` stack frame.
 `waiting_status_ptr` belongs to W's PCB and points to W's `status` variable.
 The waited-on process T owns the `waiters` queue in its PCB. **The same
-`T->waiters` attribute is used both times:** W's user-space `wait(pid)` enters
+`T->waiters` attribute is used both times:** W's user-space `waitpid(pid)` enters
 the kernel function `wait_for_process_by_pid()`, which calls
 `sleep_on_wait_queue(&T->waiters)` to add W to that queue. When T exits,
 `exit_process()` calls `remove_process(T, status)`, which reads waiters from

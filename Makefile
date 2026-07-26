@@ -31,12 +31,15 @@ USER_STARTUP_DEPENDENCIES := \
 	common/heap.picoc \
 	common/heap.header
 USER_RUNTIME_SOURCES := \
-	lib/unistd/libunistd.picoc
+	lib/unistd/libunistd.picoc \
+	lib/sys/wait/libwait.picoc
 USER_RUNTIME_DEPENDENCIES := \
 	$(USER_RUNTIME_SOURCES) \
 	lib/unistd/process.picoc \
 	lib/unistd/blocking.picoc \
 	lib/unistd/unistd.header \
+	lib/sys/wait/wait.picoc \
+	lib/sys/wait/wait.header \
 	common/syscall.header \
 	common/stddef.header \
 	common/wait_queue.header
