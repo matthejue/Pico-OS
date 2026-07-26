@@ -238,7 +238,7 @@ bool unload_process_by_pid(int pid) {
     return true;
 }
 
-bool wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context) {
+bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context) {
     struct Process *process = current_process();
     struct Process *waited_process;
 
@@ -247,7 +247,7 @@ bool wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_con
         return true;
     }
 
-    // wait() stores a pointer to its stack-local return status in request->status.
+    // waitpid() stores a pointer to its stack-local return status in request->status.
     // When the target exits, it writes its status back through this pointer
     process->waiting_status_ptr = request->status;
     sleep_on_wait_queue(&(waited_process->waiters), caller_context);

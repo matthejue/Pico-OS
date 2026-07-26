@@ -1,6 +1,7 @@
-// dependencies: ../../lib/unistd/libunistd.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc
 
 #include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/wait/wait.header"
 
 void deactivate_timer_interrupt(void) {
     asm("STOREIN BAF DS 0"); // Save DS before switching address spaces
@@ -26,9 +27,9 @@ int main(void) {
     run(green_worker, "green", NULL);
     run(blue_worker, "blue", NULL);
 
-    wait(red_worker);
-    wait(green_worker);
-    wait(blue_worker);
+    waitpid(red_worker);
+    waitpid(green_worker);
+    waitpid(blue_worker);
 
     return 0;
 }

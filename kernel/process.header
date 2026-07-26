@@ -30,7 +30,7 @@ struct Process {
     int word_count;
     char *binary_path;
     struct ActivationRecord activation;
-    // Pointer to the exit-status storage supplied by this process's wait() call
+    // Pointer to the exit-status storage supplied by this process's waitpid() call
     int *waiting_status_ptr;
     // Queue of processes waiting for this process to exit and receive its status
     struct wait_queue waiters;
@@ -55,7 +55,7 @@ struct Process *create_process(
     char *binary_path
 );
 bool unload_process_by_pid(int pid);
-bool wait_for_process_by_pid(struct WaitProcessRequest *request, int *caller_context);
+bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context);
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
 bool wakeup_wait_queue(struct wait_queue *queue);
 int process_heap_start(void);

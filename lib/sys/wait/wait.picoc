@@ -1,0 +1,23 @@
+#include "wait.header"
+#include "../../../common/syscall.header"
+
+int invoke_waitpid_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+int waitpid(int pid) {
+    int status = 0;
+    struct WaitPidRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
+    }
+    return status;
+}
