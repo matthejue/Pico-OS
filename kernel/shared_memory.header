@@ -1,0 +1,27 @@
+#pragma once
+
+#include "../common/stddef.header"
+#include "../common/syscall.header"
+
+struct Process;
+
+struct SharedMemoryEntry {
+    char *name;
+    int id;
+    void *address;
+    size_t size;
+    int reference_count;
+    bool unlink_requested;
+    struct SharedMemoryEntry *next;
+};
+
+struct SharedMemoryAttachment {
+    struct SharedMemoryEntry *entry;
+    struct SharedMemoryAttachment *next;
+};
+
+void initialize_shared_memory(void);
+int open_shared_memory(struct ShmOpenRequest *request);
+void *map_shared_memory(int shared_memory_id);
+int unlink_shared_memory(char *name);
+void release_process_shared_memory(struct Process *process);

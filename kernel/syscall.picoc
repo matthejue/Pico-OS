@@ -5,6 +5,7 @@
 #include "process.header"
 #include "process_arguments.header"
 #include "process_loader.header"
+#include "shared_memory.header"
 
 void send_byte_over_uart(int value);
 int receive_byte_over_uart(void);
@@ -64,6 +65,12 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
         return seek_file_descriptor((struct SeekRequest *)argument);
     } else if (syscall_number == SYSCALL_FILE_DESCRIPTORS_AVAILABLE) {
         return 1;
+    } else if (syscall_number == SYSCALL_SHM_OPEN) {
+        return open_shared_memory((struct ShmOpenRequest *)argument);
+    } else if (syscall_number == SYSCALL_MMAP) {
+        return (int)map_shared_memory(argument);
+    } else if (syscall_number == SYSCALL_SHM_UNLINK) {
+        return unlink_shared_memory((char *)argument);
     }
 
     return 0;

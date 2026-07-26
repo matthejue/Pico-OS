@@ -1,0 +1,39 @@
+// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/mutex/libmutex.picoc ../../lib/schedule/libschedule.picoc ../../lib/sys/mman/libmman.picoc
+
+#include "shared.header"
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/stdlib/stdlib.header"
+#include "../../lib/schedule/schedule.header"
+#include "../../lib/sys/mman/mman.header"
+
+int main(int argc, char **argv) {
+    int worker_number = atoi(argv[1]);
+    int shared_memory_id = atoi(argv[2]);
+    struct SharedState *shared_state;
+
+    shared_state = (struct SharedState *)mmap(shared_memory_id);
+    if (shared_state == NULL) {
+        return 1;
+    }
+
+    printf("worker %d: trying to lock mutex\n", worker_number);
+    mutex_lock(&(shared_state->mutex));
+    printf("worker %d: acquired mutex\n", worker_number);
+
+    shared_state->value = worker_number;
+    printf(
+        "worker %d: shared value = %d\n",
+        worker_number,
+        shared_state->value
+    );
+
+    if (worker_number == 1) {
+        printf("worker 1: yielding while holding mutex\n");
+        yield();
+        printf("worker 1: resumed\n");
+    }
+
+    mutex_unlock(&(shared_state->mutex));
+    printf("worker %d: unlocked mutex\n", worker_number);
+    return 0;
+}

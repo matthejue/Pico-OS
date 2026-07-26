@@ -1,0 +1,3 @@
+load sys_tests/shared_memory/launcher.bin
+run 3
+exit
