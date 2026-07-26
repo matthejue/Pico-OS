@@ -5,7 +5,7 @@
 #include "../../common/stddef.header"
 
 int main(void) {
-    int pid = load("sys_tests/basic_hello_world/hello_world.bin");
+    int pid = load("sys_tests/hello_world/hello_world.bin");
 
     run(pid, NULL, NULL);
     waitpid(pid);

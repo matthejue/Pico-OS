@@ -1,3 +1,0 @@
-load sys_tests/basic_hello_world/launcher.bin
-run 3
-exit

@@ -16,7 +16,7 @@ Each OS test is one subdirectory. The directory name should describe the
 behavior under test, for example:
 
 ```text
-sys_tests/basic_hello_world/
+sys_tests/hello_world/
 ```
 
 A test directory contains:
@@ -70,7 +70,7 @@ and runs the test's launcher, then finishes with `quit` or `exit`.
 Example:
 
 ```text
-load sys_tests/basic_hello_world/launcher.bin
+load sys_tests/hello_world/launcher.bin
 run 3
 exit
 ```
@@ -131,8 +131,8 @@ opts/os_run_emu_opts.txt      emulator options used by make run-os
 The same values can be overridden on the command line:
 
 ```sh
-make test-os OS_TEST_PATTERN=basic_hello_world
-make run-os OS_RUN_PATH=sys_tests/basic_hello_world
+make test-os OS_TEST_PATTERN=hello_world
+make run-os OS_RUN_PATH=sys_tests/hello_world
 ```
 
 Additional options can be appended with the shared variables:
