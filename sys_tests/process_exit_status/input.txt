@@ -1,5 +1,5 @@
 ./sys_tests/process_exit_status/launcher.bin &
-./user/echo.bin $?
+echo.bin $?
 ./sys_tests/process_exit_status/launcher.bin
-./user/echo.bin status $? $?
+echo.bin status $? $?
 exit

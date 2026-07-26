@@ -78,7 +78,7 @@ void syscall_interrupt(void) {
     asm("JUMP== 9");
     asm("SUBI ACC 1");
     asm("JUMP== 12");
-    asm("SUBI ACC 6");
+    asm("SUBI ACC 5");
     asm("JUMP== 15");
     asm("SUBI ACC 1");
     asm("JUMP== 17");

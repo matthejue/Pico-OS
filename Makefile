@@ -39,7 +39,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 .PHONY: help
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-all test_not_passed test-os
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user echo.bin echo.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti echo.bin echo.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -65,6 +65,7 @@ help:
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
+	@echo "  make shell.bin                  Build the shell system program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
@@ -93,7 +94,7 @@ help:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin
+run-os: kernel.reti system/init.bin system/shell.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -116,7 +117,7 @@ test: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh "$${COLUMNS}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-test-all:
+test-all: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh "$${COLUMNS}" "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
@@ -124,7 +125,7 @@ test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh --not-passed "$${COLUMNS}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-test-os: kernel.reti system/init.bin user/echo.bin
+test-os: kernel.reti system/init.bin system/shell.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py "$${COLUMNS}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -133,7 +134,7 @@ test-os: kernel.reti system/init.bin user/echo.bin
 # Firmware build
 # ----------------------------------------------------------------------
 
-firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin
+firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin system/shell.bin
 
 eprom: eprom_startprogram/startprogram.reti
 
@@ -155,6 +156,10 @@ user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/stdio.h
 echo.reti: user/echo.reti
 
 echo.bin: user/echo.bin
+
+shell.reti: system/shell.reti
+
+shell.bin: system/shell.bin
 
 ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
@@ -194,16 +199,15 @@ eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) eprom_startprogram/
 		-O1 -i -w -s -v \
 		-o eprom_startprogram/startprogram.reti
 
-SYSTEM_PICOC_SOURCES := \
-	system/init.picoc \
+SYSTEM_LIBRARY_SOURCES := \
 	$(USER_RUNTIME_SOURCES) \
 	lib/stdio/stdio.picoc \
 	lib/string/libstring.picoc \
 	common/uart_protocol.picoc
 
-system/init.reti: $(SYSTEM_PICOC_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
+system/init.reti: system/init.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
 	picoc_compiler \
-		$(SYSTEM_PICOC_SOURCES) \
+		system/init.picoc $(SYSTEM_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
 		-o system/init.reti
@@ -211,6 +215,13 @@ system/init.reti: $(SYSTEM_PICOC_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/proce
 system/init.bin: system/init.reti
 	reti_emulator -f /tmp -a system/init.reti
 	hexyl system/init.bin
+
+system/shell.reti: system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) $(USER_STARTUP_DEPENDENCIES) lib/process/process.picoc lib/process/process.header lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header common/syscall.header
+	picoc_compiler \
+		system/shell.picoc $(SYSTEM_LIBRARY_SOURCES) \
+		-C $(USER_STARTUP_SOURCE) \
+		-O1 -i -w -s -g -v \
+		-o system/shell.reti
 
 system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_SOURCES)
 	picoc_compiler \
@@ -272,7 +283,7 @@ kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel.reti system/init.bin
+run-firmware: kernel.reti system/init.bin system/shell.bin
 	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
 
 bootload: firmware

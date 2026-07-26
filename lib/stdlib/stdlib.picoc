@@ -5,18 +5,37 @@
 #include "../../common/stddef.header"
 
 struct Heap process_heap;
+char **environ = NULL;
+
+void initialize_environment(char **environment) {
+    int count = 0;
+    int index = 0;
+
+    if (environment != NULL) {
+        while (environment[count] != NULL) {
+            count = count + 1;
+        }
+    }
+
+    environ = malloc((count + 1) * sizeof(char *));
+    while (index < count) {
+        environ[index] = environment[index];
+        index = index + 1;
+    }
+    environ[count] = NULL;
+}
 
 void init_process_heap(void) {
     int heap_start;
     int heap_size;
 
     // SYSCALL_PROCESS_HEAP_START
-    asm("LOADI ACC 7");
+    asm("LOADI ACC 6");
     asm("INT 0");
     asm("STOREIN BAF ACC 0");
 
     // SYSCALL_PROCESS_HEAP_SIZE
-    asm("LOADI ACC 8");
+    asm("LOADI ACC 7");
     asm("INT 0");
     asm("STOREIN BAF ACC -1");
 
@@ -60,4 +79,101 @@ int atoi(char *text) {
     }
 
     return value;
+}
+
+char *getenv(char *name) {
+    int environment_index = 0;
+    int name_index;
+    char *variable;
+
+    while (environ[environment_index] != NULL) {
+        variable = environ[environment_index];
+        name_index = 0;
+
+        while (name[name_index] != 0 &&
+               variable[name_index] == name[name_index]) {
+            name_index = name_index + 1;
+        }
+
+        if (name[name_index] == 0 && variable[name_index] == '=') {
+            return variable + name_index + 1;
+        }
+
+        environment_index = environment_index + 1;
+    }
+
+    return NULL;
+}
+
+int setenv(char *name, char *value, bool overwrite) {
+    char *variable;
+    char **resized_environment;
+    int environment_index = 0;
+    int name_length = 0;
+    int value_length = 0;
+    int index = 0;
+    bool found = false;
+
+    while (name[name_length] != 0) {
+        name_length = name_length + 1;
+    }
+
+    while (value[value_length] != 0) {
+        value_length = value_length + 1;
+    }
+
+    while (environ[environment_index] != NULL && !found) {
+        variable = environ[environment_index];
+        index = 0;
+
+        while (index < name_length && variable[index] == name[index]) {
+            index = index + 1;
+        }
+
+        if (index == name_length && variable[index] == '=') {
+            if (!overwrite) {
+                return 0;
+            }
+            found = true;
+        } else {
+            environment_index = environment_index + 1;
+        }
+    }
+
+    variable = malloc(name_length + value_length + 2);
+    if (variable == NULL) {
+        return -1;
+    }
+
+    index = 0;
+    while (index < name_length) {
+        variable[index] = name[index];
+        index = index + 1;
+    }
+    variable[name_length] = '=';
+
+    index = 0;
+    while (index <= value_length) {
+        variable[name_length + 1 + index] = value[index];
+        index = index + 1;
+    }
+
+    if (found) {
+        environ[environment_index] = variable;
+        return 0;
+    }
+
+    resized_environment = realloc(
+        environ,
+        (environment_index + 2) * sizeof(char *)
+    );
+    if (resized_environment == NULL) {
+        free(variable);
+        return -1;
+    }
+
+    environ = resized_environment;
+    environ[environment_index] = variable;
+    environ[environment_index + 1] = NULL;
+    return 0;
 }

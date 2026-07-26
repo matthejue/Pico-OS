@@ -7,3 +7,5 @@ void *malloc(int size);
 void *realloc(void *ptr, int size);
 void free(void *ptr);
 int atoi(char *text);
+char *getenv(char *name);
+int setenv(char *name, char *value, bool overwrite);
