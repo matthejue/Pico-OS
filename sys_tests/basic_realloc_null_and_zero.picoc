@@ -1,0 +1,38 @@
+// in:
+// expected:42 1 12 7
+// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
+
+#include "../lib/stdio/stdio.header"
+#include "../lib/stdlib/stdlib.header"
+
+int main() {
+    init_process_heap();
+
+    int *a = (int *)realloc(NULL, 4);
+    int *b;
+    int *c;
+
+    a[0] = 6;
+    a[3] = 7;
+    printf("%d ", a[0] * a[3]);
+
+    b = (int *)malloc(3);
+    b[0] = 3;
+    b[2] = 4;
+
+    a = (int *)realloc(a, 0);
+    if (a == NULL) {
+        printf("%d ", 1);
+    } else {
+        printf("%d ", 0);
+    }
+
+    c = (int *)malloc(4);
+    c[0] = 2;
+    c[3] = 6;
+
+    printf("%d ", c[0] * c[3]);
+    printf("%d", b[0] + b[2]);
+
+    return 0;
+}
