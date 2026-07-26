@@ -214,7 +214,11 @@ def run_os_test_interactive(test_dir, extra_emu_args):
     return "passed" if result.returncode == 0 else "failed"
 
 
-def run_os_test(test_dir, extra_emu_args):
+def run_os_test(
+    test_dir,
+    extra_emu_args,
+    max_duration_seconds=MAX_EMULATOR_DURATION_SECONDS,
+):
     input_file = test_dir / "input.txt"
     output_file = test_dir / "output.txt"
     raw_output_file = test_dir / "raw_output.txt"
@@ -261,7 +265,7 @@ def run_os_test(test_dir, extra_emu_args):
     def wait_for_prompt():
         nonlocal prompt_search_start
         prompt = SHELL_PROMPT.encode("ascii")
-        deadline = time.monotonic() + MAX_EMULATOR_DURATION_SECONDS
+        deadline = time.monotonic() + max_duration_seconds
 
         while time.monotonic() < deadline:
             prompt_index = stdout.find(prompt, prompt_search_start)
@@ -289,7 +293,7 @@ def run_os_test(test_dir, extra_emu_args):
     if timed_out and process.poll() is None:
         process.kill()
     else:
-        deadline = time.monotonic() + MAX_EMULATOR_DURATION_SECONDS
+        deadline = time.monotonic() + max_duration_seconds
         while process.poll() is None and time.monotonic() < deadline:
             read_available(min(0.1, deadline - time.monotonic()))
         if process.poll() is None:
@@ -313,7 +317,7 @@ def run_os_test(test_dir, extra_emu_args):
             print(stderr_text, end="", file=sys.stderr)
         print(
             "Emulator timed out after "
-            f"{MAX_EMULATOR_DURATION_SECONDS}s for {test_dir}"
+            f"{max_duration_seconds}s for {test_dir}"
         )
         return "timeout"
     if process.returncode != 0:

@@ -62,6 +62,7 @@ struct Process *create_process(
     char *binary_path
 );
 bool unload_process_by_pid(int pid);
+void remove_test_processes(void);
 bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context);
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
 bool wakeup_wait_queue(struct wait_queue *queue);

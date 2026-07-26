@@ -36,3 +36,8 @@ struct SeekRequest {
     int origin;
     bool show_loading_bar;
 };
+
+struct Dup2Request {
+    int old_file_descriptor;
+    int new_file_descriptor;
+};

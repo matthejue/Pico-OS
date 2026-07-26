@@ -1,4 +1,5 @@
 #include "../lib/unistd/unistd.header"
+#include "../lib/fcntl/fcntl.header"
 #include "../lib/sys/wait/wait.header"
 #include "../lib/stdlib/stdlib.header"
 #include "../lib/string/string.header"
@@ -6,6 +7,7 @@
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
+#define SHELL_SAVED_STDOUT_FILENO 7
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
 #define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
@@ -252,25 +254,124 @@ bool strip_background_operator(char *command) {
     return true;
 }
 
+int strip_stdout_redirection(char *command, char **path) {
+    int command_end;
+    int index = 0;
+    int path_end;
+    int path_start;
+    int redirect = -1;
+
+    while (command[index] != 0 && redirect == -1) {
+        if (command[index] == '>' &&
+            index > 0 &&
+            is_line_whitespace(command[index - 1])) {
+            redirect = index;
+        } else {
+            index = index + 1;
+        }
+    }
+    if (redirect == -1) {
+        *path = NULL;
+        return 0;
+    }
+
+    path_start = redirect + 1;
+    while (is_line_whitespace(command[path_start])) {
+        path_start = path_start + 1;
+    }
+    if (command[path_start] == 0) {
+        return -1;
+    }
+
+    path_end = path_start;
+    while (command[path_end] != 0 &&
+           !is_line_whitespace(command[path_end])) {
+        if (command[path_end] == '>') {
+            return -1;
+        }
+        path_end = path_end + 1;
+    }
+    index = path_end;
+    while (is_line_whitespace(command[index])) {
+        index = index + 1;
+    }
+    if (command[index] != 0) {
+        return -1;
+    }
+    command[path_end] = 0;
+
+    command_end = redirect;
+    while (command_end > 0 &&
+           is_line_whitespace(command[command_end - 1])) {
+        command_end = command_end - 1;
+    }
+    if (command_end == 0) {
+        return -1;
+    }
+    command[command_end] = 0;
+    *path = command + path_start;
+    return 1;
+}
+
 void shutdown(void) {
     asm("LOADI ACC 2"); // SYSCALL_SHUTDOWN
     asm("INT 0");
 }
 
-void run_process(int pid, char *arguments, bool background) {
+bool run_process(
+    int pid,
+    char *arguments,
+    bool background,
+    char *stdout_path
+) {
     char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
+    bool redirected = false;
+    bool started;
+    int output_file_descriptor;
 
-    if (!run(pid, expand_variables(
-                      arguments,
-                      expanded_arguments,
-                      SHELL_COMMAND_BUFFER_CAPACITY),
-             NULL)) {
+    if (stdout_path != NULL) {
+        output_file_descriptor = open(
+            stdout_path,
+            O_WRONLY | O_CREAT | O_TRUNC
+        );
+        if (output_file_descriptor < 0) {
+            shell_write_string("error: could not redirect stdout\n");
+            return false;
+        }
+        if (dup2(STDOUT_FILENO, SHELL_SAVED_STDOUT_FILENO) < 0) {
+            close(output_file_descriptor);
+            shell_write_string("error: could not redirect stdout\n");
+            return false;
+        }
+        if (dup2(output_file_descriptor, STDOUT_FILENO) < 0) {
+            close(output_file_descriptor);
+            close(SHELL_SAVED_STDOUT_FILENO);
+            shell_write_string("error: could not redirect stdout\n");
+            return false;
+        }
+        close(output_file_descriptor);
+        redirected = true;
+    }
+
+    started = run(pid, expand_variables(
+                           arguments,
+                           expanded_arguments,
+                           SHELL_COMMAND_BUFFER_CAPACITY),
+                  NULL);
+
+    if (redirected) {
+        dup2(SHELL_SAVED_STDOUT_FILENO, STDOUT_FILENO);
+        close(SHELL_SAVED_STDOUT_FILENO);
+    }
+
+    if (!started) {
         shell_write_string("error: process not found\n");
     } else if (background) {
         last_background_process_id = pid;
     } else {
         last_foreground_exit_status = waitpid(pid);
     }
+    return started;
 }
 
 void build_executable_path(char *directory, char *name, char *result) {
@@ -318,7 +419,9 @@ int load_from_path(char *name) {
 
 void handle_command(char *command) {
     char *raw_arguments;
+    char *stdout_path;
     int pid;
+    int redirection_status;
     bool background;
 
     if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
@@ -331,8 +434,21 @@ void handle_command(char *command) {
         load(command + 5);
     } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
         background = strip_background_operator(command);
-        pid = parse_process_id(command + 4);
-        run_process(pid, command_arguments(command + 4), background);
+        redirection_status = strip_stdout_redirection(
+            command,
+            &stdout_path
+        );
+        if (redirection_status < 0) {
+            shell_write_string("error: invalid stdout redirection\n");
+        } else {
+            pid = parse_process_id(command + 4);
+            run_process(
+                pid,
+                command_arguments(command + 4),
+                background,
+                stdout_path
+            );
+        }
     } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
         pid = parse_process_id(command + 7);
         if (!unload(pid)) {
@@ -342,18 +458,26 @@ void handle_command(char *command) {
         list();
     } else {
         background = strip_background_operator(command);
-        raw_arguments = command_arguments(command);
-
-        if (strncmp(command, "./", 2) == 0 && command[2] != 0) {
-            pid = load(command);
+        redirection_status = strip_stdout_redirection(
+            command,
+            &stdout_path
+        );
+        if (redirection_status < 0) {
+            shell_write_string("error: invalid stdout redirection\n");
         } else {
-            pid = load_from_path(command);
-        }
+            raw_arguments = command_arguments(command);
 
-        if (pid == 0) {
-            shell_write_string("error: unknown command\n");
-        } else {
-            run_process(pid, raw_arguments, background);
+            if (strncmp(command, "./", 2) == 0 && command[2] != 0) {
+                pid = load(command);
+            } else {
+                pid = load_from_path(command);
+            }
+
+            if (pid == 0) {
+                shell_write_string("error: unknown command\n");
+            } else {
+                run_process(pid, raw_arguments, background, stdout_path);
+            }
         }
     }
 }
