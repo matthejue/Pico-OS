@@ -2,7 +2,4 @@
 
 int printf(char *format, ...);
 int scanf(char *format, ...);
-int uart_print_character(int value);
-void send_byte_over_uart(int value);
 int receive_byte_over_uart(void);
-void uart_print_string(char *value);
