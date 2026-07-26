@@ -1,5 +1,7 @@
 #pragma once
 
+#include "stddef.header"
+
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
@@ -25,10 +27,12 @@ struct IoRequest {
     int file_descriptor;
     char *buffer;
     int count;
+    bool show_loading_bar;
 };
 
 struct SeekRequest {
     int file_descriptor;
     int offset;
     int origin;
+    bool show_loading_bar;
 };

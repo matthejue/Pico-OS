@@ -188,6 +188,7 @@ int fputc(int character, FILE *stream) {
     request.file_descriptor = stream->file_descriptor;
     request.buffer = &value;
     request.count = 1;
+    request.show_loading_bar = false;
     if (invoke_stdio_syscall(SYSCALL_WRITE, (int)&request) != 1) {
         return -1;
     }
@@ -211,6 +212,7 @@ int fputs(char *text, FILE *stream) {
         request.file_descriptor = stream->file_descriptor;
         request.buffer = text;
         request.count = length;
+        request.show_loading_bar = false;
         return invoke_stdio_syscall(SYSCALL_WRITE, (int)&request);
     }
 

@@ -1,0 +1,5 @@
+#pragma once
+
+#include "../common/stddef.header"
+
+bool loading_bar_enabled = true;

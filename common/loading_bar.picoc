@@ -1,0 +1,69 @@
+#include "loading_bar.header"
+#include "uart_protocol.header"
+
+#define LOADING_BAR_WIDTH 10
+
+void uart_print_loading_bar_label(
+    bool show_loading_bar,
+    char *operation,
+    char *path
+) {
+    if (!show_loading_bar) {
+        return;
+    }
+
+    uart_print_string(operation);
+    uart_print_string(path);
+    uart_print_character('\n');
+}
+
+void uart_print_loading_bar(int filled, int percentage) {
+    int index = 0;
+
+    uart_print_character('\r');
+    uart_print_character('[');
+    while (index < LOADING_BAR_WIDTH) {
+        if (index < filled) {
+            uart_print_character('#');
+        } else {
+            uart_print_character(' ');
+        }
+        index = index + 1;
+    }
+    uart_print_string("] ");
+    uart_print_integer(percentage);
+    uart_print_character('%');
+}
+
+int loading_bar_update_threshold(int total, int step) {
+    return (total * step + LOADING_BAR_WIDTH - 1) /
+           LOADING_BAR_WIDTH;
+}
+
+int uart_start_loading_bar(bool show_loading_bar, int total) {
+    if (!show_loading_bar) {
+        return -1;
+    }
+
+    if (total <= 0) {
+        uart_print_loading_bar(LOADING_BAR_WIDTH, 100);
+        uart_print_character('\n');
+        return -1;
+    }
+
+    uart_print_loading_bar(0, 0);
+    return loading_bar_update_threshold(total, 1);
+}
+
+int uart_update_loading_bar(int current, int total) {
+    int filled = current * LOADING_BAR_WIDTH / total;
+    int percentage = current * 100 / total;
+
+    uart_print_loading_bar(filled, percentage);
+    if (current == total) {
+        uart_print_character('\n');
+        return -1;
+    }
+
+    return loading_bar_update_threshold(total, filled + 1);
+}

@@ -1,5 +1,6 @@
 #include "unistd.header"
 #include "../stdlib/stdlib.header"
+#include "../../common/loading_bar.header"
 #include "../../common/syscall.header"
 #include "../../common/stddef.header"
 
@@ -14,7 +15,12 @@ int invoke_syscall(int number, int argument) {
 }
 
 int load(char *path) {
-    return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)path);
+    struct LoadProcessRequest request;
+
+    request.path = path;
+    request.show_loading_bar =
+        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
+    return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
 }
 
 bool run(int pid, char *arguments, char **environment) {

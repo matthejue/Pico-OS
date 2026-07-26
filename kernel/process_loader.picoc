@@ -1,6 +1,7 @@
 #include "process_loader.header"
 #include "process.header"
 #include "pmalloc.header"
+#include "../common/loading_bar.header"
 #include "../common/uart_protocol.header"
 #include "../common/sram_loader.header"
 
@@ -16,16 +17,29 @@ int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
     return stack_start;
 }
 
-void drain_process_words(int payload_word_count) {
+void drain_process_words(
+    int payload_word_count,
+    bool show_loading_bar
+) {
     int index = 0;
+    int loading_bar_update = uart_start_loading_bar(
+        show_loading_bar,
+        payload_word_count
+    );
 
     while (index < payload_word_count) {
         receive_word();
         index = index + 1;
+        if (index == loading_bar_update) {
+            loading_bar_update = uart_update_loading_bar(
+                index,
+                payload_word_count
+            );
+        }
     }
 }
 
-int load_process(char *path) {
+int load_process(char *path, bool show_loading_bar) {
     int word_count;
     int code_start;
     int data_start;
@@ -52,13 +66,14 @@ int load_process(char *path) {
     heap_size = DEFAULT_PROCESS_HEAP_CELLS;
 
     payload_word_count = word_count - 4;
+    uart_print_loading_bar_label(show_loading_bar, "load ", path);
     effective_stack_start = loaded_process_stack_start(
         heap_start,
         heap_size,
         stack_start
     );
     if (effective_stack_start == PMALLOC_INVALID_START) {
-        drain_process_words(payload_word_count);
+        drain_process_words(payload_word_count, show_loading_bar);
         uart_print_string("error: invalid process stack start\n");
         return 0;
     }
@@ -66,12 +81,16 @@ int load_process(char *path) {
     base_address = pmalloc(process_size);
 
     if (base_address == PMALLOC_INVALID_START) {
-        drain_process_words(payload_word_count);
+        drain_process_words(payload_word_count, show_loading_bar);
         uart_print_string("error: not enough process memory\n");
         return 0;
     }
 
-    receive_words_to_sram(base_address, payload_word_count);
+    receive_words_to_sram(
+        base_address,
+        payload_word_count,
+        show_loading_bar
+    );
     process = create_process(
         base_address,
         process_size,
