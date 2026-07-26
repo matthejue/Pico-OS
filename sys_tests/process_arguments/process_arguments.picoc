@@ -1,8 +1,7 @@
-// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/unistd/libunistd.picoc
+// dependencies: ../../lib/stdio/libstdio.picoc
 
 #include "../../lib/stdio/stdio.header"
 #include "../../lib/stdlib/stdlib.header"
-#include "../../lib/unistd/unistd.header"
 
 int main(int argc, char **argv) {
     int index = 0;
@@ -18,5 +17,5 @@ int main(int argc, char **argv) {
         printf("argv_end=NULL\n");
     }
     printf("number=%d\n", atoi(argv[1]));
-    return getpid();
+    return 0;
 }

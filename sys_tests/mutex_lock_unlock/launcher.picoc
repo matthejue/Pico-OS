@@ -5,7 +5,7 @@
 #include "../../common/stddef.header"
 
 int main(void) {
-    int pid = load("sys_tests/basic_mutex_lock_unlock/mutex_lock_unlock.bin");
+    int pid = load("sys_tests/mutex_lock_unlock/mutex_lock_unlock.bin");
 
     run(pid, NULL, NULL);
     waitpid(pid);

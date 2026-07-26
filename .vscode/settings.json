@@ -1,0 +1,20 @@
+{
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "files.associations": {
+        "*.picoc": "c",
+        "*.header": "c"
+    },
+    "clangd.arguments": [
+        "--compile-commands-dir=.",
+        "--background-index"
+    ],
+    "clangd.fallbackFlags": [
+        "-x",
+        "c",
+        "-std=gnu11",
+        "-fno-builtin",
+        "-I.",
+        "-Dasm(...)=",
+        "-Ddebug="
+    ]
+}

@@ -9,9 +9,10 @@
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
-#define SHELL_STATUS_BUFFER_CAPACITY 11
+#define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
 int last_foreground_exit_status = 0;
+int last_background_process_id = 0;
 
 int is_line_whitespace(char value) {
     return value == ' ' || value == '\t';
@@ -95,13 +96,14 @@ bool is_environment_name_character(char value) {
 }
 
 char *expand_variables(char *arguments, char *result, int capacity) {
-    char status[SHELL_STATUS_BUFFER_CAPACITY]; // Provides storage for the exit status as string
+    char special_parameter[SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY];
     int argument_index = 0;
     int result_index = 0;
     int name_start;
     int name_end;
-    int status_index;
-    int status_length;
+    int special_parameter_index;
+    int special_parameter_length;
+    int special_parameter_value;
     int value_index;
     char saved_character;
     char *value;
@@ -114,23 +116,29 @@ char *expand_variables(char *arguments, char *result, int capacity) {
     // Copies arguments while reserving one result position for the terminating '\0'
     while (arguments[argument_index] != '\0' &&
            result_index < capacity - 1) {
-        // Replaces the next "$?" sequence with the formatted exit status
-        if (strncmp(arguments + argument_index, "$?", 2) == 0) {
-            // Formats the last foreground exit status as decimal text
-            status_length = uart_append_decimal(
-                status,
+        // Replaces special shell parameters with their decimal values
+        if (strncmp(arguments + argument_index, "$?", 2) == 0 ||
+            strncmp(arguments + argument_index, "$!", 2) == 0) {
+            if (arguments[argument_index + 1] == '?') {
+                special_parameter_value = last_foreground_exit_status;
+            } else {
+                special_parameter_value = last_background_process_id;
+            }
+            special_parameter_length = uart_append_decimal(
+                special_parameter,
                 0,
-                last_foreground_exit_status
+                special_parameter_value
             );
-            status_index = 0;
-            while (status_index < status_length &&
+            special_parameter_index = 0;
+            while (special_parameter_index < special_parameter_length &&
                    result_index < capacity - 1) {
-                result[result_index] = status[status_index];
+                result[result_index] =
+                    special_parameter[special_parameter_index];
                 result_index++;
-                status_index++;
+                special_parameter_index++;
             }
 
-            // Advances past both characters of the expanded "$?" sequence
+            // Advances past both characters of the expanded parameter
             argument_index = argument_index + 2;
         } else if (arguments[argument_index] == '$' &&
                    is_environment_name_start(
@@ -239,7 +247,9 @@ void run_process(int pid, char *arguments, bool background) {
                       SHELL_COMMAND_BUFFER_CAPACITY),
              NULL)) {
         printf("error: process not found%c", '\n');
-    } else if (!background) {
+    } else if (background) {
+        last_background_process_id = pid;
+    } else {
         last_foreground_exit_status = waitpid(pid);
     }
 }
