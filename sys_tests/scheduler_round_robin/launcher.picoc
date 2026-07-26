@@ -22,9 +22,9 @@ int main(void) {
     green_worker = load("sys_tests/scheduler_round_robin/worker.bin");
     blue_worker = load("sys_tests/scheduler_round_robin/worker.bin");
 
-    run(red_worker, "red");
-    run(green_worker, "green");
-    run(blue_worker, "blue");
+    run(red_worker, "red", NULL);
+    run(green_worker, "green", NULL);
+    run(blue_worker, "blue", NULL);
 
     wait(red_worker);
     wait(green_worker);

@@ -1,0 +1,29 @@
+#include "stdlib.header"
+#include "../../common/stddef.header"
+
+int atoi(char *text) {
+    int index = 0;
+    int value = 0;
+    bool negative = false;
+
+    if (text == NULL) {
+        return 0;
+    }
+
+    if (text[index] == '-' || text[index] == '+') {
+        negative = text[index] == '-';
+        index = index + 1;
+    }
+
+    while (text[index] != 0) {
+        if (negative) {
+            // Accumulate negatives directly so -2147483648 remains representable
+            value = (value * 10) - (text[index] - '0');
+        } else {
+            value = (value * 10) + (text[index] - '0');
+        }
+        index = index + 1;
+    }
+
+    return value;
+}

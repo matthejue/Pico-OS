@@ -3,8 +3,7 @@
 #include "../../common/stddef.header"
 
 int load(char *path);
-bool run(int pid, char *arguments);
+bool run(int pid, char *arguments, char **environment);
 bool unload(int pid);
 void list(void);
-void exit(int status);
 int wait(int pid);

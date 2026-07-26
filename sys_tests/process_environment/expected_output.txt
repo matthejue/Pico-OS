@@ -1,0 +1,2 @@
+worker inherited launcher environment
+worker received custom environment

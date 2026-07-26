@@ -1,0 +1,16 @@
+// dependencies: ../../lib/stdio/libstdio.picoc
+
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/stdlib/stdlib.header"
+
+int main(void) {
+    if (getenv("LAUNCHER_VARIABLE") != NULL) {
+        printf("worker inherited launcher environment%c", '\n');
+    } else if (getenv("WORKER_VARIABLE") != NULL) {
+        printf("worker received custom environment%c", '\n');
+    } else {
+        printf("worker received no environment%c", '\n');
+    }
+
+    return 0;
+}

@@ -23,7 +23,10 @@ USER_STARTUP_DEPENDENCIES := \
 	$(USER_STARTUP_SOURCE) \
 	lib/start/start.picoc \
 	lib/stdlib/libstdlib.picoc \
-	lib/stdlib/stdlib.picoc \
+	lib/stdlib/malloc.picoc \
+	lib/stdlib/atoi.picoc \
+	lib/stdlib/env.picoc \
+	lib/stdlib/exit.picoc \
 	lib/stdlib/stdlib.header \
 	common/heap.picoc \
 	common/heap.header

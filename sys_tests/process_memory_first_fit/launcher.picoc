@@ -38,15 +38,15 @@ int main(void) {
     worker_7 = load("sys_tests/process_memory_first_fit/worker.bin");
     worker_8 = load("sys_tests/process_memory_first_fit/worker.bin");
 
-    run(worker_1, NULL);
+    run(worker_1, NULL, NULL);
     address_1 = wait(worker_1);
-    run(worker_7, NULL);
+    run(worker_7, NULL, NULL);
     address_7 = wait(worker_7);
-    run(worker_8, NULL);
+    run(worker_8, NULL, NULL);
     address_8 = wait(worker_8);
-    run(worker_4, NULL);
+    run(worker_4, NULL, NULL);
     address_4 = wait(worker_4);
-    run(worker_6, NULL);
+    run(worker_6, NULL, NULL);
     address_6 = wait(worker_6);
 
     first_fit_1 = address_1 < address_7;

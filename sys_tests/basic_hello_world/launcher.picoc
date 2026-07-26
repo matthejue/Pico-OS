@@ -6,7 +6,7 @@
 int main(void) {
     int pid = load("sys_tests/basic_hello_world/hello_world.bin");
 
-    run(pid, NULL);
+    run(pid, NULL, NULL);
     wait(pid);
     return 0;
 }
