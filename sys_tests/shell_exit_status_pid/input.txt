@@ -1,0 +1,6 @@
+./sys_tests/shell_exit_status_pid/launcher.bin &
+echo.bin $!
+echo.bin $?
+./sys_tests/shell_exit_status_pid/launcher.bin
+echo.bin status $? $?
+exit

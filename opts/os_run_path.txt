@@ -1,1 +1,1 @@
-sys_tests/basic_hello_world
+sys_tests/hello_world

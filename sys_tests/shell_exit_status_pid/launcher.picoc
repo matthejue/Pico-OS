@@ -1,0 +1,9 @@
+// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/unistd/libunistd.picoc
+
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/unistd/unistd.header"
+
+int main(void) {
+    printf("%d\n", getpid());
+    return 42;
+}

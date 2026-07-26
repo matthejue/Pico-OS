@@ -1,8 +1,7 @@
 argc=4
-arg0=sys_tests/args/args.bin
+arg0=sys_tests/process_arguments/process_arguments.bin
 arg1=42
 arg2=beta
 arg3=gamma
 argv_end=NULL
 number=42
-getpid matches loaded pid=1

@@ -50,7 +50,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 # Phony targets
 # ----------------------------------------------------------------------
 
-.PHONY: help
+.PHONY: help code-index
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-all test_not_passed test-os
 .PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti echo.bin echo.reti clean-firmware rebuild-firmware
@@ -84,6 +84,7 @@ help:
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
+	@echo "  make code-index                 Refresh VS Code navigation for PicoC files"
 	@echo ""
 	@echo "Variables:"
 	@echo "  TEST_PATTERN=<pattern>          Override the configured test pattern"
@@ -99,6 +100,14 @@ help:
 	@echo ""
 	@echo "Each sys test is stopped automatically if the emulator exceeds"
 	@echo "the timeout configured in ./run_sys_tests.sh."
+
+
+# ----------------------------------------------------------------------
+# Editor tooling
+# ----------------------------------------------------------------------
+
+code-index:
+	./update_code_index.py
 
 
 # ----------------------------------------------------------------------

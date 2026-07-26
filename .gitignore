@@ -15,6 +15,10 @@ README.txt
 *.ast
 *.rast
 *.json
+!/.vscode/
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/extensions.json
 *.picoc_shrink
 *.picoc_blocks
 *.picoc_patch

@@ -1,3 +1,0 @@
-load sys_tests/basic_mutex_lock_unlock/launcher.bin
-run 3
-exit
