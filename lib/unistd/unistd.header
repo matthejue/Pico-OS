@@ -1,8 +1,14 @@
 #pragma once
 
 #include "../../common/stddef.header"
+#include "../../common/file.header"
 #include "../../common/wait_queue.header"
 
+int invoke_syscall(int number, int argument);
+int read(int file_descriptor, void *buffer, int count);
+int write(int file_descriptor, void *buffer, int count);
+int close(int file_descriptor);
+int lseek(int file_descriptor, int offset, int origin);
 int load(char *path);
 bool run(int pid, char *arguments, char **environment);
 bool unload(int pid);

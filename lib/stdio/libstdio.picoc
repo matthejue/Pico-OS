@@ -1,2 +1,3 @@
+#include "../../common/decimal.picoc"
 #include "stdio.picoc"
-#include "../../common/uart_protocol.picoc"
+#include "scanf.picoc"

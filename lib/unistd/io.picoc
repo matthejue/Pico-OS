@@ -1,0 +1,33 @@
+#include "unistd.header"
+#include "../../common/syscall.header"
+
+int read(int file_descriptor, void *buffer, int count) {
+    struct IoRequest request;
+
+    request.file_descriptor = file_descriptor;
+    request.buffer = (char *)buffer;
+    request.count = count;
+    return invoke_syscall(SYSCALL_READ, (int)&request);
+}
+
+int write(int file_descriptor, void *buffer, int count) {
+    struct IoRequest request;
+
+    request.file_descriptor = file_descriptor;
+    request.buffer = (char *)buffer;
+    request.count = count;
+    return invoke_syscall(SYSCALL_WRITE, (int)&request);
+}
+
+int close(int file_descriptor) {
+    return invoke_syscall(SYSCALL_CLOSE, file_descriptor);
+}
+
+int lseek(int file_descriptor, int offset, int origin) {
+    struct SeekRequest request;
+
+    request.file_descriptor = file_descriptor;
+    request.offset = offset;
+    request.origin = origin;
+    return invoke_syscall(SYSCALL_LSEEK, (int)&request);
+}

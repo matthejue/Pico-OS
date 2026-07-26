@@ -1,0 +1,40 @@
+#include "decimal.header"
+#include "stddef.header"
+
+int append_decimal(char *buffer, int value) {
+    char digits[12];
+    int digit_count = 0;
+    int index = 0;
+    int current = value;
+    bool negative = value < 0;
+    int digit;
+
+    if (current == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
+    if (negative) {
+        buffer[index] = '-';
+        index = index + 1;
+    }
+
+    while (current != 0) {
+        digit = current % 10;
+        if (digit < 0) {
+            digit = -digit;
+        } else if (negative && digit != 0) {
+            digit = 10 - digit;
+        }
+
+        digits[digit_count] = digit + '0';
+        current = current / 10;
+        digit_count = digit_count + 1;
+    }
+
+    while (digit_count != 0) {
+        digit_count = digit_count - 1;
+        buffer[index] = digits[digit_count];
+        index = index + 1;
+    }
+    return index;
+}

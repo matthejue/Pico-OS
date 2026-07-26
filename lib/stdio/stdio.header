@@ -1,5 +1,24 @@
 #pragma once
 
+struct PicoFile {
+    int file_descriptor;
+};
+
+typedef struct PicoFile FILE;
+
+#define stdin standard_input()
+#define stdout standard_output()
+#define stderr standard_error()
+
+void initialize_standard_streams(void);
+FILE *standard_input(void);
+FILE *standard_output(void);
+FILE *standard_error(void);
+FILE *fopen(char *path, char *mode);
+int fclose(FILE *stream);
+int fputc(int character, FILE *stream);
+int fputs(char *text, FILE *stream);
+int fprintf(FILE *stream, char *format, ...);
 int printf(char *format, ...);
 int scanf(char *format, ...);
 int receive_byte_over_uart(void);

@@ -1,0 +1,40 @@
+// dependencies: ../../lib/fcntl/libfcntl.picoc ../../lib/unistd/libunistd.picoc
+
+#include "../../lib/fcntl/fcntl.header"
+#include "../../lib/unistd/unistd.header"
+
+#define TEST_PATH "/tmp/pico_os_file_descriptors.txt"
+
+int main(void) {
+    char buffer[32];
+    int file_descriptor;
+    int count;
+
+    file_descriptor = creat(TEST_PATH, 0);
+    if (file_descriptor < 0) {
+        return 1;
+    }
+    write(file_descriptor, "alpha", 5);
+    close(file_descriptor);
+
+    file_descriptor = open(TEST_PATH, O_WRONLY | O_APPEND);
+    if (file_descriptor < 0) {
+        return 2;
+    }
+    write(file_descriptor, " beta", 5);
+    close(file_descriptor);
+
+    file_descriptor = open(TEST_PATH, O_RDONLY);
+    if (file_descriptor < 0) {
+        return 3;
+    }
+    count = read(file_descriptor, buffer, 32);
+    close(file_descriptor);
+
+    if (count != 10) {
+        return 4;
+    }
+    write(STDOUT_FILENO, buffer, count);
+    write(STDOUT_FILENO, "\n", 1);
+    return 0;
+}

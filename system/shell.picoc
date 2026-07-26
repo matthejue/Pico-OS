@@ -1,10 +1,8 @@
 #include "../lib/unistd/unistd.header"
 #include "../lib/sys/wait/wait.header"
-#include "../lib/stdio/stdio.header"
 #include "../lib/stdlib/stdlib.header"
 #include "../lib/string/string.header"
-#include "../common/uart_protocol.header"
-#include "../common/syscall.header"
+#include "../common/decimal.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
@@ -14,28 +12,50 @@
 int last_foreground_exit_status = 0;
 int last_background_process_id = 0;
 
+void shell_write_character(char character) {
+    write(STDOUT_FILENO, &character, 1);
+}
+
+void shell_write_string(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDOUT_FILENO, text, length);
+}
+
 int is_line_whitespace(char value) {
     return value == ' ' || value == '\t';
 }
 
 int read_line(char *buffer, int capacity) {
     int length = 0;
-    int character = receive_byte_over_uart();
+    char character;
+    bool complete = false;
 
-    while (character != '\n' && character != '\r') {
-        if (length < capacity - 1) {
-            buffer[length] = character;
-            length++;
+    shell_write_string("PICOS> ");
+    while (!complete) {
+        if (read(STDIN_FILENO, &character, 1) == 1) {
+            if (character == '\n' || character == '\r') {
+                shell_write_character('\n');
+                complete = true;
+            } else if (character == '\b' || character == 127) {
+                if (length > 0) {
+                    length = length - 1;
+                    shell_write_character('\b');
+                    shell_write_character(' ');
+                    shell_write_character('\b');
+                }
+            } else if (length < capacity - 1) {
+                buffer[length] = character;
+                length = length + 1;
+                shell_write_character(character);
+            }
         }
-
-        // If the buffer is full, remaining characters are discarded
-        // until the end of the line is reached.
-        character = receive_byte_over_uart();
     }
 
-    // Leave the buffer as a valid null-terminated C string.
     buffer[length] = '\0';
-
     return length;
 }
 
@@ -124,9 +144,8 @@ char *expand_variables(char *arguments, char *result, int capacity) {
             } else {
                 special_parameter_value = last_background_process_id;
             }
-            special_parameter_length = uart_append_decimal(
+            special_parameter_length = append_decimal(
                 special_parameter,
-                0,
                 special_parameter_value
             );
             special_parameter_index = 0;
@@ -246,7 +265,7 @@ void run_process(int pid, char *arguments, bool background) {
                       expanded_arguments,
                       SHELL_COMMAND_BUFFER_CAPACITY),
              NULL)) {
-        printf("error: process not found%c", '\n');
+        shell_write_string("error: process not found\n");
     } else if (background) {
         last_background_process_id = pid;
     } else {
@@ -306,7 +325,7 @@ void handle_command(char *command) {
         shutdown();
     } else if (strncmp(command, "export ", 7) == 0 && command[7] != 0) {
         if (!export_environment_variable(command + 7)) {
-            printf("error: invalid export%c", '\n');
+            shell_write_string("error: invalid export\n");
         }
     } else if (strncmp(command, "load ", 5) == 0 && command[5] != 0) {
         load(command + 5);
@@ -317,7 +336,7 @@ void handle_command(char *command) {
     } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
         pid = parse_process_id(command + 7);
         if (!unload(pid)) {
-            printf("error: process not found%c", '\n');
+            shell_write_string("error: process not found\n");
         }
     } else if (strcmp(command, "list") == 0) {
         list();
@@ -332,7 +351,7 @@ void handle_command(char *command) {
         }
 
         if (pid == 0) {
-            printf("error: unknown command%c", '\n');
+            shell_write_string("error: unknown command\n");
         } else {
             run_process(pid, raw_arguments, background);
         }
@@ -343,8 +362,9 @@ int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
 
     while (1) {
-        read_line(command, SHELL_COMMAND_BUFFER_CAPACITY);
-        handle_command(command);
+        if (read_line(command, SHELL_COMMAND_BUFFER_CAPACITY) > 0) {
+            handle_command(command);
+        }
     }
 
     return 0;

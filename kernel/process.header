@@ -4,6 +4,8 @@
 #include "../common/syscall.header"
 #include "../common/wait_queue.header"
 
+struct FileDescriptorTable;
+
 #define PROCESS_STATE_NEW 0
 #define PROCESS_STATE_READY 1
 #define PROCESS_STATE_RUNNING 2
@@ -30,6 +32,8 @@ struct Process {
     int word_count;
     char *binary_path;
     struct ActivationRecord activation;
+    // Kept after activation because the dispatcher loads that record by fixed offsets
+    struct FileDescriptorTable *file_descriptors;
     // Pointer to the exit-status storage supplied by this process's waitpid() call
     int *waiting_status_ptr;
     // Queue of processes waiting for this process to exit and receive its status
