@@ -1,0 +1,38 @@
+#include "unistd.header"
+#include "../../common/syscall.header"
+
+void wait_queue_init(struct wait_queue *wq) {
+    wq->head = NULL;
+    wq->tail = NULL;
+}
+
+void sleep(struct wait_queue *wq) {
+    if (wq == NULL) {
+        return;
+    }
+
+    asm("LOADIN BAF IN1 3");
+    asm("LOADI ACC 11"); // SYSCALL_SLEEP
+    asm("INT 0");
+}
+
+void wakeup(struct wait_queue *wq) {
+    if (wq == NULL) {
+        return;
+    }
+
+    asm("LOADIN BAF IN1 3");
+    asm("LOADI ACC 12"); // SYSCALL_WAKEUP
+    asm("INT 0");
+}
+
+int wait(int pid) {
+    int status = 0;
+    struct WaitProcessRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_syscall(SYSCALL_WAIT_PROCESS, (int)&request)) {
+    }
+    return status;
+}

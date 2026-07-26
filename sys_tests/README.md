@@ -53,7 +53,7 @@ reti_emulator -f /tmp -a program.reti
 ```
 
 The resulting `launcher.bin` is loaded by the OS through `input.txt`. The
-launcher uses the process library to load, run, wait for, and optionally unload
+launcher uses the unistd library to load, run, wait for, and optionally unload
 the other test binaries. Keeping process orchestration in PicoC makes each test
 self-contained and avoids encoding process IDs and setup steps in UART input.
 
