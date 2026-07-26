@@ -5,6 +5,7 @@
 #include "../common/wait_queue.header"
 
 struct FileDescriptorTable;
+struct SharedMemoryAttachment;
 
 #define PROCESS_STATE_NEW 0
 #define PROCESS_STATE_READY 1
@@ -45,6 +46,8 @@ struct Process {
     struct Process *wait_next;
     // Link to this process's successor in the global process list
     struct Process *next;
+    // Shared-memory mappings released when this process is removed
+    struct SharedMemoryAttachment *shared_memory_attachments;
 };
 
 void initialize_process_table(void);

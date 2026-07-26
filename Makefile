@@ -288,6 +288,7 @@ KERNEL_PICOC_SOURCES := \
 	common/heap.picoc \
 	kernel/kmalloc.picoc \
 	kernel/pmalloc.picoc \
+	kernel/shared_memory.picoc \
 	kernel/process.picoc \
 	kernel/filesystem.picoc \
 	kernel/process_arguments.picoc \

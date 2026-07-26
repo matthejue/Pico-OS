@@ -3,6 +3,7 @@
 #include "kernel.header"
 #include "kmalloc.header"
 #include "pmalloc.header"
+#include "shared_memory.header"
 #include "dispatcher.header"
 #include "filesystem.header"
 #include "../common/uart_protocol.header"
@@ -120,6 +121,7 @@ struct Process *create_process(
     process->waiters.tail = NULL;
     process->waiting_queue_ptr = NULL;
     process->wait_next = NULL;
+    process->shared_memory_attachments = NULL;
     *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
@@ -224,6 +226,7 @@ void remove_process(struct Process *process, int status) {
         active_process = previous;
     }
 
+    release_process_shared_memory(candidate);
     pfree(candidate->base_address);
     destroy_file_descriptor_table(candidate->file_descriptors);
     kfree(candidate->binary_path);
