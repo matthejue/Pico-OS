@@ -1,0 +1,24 @@
+// dependencies: ../../lib/process/libprocess.picoc
+
+#include "../../lib/process/process.header"
+#include "../../lib/stdlib/stdlib.header"
+
+int main(void) {
+    char *custom_environment[2];
+    int inherited_worker;
+    int custom_worker;
+
+    setenv("LAUNCHER_VARIABLE", "true", true);
+    custom_environment[0] = "WORKER_VARIABLE=true";
+    custom_environment[1] = NULL;
+
+    inherited_worker = load("sys_tests/process_environment/worker.bin");
+    custom_worker = load("sys_tests/process_environment/worker.bin");
+
+    run(inherited_worker, NULL, NULL);
+    wait(inherited_worker);
+
+    run(custom_worker, NULL, custom_environment);
+    wait(custom_worker);
+    return 0;
+}

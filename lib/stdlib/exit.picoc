@@ -1,0 +1,8 @@
+#include "stdlib.header"
+
+void exit(int status) {
+    // SYSCALL_EXIT
+    asm("LOADI ACC 9");
+    asm("LOADIN BAF IN1 3");
+    asm("INT 0");
+}

@@ -70,7 +70,7 @@ int main(void) {
         return 1;
     }
 
-    if (!run(shell_pid, NULL)) {
+    if (!run(shell_pid, NULL, NULL)) {
         return 1;
     }
 

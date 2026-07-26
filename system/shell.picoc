@@ -11,7 +11,6 @@
 #define SHELL_STATUS_BUFFER_CAPACITY 11
 
 int last_foreground_exit_status = 0;
-char *executable_search_path = NULL;
 
 int is_line_whitespace(char value) {
     return value == ' ' || value == '\t';
@@ -83,29 +82,46 @@ char *command_arguments(char *command) {
     return command + index;
 }
 
-char *expand_last_exit_status(char *arguments, char *result, int capacity) {
+bool is_environment_name_start(char value) {
+    return (value >= 'a' && value <= 'z') ||
+           (value >= 'A' && value <= 'Z') ||
+           value == '_';
+}
+
+bool is_environment_name_character(char value) {
+    return is_environment_name_start(value) ||
+           (value >= '0' && value <= '9');
+}
+
+char *expand_variables(char *arguments, char *result, int capacity) {
     char status[SHELL_STATUS_BUFFER_CAPACITY]; // Provides storage for the exit status as string
     int argument_index = 0;
     int result_index = 0;
+    int name_start;
+    int name_end;
     int status_index;
     int status_length;
+    int value_index;
+    char saved_character;
+    char *value;
 
     // Returns early when there are no arguments to expand
     if (arguments == NULL) {
         return NULL;
     }
 
-    // Formats the last foreground exit status as decimal text
-    status_length = uart_append_decimal(status, 0,
-                                        last_foreground_exit_status);
-
     // Copies arguments while reserving one result position for the terminating '\0'
     while (arguments[argument_index] != '\0' &&
            result_index < capacity - 1) {
         // Replaces the next "$?" sequence with the formatted exit status
         if (strncmp(arguments + argument_index, "$?", 2) == 0) {
+            // Formats the last foreground exit status as decimal text
+            status_length = uart_append_decimal(
+                status,
+                0,
+                last_foreground_exit_status
+            );
             status_index = 0;
-
             while (status_index < status_length &&
                    result_index < capacity - 1) {
                 result[result_index] = status[status_index];
@@ -115,6 +131,32 @@ char *expand_last_exit_status(char *arguments, char *result, int capacity) {
 
             // Advances past both characters of the expanded "$?" sequence
             argument_index = argument_index + 2;
+        } else if (arguments[argument_index] == '$' &&
+                   is_environment_name_start(
+                       arguments[argument_index + 1])) {
+            name_start = argument_index + 1;
+            name_end = name_start;
+            while (is_environment_name_character(arguments[name_end])) {
+                name_end = name_end + 1;
+            }
+
+            saved_character = arguments[name_end];
+            arguments[name_end] = 0;
+            value = getenv(arguments + name_start);
+            arguments[name_end] = saved_character;
+
+            value_index = 0;
+            while (value != NULL &&
+                   value[value_index] != 0 &&
+                   result_index < capacity - 1) {
+                result[result_index] = value[value_index];
+                result_index = result_index + 1;
+                value_index = value_index + 1;
+            }
+            argument_index = name_end;
+        } else if (arguments[argument_index] == '"') {
+            // Removes shell quotes before passing arguments to the process
+            argument_index = argument_index + 1;
         } else {
             // Copies any other character unchanged and advances both indices
             result[result_index] = arguments[argument_index];
@@ -126,6 +168,32 @@ char *expand_last_exit_status(char *arguments, char *result, int capacity) {
     // Terminates the possibly truncated result
     result[result_index] = '\0';
     return result;
+}
+
+bool export_environment_variable(char *assignment) {
+    char expanded_assignment[SHELL_COMMAND_BUFFER_CAPACITY];
+    int separator = 0;
+
+    expand_variables(
+        assignment,
+        expanded_assignment,
+        SHELL_COMMAND_BUFFER_CAPACITY
+    );
+
+    while (expanded_assignment[separator] != 0 &&
+           expanded_assignment[separator] != '=') {
+        separator = separator + 1;
+    }
+    if (expanded_assignment[separator] != '=') {
+        return false;
+    }
+
+    expanded_assignment[separator] = 0;
+    return setenv(
+        expanded_assignment,
+        expanded_assignment + separator + 1,
+        true
+    ) == 0;
 }
 
 bool strip_background_operator(char *command) {
@@ -164,10 +232,11 @@ void shutdown(void) {
 void run_process(int pid, char *arguments, bool background) {
     char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
 
-    if (!run(pid, expand_last_exit_status(
+    if (!run(pid, expand_variables(
                       arguments,
                       expanded_arguments,
-                      SHELL_COMMAND_BUFFER_CAPACITY))) {
+                      SHELL_COMMAND_BUFFER_CAPACITY),
+             NULL)) {
         printf("error: process not found%c", '\n');
     } else if (!background) {
         last_foreground_exit_status = wait(pid);
@@ -183,6 +252,7 @@ void build_executable_path(char *directory, char *name, char *result) {
 
 int load_from_path(char *name) {
     char executable_path[SHELL_EXECUTABLE_PATH_CAPACITY];
+    char *executable_search_path = getenv("PATH");
     int directory_start = 0;
     int path_index = 0;
     char separator;
@@ -223,6 +293,10 @@ void handle_command(char *command) {
 
     if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
         shutdown();
+    } else if (strncmp(command, "export ", 7) == 0 && command[7] != 0) {
+        if (!export_environment_variable(command + 7)) {
+            printf("error: invalid export%c", '\n');
+        }
     } else if (strncmp(command, "load ", 5) == 0 && command[5] != 0) {
         load(command + 5);
     } else if (strncmp(command, "run ", 4) == 0 && command[4] != 0) {
@@ -256,8 +330,6 @@ void handle_command(char *command) {
 
 int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
-
-    executable_search_path = getenv("PATH");
 
     while (1) {
         read_line(command, SHELL_COMMAND_BUFFER_CAPACITY);

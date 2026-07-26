@@ -1,2 +1,5 @@
 #include "../../common/heap.picoc"
-#include "stdlib.picoc"
+#include "malloc.picoc"
+#include "atoi.picoc"
+#include "env.picoc"
+#include "exit.picoc"
