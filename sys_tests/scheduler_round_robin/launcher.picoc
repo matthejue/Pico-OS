@@ -8,7 +8,7 @@ void deactivate_timer_interrupt(void) {
     asm("LOADI DS 1048576"); // 2^20
     asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
     asm("LOADI ACC 0");
-    asm("STORE ACC 7"); // Timer interval register
+    asm("STORE ACC 9"); // Timer interval register
     asm("LOADIN BAF DS 0"); // Restore DS after periphery access
 }
 

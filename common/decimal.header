@@ -1,0 +1,3 @@
+#pragma once
+
+int append_decimal(char *buffer, int value);

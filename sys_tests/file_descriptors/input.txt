@@ -1,0 +1,2 @@
+./sys_tests/file_descriptors/file_descriptors.bin
+exit

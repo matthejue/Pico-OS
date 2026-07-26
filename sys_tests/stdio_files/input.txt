@@ -1,0 +1,2 @@
+./sys_tests/stdio_files/stdio_files.bin
+exit

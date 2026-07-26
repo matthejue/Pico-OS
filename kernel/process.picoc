@@ -4,6 +4,7 @@
 #include "kmalloc.header"
 #include "pmalloc.header"
 #include "dispatcher.header"
+#include "filesystem.header"
 #include "../common/uart_protocol.header"
 
 struct Process *process_list_head = NULL;
@@ -92,6 +93,12 @@ struct Process *create_process(
     process->word_count = word_count;
     process->binary_path = copy_process_path(binary_path);
     if (process->binary_path == NULL) {
+        kfree(process);
+        return NULL;
+    }
+    process->file_descriptors = create_file_descriptor_table();
+    if (process->file_descriptors == NULL) {
+        kfree(process->binary_path);
         kfree(process);
         return NULL;
     }
@@ -218,6 +225,7 @@ void remove_process(struct Process *process, int status) {
     }
 
     pfree(candidate->base_address);
+    destroy_file_descriptor_table(candidate->file_descriptors);
     kfree(candidate->binary_path);
     kfree(candidate);
 }

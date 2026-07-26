@@ -1,0 +1,495 @@
+#include "filesystem.header"
+#include "kmalloc.header"
+#include "periphery.header"
+#include "process.header"
+#include "../common/uart_protocol.header"
+
+#define UART_RECEIVE_REGISTER 1
+#define UART_STATUS_REGISTER 2
+#define UART_RECEIVE_READY 2
+
+int receive_byte_over_uart(void);
+
+char *copy_file_path(char *path) {
+    int length = 0;
+    int index = 0;
+    char *copy;
+
+    while (path[length] != 0) {
+        length = length + 1;
+    }
+
+    copy = (char *)kmalloc(length + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+
+    while (index < length) {
+        copy[index] = path[index];
+        index = index + 1;
+    }
+    copy[index] = 0;
+    return copy;
+}
+
+void initialize_file_descriptor(
+    struct FileDescriptor *descriptor,
+    int kind,
+    int flags
+) {
+    descriptor->kind = kind;
+    descriptor->flags = flags;
+    descriptor->offset = 0;
+    descriptor->path = NULL;
+}
+
+struct FileDescriptorTable *create_file_descriptor_table(void) {
+    struct FileDescriptorTable *table;
+    int index;
+
+    table = (struct FileDescriptorTable *)kmalloc(
+        sizeof(struct FileDescriptorTable)
+    );
+    if (table == NULL) {
+        return NULL;
+    }
+
+    table->entries = (struct FileDescriptor *)kmalloc(
+        sizeof(struct FileDescriptor) * FILE_DESCRIPTOR_COUNT
+    );
+    table->stdin_buffer = (char *)kmalloc(STDIN_BUFFER_CAPACITY);
+    if (table->entries == NULL || table->stdin_buffer == NULL) {
+        kfree(table->entries);
+        kfree(table->stdin_buffer);
+        kfree(table);
+        return NULL;
+    }
+
+    index = 0;
+    while (index < FILE_DESCRIPTOR_COUNT) {
+        initialize_file_descriptor(
+            table->entries + index,
+            FILE_DESCRIPTOR_FREE,
+            0
+        );
+        index = index + 1;
+    }
+    initialize_file_descriptor(
+        table->entries + STDIN_FILENO,
+        FILE_DESCRIPTOR_STDIN,
+        O_RDONLY
+    );
+    initialize_file_descriptor(
+        table->entries + STDOUT_FILENO,
+        FILE_DESCRIPTOR_STDOUT,
+        O_WRONLY
+    );
+    initialize_file_descriptor(
+        table->entries + STDERR_FILENO,
+        FILE_DESCRIPTOR_STDERR,
+        O_WRONLY
+    );
+
+    table->stdin_head = 0;
+    table->stdin_tail = 0;
+    table->stdin_count = 0;
+    table->stdin_waiters.head = NULL;
+    table->stdin_waiters.tail = NULL;
+    table->pending_read_buffer = NULL;
+    table->pending_read_count = 0;
+    table->pending_character_read = false;
+    return table;
+}
+
+void destroy_file_descriptor_table(struct FileDescriptorTable *table) {
+    int index = 0;
+
+    if (table == NULL) {
+        return;
+    }
+
+    while (index < FILE_DESCRIPTOR_COUNT) {
+        kfree(table->entries[index].path);
+        index = index + 1;
+    }
+    kfree(table->entries);
+    kfree(table->stdin_buffer);
+    kfree(table);
+}
+
+bool file_descriptor_is_valid(int file_descriptor) {
+    return file_descriptor >= 0 &&
+           file_descriptor < FILE_DESCRIPTOR_COUNT;
+}
+
+bool file_descriptor_can_read(struct FileDescriptor *descriptor) {
+    int access_mode = descriptor->flags & O_ACCMODE;
+
+    return access_mode == O_RDONLY || access_mode == O_RDWR;
+}
+
+bool file_descriptor_can_write(struct FileDescriptor *descriptor) {
+    int access_mode = descriptor->flags & O_ACCMODE;
+
+    return access_mode == O_WRONLY || access_mode == O_RDWR;
+}
+
+int receive_file_size(char *path) {
+    uart_send_file_command("read ", path);
+    return receive_word();
+}
+
+void discard_uart_bytes(int count) {
+    while (count > 0) {
+        receive_byte_over_uart();
+        count = count - 1;
+    }
+}
+
+bool file_exists(char *path) {
+    int size = receive_file_size(path);
+
+    if (size < 0) {
+        return false;
+    }
+    discard_uart_bytes(size);
+    return true;
+}
+
+void select_uart_output(char *command, char *path) {
+    uart_send_file_command(command, path);
+}
+
+void restore_uart_output(void) {
+    uart_send_file_command("write ", "stdout");
+}
+
+int free_file_descriptor(struct FileDescriptorTable *table) {
+    int index = 3;
+
+    while (index < FILE_DESCRIPTOR_COUNT) {
+        if (table->entries[index].kind == FILE_DESCRIPTOR_FREE) {
+            return index;
+        }
+        index = index + 1;
+    }
+    return -1;
+}
+
+int open_file_descriptor(struct OpenRequest *request) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+    struct FileDescriptor *descriptor;
+    char *path;
+    int file_descriptor;
+    int access_mode;
+
+    if (request == NULL || request->path == NULL) {
+        return -1;
+    }
+
+    access_mode = request->flags & O_ACCMODE;
+    if (access_mode != O_RDONLY &&
+        access_mode != O_WRONLY &&
+        access_mode != O_RDWR) {
+        return -1;
+    }
+
+    file_descriptor = free_file_descriptor(table);
+    if (file_descriptor < 0) {
+        return -1;
+    }
+
+    path = copy_file_path(request->path);
+    if (path == NULL) {
+        return -1;
+    }
+
+    if ((request->flags & O_TRUNC) != 0) {
+        if (access_mode == O_RDONLY) {
+            kfree(path);
+            return -1;
+        }
+        select_uart_output("write ", path);
+        restore_uart_output();
+    } else if (!file_exists(path)) {
+        if ((request->flags & O_CREAT) == 0) {
+            kfree(path);
+            return -1;
+        }
+        select_uart_output("write ", path);
+        restore_uart_output();
+    }
+
+    descriptor = table->entries + file_descriptor;
+    descriptor->kind = FILE_DESCRIPTOR_FILE;
+    descriptor->flags = request->flags;
+    descriptor->offset = 0;
+    descriptor->path = path;
+    return file_descriptor;
+}
+
+int pop_stdin_byte(struct FileDescriptorTable *table) {
+    int value = table->stdin_buffer[table->stdin_head];
+
+    table->stdin_head = (table->stdin_head + 1) % STDIN_BUFFER_CAPACITY;
+    table->stdin_count = table->stdin_count - 1;
+    return value;
+}
+
+int copy_stdin_bytes(
+    struct FileDescriptorTable *table,
+    char *buffer,
+    int count
+) {
+    int copied = 0;
+
+    while (copied < count && table->stdin_count > 0) {
+        buffer[copied] = pop_stdin_byte(table);
+        copied = copied + 1;
+    }
+    return copied;
+}
+
+int begin_stdin_read(
+    struct FileDescriptorTable *table,
+    char *buffer,
+    int count,
+    bool character_read,
+    int *caller_context
+) {
+    if (table->stdin_count > 0) {
+        if (character_read) {
+            return pop_stdin_byte(table);
+        }
+        return copy_stdin_bytes(table, buffer, count);
+    }
+
+    table->pending_read_buffer = buffer;
+    table->pending_read_count = count;
+    table->pending_character_read = character_read;
+    sleep_on_wait_queue(&(table->stdin_waiters), caller_context);
+    return 1;
+}
+
+int read_stdin_character(int *caller_context) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+
+    return begin_stdin_read(table, NULL, 1, true, caller_context);
+}
+
+int read_regular_file(
+    struct FileDescriptor *descriptor,
+    char *buffer,
+    int count
+) {
+    int file_size = receive_file_size(descriptor->path);
+    int file_index = 0;
+    int copied = 0;
+    int value;
+
+    if (file_size < 0) {
+        return -1;
+    }
+
+    while (file_index < file_size) {
+        value = receive_byte_over_uart();
+        if (file_index >= descriptor->offset && copied < count) {
+            buffer[copied] = value;
+            copied = copied + 1;
+        }
+        file_index = file_index + 1;
+    }
+    descriptor->offset = descriptor->offset + copied;
+    return copied;
+}
+
+int read_file_descriptor(struct IoRequest *request, int *caller_context) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+    struct FileDescriptor *descriptor;
+
+    if (request == NULL ||
+        request->count < 0 ||
+        (request->count > 0 && request->buffer == NULL) ||
+        !file_descriptor_is_valid(request->file_descriptor)) {
+        return -1;
+    }
+    if (request->count == 0) {
+        return 0;
+    }
+
+    descriptor = table->entries + request->file_descriptor;
+    if (!file_descriptor_can_read(descriptor)) {
+        return -1;
+    }
+    if (descriptor->kind == FILE_DESCRIPTOR_STDIN) {
+        return begin_stdin_read(
+            table,
+            request->buffer,
+            request->count,
+            false,
+            caller_context
+        );
+    }
+    if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
+        return read_regular_file(descriptor, request->buffer, request->count);
+    }
+    return -1;
+}
+
+void write_uart_bytes(char *buffer, int count) {
+    int index = 0;
+
+    while (index < count) {
+        uart_print_character(buffer[index]);
+        index = index + 1;
+    }
+}
+
+int write_file_descriptor(struct IoRequest *request) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+    struct FileDescriptor *descriptor;
+
+    if (request == NULL ||
+        request->count < 0 ||
+        (request->count > 0 && request->buffer == NULL) ||
+        !file_descriptor_is_valid(request->file_descriptor)) {
+        return -1;
+    }
+
+    descriptor = table->entries + request->file_descriptor;
+    if (!file_descriptor_can_write(descriptor)) {
+        return -1;
+    }
+
+    if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
+        select_uart_output("write ", "stderr");
+    } else if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
+        select_uart_output("append ", descriptor->path);
+    } else if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
+        return -1;
+    }
+
+    write_uart_bytes(request->buffer, request->count);
+    if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
+        restore_uart_output();
+    }
+    descriptor->offset = descriptor->offset + request->count;
+    return request->count;
+}
+
+int close_file_descriptor(int file_descriptor) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+    struct FileDescriptor *descriptor;
+
+    if (file_descriptor < 3 ||
+        !file_descriptor_is_valid(file_descriptor)) {
+        return -1;
+    }
+
+    descriptor = table->entries + file_descriptor;
+    if (descriptor->kind == FILE_DESCRIPTOR_FREE) {
+        return -1;
+    }
+    kfree(descriptor->path);
+    initialize_file_descriptor(descriptor, FILE_DESCRIPTOR_FREE, 0);
+    return 0;
+}
+
+int seek_file_descriptor(struct SeekRequest *request) {
+    struct FileDescriptorTable *table = current_process()->file_descriptors;
+    struct FileDescriptor *descriptor;
+    int offset;
+
+    if (request == NULL ||
+        !file_descriptor_is_valid(request->file_descriptor)) {
+        return -1;
+    }
+
+    descriptor = table->entries + request->file_descriptor;
+    if (descriptor->kind != FILE_DESCRIPTOR_FILE) {
+        return -1;
+    }
+
+    if (request->origin == SEEK_SET) {
+        offset = request->offset;
+    } else if (request->origin == SEEK_CUR) {
+        offset = descriptor->offset + request->offset;
+    } else if (request->origin == SEEK_END) {
+        offset = receive_file_size(descriptor->path);
+        if (offset < 0) {
+            return -1;
+        }
+        discard_uart_bytes(offset);
+        offset = offset + request->offset;
+    } else {
+        return -1;
+    }
+
+    if (offset < 0) {
+        return -1;
+    }
+    descriptor->offset = offset;
+    return offset;
+}
+
+void enqueue_stdin_byte(struct FileDescriptorTable *table, int value) {
+    if (table->stdin_count == STDIN_BUFFER_CAPACITY) {
+        table->stdin_head =
+            (table->stdin_head + 1) % STDIN_BUFFER_CAPACITY;
+        table->stdin_count = table->stdin_count - 1;
+    }
+
+    table->stdin_buffer[table->stdin_tail] = value;
+    table->stdin_tail =
+        (table->stdin_tail + 1) % STDIN_BUFFER_CAPACITY;
+    table->stdin_count = table->stdin_count + 1;
+}
+
+void complete_pending_stdin_read(
+    struct Process *process,
+    struct FileDescriptorTable *table
+) {
+    int result;
+
+    if (table->stdin_waiters.head == NULL) {
+        return;
+    }
+
+    if (table->pending_character_read) {
+        result = pop_stdin_byte(table);
+    } else {
+        result = copy_stdin_bytes(
+            table,
+            table->pending_read_buffer,
+            table->pending_read_count
+        );
+    }
+
+    process->activation.acc = result;
+    table->pending_read_buffer = NULL;
+    table->pending_read_count = 0;
+    table->pending_character_read = false;
+    wakeup_wait_queue(&(table->stdin_waiters));
+}
+
+void handle_uart_interrupt(void) {
+    struct Process *process = current_process();
+    struct FileDescriptorTable *table;
+    int value;
+    int status;
+
+    value = periphery_read_register(UART_RECEIVE_REGISTER) & 255;
+    status = periphery_read_register(UART_STATUS_REGISTER);
+    periphery_write_register(
+        UART_STATUS_REGISTER,
+        status | UART_RECEIVE_READY
+    );
+
+    if (process == NULL || process->file_descriptors == NULL) {
+        return;
+    }
+
+    table = process->file_descriptors;
+    enqueue_stdin_byte(table, value);
+    complete_pending_stdin_read(process, table);
+}

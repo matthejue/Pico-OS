@@ -1,12 +1,20 @@
 #include "stdio.header"
+#include "../../common/file.header"
+#include "../../common/decimal.header"
 #include "../../common/stddef.header"
 #include "../../common/syscall.header"
-#include "../../common/uart_protocol.header"
 
-#define PRINTF_BUFFER_CAPACITY 10
+#define FOPEN_STREAM_COUNT 5
 
-bool has_unread_input = false;
-int unread_input = 0;
+FILE standard_input_stream;
+FILE standard_output_stream;
+FILE standard_error_stream;
+FILE file_streams[FOPEN_STREAM_COUNT];
+bool file_stream_used[FOPEN_STREAM_COUNT];
+FILE *standard_input_pointer = NULL;
+FILE *standard_output_pointer = NULL;
+FILE *standard_error_pointer = NULL;
+bool standard_streams_use_file_descriptors = false;
 
 void send_byte_over_uart(int value) {
     asm("LOADIN BAF IN1 3");
@@ -23,246 +31,297 @@ int receive_byte_over_uart(void) {
     return value;
 }
 
-void flush_printf_buffer(char *buffer, int *buffer_index) {
-    if (*buffer_index == 0) {
+int invoke_stdio_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+void prepare_standard_streams(void) {
+    int index;
+
+    if (standard_input_pointer != NULL) {
         return;
     }
 
-    buffer[*buffer_index] = 0;
-    uart_print_string(buffer);
-    *buffer_index = 0;
-}
+    standard_input_stream.file_descriptor = STDIN_FILENO;
+    standard_output_stream.file_descriptor = STDOUT_FILENO;
+    standard_error_stream.file_descriptor = STDERR_FILENO;
+    standard_input_pointer = &standard_input_stream;
+    standard_output_pointer = &standard_output_stream;
+    standard_error_pointer = &standard_error_stream;
+    standard_streams_use_file_descriptors = invoke_stdio_syscall(
+        SYSCALL_FILE_DESCRIPTORS_AVAILABLE,
+        0
+    ) == 1;
 
-int append_character_buffered(char *buffer, int buffer_index, int value) {
-    if (buffer_index == PRINTF_BUFFER_CAPACITY - 1) {
-        flush_printf_buffer(buffer, &buffer_index);
+    index = 0;
+    while (index < FOPEN_STREAM_COUNT) {
+        file_stream_used[index] = false;
+        index = index + 1;
     }
-
-    buffer[buffer_index] = value;
-    return buffer_index + 1;
 }
 
-int append_decimal_buffered(char *buffer, int buffer_index, int value) {
-    char digits[12];
-    int index = 0;
-    int digit_count = uart_append_decimal(digits, 0, value);
+void initialize_standard_streams(void) {
+    prepare_standard_streams();
+    standard_streams_use_file_descriptors = true;
+}
 
-    while (index != digit_count) {
-        buffer_index = append_character_buffered(buffer, buffer_index, digits[index]);
+FILE *standard_input(void) {
+    prepare_standard_streams();
+    return standard_input_pointer;
+}
+
+FILE *standard_output(void) {
+    prepare_standard_streams();
+    return standard_output_pointer;
+}
+
+FILE *standard_error(void) {
+    prepare_standard_streams();
+    return standard_error_pointer;
+}
+
+int mode_to_flags(char *mode) {
+    int flags;
+    int index = 0;
+    bool update = false;
+
+    if (mode == NULL) {
+        return -1;
+    }
+    while (mode[index] != 0) {
+        if (mode[index] == '+') {
+            update = true;
+        }
         index = index + 1;
     }
 
-    return buffer_index;
-}
-
-bool is_decimal_digit(int value) { return value >= '0' && value <= '9'; }
-
-bool is_whitespace(int value) {
-    return value == ' ' || value == '\n' ||
-           value == '\r' || value == '\t';
-}
-
-int read_input(void) {
-    if (has_unread_input) {
-        has_unread_input = false;
-        return unread_input;
+    if (mode[0] == 'r') {
+        flags = O_RDONLY;
+    } else if (mode[0] == 'w') {
+        flags = O_WRONLY | O_CREAT | O_TRUNC;
+    } else if (mode[0] == 'a') {
+        flags = O_WRONLY | O_CREAT | O_APPEND;
+    } else {
+        return -1;
     }
 
-    return receive_byte_over_uart();
+    if (update) {
+        flags = (flags & (0 - O_ACCMODE - 1)) | O_RDWR;
+    }
+    return flags;
 }
 
-void unread(int value) {
-    has_unread_input = true;
-    unread_input = value;
-}
+FILE *fopen(char *path, char *mode) {
+    struct OpenRequest request;
+    int stream_index = 0;
+    int file_descriptor;
 
-void skip_whitespace(void) {
-    int current = read_input();
-
-    while (is_whitespace(current)) {
-        current = read_input();
+    prepare_standard_streams();
+    while (stream_index < FOPEN_STREAM_COUNT &&
+           file_stream_used[stream_index]) {
+        stream_index = stream_index + 1;
+    }
+    if (stream_index == FOPEN_STREAM_COUNT) {
+        return NULL;
     }
 
-    unread(current);
-}
-
-bool read_decimal(int *target) {
-    int current;
-    int sign = 1;
-    int value = 0;
-    bool read_any_digit = false;
-
-    skip_whitespace();
-    current = read_input();
-
-    if (!is_decimal_digit(current) && current != '-' && current != '+') {
-        unread(current);
-        return false;
+    request.path = path;
+    request.flags = mode_to_flags(mode);
+    if (request.flags < 0) {
+        return NULL;
     }
 
-    if (current == '-' || current == '+') {
-        if (current == '-') {
-            sign = -1;
+    file_descriptor = invoke_stdio_syscall(SYSCALL_OPEN, (int)&request);
+    if (file_descriptor < 0) {
+        return NULL;
+    }
+
+    file_stream_used[stream_index] = true;
+    file_streams[stream_index].file_descriptor = file_descriptor;
+    return file_streams + stream_index;
+}
+
+int fclose(FILE *stream) {
+    int stream_index = 0;
+    int result;
+
+    prepare_standard_streams();
+    if (stream == NULL) {
+        return -1;
+    }
+
+    result = invoke_stdio_syscall(
+        SYSCALL_CLOSE,
+        stream->file_descriptor
+    );
+    while (stream_index < FOPEN_STREAM_COUNT) {
+        if (stream == file_streams + stream_index) {
+            file_stream_used[stream_index] = false;
+            return result;
         }
-
-        current = read_input();
-
-        if (!is_decimal_digit(current)) {
-            unread(current);
-            return false;
-        }
+        stream_index = stream_index + 1;
     }
-
-    while (is_decimal_digit(current)) {
-        value = (value * 10) + (current - '0');
-        read_any_digit = true;
-        current = read_input();
-    }
-
-    unread(current);
-
-    if (!read_any_digit) {
-        return false;
-    }
-
-    *target = value * sign;
-    return true;
+    return result;
 }
 
-bool read_string(char *target) {
+int fputc(int character, FILE *stream) {
+    struct IoRequest request;
+    char value = character;
+
+    prepare_standard_streams();
+    if (stream == NULL) {
+        return -1;
+    }
+
+    if (!standard_streams_use_file_descriptors &&
+        stream->file_descriptor == STDOUT_FILENO) {
+        send_byte_over_uart(character);
+        return character & 255;
+    }
+
+    request.file_descriptor = stream->file_descriptor;
+    request.buffer = &value;
+    request.count = 1;
+    if (invoke_stdio_syscall(SYSCALL_WRITE, (int)&request) != 1) {
+        return -1;
+    }
+    return character & 255;
+}
+
+int fputs(char *text, FILE *stream) {
+    struct IoRequest request;
+    int length = 0;
+    int index;
+
+    if (text == NULL || stream == NULL) {
+        return -1;
+    }
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+
+    if (standard_streams_use_file_descriptors ||
+        stream->file_descriptor != STDOUT_FILENO) {
+        request.file_descriptor = stream->file_descriptor;
+        request.buffer = text;
+        request.count = length;
+        return invoke_stdio_syscall(SYSCALL_WRITE, (int)&request);
+    }
+
+    index = 0;
+    while (index < length) {
+        send_byte_over_uart(text[index]);
+        index = index + 1;
+    }
+    return length;
+}
+
+int write_decimal(FILE *stream, int value) {
+    char digits[12];
+    int length = append_decimal(digits, value);
+    int written = 0;
+
+    while (written < length) {
+        if (fputc(digits[written], stream) < 0) {
+            return -1;
+        }
+        written = written + 1;
+    }
+    return written;
+}
+
+int format_argument(int argument_base, int argument_index, int first_argument) {
+    return *((int *)(argument_base + first_argument + argument_index));
+}
+
+int format_stream(
+    FILE *stream,
+    char *format,
+    int argument_base,
+    int first_argument
+) {
     int index = 0;
-    int current;
+    int argument_index = 0;
+    int argument_value;
+    int written = 0;
+    int count;
 
-    skip_whitespace();
-    current = read_input();
+    while (format[index] != 0) {
+        if (format[index] != '%') {
+            if (fputc(format[index], stream) < 0) {
+                return -1;
+            }
+            written = written + 1;
+            index = index + 1;
+        } else {
+            index = index + 1;
+            if (format[index] == 'd') {
+                argument_value = format_argument(
+                    argument_base,
+                    argument_index,
+                    first_argument
+                );
+                count = write_decimal(stream, argument_value);
+                argument_index = argument_index + 1;
+            } else if (format[index] == 'c') {
+                argument_value = format_argument(
+                    argument_base,
+                    argument_index,
+                    first_argument
+                );
+                count = fputc(argument_value, stream);
+                if (count >= 0) {
+                    count = 1;
+                }
+                argument_index = argument_index + 1;
+            } else if (format[index] == 's') {
+                argument_value = format_argument(
+                    argument_base,
+                    argument_index,
+                    first_argument
+                );
+                count = fputs((char *)argument_value, stream);
+                argument_index = argument_index + 1;
+            } else if (format[index] == '%') {
+                count = fputc('%', stream);
+                if (count >= 0) {
+                    count = 1;
+                }
+            } else {
+                count = 0;
+            }
 
-    if (is_whitespace(current)) {
-        unread(current);
-        target[0] = 0;
-        return false;
+            if (count < 0) {
+                return -1;
+            }
+            written = written + count;
+            if (format[index] != 0) {
+                index = index + 1;
+            }
+        }
     }
-
-    while (current != 0 && !is_whitespace(current)) {
-        target[index] = current;
-        index++;
-        current = read_input();
-    }
-
-    unread(current);
-    target[index] = 0;
-    return index != 0;
+    return written;
 }
 
-int next_argument(int argument_index) {
-    int base = 0;
+int fprintf(FILE *stream, char *format, ...) {
+    int argument_base;
 
-    asm("LOADIN BAF IN1 1");
+    asm("MOVE BAF IN1");
     asm("STOREIN BAF IN1 0");
-    // 4 and not 3 because first argument is the format string
-    return *((int *)(base + argument_index + 4));
+    return format_stream(stream, format, argument_base, 5);
 }
 
 int printf(char *format, ...) {
-    char buffer[PRINTF_BUFFER_CAPACITY];
-    int index = 0;
-    int buffer_index = 0;
-    int current;
-    int argument_index = 0;
-    int argument_value;
+    int argument_base;
 
-    while (format[index] != 0) {
-        current = format[index];
-
-        if (current == '%') {
-            index = index + 1;
-            current = format[index];
-
-            if (current == 'd') {
-                argument_value = next_argument(argument_index);
-                buffer_index = append_decimal_buffered(buffer, buffer_index, argument_value);
-                argument_index = argument_index + 1;
-            } else if (current == 'c') {
-                argument_value = next_argument(argument_index);
-                buffer_index = append_character_buffered(buffer, buffer_index, argument_value);
-                argument_index = argument_index + 1;
-            } else if (current == 's') {
-                argument_value = next_argument(argument_index);
-                flush_printf_buffer(buffer, &buffer_index);
-                uart_print_string((char *)argument_value);
-                argument_index = argument_index + 1;
-            } else if (current == '%') {
-                buffer_index = append_character_buffered(buffer, buffer_index, '%');
-            }
-        } else {
-            buffer_index = append_character_buffered(buffer, buffer_index, current);
-        }
-
-        index = index + 1;
-    }
-
-    flush_printf_buffer(buffer, &buffer_index);
-    return 0;
-}
-
-int scanf(char *format, ...) {
-    int index = 0;
-    int current;
-    int argument_index = 0;
-    int assigned_count = 0;
-    int *target;
-    int input;
-
-    while (format[index] != 0) {
-        current = format[index];
-
-        if (current == '%') {
-            index++;
-            current = format[index];
-
-            if (current == 'd') {
-                target = (int *)next_argument(argument_index);
-                if (!read_decimal(target)) {
-                    return assigned_count;
-                }
-                argument_index++;
-                assigned_count++;
-            } else if (current == 'c') {
-                target = (int *)next_argument(argument_index);
-                *target = read_input();
-                argument_index++;
-                assigned_count++;
-            } else if (current == 's') {
-                target = (int *)next_argument(argument_index);
-                if (!read_string((char *)target)) {
-                    return assigned_count;
-                }
-                argument_index++;
-                assigned_count++;
-            } else if (current == '%') {
-                input = read_input();
-                if (input != '%') {
-                    unread(input);
-                    return assigned_count;
-                }
-            } else if (current != '%') {
-                return assigned_count;
-            }
-        } else if (is_whitespace(current)) {
-            while (is_whitespace(format[index + 1])) {
-                index++;
-            }
-
-            skip_whitespace();
-        } else {
-            input = read_input();
-            if (input != current) {
-                unread(input);
-                return assigned_count;
-            }
-        }
-
-        index = index + 1;
-    }
-
-    return assigned_count;
+    prepare_standard_streams();
+    asm("MOVE BAF IN1");
+    asm("STOREIN BAF IN1 0");
+    return format_stream(stdout, format, argument_base, 4);
 }

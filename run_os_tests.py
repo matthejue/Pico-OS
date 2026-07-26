@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import argparse
+import os
+import select
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
 RESULT_FILE = Path("sys_tests/os_tests.res")
 NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
-MAX_EMULATOR_DURATION_SECONDS = 60
+MAX_EMULATOR_DURATION_SECONDS = 120
+SHELL_PROMPT = "PICOS> "
 
 
 def parse_args():
@@ -112,13 +116,55 @@ def compile_and_assemble(picoc_file, extra_cpl_args):
     return True
 
 
+def render_terminal_output(output):
+    lines = [[]]
+    column = 0
+
+    for character in output:
+        value = ord(character)
+        if value == 10:
+            lines.append([])
+            column = 0
+        elif value == 13:
+            column = 0
+        elif value in (8, 127):
+            if column > 0:
+                column -= 1
+                if column < len(lines[-1]):
+                    del lines[-1][column]
+        elif value == 9:
+            next_tab_stop = (column // 8 + 1) * 8
+            while column < next_tab_stop:
+                if column < len(lines[-1]):
+                    lines[-1][column] = " "
+                else:
+                    lines[-1].append(" ")
+                column += 1
+        elif 32 <= value <= 126:
+            if column < len(lines[-1]):
+                lines[-1][column] = character
+            else:
+                lines[-1].extend(" " for _ in range(column - len(lines[-1])))
+                lines[-1].append(character)
+            column += 1
+
+    return "\n".join("".join(line) for line in lines)
+
+
 def normalize_os_output(output):
-    output = output.replace("\r\n", "\n")
-    output = output.replace("\r", "\n")
-    output = output.replace("\nUART input (empty = newline): ", "")
-    if output.startswith("UART input (empty = newline): "):
-        output = output[len("UART input (empty = newline): "):]
-    return output
+    rendered = render_terminal_output(output)
+    lines = []
+    for line in rendered.splitlines():
+        prompt_index = line.find(SHELL_PROMPT)
+        if prompt_index >= 0:
+            line = line[:prompt_index]
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def decode_test_input(line):
+    return line.replace("\\b", "\x7f")
 
 
 def emulator_args_request_debug(extra_emu_args):
@@ -165,37 +211,102 @@ def run_os_test(test_dir, extra_emu_args):
         "kernel.reti",
     ]
 
-    with input_file.open("r", encoding="utf-8") as stdin:
-        try:
-            result = run_command(
-                command,
-                stdin=stdin,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=MAX_EMULATOR_DURATION_SECONDS,
-            )
-        except subprocess.TimeoutExpired as exc:
-            stdout = process_text(exc.stdout)
-            stderr = process_text(exc.stderr)
-            raw_output_file.write_text(stdout, encoding="utf-8")
-            output_file.write_text(normalize_os_output(stdout), encoding="utf-8")
-            if stdout:
-                print(stdout, end="")
-            if stderr:
-                print(stderr, end="", file=sys.stderr)
-            print(
-                "Emulator timed out after "
-                f"{MAX_EMULATOR_DURATION_SECONDS}s for {test_dir}"
-            )
-            return "timeout"
+    input_lines = input_file.read_text(encoding="utf-8").splitlines()
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout = bytearray()
+    stderr = bytearray()
+    prompt_search_start = 0
 
-    if result.returncode != 0:
-        print_process_output(result)
-        print(f"Emulator failed with exit status {result.returncode} for {test_dir}")
+    def read_available(wait_seconds):
+        streams = [
+            stream
+            for stream in (process.stdout, process.stderr)
+            if stream is not None
+        ]
+        if not streams:
+            return
+        readable, _, _ = select.select(streams, [], [], wait_seconds)
+        for stream in readable:
+            chunk = os.read(stream.fileno(), 4096)
+            if stream is process.stdout:
+                stdout.extend(chunk)
+            else:
+                stderr.extend(chunk)
+
+    def wait_for_prompt():
+        nonlocal prompt_search_start
+        prompt = SHELL_PROMPT.encode("ascii")
+        deadline = time.monotonic() + MAX_EMULATOR_DURATION_SECONDS
+
+        while time.monotonic() < deadline:
+            prompt_index = stdout.find(prompt, prompt_search_start)
+            if prompt_index >= 0:
+                prompt_search_start = prompt_index + len(prompt)
+                return True
+            if process.poll() is not None:
+                read_available(0)
+                return False
+            read_available(min(0.1, deadline - time.monotonic()))
+        return False
+
+    timed_out = False
+    for line in input_lines:
+        if not wait_for_prompt():
+            timed_out = process.poll() is None
+            break
+        process.stdin.write((decode_test_input(line) + "\r").encode("latin-1"))
+        process.stdin.flush()
+
+    if process.stdin is not None:
+        process.stdin.close()
+        process.stdin = None
+
+    if timed_out and process.poll() is None:
+        process.kill()
+    else:
+        deadline = time.monotonic() + MAX_EMULATOR_DURATION_SECONDS
+        while process.poll() is None and time.monotonic() < deadline:
+            read_available(min(0.1, deadline - time.monotonic()))
+        if process.poll() is None:
+            timed_out = True
+            process.kill()
+    process.wait()
+    if process.stdout is not None:
+        stdout.extend(process.stdout.read())
+    if process.stderr is not None:
+        stderr.extend(process.stderr.read())
+
+    stdout_text = stdout.decode("utf-8", errors="replace")
+    stderr_text = stderr.decode("utf-8", errors="replace")
+    raw_output_file.write_text(stdout_text, encoding="utf-8")
+    output_file.write_text(normalize_os_output(stdout_text), encoding="utf-8")
+
+    if timed_out:
+        if stdout_text:
+            print(stdout_text, end="")
+        if stderr_text:
+            print(stderr_text, end="", file=sys.stderr)
+        print(
+            "Emulator timed out after "
+            f"{MAX_EMULATOR_DURATION_SECONDS}s for {test_dir}"
+        )
+        return "timeout"
+    if process.returncode != 0:
+        if stdout_text:
+            print(stdout_text, end="")
+        if stderr_text:
+            print(stderr_text, end="", file=sys.stderr)
+        print(
+            f"Emulator failed with exit status {process.returncode} "
+            f"for {test_dir}"
+        )
         return "failed"
 
-    raw_output_file.write_text(result.stdout, encoding="utf-8")
-    output_file.write_text(normalize_os_output(result.stdout), encoding="utf-8")
     return "passed"
 
 
