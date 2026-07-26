@@ -28,6 +28,14 @@ int close(int file_descriptor) {
     return invoke_syscall(SYSCALL_CLOSE, file_descriptor);
 }
 
+int dup2(int old_file_descriptor, int new_file_descriptor) {
+    struct Dup2Request request;
+
+    request.old_file_descriptor = old_file_descriptor;
+    request.new_file_descriptor = new_file_descriptor;
+    return invoke_syscall(SYSCALL_DUP2, (int)&request);
+}
+
 int lseek(int file_descriptor, int offset, int origin) {
     struct SeekRequest request;
 
