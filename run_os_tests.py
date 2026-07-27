@@ -20,6 +20,12 @@ def parse_args():
         description="Run Pico-OS integration tests from sys_tests subdirectories."
     )
     parser.add_argument(
+        "--kind",
+        choices=("all", "os", "shell"),
+        default="all",
+        help="Select all OS tests, OS feature tests, or shell tests.",
+    )
+    parser.add_argument(
         "--run",
         metavar="TEST_DIR",
         help="Run one OS test directory without comparing expected_output.txt.",
@@ -54,10 +60,29 @@ def process_text(value):
     return value
 
 
-def selected_test_dirs(pattern):
+def is_os_feature_test(test_dir):
+    launcher_file = test_dir / "launcher.picoc"
+    input_file = test_dir / "input.txt"
+
+    if not launcher_file.is_file() or not input_file.is_file():
+        return False
+    return input_file.read_text(encoding="utf-8").splitlines() == [
+        f"load {test_dir}/launcher.bin",
+        "run 3",
+        "exit",
+    ]
+
+
+def selected_test_dirs(pattern, kind="all"):
     candidates = [path for path in Path("sys_tests").iterdir() if path.is_dir()]
     if pattern and pattern != "all":
         candidates = [path for path in candidates if pattern in path.name]
+    if kind == "os":
+        candidates = [path for path in candidates if is_os_feature_test(path)]
+    elif kind == "shell":
+        candidates = [
+            path for path in candidates if not is_os_feature_test(path)
+        ]
     return sorted(candidates)
 
 
@@ -438,7 +463,7 @@ def run_configured_test(args, extra_cpl_args, extra_emu_args):
 
 
 def run_matching_tests(args, extra_cpl_args, extra_emu_args):
-    paths = selected_test_dirs(args.test_pattern)
+    paths = selected_test_dirs(args.test_pattern, args.kind)
     paths = [path for path in paths if validate_test_dir(path)]
 
     if not paths:

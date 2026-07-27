@@ -1,10 +1,31 @@
-// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/mutex/libmutex.picoc ../../lib/schedule/libschedule.picoc ../../lib/sys/mman/libmman.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/mutex/libmutex.picoc ../../lib/schedule/libschedule.picoc ../../lib/sys/mman/libmman.picoc
 
 #include "shared.header"
-#include "../../lib/stdio/stdio.header"
 #include "../../lib/stdlib/stdlib.header"
 #include "../../lib/schedule/schedule.header"
 #include "../../lib/sys/mman/mman.header"
+#include "../../lib/unistd/unistd.header"
+
+void write_text(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDOUT_FILENO, text, length);
+}
+
+void write_worker_message(
+    int worker_number,
+    char *first_worker_message,
+    char *second_worker_message
+) {
+    if (worker_number == 1) {
+        write_text(first_worker_message);
+    } else {
+        write_text(second_worker_message);
+    }
+}
 
 int main(int argc, char **argv) {
     int worker_number = atoi(argv[1]);
@@ -16,24 +37,36 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("worker %d: trying to lock mutex\n", worker_number);
+    write_worker_message(
+        worker_number,
+        "worker 1: trying to lock mutex\n",
+        "worker 2: trying to lock mutex\n"
+    );
     mutex_lock(&(shared_state->mutex));
-    printf("worker %d: acquired mutex\n", worker_number);
+    write_worker_message(
+        worker_number,
+        "worker 1: acquired mutex\n",
+        "worker 2: acquired mutex\n"
+    );
 
     shared_state->value = worker_number;
-    printf(
-        "worker %d: shared value = %d\n",
+    write_worker_message(
         worker_number,
-        shared_state->value
+        "worker 1: shared value = 1\n",
+        "worker 2: shared value = 2\n"
     );
 
     if (worker_number == 1) {
-        printf("worker 1: yielding while holding mutex\n");
+        write_text("worker 1: yielding while holding mutex\n");
         yield();
-        printf("worker 1: resumed\n");
+        write_text("worker 1: resumed\n");
     }
 
     mutex_unlock(&(shared_state->mutex));
-    printf("worker %d: unlocked mutex\n", worker_number);
+    write_worker_message(
+        worker_number,
+        "worker 1: unlocked mutex\n",
+        "worker 2: unlocked mutex\n"
+    );
     return 0;
 }
