@@ -58,7 +58,9 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 
 .PHONY: help code-index
 .PHONY: run run_send_keypresses run-os
-.PHONY: test test-all test_not_passed test-os test-os-fast
+.PHONY: test test-lib test-all test_not_passed
+.PHONY: test-sys test-sys-fast
+.PHONY: test-os test-os-fast test-shell test-shell-fast
 .PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
@@ -72,11 +74,16 @@ help:
 	@echo "  make run                        Run configured program using RUN_PATH"
 	@echo "  make run_send_keypresses        Run configured program and send keypresses"
 	@echo "  make run-os                     Run configured OS test using OS_RUN_PATH"
-	@echo "  make test                       Run sys tests using TEST_PATTERN"
-	@echo "  make test-all                   Run all sys tests"
-	@echo "  make test_not_passed            Run paths from ./opts/not_passed_tests.txt"
-	@echo "  make test-os                    Run OS integration tests from sys_tests/*/"
-	@echo "  make test-os-fast               Run launcher-based OS tests with one OS boot"
+	@echo "  make test                       Run library, OS feature, and shell tests"
+	@echo "  make test-lib                   Run library tests using TEST_PATTERN"
+	@echo "  make test-all                   Alias for make test"
+	@echo "  make test_not_passed            Run library paths from ./opts/not_passed_tests.txt"
+	@echo "  make test-sys                   Run OS feature and shell tests normally"
+	@echo "  make test-sys-fast              Run OS feature and shell tests with one OS boot"
+	@echo "  make test-os                    Run OS feature tests normally"
+	@echo "  make test-os-fast               Run OS feature tests with one OS boot"
+	@echo "  make test-shell                 Run shell tests normally"
+	@echo "  make test-shell-fast            Run shell tests with one OS boot"
 	@echo "  make firmware                   Build bootloader and kernel artifacts"
 	@echo "  make bootload                   Build firmware and boot through startprogram.reti"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
@@ -144,25 +151,43 @@ run_send_keypresses:
 # Tests
 # ----------------------------------------------------------------------
 
-test: opts/isrs.reti
+test:
+	$(MAKE) test-lib TEST_PATTERN=all
+	$(MAKE) test-sys-fast OS_TEST_PATTERN=all
+
+test-lib: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh "$${COLUMNS:-120}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-test-all: opts/isrs.reti
-	./export_environment_vars_for_makefile.sh;\
-	./run_sys_tests.sh "$${COLUMNS:-120}" "all" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+test-all: test
 
 test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
 	./run_sys_tests.sh --not-passed "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
+test-sys:
+	$(MAKE) test-os
+	$(MAKE) test-shell
+
 test-os: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+
+test-shell: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
+	./export_environment_vars_for_makefile.sh;\
+	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+
+test-sys-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+	./export_environment_vars_for_makefile.sh;\
+	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
 test-os-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+
+test-shell-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+	./export_environment_vars_for_makefile.sh;\
+	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------

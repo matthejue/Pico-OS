@@ -12,4 +12,7 @@ int setenv(char *name, char *value, bool overwrite);
 int unsetenv(char *name);
 int putenv(char *variable);
 int clearenv(void);
+char **clone_environment(void);
+void destroy_environment(char **environment);
+int restore_environment(char **environment);
 void exit(int status);

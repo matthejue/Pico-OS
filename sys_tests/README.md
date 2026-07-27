@@ -1,14 +1,13 @@
 # System Tests
 
-This directory contains two different kinds of tests:
+This directory contains three kinds of tests:
 
-- legacy compiler/runtime sys tests as single `*.picoc` files directly in
-  `sys_tests/`
-- operating-system integration tests as subdirectories below `sys_tests/`
+- library tests as single `*.picoc` files directly in `sys_tests/`
+- OS feature tests with a `launcher.picoc` in a subdirectory
+- shell tests whose `input.txt` exercises shell command handling
 
-The OS tests are run through the Pico-OS kernel, init process, and shell. They
-are meant to test commands implemented by `system/shell.picoc`, such as `load`,
-`run`, `unload`, `list`, `quit`, and `exit`.
+OS feature and shell tests run through the Pico-OS kernel, init process, and
+shell.
 
 ## OS Test Directory Layout
 
@@ -52,10 +51,11 @@ and assembled with:
 reti_emulator -f /tmp -a program.reti
 ```
 
-The resulting `launcher.bin` is loaded by the OS through `input.txt`. The
-launcher uses the unistd library to load, run, wait for, and optionally unload
-the other test binaries. Keeping process orchestration in PicoC makes each test
-self-contained and avoids encoding process IDs and setup steps in UART input.
+For an OS feature test, the resulting `launcher.bin` is loaded by the OS
+through `input.txt`. The launcher uses the unistd library to load, run, wait
+for, and optionally unload the other test binaries. Keeping process
+orchestration in PicoC makes each test self-contained and avoids encoding
+process IDs and setup steps in UART input.
 
 The Makefile links `lib/start/libstart.picoc` into every test program through the
 compiler's `-C` option. This startup function initializes the process heap,
@@ -64,8 +64,9 @@ so the kernel can schedule another process and wake any waiters.
 
 ## input.txt
 
-`input.txt` contains the ASCII command stream typed into init. It only loads
-and runs the test's launcher, then finishes with `quit` or `exit`.
+`input.txt` contains the ASCII command stream typed into the shell. An OS
+feature test loads and runs its launcher, then finishes with `quit` or `exit`.
+Shell tests contain the commands whose parsing or shell state they exercise.
 
 Example:
 
@@ -89,8 +90,8 @@ Example:
 hello world
 ```
 
-`make test-os` compares `output.txt` against this file. Trailing whitespace is
-ignored for the comparison.
+`make test-os` and `make test-shell` compare `output.txt` against this file.
+Trailing whitespace is ignored for the comparison.
 
 The shell redirects a started process's standard output with a trailing
 `> path`:
@@ -105,30 +106,63 @@ Processes subsequently started by that process inherit the same redirection.
 
 ## Running OS Tests
 
-Run all configured OS tests:
+Run every test category sequentially:
+
+```sh
+make test
+```
+
+Run only the library tests:
+
+```sh
+make test-lib
+```
+
+Set `TEST_PATTERN=all` to run every library test explicitly:
+
+```sh
+make test-lib TEST_PATTERN=all
+```
+
+Run OS feature and shell tests normally:
+
+```sh
+make test-sys
+```
+
+Run only OS feature tests or shell tests normally:
 
 ```sh
 make test-os
+make test-shell
 ```
 
-Run launcher-based tests through one shared OS boot:
+Run OS feature and shell tests through one shared OS boot:
+
+```sh
+make test-sys-fast
+```
+
+Run only OS feature tests or shell tests through one shared OS boot:
 
 ```sh
 make test-os-fast
+make test-shell-fast
 ```
 
-`system/fast_os_test_launcher.picoc` reads the selected test directories from
-a generated manifest. It starts each available `launcher.bin` in sequence,
-redirects its inherited standard output directly to that test's `output.txt`,
-and removes leftover test processes before continuing. The launcher removes
+`system/fast_os_test_launcher.picoc` reads compatible test directories from a
+generated manifest. It starts each `launcher.bin` in sequence, redirects its
+inherited standard output directly to that test's `output.txt`, and removes
+leftover test processes before continuing. The launcher removes
 `PICOOS_LOADING_BAR` from its environment first, so test launchers and their
 workers do not inherit loader UI output.
 
-Tests whose expected behavior depends on interactive shell input still use the
-normal isolated OS runner. This includes tests without a `launcher.picoc` and
-tests whose `input.txt` does more than load and run that launcher. Their
-results are included in the same final summary, so `test-os-fast` covers the
-same selected test directories as `test-os`.
+For shell tests, the shell reads each `input.txt` and passes its lines to
+`eval()`. Before each test, `shell_reset()` removes test processes, resets
+descriptors, status values, process IDs, and the environment. Each test's
+output is captured separately. The line-editing test remains a raw UART
+command at the end of the same boot because it specifically tests backspace
+handling in `read_line()`.
 
 Run one configured OS test without comparing `expected_output.txt`:
 
@@ -146,13 +180,13 @@ emulator and stdout is not captured; enter UART input manually through the TUI.
 
 ## opts Configuration
 
-The OS test targets use their own files in `opts/`, separate from the legacy
-single-file sys tests:
+The OS feature and shell test targets use their own files in `opts/`, separate
+from the library tests:
 
 ```text
-opts/os_test_pattern.txt      pattern used by make test-os
-opts/os_test_cpl_opts.txt     compiler options used by make test-os
-opts/os_test_emu_opts.txt     emulator options used by make test-os
+opts/os_test_pattern.txt      pattern used by system test targets
+opts/os_test_cpl_opts.txt     compiler options used by OS and shell tests
+opts/os_test_emu_opts.txt     emulator options used by OS and shell tests
 opts/os_run_path.txt          test directory used by make run-os
 opts/os_run_cpl_opts.txt      compiler options used by make run-os
 opts/os_run_emu_opts.txt      emulator options used by make run-os
@@ -162,6 +196,7 @@ The same values can be overridden on the command line:
 
 ```sh
 make test-os OS_TEST_PATTERN=hello_world
+make test-shell OS_TEST_PATTERN=environment
 make run-os OS_RUN_PATH=sys_tests/hello_world
 ```
 
@@ -202,4 +237,5 @@ The paths of OS tests that did not pass are written to:
 opts/not_passed_os_tests.txt
 ```
 
-The OS emulator run currently has a fixed timeout in `run_os_tests.py`.
+Normal OS emulator runs have a fixed 120-second timeout. The shared fast
+session allows 60 seconds per OS feature or shell test.

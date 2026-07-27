@@ -1,11 +1,19 @@
-// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/sys/mman/libmman.picoc ../../lib/mutex/libmutex.picoc
+// dependencies: ../../common/decimal.picoc ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/sys/mman/libmman.picoc ../../lib/mutex/libmutex.picoc
 
 #include "shared.header"
 #include "../../common/decimal.header"
-#include "../../lib/stdio/stdio.header"
 #include "../../lib/unistd/unistd.header"
 #include "../../lib/sys/wait/wait.header"
 #include "../../lib/sys/mman/mman.header"
+
+void write_text(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDOUT_FILENO, text, length);
+}
 
 void deactivate_timer_interrupt(void) {
     asm("STOREIN BAF DS 0"); // Save DS before switching address spaces
@@ -50,7 +58,7 @@ int main(void) {
     shared_state = (struct SharedState *)mmap(shared_memory_id);
     shared_state->value = 0;
     mutex_init(&(shared_state->mutex));
-    printf("launcher: shared value = %d\n", shared_state->value);
+    write_text("launcher: shared value = 0\n");
 
     first_worker = load(
         "sys_tests/shared_memory_mutual_exclusion/worker.bin"
@@ -74,7 +82,11 @@ int main(void) {
     waitpid(first_worker);
     waitpid(second_worker);
 
-    printf("launcher: final shared value = %d\n", shared_state->value);
+    if (shared_state->value == 2) {
+        write_text("launcher: final shared value = 2\n");
+    } else {
+        write_text("launcher: final shared value is invalid\n");
+    }
     shm_unlink("shared-memory-mutual-exclusion");
     return 0;
 }
