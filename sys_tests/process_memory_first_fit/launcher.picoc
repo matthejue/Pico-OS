@@ -1,9 +1,8 @@
-// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/stdio/libstdio.picoc
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc
 
 #include "../../common/stddef.header"
 #include "../../lib/unistd/unistd.header"
 #include "../../lib/sys/wait/wait.header"
-#include "../../lib/stdio/stdio.header"
 
 int main(void) {
     int worker_1;
@@ -24,6 +23,7 @@ int main(void) {
     int first_fit_3;
     int first_fit_4;
     int first_fit_5;
+    char result[10];
 
     worker_1 = load("sys_tests/process_memory_first_fit/worker.bin");
     worker_2 = load("sys_tests/process_memory_first_fit/worker.bin");
@@ -56,13 +56,16 @@ int main(void) {
     first_fit_4 = address_4 < address_6;
     first_fit_5 = address_8 < address_6;
 
-    printf(
-        "%d %d %d %d %d\n",
-        first_fit_1,
-        first_fit_2,
-        first_fit_3,
-        first_fit_4,
-        first_fit_5
-    );
+    result[0] = first_fit_1 + '0';
+    result[1] = ' ';
+    result[2] = first_fit_2 + '0';
+    result[3] = ' ';
+    result[4] = first_fit_3 + '0';
+    result[5] = ' ';
+    result[6] = first_fit_4 + '0';
+    result[7] = ' ';
+    result[8] = first_fit_5 + '0';
+    result[9] = '\n';
+    write(STDOUT_FILENO, result, 10);
     return 0;
 }

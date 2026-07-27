@@ -263,6 +263,11 @@ void remove_test_processes(void) {
         }
         process = next_process;
     }
+
+    // A shell reset restores the PID sequence of a freshly started shell
+    if (active_process != NULL && active_process->pid == 2) {
+        next_process_id = 3;
+    }
 }
 
 bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context) {

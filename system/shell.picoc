@@ -4,15 +4,22 @@
 #include "../lib/stdlib/stdlib.header"
 #include "../lib/string/string.header"
 #include "../common/decimal.header"
+#include "../common/loading_bar.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
 #define SHELL_SAVED_STDOUT_FILENO 7
+#define SHELL_TEST_SAVED_STDOUT_FILENO 6
+#define SHELL_PRIVATE_FILE_DESCRIPTOR_START 3
+#define SHELL_FILE_DESCRIPTOR_COUNT 8
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
 #define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
 int last_foreground_exit_status = 0;
 int last_background_process_id = 0;
+char **initial_shell_environment = NULL;
+
+bool eval(char *command);
 
 void shell_write_character(char character) {
     write(STDOUT_FILENO, &character, 1);
@@ -25,6 +32,26 @@ void shell_write_string(char *text) {
         length = length + 1;
     }
     write(STDOUT_FILENO, text, length);
+}
+
+void shell_yield(void) {
+    asm("LOADI IN1 0");
+    asm("LOADI ACC 13"); // SYSCALL_YIELD
+    asm("INT 0");
+}
+
+bool shell_reset(void) {
+    int file_descriptor = SHELL_PRIVATE_FILE_DESCRIPTOR_START;
+
+    reset_processes();
+    while (file_descriptor < SHELL_FILE_DESCRIPTOR_COUNT) {
+        close(file_descriptor);
+        file_descriptor = file_descriptor + 1;
+    }
+    last_foreground_exit_status = 0;
+    last_background_process_id = 0;
+    return initial_shell_environment != NULL &&
+        restore_environment(initial_shell_environment) == 0;
 }
 
 int is_line_whitespace(char value) {
@@ -417,7 +444,144 @@ int load_from_path(char *name) {
     }
 }
 
-void handle_command(char *command) {
+char *read_shell_test_file(char *path, int *size) {
+    char *contents;
+    int file_descriptor = open(path, O_RDONLY);
+
+    if (file_descriptor < 0) {
+        return NULL;
+    }
+    *size = lseek(file_descriptor, 0, SEEK_END);
+    if (*size < 0 || lseek(file_descriptor, 0, SEEK_SET) < 0) {
+        close(file_descriptor);
+        return NULL;
+    }
+
+    contents = (char *)malloc(*size + 1);
+    if (contents == NULL ||
+        (*size > 0 &&
+         read(file_descriptor, contents, *size) != *size)) {
+        close(file_descriptor);
+        free(contents);
+        return NULL;
+    }
+    close(file_descriptor);
+    contents[*size] = 0;
+    return contents;
+}
+
+bool run_shell_test(char *test_directory) {
+    char capture_path[SHELL_EXECUTABLE_PATH_CAPACITY];
+    char input_path[SHELL_EXECUTABLE_PATH_CAPACITY];
+    char *input;
+    int input_size;
+    int index = 0;
+    int line_start;
+    int output_file_descriptor;
+    bool evaluating = true;
+    bool passed = true;
+
+    build_executable_path(test_directory, "input.txt", input_path);
+    build_executable_path(
+        test_directory,
+        ".fast_shell_output.txt",
+        capture_path
+    );
+
+    if (!shell_reset()) {
+        return false;
+    }
+    unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
+    input = read_shell_test_file(input_path, &input_size);
+    if (input == NULL) {
+        shell_reset();
+        return false;
+    }
+
+    output_file_descriptor = open(
+        capture_path,
+        O_WRONLY | O_CREAT | O_TRUNC
+    );
+    if (output_file_descriptor < 0 ||
+        dup2(STDOUT_FILENO, SHELL_TEST_SAVED_STDOUT_FILENO) < 0 ||
+        dup2(output_file_descriptor, STDOUT_FILENO) < 0) {
+        if (output_file_descriptor >= 0) {
+            close(output_file_descriptor);
+        }
+        close(SHELL_TEST_SAVED_STDOUT_FILENO);
+        free(input);
+        shell_reset();
+        return false;
+    }
+    close(output_file_descriptor);
+
+    while (index < input_size && evaluating) {
+        line_start = index;
+        while (index < input_size &&
+               input[index] != '\n' &&
+               input[index] != '\r') {
+            index = index + 1;
+        }
+        input[index] = 0;
+        if (index > line_start) {
+            evaluating = eval(input + line_start);
+            if (evaluating) {
+                shell_yield();
+            }
+        }
+        index = index + 1;
+        while (index < input_size &&
+               (input[index] == '\n' || input[index] == '\r')) {
+            index = index + 1;
+        }
+    }
+
+    if (dup2(SHELL_TEST_SAVED_STDOUT_FILENO, STDOUT_FILENO) < 0) {
+        passed = false;
+    }
+    close(SHELL_TEST_SAVED_STDOUT_FILENO);
+    free(input);
+    if (!shell_reset()) {
+        passed = false;
+    }
+    return passed;
+}
+
+bool run_shell_test_manifest(char *path) {
+    char *manifest;
+    int index = 0;
+    int manifest_size;
+    int test_start;
+    bool passed = true;
+
+    manifest = read_shell_test_file(path, &manifest_size);
+    if (manifest == NULL) {
+        return false;
+    }
+    while (index < manifest_size) {
+        test_start = index;
+        while (index < manifest_size &&
+               manifest[index] != '\n' &&
+               manifest[index] != '\r') {
+            index = index + 1;
+        }
+        manifest[index] = 0;
+        if (index > test_start &&
+            !run_shell_test(manifest + test_start)) {
+            passed = false;
+        }
+        index = index + 1;
+        while (index < manifest_size &&
+               (manifest[index] == '\n' ||
+                manifest[index] == '\r')) {
+            index = index + 1;
+        }
+    }
+    free(manifest);
+    return passed;
+}
+
+bool eval(char *command) {
     char *raw_arguments;
     char *stdout_path;
     int pid;
@@ -425,7 +589,16 @@ void handle_command(char *command) {
     bool background;
 
     if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
-        shutdown();
+        return false;
+    } else if (strcmp(command, "eval") == 0) {
+        return true;
+    } else if (strncmp(command, "eval ", 5) == 0 && command[5] != 0) {
+        return eval(command + 5);
+    } else if (strncmp(command, "run-shell-tests ", 16) == 0 &&
+               command[16] != 0) {
+        if (!run_shell_test_manifest(command + 16)) {
+            shell_write_string("error: shell tests failed\n");
+        }
     } else if (strncmp(command, "export ", 7) == 0 && command[7] != 0) {
         if (!export_environment_variable(command + 7)) {
             shell_write_string("error: invalid export\n");
@@ -480,14 +653,21 @@ void handle_command(char *command) {
             }
         }
     }
+    return true;
 }
 
 int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
 
+    initial_shell_environment = clone_environment();
+    if (initial_shell_environment == NULL) {
+        return 1;
+    }
     while (1) {
         if (read_line(command, SHELL_COMMAND_BUFFER_CAPACITY) > 0) {
-            handle_command(command);
+            if (!eval(command)) {
+                shutdown();
+            }
         }
     }
 
