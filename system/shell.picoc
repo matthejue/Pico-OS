@@ -214,11 +214,6 @@ char *expand_variables(char *arguments, char *result, int capacity) {
         } else if (arguments[argument_index] == '"') {
             // Removes shell quotes before passing arguments to the process
             argument_index = argument_index + 1;
-        } else if (arguments[argument_index] == '\\' &&
-                   arguments[argument_index + 1] == 'n') {
-            result[result_index] = '\n';
-            result_index = result_index + 1;
-            argument_index = argument_index + 2;
         } else {
             // Copies any other character unchanged and advances both indices
             result[result_index] = arguments[argument_index];
