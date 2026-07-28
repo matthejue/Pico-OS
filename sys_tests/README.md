@@ -94,15 +94,17 @@ hello world
 Trailing whitespace is ignored for the comparison.
 
 The shell redirects a started process's standard output with a trailing
-`> path`:
+`> path`, or appends it with `>> path`:
 
 ```text
 echo.bin hello > ./sys_tests/example/output.txt
+echo.bin again >> ./sys_tests/example/output.txt
 ```
 
-It opens and truncates the target, uses `dup2()` for standard output, and
-passes the resulting standard descriptors to the process when it is started.
-Processes subsequently started by that process inherit the same redirection.
+It opens the target in the requested mode, uses `dup2()` for standard output,
+and passes the resulting standard descriptors to the process when it is
+started. Processes subsequently started by that process inherit the same
+redirection. The shell expands `\n` in arguments to a newline character.
 
 ## Running OS Tests
 
