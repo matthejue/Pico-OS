@@ -134,7 +134,7 @@ run:
 
 run-os: kernel.reti system/init.bin system/shell.bin user/cat.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 run_send_keypresses:
 	@set -e; \
@@ -171,23 +171,23 @@ test-sys:
 
 test-os: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 test-shell: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 test-sys-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 test-os-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 test-shell-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O -U $(EXTRA_EMU_ARGS)"
+	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 
 # ----------------------------------------------------------------------

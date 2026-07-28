@@ -214,6 +214,11 @@ char *expand_variables(char *arguments, char *result, int capacity) {
         } else if (arguments[argument_index] == '"') {
             // Removes shell quotes before passing arguments to the process
             argument_index = argument_index + 1;
+        } else if (arguments[argument_index] == '\\' &&
+                   arguments[argument_index + 1] == 'n') {
+            result[result_index] = '\n';
+            result_index = result_index + 1;
+            argument_index = argument_index + 2;
         } else {
             // Copies any other character unchanged and advances both indices
             result[result_index] = arguments[argument_index];
@@ -281,7 +286,11 @@ bool strip_background_operator(char *command) {
     return true;
 }
 
-int strip_stdout_redirection(char *command, char **path) {
+int strip_stdout_redirection(
+    char *command,
+    char **path,
+    bool *append
+) {
     int command_end;
     int index = 0;
     int path_end;
@@ -299,10 +308,15 @@ int strip_stdout_redirection(char *command, char **path) {
     }
     if (redirect == -1) {
         *path = NULL;
+        *append = false;
         return 0;
     }
 
     path_start = redirect + 1;
+    *append = command[path_start] == '>';
+    if (*append) {
+        path_start = path_start + 1;
+    }
     while (is_line_whitespace(command[path_start])) {
         path_start = path_start + 1;
     }
@@ -349,18 +363,23 @@ bool run_process(
     int pid,
     char *arguments,
     bool background,
-    char *stdout_path
+    char *stdout_path,
+    bool append_stdout
 ) {
     char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
     bool redirected = false;
     bool started;
     int output_file_descriptor;
+    int output_flags;
 
     if (stdout_path != NULL) {
-        output_file_descriptor = open(
-            stdout_path,
-            O_WRONLY | O_CREAT | O_TRUNC
-        );
+        output_flags = O_WRONLY | O_CREAT;
+        if (append_stdout) {
+            output_flags = output_flags | O_APPEND;
+        } else {
+            output_flags = output_flags | O_TRUNC;
+        }
+        output_file_descriptor = open(stdout_path, output_flags);
         if (output_file_descriptor < 0) {
             shell_write_string("error: could not redirect stdout\n");
             return false;
@@ -586,6 +605,7 @@ bool eval(char *command) {
     char *stdout_path;
     int pid;
     int redirection_status;
+    bool append_stdout;
     bool background;
 
     if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
@@ -609,7 +629,8 @@ bool eval(char *command) {
         background = strip_background_operator(command);
         redirection_status = strip_stdout_redirection(
             command,
-            &stdout_path
+            &stdout_path,
+            &append_stdout
         );
         if (redirection_status < 0) {
             shell_write_string("error: invalid stdout redirection\n");
@@ -619,7 +640,8 @@ bool eval(char *command) {
                 pid,
                 command_arguments(command + 4),
                 background,
-                stdout_path
+                stdout_path,
+                append_stdout
             );
         }
     } else if (strncmp(command, "unload ", 7) == 0 && command[7] != 0) {
@@ -633,7 +655,8 @@ bool eval(char *command) {
         background = strip_background_operator(command);
         redirection_status = strip_stdout_redirection(
             command,
-            &stdout_path
+            &stdout_path,
+            &append_stdout
         );
         if (redirection_status < 0) {
             shell_write_string("error: invalid stdout redirection\n");
@@ -649,7 +672,13 @@ bool eval(char *command) {
             if (pid == 0) {
                 shell_write_string("error: unknown command\n");
             } else {
-                run_process(pid, raw_arguments, background, stdout_path);
+                run_process(
+                    pid,
+                    raw_arguments,
+                    background,
+                    stdout_path,
+                    append_stdout
+                );
             }
         }
     }
