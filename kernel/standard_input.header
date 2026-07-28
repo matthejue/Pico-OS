@@ -1,0 +1,13 @@
+#pragma once
+
+#include "file_descriptor.header"
+
+int begin_stdin_read(
+    struct FileDescriptorTable *table,
+    char *buffer,
+    int count,
+    bool character_read,
+    int *caller_context
+);
+int read_stdin_character(int *caller_context);
+void handle_uart_interrupt(void);
