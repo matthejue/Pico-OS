@@ -2,11 +2,26 @@
 
 #include "../lib/stdio/stdio.header"
 
+void print_argument(char *argument) {
+    int index = 0;
+
+    while (argument[index] != 0) {
+        if (argument[index] == '\\' &&
+            argument[index + 1] == 'n') {
+            printf("%c", '\n');
+            index = index + 2;
+        } else {
+            printf("%c", argument[index]);
+            index = index + 1;
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     int index = 1;
 
     while (index < argc) {
-        printf("%s", argv[index]);
+        print_argument(argv[index]);
         if (index + 1 < argc) {
             printf(" ");
         }

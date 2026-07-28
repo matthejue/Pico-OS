@@ -104,7 +104,8 @@ echo.bin again >> ./sys_tests/example/output.txt
 It opens the target in the requested mode, uses `dup2()` for standard output,
 and passes the resulting standard descriptors to the process when it is
 started. Processes subsequently started by that process inherit the same
-redirection. The shell expands `\n` in arguments to a newline character.
+redirection. The shell passes `\n` through unchanged, and `echo.bin` expands it
+to a newline character while printing its arguments.
 
 ## Running OS Tests
 
