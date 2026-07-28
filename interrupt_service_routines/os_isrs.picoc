@@ -2,7 +2,7 @@
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
 #include "../kernel/interrupt_controller.header"
-#include "../kernel/filesystem.header"
+#include "../kernel/standard_input.header"
 #include "../kernel/syscall.header"
 
 #define OS_INTERRUPT_VECTOR_COUNT 3
