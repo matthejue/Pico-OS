@@ -5,7 +5,7 @@
 #include "pmalloc.header"
 #include "shared_memory.header"
 #include "dispatcher.header"
-#include "filesystem.header"
+#include "file_descriptor.header"
 #include "../common/uart_protocol.header"
 
 struct Process *process_list_head = NULL;

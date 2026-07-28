@@ -1,47 +1,8 @@
 #pragma once
 
 #include "../common/file.header"
-#include "../common/stddef.header"
-#include "../common/wait_queue.header"
 
-#define FILE_DESCRIPTOR_COUNT 8
-#define STDIN_BUFFER_CAPACITY 128
-
-#define FILE_DESCRIPTOR_FREE 0
-#define FILE_DESCRIPTOR_STDIN 1
-#define FILE_DESCRIPTOR_STDOUT 2
-#define FILE_DESCRIPTOR_STDERR 3
-#define FILE_DESCRIPTOR_FILE 4
-
-struct FileDescriptor {
-    int kind;
-    int flags;
-    int offset;
-    char *path;
-};
-
-struct FileDescriptorTable {
-    struct FileDescriptor *entries;
-    char *stdin_buffer;
-    int stdin_head;
-    int stdin_tail;
-    int stdin_count;
-    struct wait_queue stdin_waiters;
-    char *pending_read_buffer;
-    int pending_read_count;
-    bool pending_character_read;
-};
-
-struct FileDescriptorTable *create_file_descriptor_table(void);
-struct FileDescriptorTable *inherit_standard_file_descriptors(
-    struct FileDescriptorTable *source
-);
-void destroy_file_descriptor_table(struct FileDescriptorTable *table);
 int open_file_descriptor(struct OpenRequest *request);
 int read_file_descriptor(struct IoRequest *request, int *caller_context);
 int write_file_descriptor(struct IoRequest *request);
-int close_file_descriptor(int file_descriptor);
 int seek_file_descriptor(struct SeekRequest *request);
-int duplicate_file_descriptor(struct Dup2Request *request);
-int read_stdin_character(int *caller_context);
-void handle_uart_interrupt(void);

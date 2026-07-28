@@ -327,7 +327,9 @@ KERNEL_PICOC_SOURCES := \
 	kernel/pmalloc.picoc \
 	kernel/shared_memory.picoc \
 	kernel/process.picoc \
+	kernel/file_descriptor.picoc \
 	kernel/filesystem.picoc \
+	kernel/standard_input.picoc \
 	kernel/process_arguments.picoc \
 	kernel/scheduler.picoc \
 	kernel/dispatcher.picoc \
