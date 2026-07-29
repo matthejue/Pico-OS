@@ -93,7 +93,7 @@ help:
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
-	@echo "  make shell.bin                  Build the shell system program binary"
+	@echo "  make shell.bin                  Build the shell user program binary"
 	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
@@ -132,7 +132,7 @@ code-index:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin system/shell.bin user/cat.bin
+run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -169,23 +169,23 @@ test-sys:
 	$(MAKE) test-os
 	$(MAKE) test-shell
 
-test-os: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
+test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell: kernel.reti system/init.bin system/shell.bin user/cat.bin user/echo.bin
+test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-sys-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-os-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -194,7 +194,7 @@ test-shell-fast: kernel.reti system/init.bin system/shell.bin system/fast_os_tes
 # Firmware build
 # ----------------------------------------------------------------------
 
-firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin system/shell.bin
+firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin user/shell.bin
 
 eprom: eprom_startprogram/startprogram.reti
 
@@ -221,9 +221,9 @@ echo.reti: user/echo.reti
 
 echo.bin: user/echo.bin
 
-shell.reti: system/shell.reti
+shell.reti: user/shell.reti
 
-shell.bin: system/shell.bin
+shell.bin: user/shell.bin
 
 ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
@@ -286,12 +286,12 @@ system/init.bin: system/init.reti
 	reti_emulator -f /tmp -a system/init.reti
 	hexyl system/init.bin
 
-system/shell.reti: system/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header
+user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header
 	picoc_compiler \
-		system/shell.picoc $(SHELL_LIBRARY_SOURCES) \
+		user/shell.picoc $(SHELL_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
-		-o system/shell.reti
+		-o user/shell.reti
 
 system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES)
 	picoc_compiler \
@@ -371,7 +371,7 @@ kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel.reti system/init.bin system/shell.bin
+run-firmware: kernel.reti system/init.bin user/shell.bin
 	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
 
 bootload: firmware

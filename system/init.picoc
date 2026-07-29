@@ -85,7 +85,7 @@ int main(void) {
         }
     }
 
-    shell_pid = load("./system/shell.bin");
+    shell_pid = load("./user/shell.bin");
     if (shell_pid == 0) {
         return 1;
     }
