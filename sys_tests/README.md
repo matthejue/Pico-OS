@@ -65,7 +65,7 @@ so the kernel can schedule another process and wake any waiters.
 ## input.txt
 
 `input.txt` contains the ASCII command stream typed into the shell. An OS
-feature test loads and runs its launcher, then finishes with `quit` or `exit`.
+feature test loads and runs its launcher, then finishes with `poweroff.bin`.
 Shell tests contain the commands whose parsing or shell state they exercise.
 
 Example:
@@ -73,7 +73,7 @@ Example:
 ```text
 load sys_tests/hello_world/launcher.bin
 run 3
-exit
+poweroff.bin
 ```
 
 PID `1` is normally `system/init.bin` and PID `2` is `user/shell.bin`, so the

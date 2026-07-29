@@ -1,0 +1,9 @@
+// dependencies: ../lib/unistd/libunistd.picoc
+
+#include "../common/syscall.header"
+#include "../lib/unistd/unistd.header"
+
+int main(void) {
+    invoke_syscall(SYSCALL_SHUTDOWN, 0);
+    return 0;
+}
