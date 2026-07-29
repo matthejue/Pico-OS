@@ -1,3 +1,4 @@
 echo.bin redirected output > ./sys_tests/stdout_redirection/output.txt
 cat.bin ./sys_tests/stdout_redirection/output.txt
 exit
+poweroff.bin

@@ -2,3 +2,4 @@ echo.bin first line > ./sys_tests/stdout_append_redirection/output.txt
 echo.bin second\nthird >> ./sys_tests/stdout_append_redirection/output.txt
 cat.bin ./sys_tests/stdout_append_redirection/output.txt
 exit
+poweroff.bin
