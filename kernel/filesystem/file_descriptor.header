@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../common/file.header"
-#include "../common/stddef.header"
-#include "../common/wait_queue.header"
+#include "../../common/file.header"
+#include "../../common/stddef.header"
+#include "../../common/wait_queue.header"
 
 #define FILE_DESCRIPTOR_COUNT 8
 #define STDIN_BUFFER_CAPACITY 128

@@ -74,3 +74,4 @@ git_diff_workspace_*.pdf
 .bak/
 output.txt
 raw_output.txt
+.fast_shell_output.txt

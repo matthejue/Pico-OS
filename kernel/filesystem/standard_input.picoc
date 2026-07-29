@@ -1,8 +1,8 @@
 #include "standard_input.header"
-#include "dispatcher.header"
-#include "interrupt_controller.header"
-#include "periphery.header"
-#include "process.header"
+#include "../dispatcher.header"
+#include "../interrupt_controller.header"
+#include "../periphery.header"
+#include "../process.header"
 
 #define UART_RECEIVE_REGISTER 1
 #define UART_STATUS_REGISTER 2
