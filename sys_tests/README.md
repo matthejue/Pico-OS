@@ -76,7 +76,7 @@ run 3
 exit
 ```
 
-PID `1` is normally `system/init.bin` and PID `2` is `system/shell.bin`, so the
+PID `1` is normally `system/init.bin` and PID `2` is `user/shell.bin`, so the
 first program loaded by the shell is usually PID `3`.
 
 ## expected_output.txt
