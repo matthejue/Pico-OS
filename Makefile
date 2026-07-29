@@ -327,9 +327,9 @@ KERNEL_PICOC_SOURCES := \
 	kernel/pmalloc.picoc \
 	kernel/shared_memory.picoc \
 	kernel/process.picoc \
-	kernel/file_descriptor.picoc \
-	kernel/filesystem.picoc \
-	kernel/standard_input.picoc \
+	kernel/filesystem/file_descriptor.picoc \
+	kernel/filesystem/filesystem.picoc \
+	kernel/filesystem/standard_input.picoc \
 	kernel/process_arguments.picoc \
 	kernel/scheduler.picoc \
 	kernel/dispatcher.picoc \
@@ -338,6 +338,7 @@ KERNEL_PICOC_SOURCES := \
 
 KERNEL_HEADERS := \
 	$(filter-out kernel/memory_constants.header,$(wildcard kernel/*.header)) \
+	$(wildcard kernel/filesystem/*.header) \
 	$(wildcard common/*.header)
 
 kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefile
