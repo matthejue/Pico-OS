@@ -69,7 +69,7 @@ def is_os_feature_test(test_dir):
     return input_file.read_text(encoding="utf-8").splitlines() == [
         f"load {test_dir}/launcher.bin",
         "run 3",
-        "exit",
+        "poweroff.bin",
     ]
 
 

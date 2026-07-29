@@ -349,11 +349,6 @@ int strip_stdout_redirection(
     return 1;
 }
 
-void shutdown(void) {
-    asm("LOADI ACC 2"); // SYSCALL_SHUTDOWN
-    asm("INT 0");
-}
-
 bool run_process(
     int pid,
     char *arguments,
@@ -603,7 +598,7 @@ bool eval(char *command) {
     bool append_stdout;
     bool background;
 
-    if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) {
+    if (strcmp(command, "exit") == 0) {
         return false;
     } else if (strcmp(command, "eval") == 0) {
         return true;
@@ -690,10 +685,8 @@ int main(int argc, char **argv) {
     while (1) {
         if (read_line(command, SHELL_COMMAND_BUFFER_CAPACITY) > 0) {
             if (!eval(command)) {
-                shutdown();
+                return 0;
             }
         }
     }
-
-    return 0;
 }

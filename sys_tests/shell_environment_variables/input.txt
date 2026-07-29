@@ -2,3 +2,4 @@ echo.bin arg1
 export MYVAR="hello"
 echo.bin "$MYVAR"
 exit
+poweroff.bin

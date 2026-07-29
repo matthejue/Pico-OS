@@ -1,1 +1,5 @@
+quit
+export SHELL_EXIT_TEST=preserved
 exut\b\bit
+echo.bin before$SHELL_EXIT_TEST-after
+poweroff.bin

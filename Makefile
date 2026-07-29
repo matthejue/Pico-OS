@@ -61,7 +61,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 .PHONY: test test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -96,6 +96,7 @@ help:
 	@echo "  make shell.bin                  Build the shell user program binary"
 	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
+	@echo "  make poweroff.bin               Build the poweroff user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -132,7 +133,7 @@ code-index:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin
+run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -169,23 +170,23 @@ test-sys:
 	$(MAKE) test-os
 	$(MAKE) test-shell
 
-test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin
+test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin
+test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin
+test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -194,7 +195,7 @@ test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_
 # Firmware build
 # ----------------------------------------------------------------------
 
-firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin user/shell.bin
+firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin user/shell.bin user/poweroff.bin
 
 eprom: eprom_startprogram/startprogram.reti
 
@@ -220,6 +221,10 @@ cat.bin: user/cat.bin
 echo.reti: user/echo.reti
 
 echo.bin: user/echo.bin
+
+poweroff.reti: user/poweroff.reti
+
+poweroff.bin: user/poweroff.bin
 
 shell.reti: user/shell.reti
 
@@ -371,7 +376,7 @@ kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel.reti system/init.bin user/shell.bin
+run-firmware: kernel.reti system/init.bin user/shell.bin user/poweroff.bin
 	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
 
 bootload: firmware

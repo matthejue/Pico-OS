@@ -80,7 +80,7 @@ def run_fast_session(
                 ).splitlines()
             )
         if not uart_shell_test_dirs:
-            input_lines.append("exit")
+            input_lines.append("poweroff.bin")
 
         (session_dir / "input.txt").write_text(
             "\n".join(input_lines) + "\n",
