@@ -1,9 +1,11 @@
 #include "exception.header"
+#include "filesystem/filesystem.header"
 #include "kernel.header"
 #include "kmalloc.header"
 #include "memory_constants.header"
 #include "periphery.header"
 #include "process.header"
+#include "../common/file.header"
 #include "../common/uart_protocol.header"
 
 void activate_kernel_stack_boundary(void) {
@@ -24,6 +26,20 @@ void activate_current_process_stack_boundary(void) {
     );
 }
 
+void write_process_exception_message(char *message) {
+    struct IoRequest request;
+    int length = 0;
+
+    while (message[length] != 0) {
+        length = length + 1;
+    }
+    request.file_descriptor = STDOUT_FILENO;
+    request.buffer = message;
+    request.count = length;
+    request.show_loading_bar = false;
+    write_file_descriptor(&request);
+}
+
 void print_cpu_exception_message(int cause, bool kernel_exception) {
     if (kernel_exception) {
         if (cause == CPU_EXCEPTION_DIVIDE_BY_ZERO) {
@@ -35,11 +51,17 @@ void print_cpu_exception_message(int cause, bool kernel_exception) {
         }
     } else {
         if (cause == CPU_EXCEPTION_DIVIDE_BY_ZERO) {
-            uart_print_string("Process terminated: division by zero\n");
+            write_process_exception_message(
+                "Process terminated: division by zero\n"
+            );
         } else if (cause == CPU_EXCEPTION_STACK_OVERFLOW) {
-            uart_print_string("Process terminated: stack overflow\n");
+            write_process_exception_message(
+                "Process terminated: stack overflow\n"
+            );
         } else {
-            uart_print_string("Process terminated: illegal instruction\n");
+            write_process_exception_message(
+                "Process terminated: illegal instruction\n"
+            );
         }
     }
 }
