@@ -12,7 +12,7 @@ from pathlib import Path
 RESULT_FILE = Path("sys_tests/os_tests.res")
 NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
 MAX_EMULATOR_DURATION_SECONDS = 120
-SHELL_PROMPT = "PICOS> "
+SHELL_PROMPT = "PicoOS> "
 
 
 def parse_args():

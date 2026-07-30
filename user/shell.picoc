@@ -63,7 +63,7 @@ int read_line(char *buffer, int capacity) {
     char character;
     bool complete = false;
 
-    shell_write_string("PICOS> ");
+    shell_write_string("PicoOS> ");
     while (!complete) {
         if (read(STDIN_FILENO, &character, 1) == 1) {
             if (character == '\n' || character == '\r') {
