@@ -1,0 +1,57 @@
+#include "exception.header"
+#include "kernel.header"
+#include "kmalloc.header"
+#include "memory_constants.header"
+#include "periphery.header"
+#include "process.header"
+#include "../common/uart_protocol.header"
+
+void activate_kernel_stack_boundary(void) {
+    periphery_write_register(
+        STACK_HEAP_BOUNDARY_REGISTER,
+        KERNEL_HEAP_START + DEFAULT_KERNEL_HEAP_CELLS - 1
+    );
+}
+
+int process_stack_boundary(struct Process *process) {
+    return process->base_address + process->heap_start + process->heap_size - 1;
+}
+
+void activate_current_process_stack_boundary(void) {
+    periphery_write_register(
+        STACK_HEAP_BOUNDARY_REGISTER,
+        process_stack_boundary(current_process())
+    );
+}
+
+void print_cpu_exception_message(int cause, bool kernel_exception) {
+    if (kernel_exception) {
+        if (cause == CPU_EXCEPTION_DIVIDE_BY_ZERO) {
+            uart_print_string("Kernel panic: division by zero\n");
+        } else if (cause == CPU_EXCEPTION_STACK_OVERFLOW) {
+            uart_print_string("Kernel panic: kernel stack overflow\n");
+        } else {
+            uart_print_string("Kernel panic: illegal instruction\n");
+        }
+    } else {
+        if (cause == CPU_EXCEPTION_DIVIDE_BY_ZERO) {
+            uart_print_string("Process terminated: division by zero\n");
+        } else if (cause == CPU_EXCEPTION_STACK_OVERFLOW) {
+            uart_print_string("Process terminated: stack overflow\n");
+        } else {
+            uart_print_string("Process terminated: illegal instruction\n");
+        }
+    }
+}
+
+void handle_cpu_exception(int interrupted_kernel_cs_difference) {
+    int cause = periphery_read_register(CPU_EXCEPTION_CAUSE_REGISTER);
+    bool kernel_exception = interrupted_kernel_cs_difference == 0;
+
+    print_cpu_exception_message(cause, kernel_exception);
+    if (kernel_exception) {
+        shutdown();
+    }
+
+    exit_process(PROCESS_EXIT_STATUS_EXCEPTION);
+}

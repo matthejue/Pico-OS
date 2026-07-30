@@ -1,5 +1,6 @@
 #include "kernel.header"
 #include "dispatcher.header"
+#include "exception.header"
 #include "interrupt_controller.header"
 #include "process.header"
 #include "process_arguments.header"
@@ -16,6 +17,7 @@ int main(void) {
     int init_pid;
     struct RunProcessRequest init_request;
 
+    activate_kernel_stack_boundary();
     debug;
     init_kernel_heap();
     initialize_process_table();
