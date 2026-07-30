@@ -1,0 +1,334 @@
+#include "signal.header"
+#include "dispatcher.header"
+#include "process.header"
+#include "../common/prctl.header"
+#include "../common/signal.header"
+
+int foreground_process_id = 0;
+bool terminal_escape_pending = false;
+
+bool signal_number_is_valid(int signal_number) {
+    return signal_number > 0 && signal_number < SIGNAL_COUNT;
+}
+
+int signal_mask(int signal_number) {
+    int mask = 1;
+
+    while (signal_number > 0) {
+        mask = mask * 2;
+        signal_number = signal_number - 1;
+    }
+    return mask;
+}
+
+void wake_process_for_signal(struct Process *process) {
+    if (process->state != PROCESS_STATE_BLOCKED) {
+        return;
+    }
+
+    remove_from_wait_queue(process);
+    process->activation.acc = 0;
+    process->state = PROCESS_STATE_READY;
+}
+
+void notify_process_stopped(struct Process *process) {
+    struct Process *waiting_process;
+
+    while (process->waiters.head != NULL) {
+        waiting_process = process->waiters.head;
+        if (waiting_process->waiting_status_ptr != NULL) {
+            *(waiting_process->waiting_status_ptr) =
+                SIGNAL_STOPPED_STATUS;
+        }
+        waiting_process->waiting_status_ptr = NULL;
+        wakeup_wait_queue(&(process->waiters));
+    }
+}
+
+void stop_process(struct Process *process) {
+    if (process->state == PROCESS_STATE_STOPPED ||
+        process->state == PROCESS_STATE_ZOMBIE) {
+        return;
+    }
+
+    process->stopped_from_state = process->state;
+    process->state = PROCESS_STATE_STOPPED;
+    notify_process_stopped(process);
+}
+
+void continue_process(struct Process *process) {
+    if (process->state != PROCESS_STATE_STOPPED) {
+        return;
+    }
+
+    if (process->stopped_from_state == PROCESS_STATE_BLOCKED &&
+        process->waiting_queue_ptr != NULL) {
+        process->state = PROCESS_STATE_BLOCKED;
+    } else {
+        process->state = PROCESS_STATE_READY;
+    }
+}
+
+void queue_signal_handler(
+    struct Process *process,
+    int signal_number
+) {
+    process->pending_signals =
+        process->pending_signals | signal_mask(signal_number);
+    wake_process_for_signal(process);
+}
+
+void send_signal_to_process(
+    struct Process *process,
+    int signal_number
+) {
+    int handler;
+
+    if (process == NULL ||
+        process->state == PROCESS_STATE_ZOMBIE ||
+        !signal_number_is_valid(signal_number)) {
+        return;
+    }
+
+    if (signal_number == SIGCONT) {
+        continue_process(process);
+    }
+
+    handler = process->signal_handlers[signal_number];
+    if (signal_number == SIGKILL) {
+        handler = SIGNAL_DEFAULT_HANDLER;
+    }
+
+    if (handler == SIGNAL_IGNORE_HANDLER) {
+        return;
+    }
+    if (handler != SIGNAL_DEFAULT_HANDLER) {
+        queue_signal_handler(process, signal_number);
+        return;
+    }
+
+    if (signal_number == SIGCHLD || signal_number == SIGCONT) {
+        return;
+    }
+    if (signal_number == SIGTSTP) {
+        stop_process(process);
+        return;
+    }
+
+    // A running process is still on the interrupt return path, so its
+    // termination is deferred until the next dispatch
+    if (process == current_process() &&
+        process->state == PROCESS_STATE_RUNNING) {
+        process->pending_signals =
+            process->pending_signals | signal_mask(signal_number);
+        return;
+    }
+
+    terminate_process(
+        process,
+        SIGNAL_EXIT_STATUS_BASE + signal_number
+    );
+}
+
+int send_signal_by_pid(struct KillRequest *request) {
+    struct Process *process;
+
+    if (request == NULL ||
+        (request->signal_number != 0 &&
+         !signal_number_is_valid(request->signal_number))) {
+        return -1;
+    }
+
+    process = find_process_by_pid(request->pid);
+    if (process == NULL || process->state == PROCESS_STATE_ZOMBIE) {
+        return -1;
+    }
+    if (request->signal_number != 0) {
+        send_signal_to_process(process, request->signal_number);
+    }
+    return 0;
+}
+
+int install_signal_handler(struct SignalRequest *request) {
+    struct Process *process = current_process();
+    int previous_handler;
+
+    if (request == NULL ||
+        !signal_number_is_valid(request->signal_number) ||
+        request->signal_number == SIGKILL) {
+        return -1;
+    }
+
+    previous_handler =
+        process->signal_handlers[request->signal_number];
+    process->signal_handlers[request->signal_number] = request->handler;
+    process->signal_restorer = request->restorer;
+    return previous_handler;
+}
+
+int next_pending_signal(struct Process *process) {
+    int signal_number = 1;
+
+    while (signal_number < SIGNAL_COUNT) {
+        if ((process->pending_signals &
+             signal_mask(signal_number)) != 0) {
+            return signal_number;
+        }
+        signal_number = signal_number + 1;
+    }
+    return 0;
+}
+
+void copy_activation_record(
+    struct ActivationRecord *target,
+    struct ActivationRecord *source
+) {
+    target->in1 = source->in1;
+    target->in2 = source->in2;
+    target->acc = source->acc;
+    target->sp = source->sp;
+    target->baf = source->baf;
+    target->cs = source->cs;
+    target->ds = source->ds;
+}
+
+void begin_signal_handler(
+    struct Process *process,
+    int signal_number
+) {
+    int handler = process->signal_handlers[signal_number];
+    int *stack = (int *)(process->activation.sp - 3);
+
+    copy_activation_record(
+        &(process->signal_saved_activation),
+        &(process->activation)
+    );
+    process->handling_signal = true;
+
+    // RTI enters the handler; the following cells form its normal call frame
+    stack[1] = handler - 1;
+    stack[2] = process->signal_restorer;
+    stack[3] = signal_number;
+    process->activation.sp = (int)stack;
+}
+
+bool prepare_process_signal(struct Process *process) {
+    int handler;
+    int signal_number;
+
+    signal_number = next_pending_signal(process);
+    if (signal_number == SIGKILL) {
+        process->pending_signals =
+            process->pending_signals - signal_mask(signal_number);
+        terminate_process(
+            process,
+            SIGNAL_EXIT_STATUS_BASE + signal_number
+        );
+        return false;
+    }
+    if (process->handling_signal) {
+        return true;
+    }
+
+    if (signal_number == 0) {
+        return true;
+    }
+    process->pending_signals =
+        process->pending_signals - signal_mask(signal_number);
+
+    handler = process->signal_handlers[signal_number];
+    if (signal_number == SIGKILL ||
+        handler == SIGNAL_DEFAULT_HANDLER) {
+        terminate_process(
+            process,
+            SIGNAL_EXIT_STATUS_BASE + signal_number
+        );
+        return false;
+    }
+    if (handler == SIGNAL_IGNORE_HANDLER) {
+        return true;
+    }
+
+    begin_signal_handler(process, signal_number);
+    return true;
+}
+
+void restore_signal_context(void) {
+    struct Process *process = current_process();
+
+    if (process == NULL || !process->handling_signal) {
+        return;
+    }
+
+    copy_activation_record(
+        &(process->activation),
+        &(process->signal_saved_activation)
+    );
+    process->handling_signal = false;
+    process->state = PROCESS_STATE_READY;
+    dispatcher_start_next_process();
+}
+
+int set_parent_death_signal(struct PrctlRequest *request) {
+    if (request == NULL ||
+        request->option != PR_SET_PDEATHSIG ||
+        (request->argument != 0 &&
+         !signal_number_is_valid(request->argument))) {
+        return -1;
+    }
+
+    current_process()->parent_death_signal = request->argument;
+    return 0;
+}
+
+int set_foreground_process(int pid) {
+    struct Process *process;
+
+    if (pid == 0) {
+        foreground_process_id = 0;
+        return 0;
+    }
+
+    process = find_process_by_pid(pid);
+    if (process == NULL ||
+        process->parent_pid != current_process()->pid) {
+        return -1;
+    }
+
+    foreground_process_id = pid;
+    return 0;
+}
+
+int handle_terminal_signal_character(int value) {
+    struct Process *foreground_process;
+    int signal_number = 0;
+
+    if (terminal_escape_pending) {
+        terminal_escape_pending = false;
+        if (value == 'c' || value == 'C') {
+            signal_number = SIGTERM;
+        } else if (value == 'z' || value == 'Z') {
+            signal_number = SIGTSTP;
+        } else {
+            // Tells stdin to preserve an escape that was not a shortcut
+            return -1;
+        }
+
+        foreground_process = find_process_by_pid(
+            foreground_process_id
+        );
+        if (foreground_process != NULL) {
+            send_signal_to_process(
+                foreground_process,
+                signal_number
+            );
+        }
+        return true;
+    }
+
+    if (value == 27) {
+        terminal_escape_pending = true;
+        return true;
+    }
+    return 0;
+}

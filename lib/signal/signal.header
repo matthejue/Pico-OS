@@ -1,0 +1,12 @@
+#pragma once
+
+#include "../../common/signal.header"
+
+typedef void (*sighandler_t)(int);
+
+#define SIG_DFL ((sighandler_t)0)
+#define SIG_IGN ((sighandler_t)1)
+#define SIG_ERR -1
+
+int signal(int signal_number, sighandler_t handler);
+int kill(int pid, int signal_number);

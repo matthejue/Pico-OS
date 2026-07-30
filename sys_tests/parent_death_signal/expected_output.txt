@@ -1,0 +1,2 @@
+parent terminated both children: 1
+child disabled parent-death signal: 1

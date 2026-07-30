@@ -1,0 +1,29 @@
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/prctl/libprctl.picoc ../../lib/schedule/libschedule.picoc
+
+#include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/prctl/prctl.header"
+#include "../../lib/schedule/schedule.header"
+#include "../../lib/signal/signal.header"
+#include "../../common/stddef.header"
+
+int main(void) {
+    int first_child;
+    int second_child;
+
+    if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+        return -1;
+    }
+
+    first_child = load(
+        "sys_tests/parent_death_signal/worker.bin"
+    );
+    second_child = load(
+        "sys_tests/parent_death_signal/worker.bin"
+    );
+    run(first_child, NULL, NULL);
+    run(second_child, NULL, NULL);
+
+    // Gives both endless-loop children a chance to start
+    yield();
+    return first_child;
+}

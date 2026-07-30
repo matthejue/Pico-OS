@@ -1,0 +1,9 @@
+// dependencies: ../../lib/schedule/libschedule.picoc
+
+#include "../../lib/schedule/schedule.header"
+
+int main(void) {
+    while (1) {
+        yield();
+    }
+}

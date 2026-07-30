@@ -1,0 +1,3 @@
+#pragma once
+
+#define PR_SET_PDEATHSIG 1

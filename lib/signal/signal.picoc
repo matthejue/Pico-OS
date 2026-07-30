@@ -1,0 +1,39 @@
+#include "signal.header"
+#include "../../common/syscall.header"
+
+int invoke_signal_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+__attribute__((naked))
+void signal_restorer(void) {
+    asm("LOADI IN1 0");
+    asm("LOADI ACC 28"); // SYSCALL_SIGRETURN
+    asm("INT 0");
+}
+
+int signal(int signal_number, sighandler_t handler) {
+    struct SignalRequest request;
+
+    request.signal_number = signal_number;
+    request.handler = (int)handler;
+    request.restorer = (int)signal_restorer;
+    return invoke_signal_syscall(
+        SYSCALL_SIGNAL,
+        (int)&request
+    );
+}
+
+int kill(int pid, int signal_number) {
+    struct KillRequest request;
+
+    request.pid = pid;
+    request.signal_number = signal_number;
+    return invoke_signal_syscall(SYSCALL_KILL, (int)&request);
+}

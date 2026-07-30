@@ -21,3 +21,7 @@ int waitpid(int pid) {
     }
     return status;
 }
+
+bool WIFSTOPPED(int status) {
+    return status == SIGNAL_STOPPED_STATUS;
+}
