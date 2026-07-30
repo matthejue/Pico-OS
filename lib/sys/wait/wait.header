@@ -1,3 +1,7 @@
 #pragma once
 
+#include "../../../common/stddef.header"
+#include "../../../common/signal.header"
+
 int waitpid(int pid);
+bool WIFSTOPPED(int status);

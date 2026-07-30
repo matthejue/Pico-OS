@@ -16,6 +16,7 @@ bool unload(int pid);
 void list(void);
 int getpid(void);
 void reset_processes(void);
+int set_foreground_process(int pid);
 void wait_queue_init(struct wait_queue *wq);
 void sleep(struct wait_queue *wq);
 void wakeup(struct wait_queue *wq);

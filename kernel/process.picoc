@@ -4,6 +4,7 @@
 #include "kmalloc.header"
 #include "pmalloc.header"
 #include "shared_memory.header"
+#include "signal.header"
 #include "dispatcher.header"
 #include "filesystem/file_descriptor.header"
 #include "../common/uart_protocol.header"
@@ -78,6 +79,8 @@ struct Process *create_process(
     char *binary_path
 ) {
     struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
+    struct Process *parent = current_process();
+    int signal_number = 0;
     int stack_pointer = base_address + size - 1;
 
     if (process == NULL) {
@@ -122,6 +125,21 @@ struct Process *create_process(
     process->waiting_queue_ptr = NULL;
     process->wait_next = NULL;
     process->shared_memory_attachments = NULL;
+    process->parent_pid = 0;
+    process->parent_death_signal = 0;
+    if (parent != NULL) {
+        process->parent_pid = parent->pid;
+        process->parent_death_signal = parent->parent_death_signal;
+    }
+    process->exit_status = 0;
+    process->stopped_from_state = PROCESS_STATE_READY;
+    process->pending_signals = 0;
+    while (signal_number < SIGNAL_COUNT) {
+        process->signal_handlers[signal_number] = 0;
+        signal_number = signal_number + 1;
+    }
+    process->signal_restorer = 0;
+    process->handling_signal = false;
     *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
@@ -183,10 +201,9 @@ void remove_from_wait_queue(struct Process *process) {
     candidate->wait_next = NULL;
 }
 
-void remove_process(struct Process *process, int status) {
+void remove_process(struct Process *process) {
     struct Process *previous = NULL;
     struct Process *candidate = process_list_head;
-    struct Process *waiting_process;
 
     while (candidate != NULL && candidate != process) {
         previous = candidate;
@@ -200,17 +217,6 @@ void remove_process(struct Process *process, int status) {
     // A blocked process must be unlinked before its PCB is freed; otherwise a
     // later wakeup would follow a dangling queue entry
     remove_from_wait_queue(candidate);
-
-    // Store the status before waking each waiter, whose execution may resume
-    // as soon as the scheduler next selects it
-    while (candidate->waiters.head != NULL) {
-        waiting_process = candidate->waiters.head;
-        if (waiting_process->waiting_status_ptr != NULL) {
-            *(waiting_process->waiting_status_ptr) = status;
-        }
-        waiting_process->waiting_status_ptr = NULL;
-        wakeup_wait_queue(&(candidate->waiters));
-    }
 
     if (previous == NULL) {
         process_list_head = candidate->next;
@@ -233,6 +239,89 @@ void remove_process(struct Process *process, int status) {
     kfree(candidate);
 }
 
+bool process_has_waiting_parent(struct Process *process) {
+    struct Process *waiting_process = process->waiters.head;
+
+    while (waiting_process != NULL) {
+        if (waiting_process->pid == process->parent_pid) {
+            return true;
+        }
+        waiting_process = waiting_process->wait_next;
+    }
+    return false;
+}
+
+void wake_parent_waiting_for_process(
+    struct Process *process,
+    int status
+) {
+    struct Process *waiting_process;
+
+    while (process->waiters.head != NULL) {
+        waiting_process = process->waiters.head;
+        if (waiting_process->pid == process->parent_pid) {
+            if (waiting_process->waiting_status_ptr != NULL) {
+                *(waiting_process->waiting_status_ptr) = status;
+            }
+            waiting_process->waiting_status_ptr = NULL;
+        }
+        wakeup_wait_queue(&(process->waiters));
+    }
+}
+
+void orphan_and_signal_children(struct Process *parent) {
+    struct Process *child;
+
+    while (1) {
+        child = process_list_head;
+        while (child != NULL &&
+               child->parent_pid != parent->pid) {
+            child = child->next;
+        }
+        if (child == NULL) {
+            return;
+        }
+
+        child->parent_pid = 0;
+        if (child->state == PROCESS_STATE_ZOMBIE) {
+            remove_process(child);
+        } else if (child->parent_death_signal != 0) {
+            send_signal_to_process(
+                child,
+                child->parent_death_signal
+            );
+        }
+    }
+}
+
+void terminate_process(struct Process *process, int status) {
+    struct Process *parent;
+    bool parent_is_waiting;
+
+    if (process == NULL ||
+        process->state == PROCESS_STATE_ZOMBIE) {
+        return;
+    }
+
+    orphan_and_signal_children(process);
+    parent = find_process_by_pid(process->parent_pid);
+    parent_is_waiting =
+        parent != NULL && process_has_waiting_parent(process);
+
+    process->exit_status = status;
+    process->state = PROCESS_STATE_ZOMBIE;
+    wake_parent_waiting_for_process(process, status);
+    if (parent != NULL) {
+        send_signal_to_process(parent, SIGCHLD);
+    }
+
+    // A parent that was already waiting has received the status, while an
+    // orphan has nobody that could collect it
+    if (parent == NULL || parent_is_waiting) {
+        remove_process(process);
+    }
+}
+
 bool unload_process_by_pid(int pid) {
     struct Process *process = process_list_head;
 
@@ -245,7 +334,7 @@ bool unload_process_by_pid(int pid) {
         return false;
     }
 
-    remove_process(process, PROCESS_EXIT_STATUS_SUCCESS);
+    terminate_process(process, PROCESS_EXIT_STATUS_SUCCESS);
     return true;
 }
 
@@ -259,7 +348,7 @@ void remove_test_processes(void) {
         if (process->pid != 1 &&
             process->pid != 2 &&
             process != active_process) {
-            remove_process(process, PROCESS_EXIT_STATUS_SUCCESS);
+            remove_process(process);
         }
         process = next_process;
     }
@@ -274,8 +363,23 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
     struct Process *process = current_process();
     struct Process *waited_process;
 
+    if (request == NULL || request->status == NULL) {
+        return true;
+    }
+
     waited_process = find_process_by_pid(request->pid);
-    if (waited_process == NULL) {
+    if (waited_process == NULL ||
+        waited_process->parent_pid != process->pid) {
+        *(request->status) = -1;
+        return true;
+    }
+    if (waited_process->state == PROCESS_STATE_ZOMBIE) {
+        *(request->status) = waited_process->exit_status;
+        remove_process(waited_process);
+        return true;
+    }
+    if (waited_process->state == PROCESS_STATE_STOPPED) {
+        *(request->status) = SIGNAL_STOPPED_STATUS;
         return true;
     }
 
@@ -321,7 +425,11 @@ bool wakeup_wait_queue(struct wait_queue *queue) {
 
     process->wait_next = NULL;
     process->waiting_queue_ptr = NULL;
-    process->state = PROCESS_STATE_READY;
+    if (process->state == PROCESS_STATE_STOPPED) {
+        process->stopped_from_state = PROCESS_STATE_READY;
+    } else {
+        process->state = PROCESS_STATE_READY;
+    }
     return true;
 }
 
@@ -338,7 +446,7 @@ int process_heap_size(void) {
 }
 
 void exit_process(int status) {
-    remove_process(current_process(), status);
+    terminate_process(current_process(), status);
     dispatcher_start_next_process();
     // Switching to a next process returns via RTI; shutdown is only reached when none remain
     shutdown();

@@ -1,0 +1,20 @@
+#include "prctl.header"
+#include "../../../common/syscall.header"
+
+int invoke_prctl_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF ACC 0");
+    return result;
+}
+
+int prctl(int option, int argument) {
+    struct PrctlRequest request;
+
+    request.option = option;
+    request.argument = argument;
+    return invoke_prctl_syscall(SYSCALL_PRCTL, (int)&request);
+}

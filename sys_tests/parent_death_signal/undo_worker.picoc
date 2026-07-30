@@ -1,0 +1,15 @@
+// dependencies: ../../lib/sys/prctl/libprctl.picoc ../../lib/schedule/libschedule.picoc
+
+#include "../../lib/sys/prctl/prctl.header"
+#include "../../lib/schedule/schedule.header"
+
+int main(void) {
+    if (prctl(PR_SET_PDEATHSIG, 0) == -1) {
+        return 1;
+    }
+
+    yield();
+    while (1) {
+        yield();
+    }
+}

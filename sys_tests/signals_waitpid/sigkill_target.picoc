@@ -1,0 +1,31 @@
+// dependencies: ../../lib/signal/libsignal.picoc ../../lib/schedule/libschedule.picoc ../../lib/unistd/libunistd.picoc
+
+#include "../../lib/signal/signal.header"
+#include "../../lib/schedule/schedule.header"
+#include "../../lib/unistd/unistd.header"
+
+void ignored_handler(int signal_number) {
+}
+
+void kill_from_handler(int signal_number) {
+    if (signal_number == SIGTERM) {
+        kill(getpid(), SIGKILL);
+    }
+    while (1) {
+        yield();
+    }
+}
+
+int main(void) {
+    if (signal(SIGKILL, ignored_handler) != SIG_ERR) {
+        return 1;
+    }
+    if (signal(SIGTERM, kill_from_handler) == SIG_ERR) {
+        return 1;
+    }
+
+    yield();
+    while (1) {
+        yield();
+    }
+}
