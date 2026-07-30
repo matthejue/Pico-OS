@@ -335,6 +335,10 @@ bool unload_process_by_pid(int pid) {
     }
 
     terminate_process(process, PROCESS_EXIT_STATUS_SUCCESS);
+    process = find_process_by_pid(pid);
+    if (process != NULL) {
+        remove_process(process);
+    }
     return true;
 }
 
