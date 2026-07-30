@@ -9,28 +9,13 @@
 int receive_byte_over_uart(void);
 
 int receive_file_size(char *path) {
-    uart_send_file_command("read ", path);
-    return receive_word();
-}
+    int file_size;
+    int byte_count;
 
-void discard_uart_bytes(int count, bool show_loading_bar) {
-    int discarded = 0;
-    int loading_bar_update = uart_start_loading_bar(
-        show_loading_bar,
-        count
-    );
-
-    while (count > 0) {
-        receive_byte_over_uart();
-        count = count - 1;
-        discarded = discarded + 1;
-        if (discarded == loading_bar_update) {
-            loading_bar_update = uart_update_loading_bar(
-                discarded,
-                discarded + count
-            );
-        }
-    }
+    uart_send_file_range_command(path, 0, 0);
+    file_size = receive_word();
+    byte_count = receive_word();
+    return file_size;
 }
 
 bool file_exists(char *path) {
@@ -39,7 +24,6 @@ bool file_exists(char *path) {
     if (size < 0) {
         return false;
     }
-    discard_uart_bytes(size, false);
     return true;
 }
 
@@ -121,12 +105,19 @@ int read_regular_file(
     int count,
     bool show_loading_bar
 ) {
-    int file_size = receive_file_size(descriptor->path);
-    int file_index = 0;
+    int file_size;
+    int byte_count;
     int copied = 0;
     int loading_bar_update;
     int value;
 
+    uart_send_file_range_command(
+        descriptor->path,
+        descriptor->offset,
+        count
+    );
+    file_size = receive_word();
+    byte_count = receive_word();
     if (file_size < 0) {
         return -1;
     }
@@ -137,20 +128,17 @@ int read_regular_file(
     );
     loading_bar_update = uart_start_loading_bar(
         show_loading_bar,
-        file_size
+        byte_count
     );
 
-    while (file_index < file_size) {
+    while (copied < byte_count) {
         value = receive_byte_over_uart();
-        if (file_index >= descriptor->offset && copied < count) {
-            buffer[copied] = value;
-            copied = copied + 1;
-        }
-        file_index = file_index + 1;
-        if (file_index == loading_bar_update) {
+        buffer[copied] = value;
+        copied = copied + 1;
+        if (copied == loading_bar_update) {
             loading_bar_update = uart_update_loading_bar(
-                file_index,
-                file_size
+                copied,
+                byte_count
             );
         }
     }
@@ -261,12 +249,6 @@ int seek_file_descriptor(struct SeekRequest *request) {
         if (offset < 0) {
             return -1;
         }
-        uart_print_loading_bar_label(
-            request->show_loading_bar,
-            "read ",
-            descriptor->path
-        );
-        discard_uart_bytes(offset, request->show_loading_bar);
         offset = offset + request->offset;
     } else {
         return -1;
