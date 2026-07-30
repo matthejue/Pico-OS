@@ -12,6 +12,7 @@ struct SharedMemoryAttachment;
 #define PROCESS_STATE_RUNNING 2
 #define PROCESS_STATE_BLOCKED 3
 #define PROCESS_EXIT_STATUS_SUCCESS 0
+#define PROCESS_EXIT_STATUS_EXCEPTION 1
 
 struct ActivationRecord {
     int in1;

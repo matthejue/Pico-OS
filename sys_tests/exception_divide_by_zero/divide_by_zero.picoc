@@ -1,0 +1,6 @@
+int main(void) {
+    int zero = 0;
+    int result = 1 / zero;
+
+    return result;
+}

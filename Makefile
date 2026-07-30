@@ -13,7 +13,7 @@ OS_TEST_EMU_OPTS ?= $(shell cat ./opts/os_test_emu_opts.txt)
 OS_RUN_CPL_OPTS ?= $(shell cat ./opts/os_run_cpl_opts.txt)
 OS_RUN_EMU_OPTS ?= $(shell cat ./opts/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
-KERNEL_STACK_START ?= 30000
+KERNEL_STACK_START ?= 40000
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
@@ -325,6 +325,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/uart_hardware.picoc \
 	common/uart_protocol.picoc \
 	kernel/kernel.picoc \
+	kernel/exception.picoc \
 	kernel/interrupt_controller.picoc \
 	kernel/periphery.picoc \
 	common/heap.picoc \
