@@ -1,0 +1,15 @@
+#pragma once
+
+struct Process;
+
+#define STACK_HEAP_BOUNDARY_REGISTER 10
+#define CPU_EXCEPTION_CAUSE_REGISTER 11
+
+#define CPU_EXCEPTION_DIVIDE_BY_ZERO 1
+#define CPU_EXCEPTION_STACK_OVERFLOW 2
+#define CPU_EXCEPTION_ILLEGAL_INSTRUCTION 3
+
+void activate_kernel_stack_boundary(void);
+int process_stack_boundary(struct Process *process);
+void activate_current_process_stack_boundary(void);
+void handle_cpu_exception(int interrupted_kernel_cs_difference);

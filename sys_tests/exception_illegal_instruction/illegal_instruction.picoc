@@ -1,0 +1,14 @@
+__attribute__((naked))
+void execute_illegal_instruction(void) {
+    asm("MOVE PC IN1");
+    asm("ADDI IN1 7"); // Points to the final NOP
+    asm("LOADI32 ACC 805306368"); // Encodes the unused compute opcode 24
+    asm("STOREIN IN1 ACC 0");
+    asm("MOVE IN1 PC");
+    asm("NOP");
+}
+
+int main(void) {
+    execute_illegal_instruction();
+    return 0;
+}

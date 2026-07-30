@@ -1,10 +1,15 @@
 #include "dispatcher.header"
+#include "exception.header"
 #include "process.header"
 #include "scheduler.header"
 
 __attribute__((naked))
-void dispatcher_jump_to_process(struct Process *process) {
+void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN SP BAF 2");
+    asm("LOADIN SP IN1 3");
+    asm("LOADI ACC 1048576");
+    asm("MULTI ACC 1024");
+    asm("STOREIN ACC IN1 10");
     asm("LOADIN BAF SP 11");
     asm("LOADIN BAF CS 13");
     asm("LOADIN BAF DS 14");
@@ -21,9 +26,9 @@ void dispatcher_switch_to_process(struct Process *process) {
     }
 
     set_current_process(process);
-    current_process()->state = PROCESS_STATE_RUNNING;
+    process->state = PROCESS_STATE_RUNNING;
 
-    dispatcher_jump_to_process(current_process());
+    dispatcher_jump_to_process(process, process_stack_boundary(process));
 }
 
 void dispatcher_start_next_process(void) {

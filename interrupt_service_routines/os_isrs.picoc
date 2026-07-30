@@ -1,32 +1,25 @@
 #include "../common/stddef.header"
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
+#include "../kernel/exception.header"
 #include "../kernel/interrupt_controller.header"
 #include "../kernel/filesystem/standard_input.header"
 #include "../kernel/syscall.header"
 
-#define OS_INTERRUPT_VECTOR_COUNT 3
+#define OS_INTERRUPT_VECTOR_COUNT 4
 
 void timer_interrupt(void);
 void syscall_interrupt(void);
 void uart_interrupt(void);
+void cpu_exception_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
     syscall_interrupt,
     timer_interrupt,
-    uart_interrupt
+    uart_interrupt,
+    cpu_exception_interrupt
 };
-
-static inline void load_kernel_context(void) {
-    // Each time kernel code runs, it finishes its task before returning. Its stackframes
-    // and stack values are then no longer needed, so SP is always set to the same
-    // value here. The next kernel function call sets BAF to a suitable value,
-    // so BAF does not need to be set here
-    asm(KERNEL_CS_START_ASM); // LOADI32 CS kernel_codesegment_start
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS kernel_datasegment_start
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP kernel_stack_start
-}
 
 __attribute__((naked))
 void timer_interrupt(void) {
@@ -53,7 +46,14 @@ void timer_interrupt(void) {
 
     // BAF keeps old_sp while loading kernel CS, DS and SP
     asm("MOVE SP BAF");
-    load_kernel_context();
+    asm("LOADI ACC 1048576"); // 2^20
+    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADI IN1 0");
+    asm("STOREIN ACC IN1 10");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+    asm(KERNEL_SP_START_ASM);
+    activate_kernel_stack_boundary();
 
     // Passes the interrupted stack frame to the dispatcher
     asm("PUSH BAF"); // Caller context
@@ -78,7 +78,14 @@ void syscall_interrupt(void) {
 
     // BAF keeps old_sp while loading kernel CS, DS and SP
     asm("MOVE SP BAF");
-    load_kernel_context();
+    asm("LOADI ACC 1048576"); // 2^20
+    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADI IN1 0");
+    asm("STOREIN ACC IN1 10");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+    asm(KERNEL_SP_START_ASM);
+    activate_kernel_stack_boundary();
 
     // Builds the handle_syscall arguments from the saved context
     asm("PUSH BAF"); // Caller context
@@ -105,6 +112,9 @@ __attribute__((naked))
 void syscall_interrupt_return(void) {
     // Handle_syscall restores BAF to the saved caller context before returning
     // Restore the caller while preserving IN2 as the syscall return value
+    asm("PUSH IN2");
+    activate_current_process_stack_boundary();
+    asm("POP IN2");
     asm("MOVE BAF SP");
     asm("POP DS");
     asm("POP CS");
@@ -114,6 +124,32 @@ void syscall_interrupt_return(void) {
     asm("ADDI SP 1"); // Skip saved ACC
     asm("MOVE IN2 ACC");
     asm("RTI");
+}
+
+__attribute__((naked))
+void cpu_exception_interrupt(void) {
+    // BAF preserves the interrupted CS while the handler resets kernel context
+    asm("MOVE CS BAF");
+    asm("LOADI ACC 1048576"); // 2^20
+    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADI IN1 0");
+    asm("STOREIN ACC IN1 10");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+    asm(KERNEL_SP_START_ASM);
+    activate_kernel_stack_boundary();
+
+    // A zero difference identifies an exception raised in kernel code
+    asm("MOVE BAF ACC");
+    asm("SUB ACC CS");
+    asm("PUSH ACC");
+
+    // The exception handler terminates the process or halts after a kernel panic
+    asm("LOADI ACC 0");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC handle_cpu_exception");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
 }
 
 __attribute__((naked))
