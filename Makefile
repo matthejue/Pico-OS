@@ -33,7 +33,9 @@ USER_STARTUP_DEPENDENCIES := \
 USER_RUNTIME_SOURCES := \
 	lib/unistd/libunistd.picoc \
 	lib/fcntl/libfcntl.picoc \
-	lib/sys/wait/libwait.picoc
+	lib/sys/wait/libwait.picoc \
+	lib/signal/libsignal.picoc \
+	lib/sys/prctl/libprctl.picoc
 USER_RUNTIME_DEPENDENCIES := \
 	$(USER_RUNTIME_SOURCES) \
 	lib/unistd/process.picoc \
@@ -44,7 +46,13 @@ USER_RUNTIME_DEPENDENCIES := \
 	lib/fcntl/fcntl.header \
 	lib/sys/wait/wait.picoc \
 	lib/sys/wait/wait.header \
+	lib/signal/signal.picoc \
+	lib/signal/signal.header \
+	lib/sys/prctl/prctl.picoc \
+	lib/sys/prctl/prctl.header \
 	common/syscall.header \
+	common/signal.header \
+	common/prctl.header \
 	common/file.header \
 	common/loading_bar.header \
 	common/stddef.header \
@@ -333,6 +341,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/pmalloc.picoc \
 	kernel/shared_memory.picoc \
 	kernel/process.picoc \
+	kernel/signal.picoc \
 	kernel/filesystem/file_descriptor.picoc \
 	kernel/filesystem/filesystem.picoc \
 	kernel/filesystem/standard_input.picoc \

@@ -51,3 +51,7 @@ int getpid(void) {
 void reset_processes(void) {
     invoke_syscall(SYSCALL_RESET_PROCESSES, 0);
 }
+
+int set_foreground_process(int pid) {
+    return invoke_syscall(SYSCALL_SET_FOREGROUND_PROCESS, pid);
+}

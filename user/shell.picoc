@@ -1,6 +1,8 @@
 #include "../lib/unistd/unistd.header"
 #include "../lib/fcntl/fcntl.header"
 #include "../lib/sys/wait/wait.header"
+#include "../lib/sys/prctl/prctl.header"
+#include "../lib/signal/signal.header"
 #include "../lib/stdlib/stdlib.header"
 #include "../lib/string/string.header"
 #include "../common/decimal.header"
@@ -43,6 +45,7 @@ void shell_yield(void) {
 bool shell_reset(void) {
     int file_descriptor = SHELL_PRIVATE_FILE_DESCRIPTOR_START;
 
+    set_foreground_process(0);
     reset_processes();
     while (file_descriptor < SHELL_FILE_DESCRIPTOR_COUNT) {
         close(file_descriptor);
@@ -405,9 +408,35 @@ bool run_process(
     } else if (background) {
         last_background_process_id = pid;
     } else {
+        set_foreground_process(pid);
         last_foreground_exit_status = waitpid(pid);
+        set_foreground_process(0);
+        if (WIFSTOPPED(last_foreground_exit_status)) {
+            last_background_process_id = pid;
+        } else if (last_background_process_id == pid) {
+            last_background_process_id = 0;
+        }
     }
     return started;
+}
+
+void continue_background_process(bool foreground) {
+    int pid = last_background_process_id;
+
+    if (pid == 0 || kill(pid, SIGCONT) == -1) {
+        last_background_process_id = 0;
+        shell_write_string("error: no background process\n");
+        return;
+    }
+
+    if (foreground) {
+        set_foreground_process(pid);
+        last_foreground_exit_status = waitpid(pid);
+        set_foreground_process(0);
+        if (!WIFSTOPPED(last_foreground_exit_status)) {
+            last_background_process_id = 0;
+        }
+    }
 }
 
 void build_executable_path(char *directory, char *name, char *result) {
@@ -641,6 +670,10 @@ bool eval(char *command) {
         }
     } else if (strcmp(command, "list") == 0) {
         list();
+    } else if (strcmp(command, "fg") == 0) {
+        continue_background_process(true);
+    } else if (strcmp(command, "bg") == 0) {
+        continue_background_process(false);
     } else {
         background = strip_background_operator(command);
         redirection_status = strip_stdout_redirection(
@@ -678,6 +711,10 @@ bool eval(char *command) {
 int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
 
+    set_foreground_process(0);
+    if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+        return 1;
+    }
     initial_shell_environment = clone_environment();
     if (initial_shell_environment == NULL) {
         return 1;

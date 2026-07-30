@@ -2,6 +2,7 @@
 
 #include "../common/stddef.header"
 #include "../common/syscall.header"
+#include "../common/signal.header"
 #include "../common/wait_queue.header"
 
 struct FileDescriptorTable;
@@ -11,6 +12,8 @@ struct SharedMemoryAttachment;
 #define PROCESS_STATE_READY 1
 #define PROCESS_STATE_RUNNING 2
 #define PROCESS_STATE_BLOCKED 3
+#define PROCESS_STATE_STOPPED 4
+#define PROCESS_STATE_ZOMBIE 5
 #define PROCESS_EXIT_STATUS_SUCCESS 0
 #define PROCESS_EXIT_STATUS_EXCEPTION 1
 
@@ -49,6 +52,17 @@ struct Process {
     struct Process *next;
     // Shared-memory mappings released when this process is removed
     struct SharedMemoryAttachment *shared_memory_attachments;
+    // PID of the process that loaded this process
+    int parent_pid;
+    // Signal inherited by children and received when their parent terminates
+    int parent_death_signal;
+    int exit_status;
+    int stopped_from_state;
+    int pending_signals;
+    int signal_handlers[SIGNAL_COUNT];
+    int signal_restorer;
+    bool handling_signal;
+    struct ActivationRecord signal_saved_activation;
 };
 
 void initialize_process_table(void);
@@ -68,9 +82,11 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
 void enqueue_current_process_on_wait_queue(struct wait_queue *queue);
 bool wakeup_wait_queue(struct wait_queue *queue);
+void remove_from_wait_queue(struct Process *process);
 int process_heap_start(void);
 int process_heap_size(void);
 void exit_process(int status);
+void terminate_process(struct Process *process, int status);
 void list_processes(void);
 struct Process *first_process(void);
 struct Process *current_process(void);

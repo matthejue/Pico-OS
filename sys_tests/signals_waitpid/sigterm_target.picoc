@@ -1,0 +1,27 @@
+// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/signal/libsignal.picoc ../../lib/schedule/libschedule.picoc
+
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/signal/signal.header"
+#include "../../lib/schedule/schedule.header"
+#include "../../common/stddef.header"
+
+bool terminated = false;
+
+void handle_sigterm(int signal_number) {
+    if (signal_number == SIGTERM) {
+        terminated = true;
+    }
+}
+
+int main(void) {
+    if (signal(SIGTERM, handle_sigterm) == SIG_ERR) {
+        return 1;
+    }
+
+    yield();
+    while (!terminated) {
+        yield();
+    }
+    printf("SIGTERM cleanup finished\n");
+    return 23;
+}
