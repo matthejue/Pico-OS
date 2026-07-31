@@ -1,0 +1,3 @@
+load tests/process_memory_first_fit/launcher.bin
+run 3
+poweroff.bin

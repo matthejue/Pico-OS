@@ -1,0 +1,3 @@
+load tests/basic_ivt_text_function_addresses/launcher.bin
+run 3
+poweroff.bin

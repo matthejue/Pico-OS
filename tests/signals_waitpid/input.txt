@@ -1,0 +1,3 @@
+load tests/signals_waitpid/launcher.bin
+run 3
+poweroff.bin

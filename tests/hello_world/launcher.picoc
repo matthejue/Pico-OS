@@ -1,0 +1,13 @@
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc
+
+#include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/wait/wait.header"
+#include "../../common/stddef.header"
+
+int main(void) {
+    int pid = load("tests/hello_world/hello_world.bin");
+
+    run(pid, NULL, NULL);
+    waitpid(pid);
+    return 0;
+}

@@ -1,0 +1,3 @@
+load tests/exception_illegal_instruction/launcher.bin
+run 3
+poweroff.bin

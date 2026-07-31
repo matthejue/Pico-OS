@@ -1,3 +1,0 @@
-load sys_tests/process_environment/launcher.bin
-run 3
-poweroff.bin

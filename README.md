@@ -78,7 +78,7 @@ make bootload
 kernel section/debug metadata, and a 2^18-cell SRAM. Press capital `V` to enter
 the UART terminal view; `Escape` returns to the TUI. `make bootload-debug`
 forces debug information for both bootloader and kernel. `make run-os
-OS_RUN_PATH=sys_tests/hello_world` runs one configured OS scenario, while the
+OS_RUN_PATH=tests/hello_world` runs one configured OS scenario, while the
 focused test targets are documented in [section 14](#14-test-system).
 
 # 1. Bootloading
@@ -1895,7 +1895,7 @@ PicoOS provides compact, connected examples:
 Relevant sources include [`kernel/scheduler.picoc`](kernel/scheduler.picoc),
 [`kernel/dispatcher.picoc`](kernel/dispatcher.picoc),
 [`lib/mutex/mutex.picoc`](lib/mutex/mutex.picoc), and
-[`sys_tests/shared_memory_mutual_exclusion`](sys_tests/shared_memory_mutual_exclusion).
+[`tests/shared_memory_mutual_exclusion`](tests/shared_memory_mutual_exclusion).
 
 ## 13.2 Operating systems lecture
 
@@ -1925,11 +1925,11 @@ The checked-in teaching-related artifacts that can be named precisely are:
 
 - [`opts/sheet7ex1_fib_2.picoc`](opts/sheet7ex1_fib_2.picoc), a program named
   for sheet 7, exercise 1;
-- [`sys_tests/basic_malloc.picoc`](sys_tests/basic_malloc.picoc),
-  [`basic_free.picoc`](sys_tests/basic_free.picoc), and
-  [`basic_free_block_merging.picoc`](sys_tests/basic_free_block_merging.picoc),
+- [`tests/basic_malloc.picoc`](tests/basic_malloc.picoc),
+  [`basic_free.picoc`](tests/basic_free.picoc), and
+  [`basic_free_block_merging.picoc`](tests/basic_free_block_merging.picoc),
   focused executable examples for allocation, reuse, and coalescing;
-- [`sys_tests/process_memory_first_fit`](sys_tests/process_memory_first_fit),
+- [`tests/process_memory_first_fit`](tests/process_memory_first_fit),
   which checks complete-process first-fit reuse;
 - PicoC-Compiler's generically named
   [`example_exercise_from_sheets1.picoc`](../PicoC-Compiler/sys_tests/example_exercise_from_sheets1.picoc)
@@ -1945,26 +1945,27 @@ by their real title/path when added.
 
 Three test categories share the compiler/emulator toolchain:
 
-- single-file library tests directly in [`sys_tests`](sys_tests);
+- single-file library tests directly in [`tests`](tests);
 - OS feature directories identified by a canonical `launcher.picoc` and
   three-line `input.txt`; and
 - shell directories whose `input.txt` directly exercises command behavior.
 
-The detailed contributor guide is [`sys_tests/README.md`](sys_tests/README.md).
+The detailed contributor guide is [`tests/README.md`](tests/README.md).
 
-## 14.1 `make test`
+## 14.1 `make test` and `make test-fast`
 
 `make test` runs:
 
 ```make
-$(MAKE) test-lib TEST_PATTERN=all
-$(MAKE) test-sys-fast OS_TEST_PATTERN=all
+$(MAKE) test-lib
+$(MAKE) test-sys
 ```
 
-It therefore runs every library test, then all OS feature and shell tests
-through one shared OS boot. `make test-all` is an alias. The Makefile also
-supports pattern variables and separate compiler/emulator option files under
-[`opts`](opts).
+It runs the configured library tests, then OS feature and shell tests normally.
+`make test-fast` runs `make test-lib` followed by `make test-sys-fast`, which
+uses one shared OS boot. `make test-all` is an alias for `make test`. The
+Makefile also supports pattern variables and separate compiler/emulator option
+files under [`opts`](opts).
 
 ## 14.2 `make test-lib`
 
@@ -1985,7 +1986,7 @@ int main() {
 }
 ```
 
-This is [`sys_tests/basic_stdio.picoc`](sys_tests/basic_stdio.picoc).
+This is [`tests/basic_stdio.picoc`](tests/basic_stdio.picoc).
 [`extract_input_and_expected.sh`](extract_input_and_expected.sh) reads the
 first two lines and creates same-basename `.input` and `.expected_output`
 side files. PicoC-Compiler parses a leading
@@ -1997,7 +1998,7 @@ to the test source, de-duplicates them, and links them after the primary file.
 `opts/test_emu_opts.txt`, limits each emulator to five seconds, and compares
 actual `.output` to `.expected_output` after stripping trailing whitespace per
 line. It reports compilation, emulator, timeout, missing-output, and diff
-failures; writes a summary to `sys_tests/tests.res`; and records failed source
+failures; writes a summary to `tests/tests.res`; and records failed source
 paths in `opts/not_passed_tests.txt`.
 
 ## 14.3 System and OS tests
@@ -2014,7 +2015,7 @@ The targets all exist and mean:
 | `make test-shell-fast` | shell only | one shared boot |
 
 A normal OS feature directory such as
-[`sys_tests/hello_world`](sys_tests/hello_world) contains:
+[`tests/hello_world`](tests/hello_world) contains:
 
 ```text
 launcher.picoc
