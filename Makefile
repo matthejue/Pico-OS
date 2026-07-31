@@ -163,11 +163,15 @@ run_send_keypresses:
 # ----------------------------------------------------------------------
 
 test:
+	@echo "===== Library tests (make test-lib) ====="
 	$(MAKE) test-lib
+	@echo "===== System tests (make test-sys) ====="
 	$(MAKE) test-sys
 
 test-fast:
+	@echo "===== Library tests (make test-lib) ====="
 	$(MAKE) test-lib
+	@echo "===== System tests (make test-sys-fast) ====="
 	$(MAKE) test-sys-fast
 
 test-lib: opts/isrs.reti
@@ -181,8 +185,10 @@ test_not_passed:
 	./run_sys_tests.sh --not-passed "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test-sys:
-	$(MAKE) test-os
-	$(MAKE) test-shell
+	@set -e; SECONDS=0; \
+	$(MAKE) test-os; \
+	$(MAKE) test-shell; \
+	echo "make test-sys completed in $${SECONDS}s"
 
 test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
@@ -193,8 +199,10 @@ test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bi
 	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
 test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	@set -e; SECONDS=0; \
+	./export_environment_vars_for_makefile.sh; \
+	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	echo "make test-sys-fast completed in $${SECONDS}s"
 
 test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\

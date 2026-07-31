@@ -1965,7 +1965,9 @@ It runs the configured library tests, then OS feature and shell tests normally.
 `make test-fast` runs `make test-lib` followed by `make test-sys-fast`, which
 uses one shared OS boot. `make test-all` is an alias for `make test`. The
 Makefile also supports pattern variables and separate compiler/emulator option
-files under [`opts`](opts).
+files under [`opts`](opts). Combined targets print separate library-test and
+system-test headings, in execution order, and both system-test targets print
+their total elapsed time when they finish.
 
 ## 14.2 `make test-lib`
 
