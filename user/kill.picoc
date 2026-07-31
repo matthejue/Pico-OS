@@ -1,0 +1,16 @@
+// dependencies: ../lib/signal/libsignal.picoc
+
+#include "../lib/signal/signal.header"
+#include "../lib/stdlib/stdlib.header"
+
+int main(int argc, char **argv) {
+    int signal_number = SIGTERM;
+
+    if (argc < 2 || argc > 3) {
+        return 1;
+    }
+    if (argc == 3) {
+        signal_number = atoi(argv[2]);
+    }
+    return kill(atoi(argv[1]), signal_number) == -1;
+}

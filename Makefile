@@ -69,7 +69,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 .PHONY: test test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
 .PHONY: clean
 
 
@@ -104,6 +104,7 @@ help:
 	@echo "  make shell.bin                  Build the shell user program binary"
 	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
+	@echo "  make kill.bin                   Build the kill user program binary"
 	@echo "  make poweroff.bin               Build the poweroff user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
@@ -141,7 +142,7 @@ code-index:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/poweroff.bin
+run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(USER_RUNTIME_SOURCES) $(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -178,23 +179,23 @@ test-sys:
 	$(MAKE) test-os
 	$(MAKE) test-shell
 
-test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/poweroff.bin
+test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/poweroff.bin
+test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
+test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
+test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
-test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/poweroff.bin
+test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
 	./export_environment_vars_for_makefile.sh;\
 	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
 
@@ -229,6 +230,10 @@ cat.bin: user/cat.bin
 echo.reti: user/echo.reti
 
 echo.bin: user/echo.bin
+
+kill.reti: user/kill.reti
+
+kill.bin: user/kill.bin
 
 poweroff.reti: user/poweroff.reti
 
