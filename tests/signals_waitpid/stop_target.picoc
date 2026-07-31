@@ -1,4 +1,4 @@
-// dependencies: ../../lib/signal/libsignal.picoc ../../lib/schedule/libschedule.picoc
+// dependencies: ../../lib/signal/libsignal.reti_blocks ../../lib/schedule/libschedule.reti_blocks
 
 #include "../../lib/signal/signal.header"
 #include "../../lib/schedule/schedule.header"

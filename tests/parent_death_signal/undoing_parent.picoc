@@ -1,4 +1,4 @@
-// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/prctl/libprctl.picoc ../../lib/schedule/libschedule.picoc
+// dependencies: ../../lib/unistd/libunistd.reti_blocks ../../lib/sys/prctl/libprctl.reti_blocks ../../lib/schedule/libschedule.reti_blocks
 
 #include "../../lib/unistd/unistd.header"
 #include "../../lib/sys/prctl/prctl.header"

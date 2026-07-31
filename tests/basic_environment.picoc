@@ -1,6 +1,6 @@
 // in:
 // expected:1 one one two other 1 other three 1 1
-// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
+// dependencies: ../lib/stdlib/libstdlib.reti_blocks ../lib/stdio/libstdio.reti_blocks
 
 #include "../lib/stdlib/stdlib.header"
 #include "../lib/stdio/stdio.header"

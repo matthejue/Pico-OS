@@ -158,7 +158,7 @@ for test in "${paths[@]}"; do
 
   # The unquoted expansions intentionally permit multiple options.
   # shellcheck disable=SC2046,SC2086
-  ./run.py \
+  python3 ./compile_picoc.py \
     $(cat ./opts/test_cpl_opts.txt) \
     $extra_cpl_args \
     "$test" \
@@ -246,13 +246,25 @@ if ! write_not_passed_tests; then
   exit 1
 fi
 
-{
+summary="$({
   echo "Not failing: $((num_tests - ${#failing[@]})) / $num_tests"
   echo "Failing: ${failing[*]}"
   echo "Passed: $((num_tests - ${#not_passed[@]})) / $num_tests"
   echo "Not passed: ${not_passed[*]}"
   echo "Timed out: ${timed_out[*]}"
-} | tee -a "$RESULT_FILE"
+})"
+
+printf '%s\n' "$summary" | tee -a "$RESULT_FILE"
+
+if [[ -n "${TEST_SUMMARY_FILE:-}" ]]; then
+  {
+    if [[ -s "$TEST_SUMMARY_FILE" ]]; then
+      echo
+    fi
+    echo "===== ${TEST_SUMMARY_HEADING:-Library tests} ====="
+    printf '%s\n' "$summary"
+  } >> "$TEST_SUMMARY_FILE"
+fi
 
 echo "Updated test list: $NOT_PASSED_TESTS_FILE"
 

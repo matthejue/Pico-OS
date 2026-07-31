@@ -1,4 +1,4 @@
-// dependencies: ../common/heap.picoc
+// dependencies: ../common/heap.reti_blocks
 
 #include "kmalloc.header"
 #include "memory_constants.header"

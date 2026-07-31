@@ -1,4 +1,4 @@
-// dependencies: ../../lib/sys/mman/libmman.picoc
+// dependencies: ../../lib/sys/mman/libmman.reti_blocks
 
 #include "../../lib/sys/mman/mman.header"
 #include "../../lib/stdlib/stdlib.header"

@@ -1,4 +1,4 @@
-// dependencies: ../../common/heap.picoc
+// dependencies: ../../common/heap.reti_blocks
 
 #include "stdlib.header"
 #include "../../common/heap.header"

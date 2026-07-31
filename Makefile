@@ -58,6 +58,7 @@ USER_RUNTIME_DEPENDENCIES := \
 	common/stddef.header \
 	common/wait_queue.header
 USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
+PICOC_BUILD := python3 ./compile_picoc.py
 
 
 # ----------------------------------------------------------------------
@@ -83,12 +84,12 @@ help:
 	@echo "  make run_send_keypresses        Run configured program and send keypresses"
 	@echo "  make run-os                     Run configured OS test using OS_RUN_PATH"
 	@echo "  make test                       Run library, OS feature, and shell tests normally"
-	@echo "  make test-fast                  Run library, OS feature, and shell tests with one OS boot"
+	@echo "  make test-fast                  Run library tests, then fast OS feature and shell test groups"
 	@echo "  make test-lib                   Run library tests using TEST_PATTERN"
 	@echo "  make test-all                   Alias for make test"
 	@echo "  make test_not_passed            Run library paths from ./opts/not_passed_tests.txt"
 	@echo "  make test-sys                   Run OS feature and shell tests normally"
-	@echo "  make test-sys-fast              Run OS feature and shell tests with one OS boot"
+	@echo "  make test-sys-fast              Run OS feature and shell tests with one boot per group"
 	@echo "  make test-os                    Run OS feature tests normally"
 	@echo "  make test-os-fast               Run OS feature tests with one OS boot"
 	@echo "  make test-shell                 Run shell tests normally"
@@ -152,7 +153,7 @@ run_send_keypresses:
 	run_path="$(RUN_PATH)"; \
 	if [[ "$$run_path" == *.picoc ]]; then \
 		compiled_path="$${run_path%.picoc}.reti"; \
-		./run.py $$(cat ./opts/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
+		$(PICOC_BUILD) $$(cat ./opts/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
 		run_path="$$compiled_path"; \
 	fi; \
 	./send_keypresses.py --input ./opts/input.txt reti_emulator $$(cat ./opts/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
@@ -163,16 +164,40 @@ run_send_keypresses:
 # ----------------------------------------------------------------------
 
 test:
-	@echo "===== Library tests (make test-lib) ====="
-	$(MAKE) test-lib
-	@echo "===== System tests (make test-sys) ====="
-	$(MAKE) test-sys
+	@summary_file=$$(mktemp); \
+	status=0; \
+	print_summary() { \
+		echo; \
+		echo "===== Final test summary ====="; \
+		cat "$$summary_file"; \
+		rm -f "$$summary_file"; \
+	}; \
+	trap print_summary EXIT; \
+	echo "===== Library tests (make test-lib) ====="; \
+	TEST_SUMMARY_FILE="$$summary_file" \
+	TEST_SUMMARY_HEADING="Library tests (make test-lib)" \
+	$(MAKE) test-lib || status=$$?; \
+	echo "===== System tests (make test-sys) ====="; \
+	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys || status=$$?; \
+	exit "$$status"
 
 test-fast:
-	@echo "===== Library tests (make test-lib) ====="
-	$(MAKE) test-lib
-	@echo "===== System tests (make test-sys-fast) ====="
-	$(MAKE) test-sys-fast
+	@summary_file=$$(mktemp); \
+	status=0; \
+	print_summary() { \
+		echo; \
+		echo "===== Final test summary ====="; \
+		cat "$$summary_file"; \
+		rm -f "$$summary_file"; \
+	}; \
+	trap print_summary EXIT; \
+	echo "===== Library tests (make test-lib) ====="; \
+	TEST_SUMMARY_FILE="$$summary_file" \
+	TEST_SUMMARY_HEADING="Library tests (make test-lib)" \
+	$(MAKE) test-lib || status=$$?; \
+	echo "===== System tests (make test-sys-fast) ====="; \
+	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys-fast || status=$$?; \
+	exit "$$status"
 
 test-lib: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
@@ -185,32 +210,62 @@ test_not_passed:
 	./run_sys_tests.sh --not-passed "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
 test-sys:
-	@set -e; SECONDS=0; \
-	$(MAKE) test-os; \
-	$(MAKE) test-shell; \
-	echo "make test-sys completed in $${SECONDS}s"
+	@start=$$SECONDS; status=0; \
+	TEST_SUMMARY_HEADING="OS feature tests (make test-os)" \
+	$(MAKE) test-os || status=$$?; \
+	TEST_SUMMARY_HEADING="Shell tests (make test-shell)" \
+	$(MAKE) test-shell || status=$$?; \
+	duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-sys completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
 
 test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	@start=$$SECONDS; \
+	./export_environment_vars_for_makefile.sh; \
+	./run_os_tests.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	status=$$?; duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-os completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
 
 test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
-
-test-sys-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	@set -e; SECONDS=0; \
+	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
-	./run_os_tests_fast.py --kind all "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
-	echo "make test-sys-fast completed in $${SECONDS}s"
+	./run_os_tests.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	status=$$?; duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-shell completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
+
+test-sys-fast:
+	@start=$$SECONDS; status=0; \
+	TEST_SUMMARY_HEADING="OS feature tests (make test-os-fast)" \
+	$(MAKE) test-os-fast || status=$$?; \
+	TEST_SUMMARY_HEADING="Shell tests (make test-shell-fast)" \
+	$(MAKE) test-shell-fast || status=$$?; \
+	duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-sys-fast completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
 
 test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	@start=$$SECONDS; \
+	./export_environment_vars_for_makefile.sh; \
+	./run_os_tests_fast.py --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	status=$$?; duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-os-fast completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
 
 test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
-	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	@start=$$SECONDS; \
+	./export_environment_vars_for_makefile.sh; \
+	./run_os_tests_fast.py --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(USER_RUNTIME_SOURCES) $(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	status=$$?; duration=$$(($$SECONDS - $$start)); \
+	printf 'make test-shell-fast completed in %02d:%02d\n' \
+		"$$((duration / 60))" "$$((duration % 60))"; \
+	exit "$$status"
 
 
 # ----------------------------------------------------------------------
@@ -261,7 +316,7 @@ ISRS_PICOC_SOURCES := \
 	kernel/uart_hardware.picoc
 
 opts/isrs.reti: $(ISRS_PICOC_SOURCES)
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(ISRS_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
 		-o opts/isrs.reti
@@ -288,13 +343,13 @@ eprom_startprogram/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADE
 			'#define EPROM_STACK_START_ASM "LOADI32 SP 0"' \
 			> eprom_startprogram/memory_constants.header; \
 	fi
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -s -k eprom \
 		-o eprom_startprogram/memory_constants.header
 
 eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) eprom_startprogram/memory_constants.header kernel/memory_constants.header
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
 		-o eprom_startprogram/startprogram.reti
@@ -307,7 +362,7 @@ SHELL_LIBRARY_SOURCES := \
 	common/decimal.picoc
 
 system/init.reti: system/init.picoc opts/config.header common/loading_bar.header $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		system/init.picoc $(SYSTEM_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
@@ -318,14 +373,14 @@ system/init.bin: system/init.reti
 	hexyl system/init.bin
 
 user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		user/shell.picoc $(SHELL_LIBRARY_SOURCES) \
 		-C $(USER_STARTUP_SOURCE) \
 		-O1 -i -w -s -g -v \
 		-o user/shell.reti
 
 system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES)
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$< $(USER_PROGRAM_CPL_ARGS) \
 		-O1 -i -w -s -g -v \
 		-o $@
@@ -335,7 +390,7 @@ system/%.bin: system/%.reti
 	hexyl $@
 
 user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES)
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$< $(USER_PROGRAM_CPL_ARGS) \
 		-O1 -i -w -s -g -v \
 		-o $@
@@ -375,7 +430,7 @@ KERNEL_HEADERS := \
 	$(wildcard common/*.header)
 
 kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefile
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -s -k sram \
 		-o kernel/memory_constants.header
@@ -389,7 +444,7 @@ kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefi
 		kernel/memory_constants.header
 
 kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.header Makefile
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		-o kernel.reti
@@ -413,11 +468,11 @@ bootload: firmware
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
 	$(MAKE) eprom_startprogram/memory_constants.header
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		-o eprom_startprogram/startprogram.reti
-	picoc_compiler \
+	$(PICOC_BUILD) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		-o kernel.reti

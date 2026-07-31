@@ -1,4 +1,4 @@
-// dependencies: ../lib/unistd/libunistd.picoc
+// dependencies: ../lib/unistd/libunistd.reti_blocks
 
 #include "../common/syscall.header"
 #include "../lib/unistd/unistd.header"

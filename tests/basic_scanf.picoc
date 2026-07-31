@@ -1,6 +1,6 @@
 // in:42X99 42 X 99
 // expected:42X99 42 X 99
-// dependencies: ../lib/stdio/libstdio.picoc
+// dependencies: ../lib/stdio/libstdio.reti_blocks
 
 #include "../lib/stdio/stdio.header"
 

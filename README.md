@@ -1963,11 +1963,12 @@ $(MAKE) test-sys
 
 It runs the configured library tests, then OS feature and shell tests normally.
 `make test-fast` runs `make test-lib` followed by `make test-sys-fast`, which
-uses one shared OS boot. `make test-all` is an alias for `make test`. The
-Makefile also supports pattern variables and separate compiler/emulator option
-files under [`opts`](opts). Combined targets print separate library-test and
-system-test headings, in execution order, and both system-test targets print
-their total elapsed time when they finish.
+uses one shared OS boot for each of the OS feature and shell test groups.
+`make test-all` is an alias for `make test`. The Makefile also supports pattern
+variables and separate compiler/emulator option files under [`opts`](opts).
+Combined targets repeat the library, OS feature, and shell summaries under a
+final heading in execution order. System-test targets print each group runtime
+and their total runtime in `MM:SS` format.
 
 ## 14.2 `make test-lib`
 
@@ -2012,7 +2013,7 @@ The targets all exist and mean:
 | `make test-sys` | OS feature, then shell | one per test |
 | `make test-os` | OS feature only | one per test |
 | `make test-shell` | shell only | one per test |
-| `make test-sys-fast` | both | one shared boot |
+| `make test-sys-fast` | OS feature, then shell | one shared boot per group |
 | `make test-os-fast` | OS feature only | one shared boot |
 | `make test-shell-fast` | shell only | one shared boot |
 
