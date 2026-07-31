@@ -113,7 +113,8 @@ def compile_and_assemble(picoc_file, extra_cpl_args):
         remove_if_exists(path)
 
     compile_cmd = [
-        "picoc_compiler",
+        sys.executable,
+        "./compile_picoc.py",
         str(picoc_file),
         *extra_cpl_args,
         "-o",
@@ -416,6 +417,17 @@ def append_summary(num_tests, failing, not_passed, timed_out):
     with RESULT_FILE.open("a", encoding="utf-8") as result_file:
         for line in lines:
             result_file.write(line + "\n")
+
+    summary_file = os.environ.get("TEST_SUMMARY_FILE")
+    if summary_file:
+        summary_path = Path(summary_file)
+        with summary_path.open("a", encoding="utf-8") as file:
+            if summary_path.stat().st_size:
+                file.write("\n")
+            heading = os.environ.get("TEST_SUMMARY_HEADING", "System tests")
+            file.write(f"===== {heading} =====\n")
+            for line in lines:
+                file.write(line + "\n")
 
 
 def build_test_programs(test_dir, extra_cpl_args):

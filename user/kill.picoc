@@ -1,4 +1,4 @@
-// dependencies: ../lib/signal/libsignal.picoc
+// dependencies: ../lib/signal/libsignal.reti_blocks
 
 #include "../lib/signal/signal.header"
 #include "../lib/stdlib/stdlib.header"

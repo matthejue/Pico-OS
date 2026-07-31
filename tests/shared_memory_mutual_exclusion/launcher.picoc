@@ -1,4 +1,4 @@
-// dependencies: ../../common/decimal.picoc ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/sys/mman/libmman.picoc ../../lib/mutex/libmutex.picoc
+// dependencies: ../../common/decimal.reti_blocks ../../lib/unistd/libunistd.reti_blocks ../../lib/sys/wait/libwait.reti_blocks ../../lib/sys/mman/libmman.reti_blocks ../../lib/mutex/libmutex.reti_blocks
 
 #include "shared.header"
 #include "../../common/decimal.header"

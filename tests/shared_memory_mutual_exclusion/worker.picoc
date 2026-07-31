@@ -1,4 +1,4 @@
-// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/mutex/libmutex.picoc ../../lib/schedule/libschedule.picoc ../../lib/sys/mman/libmman.picoc
+// dependencies: ../../lib/unistd/libunistd.reti_blocks ../../lib/mutex/libmutex.reti_blocks ../../lib/schedule/libschedule.reti_blocks ../../lib/sys/mman/libmman.reti_blocks
 
 #include "shared.header"
 #include "../../lib/stdlib/stdlib.header"

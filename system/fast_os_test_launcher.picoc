@@ -1,4 +1,4 @@
-// dependencies: ../lib/fcntl/libfcntl.picoc ../lib/unistd/libunistd.picoc ../lib/sys/wait/libwait.picoc
+// dependencies: ../lib/fcntl/libfcntl.reti_blocks ../lib/unistd/libunistd.reti_blocks ../lib/sys/wait/libwait.reti_blocks
 
 #include "../common/loading_bar.header"
 #include "../common/stddef.header"

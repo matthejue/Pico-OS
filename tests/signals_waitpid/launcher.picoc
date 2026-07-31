@@ -1,4 +1,4 @@
-// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/signal/libsignal.picoc ../../lib/schedule/libschedule.picoc
+// dependencies: ../../lib/stdio/libstdio.reti_blocks ../../lib/unistd/libunistd.reti_blocks ../../lib/sys/wait/libwait.reti_blocks ../../lib/signal/libsignal.reti_blocks ../../lib/schedule/libschedule.reti_blocks
 
 #include "../../lib/stdio/stdio.header"
 #include "../../lib/unistd/unistd.header"
