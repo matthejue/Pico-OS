@@ -1,6 +1,6 @@
-#include "process_arguments.header"
-#include "filesystem/file_descriptor.header"
-#include "../common/stddef.header"
+#include "../process_arguments.header"
+#include "../filesystem/file_descriptor.header"
+#include "../../common/stddef.header"
 
 bool process_argument_is_space(int value) {
     return value == ' ' || value == '\t';

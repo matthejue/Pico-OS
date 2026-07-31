@@ -1,9 +1,9 @@
-#include "process_loader.header"
-#include "process.header"
-#include "pmalloc.header"
-#include "../common/loading_bar.header"
-#include "../common/uart_protocol.header"
-#include "../common/sram_loader.header"
+#include "../process_loader.header"
+#include "../process.header"
+#include "../pmalloc.header"
+#include "../../common/loading_bar.header"
+#include "../../common/uart_protocol.header"
+#include "../../common/sram_loader.header"
 
 int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
     if (stack_start == -1) {

@@ -823,7 +823,7 @@ successfully loaded process remains `NEW` until `run()`.
 
 ## 4.6 Program arguments and environment
 
-[`store_process_arguments()`](kernel/process_arguments.picoc) creates this
+[`store_process_arguments()`](kernel/process/process_arguments.picoc) creates this
 ascending-address layout near the top of the allocated process region:
 
 ```text
@@ -2083,10 +2083,10 @@ Start with these files when following a subsystem:
 
 | Topic | PicoOS | Related project contract |
 | --- | --- | --- |
-| Boot and binary input | [`startprogram.picoc`](eprom_startprogram/startprogram.picoc), [`process_loader.picoc`](kernel/process_loader.picoc) | [binary sections](../RETI-Emulator/doc/section_file_entries.md) |
+| Boot and binary input | [`startprogram.picoc`](eprom_startprogram/startprogram.picoc), [`process_loader.picoc`](kernel/process/process_loader.picoc) | [binary sections](../RETI-Emulator/doc/section_file_entries.md) |
 | UART | [`uart_hardware.picoc`](kernel/uart_hardware.picoc), [`uart_protocol.picoc`](common/uart_protocol.picoc) | [emulator UART](../RETI-Emulator/doc/uart_protocol.md) |
 | IVT/ISRs | [`os_isrs.picoc`](interrupt_service_routines/os_isrs.picoc) | [compiler low-level attributes](../PicoC-Compiler/doc/reti_sections_low_level_picoc.md) |
-| Processes/waits | [`process.header`](kernel/process.header), [`process.picoc`](kernel/process.picoc) | [PicoC calls/frames](../PicoC-Compiler/README.md#function-calls-and-stack-frames) |
+| Processes/waits | [`process.header`](kernel/process.header), [`process.picoc`](kernel/process/process.picoc) | [PicoC calls/frames](../PicoC-Compiler/README.md#function-calls-and-stack-frames) |
 | Scheduling/dispatch | [`scheduler.picoc`](kernel/scheduler.picoc), [`dispatcher.picoc`](kernel/dispatcher.picoc) | [`INT`/`RTI` interpreter](../RETI-Emulator/src/interpr.c) |
 | Exceptions | [`exception.picoc`](kernel/exception.picoc) | [CPU exceptions](../RETI-Emulator/doc/cpu_exceptions.md) |
 | Memory | [`heap.picoc`](common/heap.picoc), [`kmalloc.picoc`](kernel/kmalloc.picoc), [`pmalloc.picoc`](kernel/pmalloc.picoc) | [generated kernel constants](../PicoC-Compiler/doc/kernel_header_option.md) |
