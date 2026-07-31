@@ -1,6 +1,6 @@
 // in: 8 6
 // expected: 12 42
-// dependencies: ../lib/stdlib/libstdlib.picoc ../lib/stdio/libstdio.picoc
+// dependencies: ../lib/stdlib/libstdlib.reti_blocks ../lib/stdio/libstdio.reti_blocks
 
 #include "../lib/stdio/stdio.header"
 #include "../lib/stdlib/stdlib.header"

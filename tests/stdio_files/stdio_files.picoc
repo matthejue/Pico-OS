@@ -1,4 +1,4 @@
-// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/fcntl/libfcntl.picoc ../../lib/unistd/libunistd.picoc
+// dependencies: ../../lib/stdio/libstdio.reti_blocks ../../lib/fcntl/libfcntl.reti_blocks ../../lib/unistd/libunistd.reti_blocks
 
 #include "../../lib/stdio/stdio.header"
 #include "../../lib/fcntl/fcntl.header"

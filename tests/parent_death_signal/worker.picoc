@@ -1,4 +1,4 @@
-// dependencies: ../../lib/schedule/libschedule.picoc
+// dependencies: ../../lib/schedule/libschedule.reti_blocks
 
 #include "../../lib/schedule/schedule.header"
 
