@@ -340,15 +340,15 @@ KERNEL_PICOC_SOURCES := \
 	kernel/kmalloc.picoc \
 	kernel/pmalloc.picoc \
 	kernel/shared_memory.picoc \
-	kernel/process.picoc \
+	kernel/process/process.picoc \
 	kernel/signal.picoc \
 	kernel/filesystem/file_descriptor.picoc \
 	kernel/filesystem/filesystem.picoc \
 	kernel/filesystem/standard_input.picoc \
-	kernel/process_arguments.picoc \
+	kernel/process/process_arguments.picoc \
 	kernel/scheduler.picoc \
 	kernel/dispatcher.picoc \
-	kernel/process_loader.picoc \
+	kernel/process/process_loader.picoc \
 	kernel/syscall.picoc
 
 KERNEL_HEADERS := \
