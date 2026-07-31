@@ -1,0 +1,3 @@
+cat.bin tests/cat/first.txt tests/cat/second.txt
+exit
+poweroff.bin

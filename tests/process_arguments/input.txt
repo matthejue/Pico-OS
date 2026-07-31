@@ -1,0 +1,3 @@
+load tests/process_arguments/launcher.bin
+run 3
+poweroff.bin

@@ -1,0 +1,12 @@
+// dependencies: ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc
+
+#include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/wait/wait.header"
+
+int main(void) {
+    int pid = load("tests/process_arguments/process_arguments.bin");
+
+    run(pid, "42 beta gamma", NULL);
+    waitpid(pid);
+    return 0;
+}

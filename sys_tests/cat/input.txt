@@ -1,3 +1,0 @@
-cat.bin sys_tests/cat/first.txt sys_tests/cat/second.txt
-exit
-poweroff.bin

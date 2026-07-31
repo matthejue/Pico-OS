@@ -66,7 +66,7 @@ USER_PROGRAM_CPL_ARGS := $(USER_RUNTIME_SOURCES) -C $(USER_STARTUP_SOURCE)
 
 .PHONY: help code-index
 .PHONY: run run_send_keypresses run-os
-.PHONY: test test-lib test-all test_not_passed
+.PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
 .PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
@@ -82,7 +82,8 @@ help:
 	@echo "  make run                        Run configured program using RUN_PATH"
 	@echo "  make run_send_keypresses        Run configured program and send keypresses"
 	@echo "  make run-os                     Run configured OS test using OS_RUN_PATH"
-	@echo "  make test                       Run library, OS feature, and shell tests"
+	@echo "  make test                       Run library, OS feature, and shell tests normally"
+	@echo "  make test-fast                  Run library, OS feature, and shell tests with one OS boot"
 	@echo "  make test-lib                   Run library tests using TEST_PATTERN"
 	@echo "  make test-all                   Alias for make test"
 	@echo "  make test_not_passed            Run library paths from ./opts/not_passed_tests.txt"
@@ -162,8 +163,12 @@ run_send_keypresses:
 # ----------------------------------------------------------------------
 
 test:
-	$(MAKE) test-lib TEST_PATTERN=all
-	$(MAKE) test-sys-fast OS_TEST_PATTERN=all
+	$(MAKE) test-lib
+	$(MAKE) test-sys
+
+test-fast:
+	$(MAKE) test-lib
+	$(MAKE) test-sys-fast
 
 test-lib: opts/isrs.reti
 	./export_environment_vars_for_makefile.sh;\

@@ -1,0 +1,44 @@
+// dependencies: ../../lib/stdio/libstdio.picoc ../../lib/unistd/libunistd.picoc ../../lib/sys/wait/libwait.picoc ../../lib/signal/libsignal.picoc
+
+#include "../../lib/stdio/stdio.header"
+#include "../../lib/unistd/unistd.header"
+#include "../../lib/sys/wait/wait.header"
+#include "../../lib/signal/signal.header"
+#include "../../common/stddef.header"
+
+int main(void) {
+    int first_child;
+    int parent;
+    int survivor;
+    bool children_terminated;
+    bool child_survived;
+
+    parent = load(
+        "tests/parent_death_signal/terminating_parent.bin"
+    );
+    run(parent, NULL, NULL);
+    first_child = waitpid(parent);
+    children_terminated =
+        kill(first_child, 0) == -1 &&
+        kill(first_child + 1, 0) == -1;
+    printf(
+        "parent terminated both children: %d\n",
+        children_terminated
+    );
+
+    parent = load(
+        "tests/parent_death_signal/undoing_parent.bin"
+    );
+    run(parent, NULL, NULL);
+    survivor = waitpid(parent);
+    child_survived = kill(survivor, 0) == 0;
+    printf(
+        "child disabled parent-death signal: %d\n",
+        child_survived
+    );
+    if (child_survived) {
+        kill(survivor, SIGKILL);
+    }
+
+    return !(children_terminated && child_survived);
+}

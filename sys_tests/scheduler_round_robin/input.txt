@@ -1,3 +1,0 @@
-load sys_tests/scheduler_round_robin/launcher.bin
-run 3
-poweroff.bin
