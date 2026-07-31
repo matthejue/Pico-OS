@@ -1,6 +1,8 @@
 // dependencies: ../lib/fcntl/libfcntl.picoc ../lib/unistd/libunistd.picoc
 
+#include "../common/loading_bar.header"
 #include "../lib/fcntl/fcntl.header"
+#include "../lib/stdlib/stdlib.header"
 #include "../lib/unistd/unistd.header"
 
 #define CAT_BUFFER_SIZE 64
@@ -42,6 +44,7 @@ int main(int argc, char **argv) {
     int index = 1;
     int status = 0;
 
+    unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
     while (index < argc) {
         if (print_file(argv[index]) != 0) {
             status = 1;
