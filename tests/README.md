@@ -117,7 +117,9 @@ make test
 
 This runs the configured library tests and the OS feature and shell tests
 normally. Use `make test-fast` to run the library tests followed by OS feature
-and shell tests through one shared OS boot.
+and shell tests through one shared OS boot. Both targets print the total time
+needed for their system tests. Combined targets separate the library-test and
+system-test summaries with headings, in the order they run.
 
 Run only the library tests:
 
