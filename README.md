@@ -173,7 +173,7 @@ The values are generated artifacts and may move when the kernel changes.
 `KERNEL_STACK_START ?= 40000` in the [Makefile](Makefile) deliberately
 overrides the compiler's normal `stack_start`; the Makefile patches
 `KERNEL_SP_START_ASM` and `PROCESS_MEMORY_START` consistently. With the
-currently checked-in [`kernel.sections`](kernel.sections), the relative
+currently generated [`kernel.sections`](kernel.sections), the relative
 boundaries are `.text = 4`, `.data = 32329`, heap start `32733`, and kernel
 stack start `40000`.
 
@@ -1314,7 +1314,7 @@ The top two address bits select EPROM (`00`), periphery (`01`), or SRAM
 
 ```text
 SRAM offset
-0       4                         32329 32733      36829       40000 40001
+0       4                         32443 32853      36949       40000 40001
 ┌───────┬─────────────────────────┬─────┬──────────┬───────────┬─────┬─────────┐
 │ .ivt  │ kernel .text            │data │ kheap    │stack room │ SP  │ process │
 │4 cells│                         │     │4096 cells│  (free)   │ ↓   │ heap    │
