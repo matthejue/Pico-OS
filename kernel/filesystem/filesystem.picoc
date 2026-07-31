@@ -9,19 +9,14 @@
 int receive_byte_over_uart(void);
 
 int receive_file_size(char *path) {
-    int file_size;
-    int byte_count;
-
-    uart_send_file_range_command(path, 0, 0);
-    file_size = receive_word();
-    byte_count = receive_word();
-    return file_size;
+    uart_send_file_size_command(path);
+    return receive_word();
 }
 
 bool file_exists(char *path) {
     int size = receive_file_size(path);
 
-    if (size < 0) {
+    if (size == -1) {
         return false;
     }
     return true;
@@ -105,7 +100,6 @@ int read_regular_file(
     int count,
     bool show_loading_bar
 ) {
-    int file_size;
     int byte_count;
     int copied = 0;
     int loading_bar_update;
@@ -116,9 +110,8 @@ int read_regular_file(
         descriptor->offset,
         count
     );
-    file_size = receive_word();
     byte_count = receive_word();
-    if (file_size < 0) {
+    if (byte_count == -1) {
         return -1;
     }
     uart_print_loading_bar_label(

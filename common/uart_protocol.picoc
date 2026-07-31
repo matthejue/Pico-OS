@@ -99,17 +99,19 @@ void uart_send_file_range_command(char *path, int offset, int count) {
     uart_print_character('/');
 }
 
+void uart_send_file_size_command(char *path) {
+    uart_send_file_command("file-size ", path);
+}
+
 int uart_read_file(char *path, char *buffer, int capacity) {
-    int file_size;
     int byte_count;
     int buffer_index = 0;
     int value;
 
     uart_send_file_range_command(path, 0, capacity - 1);
-    file_size = receive_word();
     byte_count = receive_word();
 
-    if (file_size == -1) {
+    if (byte_count == -1) {
         buffer[0] = '\0';
         return -1;
     }
