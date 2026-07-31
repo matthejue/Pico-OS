@@ -162,10 +162,10 @@ The current generated
 | --- | ---: | --- |
 | `SRAM_BASE` | `-2147483648` | Absolute base selected by address bits `10` |
 | `SRAM_MAX_ADDRESS_IN_MEMORY_MAP` | `-2147221505` | Absolute last cell of the configured 2^18-cell SRAM |
-| `KERNEL_HEAP_START` | `-2147450915` | Absolute first cell after kernel static data |
+| `KERNEL_HEAP_START` | `-2147450821` | Absolute first cell after kernel static data |
 | `PROCESS_MEMORY_START` | `-2147443647` | First cell after the configured kernel stack start |
 | `KERNEL_CS_START_ASM` | `LOADI32 CS -2147483644` | Kernel `.text` base |
-| `KERNEL_DS_START_ASM` | `LOADI32 DS -2147451319` | Kernel `.data` base |
+| `KERNEL_DS_START_ASM` | `LOADI32 DS -2147451242` | Kernel `.data` base |
 | `KERNEL_SP_START_ASM` | `LOADI32 SP -2147443648` | Kernel stack pointer (`SRAM_BASE + 40000`) |
 | `KERNEL_CS_ACC_ASM` | `LOADI32 ACC -2147483644` | Same code base loaded into `ACC` for comparisons |
 
@@ -174,7 +174,7 @@ The values are generated artifacts and may move when the kernel changes.
 overrides the compiler's normal `stack_start`; the Makefile patches
 `KERNEL_SP_START_ASM` and `PROCESS_MEMORY_START` consistently. With the
 currently generated [`kernel.sections`](kernel.sections), the relative
-boundaries are `.text = 4`, `.data = 32329`, heap start `32733`, and kernel
+boundaries are `.text = 4`, `.data = 32406`, heap start `32827`, and kernel
 stack start `40000`.
 
 The EPROM-mode header
@@ -224,6 +224,29 @@ path is absolute), and appends to its UART input buffer:
 For `load`, an unreadable file produces a zero count. The count lets the
 receiver distinguish protocol metadata from payload; neither the escape frame
 nor a datatype marker appears in the input payload.
+
+Host-backed filesystem operations use the following ranged request:
+
+```text
+<ESC>read-range <offset> <count> <path><ESC>/
+```
+
+The emulator responds with one big-endian 32-bit returned-byte count, followed
+by at most `count` bytes from `offset`. A range reaching past the end of the
+file returns fewer bytes. `UINT32_MAX` means that the file is missing or
+unreadable.
+
+Metadata operations use a separate request:
+
+```text
+<ESC>file-size <path><ESC>/
+```
+
+It returns the complete file size as one big-endian 32-bit value, or
+`UINT32_MAX` for a missing or unreadable file. PicoOS's `file_exists()` and
+`SEEK_END` use this command, so normal ranged reads do not repeatedly transfer
+the complete file size. The complete-file `<ESC>read <path><ESC>/` command
+remains available for clients that need it.
 
 `reti_emulator -a program.reti` builds `program.bin`. The `.bin` itself begins
 with four big-endian 32-bit words copied from `program.sections`:
@@ -1314,7 +1337,7 @@ The top two address bits select EPROM (`00`), periphery (`01`), or SRAM
 
 ```text
 SRAM offset
-0       4                         32443 32853      36949       40000 40001
+0       4                         32406 32827      36923       40000 40001
 ┌───────┬─────────────────────────┬─────┬──────────┬───────────┬─────┬─────────┐
 │ .ivt  │ kernel .text            │data │ kheap    │stack room │ SP  │ process │
 │4 cells│                         │     │4096 cells│  (free)   │ ↓   │ heap    │
@@ -1611,8 +1634,10 @@ process.
 # 10. Filesystem
 
 PicoOS's "filesystem" is a kernel descriptor layer over files in the emulator
-host's working directory. Each open/read/write sends UART `read`, `write`, or
-`append` control frames. It is not an on-SRAM filesystem.
+host's working directory. Data reads use UART
+`read-range <offset> <count> <path>` control frames, metadata queries use
+`file-size <path>`, and writes use `write` or `append`. It is not an on-SRAM
+filesystem.
 
 ## 10.1 File-descriptor table
 
@@ -1645,15 +1670,16 @@ Implemented calls are `open()`, `creat()`, `close()`, `read()`, `write()`,
 `lseek()`, and `dup2()`.
 
 - `open` validates access mode and allocates the first free entry from 3.
+  A `file-size` request checks existence without transferring file contents.
   `O_TRUNC` sends an empty host `write` frame; `O_CREAT` creates a missing host
   file. `creat(path, mode)` ignores `mode` and uses write/create/truncate.
 - `read` from stdin may block as described earlier. Reading a regular file
-  asks the emulator for the **entire** file each time, discards bytes before
-  the descriptor offset, copies up to `count`, and advances the offset.
+  requests at most `count` bytes at the descriptor offset and advances the
+  offset by the returned byte count.
 - `write` sends stdout directly, temporarily selects stderr for descriptor 2,
   or selects `append <path>` for a regular file, then restores stdout.
-- `lseek` changes only the descriptor's logical read offset. `SEEK_END` reads
-  the host file size and discards the transferred bytes.
+- `lseek` changes only the descriptor's logical read offset. `SEEK_END` uses
+  `file-size` to obtain the host file size.
 - `close` frees the path and entry for descriptors 3–7.
 
 A deliberate limitation is that regular-file writes always append after open.
