@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 
-RESULT_FILE = Path("sys_tests/os_tests.res")
+RESULT_FILE = Path("tests/os_tests.res")
 NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
 MAX_EMULATOR_DURATION_SECONDS = 120
 SHELL_PROMPT = "PicoOS> "
@@ -17,7 +17,7 @@ SHELL_PROMPT = "PicoOS> "
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run Pico-OS integration tests from sys_tests subdirectories."
+        description="Run Pico-OS integration tests from tests subdirectories."
     )
     parser.add_argument(
         "--kind",
@@ -74,7 +74,7 @@ def is_os_feature_test(test_dir):
 
 
 def selected_test_dirs(pattern, kind="all"):
-    candidates = [path for path in Path("sys_tests").iterdir() if path.is_dir()]
+    candidates = [path for path in Path("tests").iterdir() if path.is_dir()]
     if pattern and pattern != "all":
         candidates = [path for path in candidates if pattern in path.name]
     if kind == "os":

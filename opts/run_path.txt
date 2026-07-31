@@ -1,1 +1,1 @@
-./sys_tests/basic_scanf.picoc
+./tests/basic_scanf.picoc

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 if [[ -n "$1" ]]; then
-  paths=(./sys_tests/*$1*.picoc)
+  paths=(./tests/*$1*.picoc)
 else
-  paths=(./sys_tests/*.picoc)
+  paths=(./tests/*.picoc)
 fi
 
 for test in "${paths[@]}"; do

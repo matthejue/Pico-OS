@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 NOT_PASSED_TESTS_FILE="./opts/not_passed_tests.txt"
-RESULT_FILE="./sys_tests/tests.res"
+RESULT_FILE="./tests/tests.res"
 MAX_EMULATOR_DURATION_SECONDS=5
 
 use_not_passed_tests=false
@@ -104,11 +104,11 @@ if [[ "$use_not_passed_tests" == true ]]; then
     exit 0
   fi
 elif [[ "$test_pattern" == "all" ]]; then
-  paths=(./sys_tests/*.picoc)
+  paths=(./tests/*.picoc)
 elif [[ -n "$test_pattern" ]]; then
-  paths=(./sys_tests/*"$test_pattern"*.picoc)
+  paths=(./tests/*"$test_pattern"*.picoc)
 else
-  paths=(./sys_tests/*.picoc)
+  paths=(./tests/*.picoc)
 fi
 
 if (( ${#paths[@]} == 0 )); then
