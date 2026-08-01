@@ -168,7 +168,7 @@ test:
 	status=0; \
 	print_summary() { \
 		echo; \
-		echo "===== Final test summary ====="; \
+		./heading_subheadings.py heading "Final test summary" "$${COLUMNS:-120}" "="; \
 		cat "$$summary_file"; \
 		rm -f "$$summary_file"; \
 	}; \
@@ -186,7 +186,7 @@ test-fast:
 	status=0; \
 	print_summary() { \
 		echo; \
-		echo "===== Final test summary ====="; \
+		./heading_subheadings.py heading "Final test summary" "$${COLUMNS:-120}" "="; \
 		cat "$$summary_file"; \
 		rm -f "$$summary_file"; \
 	}; \

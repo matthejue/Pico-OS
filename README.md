@@ -270,6 +270,15 @@ picoc_compiler program.picoc <libraries> -C lib/start/libstart.picoc \
 reti_emulator -f /tmp -a program.reti
 ```
 
+Repository builds run the compiler through `compile_picoc.py`. It compiles
+each source into `.reti_blocks` and `.st` files before linking and reuses those
+files while the artifacts themselves, the source, its recursively included
+files, the compiler options, and the compiler executable remain unchanged.
+The ignored `.picoc_build.json` file beside each compiled source records that
+build state.
+See [Incremental PicoC compilation](doc/incremental_compilation.md) for the
+complete cache and invalidation behavior.
+
 The real big-endian receiver is intentionally simple:
 
 ```c
@@ -2038,7 +2047,9 @@ expands dependency metadata, and assembles each with
 `PicoOS> ` prompt, injects one input line followed by carriage return, captures
 stdout in `raw_output.txt`, renders terminal control characters and removes
 prompts/loading UI into `output.txt`, then compares trimmed expected/actual
-text. A normal test has a 120-second limit.
+text. This loads the kernel directly instead of booting through
+`eprom_startprogram/startprogram.reti`; the explicit `make bootload` target
+continues to test that boot path. A normal test has a 120-second limit.
 
 The fast runner builds manifests and starts one kernel:
 
