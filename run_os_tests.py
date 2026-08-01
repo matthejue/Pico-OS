@@ -8,6 +8,8 @@ import sys
 import time
 from pathlib import Path
 
+from heading_subheadings import format_subheading
+
 
 RESULT_FILE = Path("tests/os_tests.res")
 NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
@@ -402,13 +404,21 @@ def print_heading(test_dir, columns):
         print(f"==== {test_dir} ====")
 
 
-def append_summary(num_tests, failing, not_passed, timed_out):
+def append_summary(
+    num_tests,
+    failing,
+    not_passed,
+    timed_out,
+    columns,
+    runtime_seconds,
+):
     lines = [
         f"Not failing: {num_tests - len(failing)} / {num_tests}",
         f"Failing: {' '.join(str(path) for path in failing)}",
         f"Passed: {num_tests - len(not_passed)} / {num_tests}",
         f"Not passed: {' '.join(str(path) for path in not_passed)}",
         f"Timed out: {' '.join(str(path) for path in timed_out)}",
+        f"Runtime: {runtime_seconds // 60:02d}:{runtime_seconds % 60:02d}",
     ]
 
     for line in lines:
@@ -425,7 +435,7 @@ def append_summary(num_tests, failing, not_passed, timed_out):
             if summary_path.stat().st_size:
                 file.write("\n")
             heading = os.environ.get("TEST_SUMMARY_HEADING", "System tests")
-            file.write(f"===== {heading} =====\n")
+            file.write(format_subheading(heading, int(columns), "-") + "\n")
             for line in lines:
                 file.write(line + "\n")
 
@@ -475,6 +485,7 @@ def run_configured_test(args, extra_cpl_args, extra_emu_args):
 
 
 def run_matching_tests(args, extra_cpl_args, extra_emu_args):
+    start_time = time.monotonic()
     paths = selected_test_dirs(args.test_pattern, args.kind)
     paths = [path for path in paths if validate_test_dir(path)]
 
@@ -504,7 +515,14 @@ def run_matching_tests(args, extra_cpl_args, extra_emu_args):
 
 
     write_not_passed_tests(not_passed)
-    append_summary(len(paths), failing, not_passed, timed_out)
+    append_summary(
+        len(paths),
+        failing,
+        not_passed,
+        timed_out,
+        args.columns,
+        int(time.monotonic() - start_time),
+    )
     print(f"Updated test list: {NOT_PASSED_TESTS_FILE}")
 
     return 1 if not_passed else 0

@@ -16,9 +16,14 @@ def heading(heading, terminal_width, symbol):
 
 
 def subheading(heading, terminal_width, symbol):
-    print(
-        f"{symbol * ((terminal_width - len(heading) - 2) // 2 + (1 if (terminal_width - len(heading)) % 2 else 0))} {heading} {symbol * ((terminal_width - len(heading) - 2) // 2)}"
-    )
+    print(format_subheading(heading, terminal_width, symbol))
+
+
+def format_subheading(heading, terminal_width, symbol):
+    left_width = (terminal_width - len(heading) - 2) // 2
+    left_width += 1 if (terminal_width - len(heading)) % 2 else 0
+    right_width = (terminal_width - len(heading) - 2) // 2
+    return f"{symbol * left_width} {heading} {symbol * right_width}"
 
 
 def _strip_multiline_string(multiline_str):

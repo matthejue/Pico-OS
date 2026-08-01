@@ -79,6 +79,7 @@ columns="$1"
 test_pattern="${2:-}"
 extra_cpl_args="${3:-}"
 extra_emu_args="${4:-}"
+start_time=$SECONDS
 
 num_tests=0
 failing=()
@@ -246,12 +247,14 @@ if ! write_not_passed_tests; then
   exit 1
 fi
 
+duration=$((SECONDS - start_time))
 summary="$({
   echo "Not failing: $((num_tests - ${#failing[@]})) / $num_tests"
   echo "Failing: ${failing[*]}"
   echo "Passed: $((num_tests - ${#not_passed[@]})) / $num_tests"
   echo "Not passed: ${not_passed[*]}"
   echo "Timed out: ${timed_out[*]}"
+  printf 'Runtime: %02d:%02d\n' "$((duration / 60))" "$((duration % 60))"
 })"
 
 printf '%s\n' "$summary" | tee -a "$RESULT_FILE"
@@ -261,7 +264,8 @@ if [[ -n "${TEST_SUMMARY_FILE:-}" ]]; then
     if [[ -s "$TEST_SUMMARY_FILE" ]]; then
       echo
     fi
-    echo "===== ${TEST_SUMMARY_HEADING:-Library tests} ====="
+    ./heading_subheadings.py \
+      subheading "${TEST_SUMMARY_HEADING:-Library tests}" "$columns" "-"
     printf '%s\n' "$summary"
   } >> "$TEST_SUMMARY_FILE"
 fi
