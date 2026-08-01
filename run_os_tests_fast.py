@@ -2,6 +2,7 @@
 import argparse
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from run_os_tests import (
@@ -124,6 +125,7 @@ def collect_results(paths, statuses):
 
 
 def main():
+    start_time = time.monotonic()
     args = parse_args()
     extra_cpl_args = split_extra_args(args.cpl_args)
     extra_emu_args = split_extra_args(args.emu_args)
@@ -231,6 +233,8 @@ def main():
         failing,
         not_passed,
         timed_out,
+        args.columns,
+        int(time.monotonic() - start_time),
     )
     print("OS feature tests:", " ".join(
         str(path) for path in os_feature_paths
