@@ -1974,6 +1974,9 @@ $(MAKE) test-sys
 It runs the configured library tests, then OS feature and shell tests normally.
 `make test-fast` runs `make test-lib` followed by `make test-sys-fast`, which
 uses one shared OS boot for each of the OS feature and shell test groups.
+Normal OS and shell tests run independent emulator instances in parallel;
+fast OS and shell tests run serially inside their shared session. Therefore,
+`TEST_JOBS` only affects the library-test part of `make test-fast`.
 `make test-all` is an alias for `make test`. The Makefile also supports pattern
 variables and separate compiler/emulator option files under [`opts`](opts).
 Combined targets repeat the library, OS feature, and shell summaries under a
