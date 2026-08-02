@@ -140,6 +140,11 @@ make test TEST_JOBS=4
 Combined targets such as `make test` and `make test-sys` ask once, then use
 the selected count for every nested test group.
 
+Fast OS and shell tests run serially inside one shared OS session, so
+`TEST_JOBS` does not parallelize `make test-os-fast` or
+`make test-shell-fast`. It only applies to the library-test part of
+`make test-fast`.
+
 Each assembler and emulator process receives its own temporary peripheral
 directory, so concurrent processes never share `sram.bin`. Tests use staged
 `.reti_blocks`/`.st` compilation by default. Direct mode instead passes the
