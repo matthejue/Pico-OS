@@ -65,9 +65,10 @@ but it returns to that kernel work; it does not schedule a different process.
 
 ## Build and run
 
-The build assumes `picoc_compiler`, `reti_emulator`, `make`, and `hexyl` are
-available on `PATH`. Build the firmware and all normal user commands, then boot
-through EPROM:
+The build assumes `picoc_compiler`, `reti_emulator`, and `make` are available on
+`PATH`. The optional `hexyl` utility is useful for inspecting generated `.bin`
+files in hexadecimal. Build the firmware and all normal user commands, then
+boot through EPROM:
 
 ```sh
 make firmware user
@@ -270,12 +271,12 @@ picoc_compiler program.picoc <libraries> -C lib/start/libstart.picoc \
 reti_emulator -f /tmp -a program.reti
 ```
 
-Repository builds run the compiler through `compile_picoc.py`. It compiles
-each source into `.reti_blocks` and `.st` files before linking and reuses those
-files while the artifacts themselves, the source, its recursively included
-files, the compiler options, and the compiler executable remain unchanged.
-The ignored `.picoc_build.json` file beside each compiled source records that
-build state.
+Repository builds call `picoc_compiler --show-input-files` directly. Staged
+test and user-program builds compile each source into `.reti_blocks` and `.st`
+files before linking. The compiler itself decides whether those files can be
+reused from the cache metadata embedded in `.reti_blocks`; Make dependency
+files keep library-test header dependencies up to date without a separate
+Python cache check.
 See [Incremental PicoC compilation](doc/incremental_compilation.md) for the
 complete cache and invalidation behavior.
 
@@ -1979,6 +1980,14 @@ Combined targets repeat the library, OS feature, and shell summaries under a
 final heading in execution order. System-test targets print each group runtime
 and their total runtime in `MM:SS` format.
 
+Tests use staged `.reti_blocks`/`.st` inputs by default. For a comparison build
+that compiles every merged `.reti` directly from `.picoc` sources without
+reusing staged artifacts, run:
+
+```sh
+make test TEST_BUILD_MODE=direct
+```
+
 ## 14.2 `make test-lib`
 
 Library tests use exact top-of-file metadata:
@@ -1999,11 +2008,10 @@ int main() {
 ```
 
 This is [`tests/basic_stdio.picoc`](tests/basic_stdio.picoc).
-[`extract_input_and_expected.sh`](extract_input_and_expected.sh) reads the
-first two lines and creates same-basename `.input` and `.expected_output`
-side files. PicoC-Compiler parses a leading
-`// dependencies: ...` line with shell-like quoting, resolves paths relative
-to the test source, de-duplicates them, and links them after the primary file.
+[`run_sys_tests.sh`](run_sys_tests.sh) reads the first two lines and creates
+same-basename `.input` and `.expected_output` side files. The parallel Make
+rules parse a leading `// dependencies: ...` line with shell-like quoting and
+resolve paths relative to the test source.
 
 [`run_sys_tests.sh`](run_sys_tests.sh) compiles each selected source using
 `opts/test_cpl_opts.txt`, runs it with `reti_emulator` and
