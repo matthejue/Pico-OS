@@ -2,9 +2,8 @@
 
 NOT_PASSED_TESTS_FILE="./opts/not_passed_tests.txt"
 RESULT_FILE="./tests/tests.res"
-MAX_EMULATOR_DURATION_SECONDS=5
-
 use_not_passed_tests=false
+direct_compile=false
 
 usage() {
   cat <<EOF
@@ -18,36 +17,27 @@ Options:
 
       TEST_PATTERN is ignored when this option is active.
 
+  --direct
+      Compile each test and its .picoc dependencies directly into the final
+      .reti file. The default compiles reusable .reti_blocks and .st files.
+
   -h, --help
       Show this help message.
 
-Examples:
-  $0 120
-  $0 120 basic
-  $0 120 all
-  $0 --not-passed 120
-
-Each emulator invocation is stopped automatically after
-${MAX_EMULATOR_DURATION_SECONDS} seconds.
-
-After a completed test run, all tests that failed compilation, failed
-emulation, timed out, or produced incorrect output are written as
-whitespace-separated paths to:
-  ${NOT_PASSED_TESTS_FILE}
+TEST_JOBS controls parallel compilation and emulator jobs and defaults to the
+number of available processors. Every emulator uses a separate temporary
+peripheral directory.
 EOF
 }
-
-cleanup() {
-  echo "Termination signal received. Cleaning up..."
-  exit 1
-}
-
-trap cleanup SIGINT SIGTERM
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --not-passed)
       use_not_passed_tests=true
+      shift
+      ;;
+    --direct)
+      direct_compile=true
       shift
       ;;
     -h|--help)
@@ -80,12 +70,13 @@ test_pattern="${2:-}"
 extra_cpl_args="${3:-}"
 extra_emu_args="${4:-}"
 start_time=$SECONDS
-
-num_tests=0
-failing=()
-not_passed=()
-timed_out=()
 paths=()
+
+cleanup() {
+  echo "Termination signal received. Cleaning up..."
+  exit 1
+}
+trap cleanup SIGINT SIGTERM
 
 shopt -s nullglob
 
@@ -94,17 +85,11 @@ if [[ "$use_not_passed_tests" == true ]]; then
     echo "Test list file not found: $NOT_PASSED_TESTS_FILE" >&2
     exit 1
   fi
-
   mapfile -t paths < <(
     tr -s '[:space:]' '\n' < "$NOT_PASSED_TESTS_FILE" |
       sed '/^[[:space:]]*$/d'
   )
-
-  if (( ${#paths[@]} == 0 )); then
-    echo "No tests are listed in $NOT_PASSED_TESTS_FILE"
-    exit 0
-  fi
-elif [[ "$test_pattern" == "all" ]]; then
+elif [[ "$test_pattern" == all ]]; then
   paths=(./tests/*.picoc)
 elif [[ -n "$test_pattern" ]]; then
   paths=(./tests/*"$test_pattern"*.picoc)
@@ -122,129 +107,81 @@ for test in "${paths[@]}"; do
     echo "Test file not found: $test" >&2
     exit 1
   fi
+
+  input="$(sed -n '1s@^// in:@@p' "$test")"
+  expected="$(sed -n '2s@^// expected:@@p' "$test")"
+  printf '%s\n' "$input" > "${test%.picoc}.input"
+  printf '%s' "$expected" > "${test%.picoc}.expected_output"
 done
 
-if [[ "$use_not_passed_tests" == true ]]; then
-  # The helper accepts a pattern rather than an array of test paths.
-  # Process every selected test using its exact basename.
-  for test in "${paths[@]}"; do
-    exact_test_pattern="$(basename "${test%.picoc}")"
+temporary_root="/tmp/reti_emulator"
+mkdir -p "$temporary_root" || exit 1
+result_dir="$(mktemp -d -p "$temporary_root")"
+cleanup_result_dir() {
+  rm -r -- "$result_dir"
+}
+trap cleanup_result_dir EXIT
 
-    if ! ./extract_input_and_expected.sh "$exact_test_pattern"; then
-      echo "Failed to extract input and expected output for $test" >&2
-      exit 1
-    fi
-  done
+if [[ "$direct_compile" == true ]]; then
+  test_build_mode=direct
 else
-  extraction_pattern="$test_pattern"
-  if [[ "$test_pattern" == "all" ]]; then
-    extraction_pattern=""
-  fi
-
-  if ! ./extract_input_and_expected.sh "$extraction_pattern"; then
-    echo "Failed to extract input and expected output." >&2
-    exit 1
-  fi
+  test_build_mode=staged
 fi
 
+export TEST_CPL_OPTIONS
+export TEST_EMU_OPTIONS
+export EXTRA_CPL_ARGS="$extra_cpl_args"
+export EXTRA_EMU_ARGS="$extra_emu_args"
+TEST_CPL_OPTIONS="$(< ./opts/test_cpl_opts.txt)"
+TEST_EMU_OPTIONS="$(< ./opts/test_emu_opts.txt)"
+
+if ! test_jobs="$(./select_test_jobs.sh)"; then
+  exit 2
+fi
+make_status=0
+TEST_JOBS="$test_jobs" COLUMNS="$columns" make \
+  --no-print-directory \
+  --output-sync=target \
+  --keep-going \
+  --jobs "$test_jobs" \
+  -f ./tests/Makefile \
+  TEST_BUILD_MODE="$test_build_mode" \
+  TEST_SOURCES="${paths[*]}" \
+  RESULT_DIR="$result_dir" \
+  all || make_status=$?
+
+num_tests=${#paths[@]}
+failing=()
+not_passed=()
+timed_out=()
+
 for test in "${paths[@]}"; do
-  ./heading_subheadings.py "heading" "$test" "$columns" "="
-
-  reti_file="${test%.picoc}.reti"
-  expected_file="${test%.picoc}.expected_output"
-  output_file="${test%.picoc}.output"
-
-  # Prevent artifacts from an earlier run from being reused.
-  rm -f "$reti_file" "$output_file"
-
-  # The unquoted expansions intentionally permit multiple options.
-  # shellcheck disable=SC2046,SC2086
-  python3 ./compile_picoc.py \
-    $(cat ./opts/test_cpl_opts.txt) \
-    $extra_cpl_args \
-    "$test" \
-    -o "$reti_file"
-
-  compile_status=$?
-  test_passed=true
-
-  if (( compile_status != 0 )); then
-    echo "Compilation failed for $test"
+  status_file="$result_dir/$(basename "${test%.picoc}").status"
+  if [[ ! -f "$status_file" ]]; then
     failing+=("$test")
-    test_passed=false
-  elif [[ ! -f "$reti_file" ]]; then
-    echo "Compilation did not produce an output file for $test"
-    failing+=("$test")
-    test_passed=false
-  else
-    # Do not use --preserve-status here. Without it, GNU timeout returns
-    # status 124 when the configured timeout is reached.
-    #
-    # --kill-after ensures that an emulator which ignores SIGTERM is
-    # forcibly stopped one second later.
-    #
-    # shellcheck disable=SC2046,SC2086
-    timeout \
-      --signal=TERM \
-      --kill-after=1s \
-      "${MAX_EMULATOR_DURATION_SECONDS}s" \
-      reti_emulator \
-      $(cat ./opts/test_emu_opts.txt) \
-      $extra_emu_args \
-      "$reti_file"
-
-    emulator_status=$?
-
-    if (( emulator_status == 124 || emulator_status == 137 )); then
-      echo "Test could not finish in time."
-      echo \
-        "Emulator timed out after ${MAX_EMULATOR_DURATION_SECONDS}s for $test"
-
-      timed_out+=("$test")
-      test_passed=false
-    elif (( emulator_status != 0 )); then
-      echo "Emulator failed with exit status $emulator_status for $test"
-      test_passed=false
-    elif [[ ! -f "$output_file" ]]; then
-      echo "Emulator did not produce an output file for $test"
-      test_passed=false
-    elif [[ ! -f "$expected_file" ]]; then
-      echo "Expected-output file not found: $expected_file"
-      test_passed=false
-    elif ! diff \
-      <(sed -e 's/[[:space:]]*$//' "$expected_file") \
-      <(sed -e 's/[[:space:]]*$//' "$output_file")
-    then
-      test_passed=false
-    fi
+    not_passed+=("$test")
+    continue
   fi
 
-  if [[ "$test_passed" == false ]]; then
+  read -r compile_status output_status timeout_status < "$status_file"
+  if [[ $compile_status -ne 0 ]]; then
+    failing+=("$test")
+  fi
+  if [[ $output_status -ne 0 ]]; then
     not_passed+=("$test")
   fi
-
-  ((num_tests++))
+  if [[ $timeout_status -ne 0 ]]; then
+    timed_out+=("$test")
+  fi
 done
 
-write_not_passed_tests() {
-  if (( ${#not_passed[@]} == 0 )); then
-    : > "$NOT_PASSED_TESTS_FILE"
-    return
-  fi
-
-  printf '%s' "${not_passed[0]}" > "$NOT_PASSED_TESTS_FILE" || return 1
-
-  if (( ${#not_passed[@]} > 1 )); then
-    printf ' %s' "${not_passed[@]:1}" >> "$NOT_PASSED_TESTS_FILE" ||
-      return 1
-  fi
-
-  printf '\n' >> "$NOT_PASSED_TESTS_FILE"
-}
-
-if ! write_not_passed_tests; then
-  echo "Failed to update $NOT_PASSED_TESTS_FILE" >&2
-  exit 1
+if (( ${#not_passed[@]} == 0 )); then
+  : > "$NOT_PASSED_TESTS_FILE"
+else
+  (
+    IFS=' '
+    printf '%s\n' "${not_passed[*]}"
+  ) > "$NOT_PASSED_TESTS_FILE"
 fi
 
 duration=$((SECONDS - start_time))
@@ -272,8 +209,6 @@ fi
 
 echo "Updated test list: $NOT_PASSED_TESTS_FILE"
 
-if (( ${#not_passed[@]} != 0 )); then
+if [[ $make_status -ne 0 || ${#not_passed[@]} -ne 0 ]]; then
   exit 1
 fi
-
-exit 0

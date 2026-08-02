@@ -128,6 +128,28 @@ Run only the library tests:
 make test-lib
 ```
 
+Normal library and OS tests run independent jobs in parallel. When started
+from a terminal, the test runner asks whether it may use all CPU cores or how
+many cores it should use. Non-interactive runs use two jobs. `TEST_JOBS` skips
+the question and sets the parallelism directly:
+
+```sh
+make test TEST_JOBS=4
+```
+
+Combined targets such as `make test` and `make test-sys` ask once, then use
+the selected count for every nested test group.
+
+Each assembler and emulator process receives its own temporary peripheral
+directory, so concurrent processes never share `sram.bin`. Tests use staged
+`.reti_blocks`/`.st` compilation by default. Direct mode instead passes the
+`.picoc` sources straight to the compiler for each merged `.reti` file and
+does not reuse staged artifacts:
+
+```sh
+make test TEST_BUILD_MODE=direct
+```
+
 Set `TEST_PATTERN=all` to run every library test explicitly:
 
 ```sh
