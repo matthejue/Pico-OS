@@ -1,4 +1,4 @@
-#include "../stdlib/libstdlib.picoc"
+#include "../stdlib/stdlib.header"
 #include "process.picoc"
 #include "io.picoc"
 #include "blocking.picoc"

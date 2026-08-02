@@ -36,6 +36,11 @@ def parse_args():
         default="all",
         help="Select all OS tests, OS feature tests, or shell tests.",
     )
+    parser.add_argument(
+        "--direct",
+        action="store_true",
+        help="Compile merged RETI files directly from PicoC sources.",
+    )
     parser.add_argument("columns", nargs="?", default="120")
     parser.add_argument("test_pattern", nargs="?", default="")
     parser.add_argument("cpl_args", nargs="?", default="")
@@ -168,7 +173,7 @@ def main():
         remove_if_exists(test_dir / "output.txt")
         remove_if_exists(test_dir / "raw_output.txt")
         remove_if_exists(test_dir / SHELL_TEST_CAPTURE_FILENAME)
-        if build_test_programs(test_dir, extra_cpl_args):
+        if build_test_programs(test_dir, extra_cpl_args, args.direct):
             if test_dir in os_feature_paths:
                 ready_os_feature_paths.append(test_dir)
             elif test_dir in uart_shell_paths:

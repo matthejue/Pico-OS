@@ -8,6 +8,7 @@ void *realloc(void *ptr, int size);
 void free(void *ptr);
 int atoi(char *text);
 char *getenv(char *name);
+char **current_environment(void);
 int setenv(char *name, char *value, bool overwrite);
 int unsetenv(char *name);
 int putenv(char *variable);

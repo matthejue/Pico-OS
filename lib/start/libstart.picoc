@@ -1,1 +1,3 @@
+// dependencies: ../stdlib/libstdlib.reti_blocks
+
 #include "start.picoc"

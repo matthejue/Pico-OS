@@ -29,7 +29,7 @@ bool run(int pid, char *arguments, char **environment) {
     request.pid = pid;
     request.arguments = arguments;
     if (environment == NULL) {
-        request.environment = environ;
+        request.environment = current_environment();
     } else {
         request.environment = environment;
     }

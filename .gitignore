@@ -1,5 +1,6 @@
 bak/
 __pycache__/
+.test_dependencies/
 dist/
 dist_old/
 dist_old_2/
