@@ -1,8 +1,8 @@
 #define SRAM_BASE (-2147483647 - 1) // -2^31
 #define SRAM_MAX_ADDRESS_IN_MEMORY_MAP -2147221505 // -2^31 + 2^18 - 1
-#define KERNEL_HEAP_START -2147450821 // -2^31 + heap_start
+#define KERNEL_HEAP_START -2147450823 // -2^31 + heap_start
 #define PROCESS_MEMORY_START -2147443647 // -2^31 + stack_start + 1
 #define KERNEL_CS_START_ASM "LOADI32 CS -2147483644" // -2^31 + codesegment_start
-#define KERNEL_DS_START_ASM "LOADI32 DS -2147451242" // -2^31 + datasegment_start
+#define KERNEL_DS_START_ASM "LOADI32 DS -2147451244" // -2^31 + datasegment_start
 #define KERNEL_SP_START_ASM "LOADI32 SP -2147443648" // -2^31 + stack_start
 #define KERNEL_CS_ACC_ASM "LOADI32 ACC -2147483644" // -2^31 + codesegment_start
