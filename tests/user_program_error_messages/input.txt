@@ -1,0 +1,3 @@
+load tests/user_program_error_messages/launcher.bin
+run 3
+poweroff.bin

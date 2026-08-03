@@ -1,3 +1,2 @@
 first file
 second file
-cat: tests/cat/missing.txt: file not found
