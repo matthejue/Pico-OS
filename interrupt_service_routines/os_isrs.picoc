@@ -32,10 +32,15 @@ void timer_interrupt(void) {
     asm("PUSH DS");
     // SP is saved later. From then on, its value is called old_sp
 
-    // Restores kernel regs and returns if CS == kernel_codesegment_start
-    asm(KERNEL_CS_ACC_ASM); // LOADI32 ACC kernel_codesegment_start
-    asm("SUB ACC CS");
-    asm("JUMP!= 14"); // If CS != kernel_codesegment_start, enter the scheduler path
+    /*
+     * Restores kernel regs when the interrupted instruction belongs to the
+     * kernel code segment. CS cannot identify this reliably because process
+     * entry and syscall return update it shortly before leaving kernel code
+     */
+    asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
+    asm(KERNEL_DS_START_ASM); // Kernel code ends before its data segment
+    asm("SUB ACC DS");
+    asm("JUMP>= 14"); // Only process code executes at or above this boundary
     asm("POP DS");
     asm("POP CS");
     asm("POP BAF");
