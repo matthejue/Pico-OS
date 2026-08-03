@@ -81,6 +81,9 @@ the UART terminal view; `Escape` returns to the TUI. `make bootload-debug`
 forces debug information for both bootloader and kernel. `make run-os
 OS_RUN_PATH=tests/hello_world` runs one configured OS scenario, while the
 focused test targets are documented in [section 14](#14-test-system).
+Both bootload targets pass `-n 4` because PicoOS's four-entry interrupt vector
+table is copied into SRAM by the EPROM loader and therefore cannot be counted
+when the emulator initially parses `startprogram.reti`.
 
 # 1. Bootloading
 
@@ -495,8 +498,11 @@ This design keeps the boundary policy in PicoOS while putting the check at the
 only place that can reliably see every `SP` write: the emulator's instruction
 interpreter. Periphery cell 11 exposes the emulator's read-only
 `cpu_exception_cause`; PicoOS reads it to select the diagnostic, and writes are
-ignored. If vector slot 3 is absent, the emulator reports an unhandled CPU
-exception and stops instead of entering PicoOS.
+ignored. The bootload command declares all four vector entries with `-n 4`, so
+the emulator knows that exception slot 3 exists even though the EPROM loader
+installs it at runtime. If fewer than four entries are parsed or configured,
+the emulator reports an unhandled CPU exception and stops instead of entering
+PicoOS.
 
 ## 3.5 PicoC-Compiler support for low-level handlers
 

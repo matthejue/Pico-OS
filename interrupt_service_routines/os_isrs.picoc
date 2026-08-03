@@ -111,15 +111,14 @@ void syscall_interrupt(void) {
 __attribute__((naked))
 void syscall_interrupt_return(void) {
     // Handle_syscall restores BAF to the saved caller context before returning
-    // Restore the caller while preserving IN2 as the syscall return value
-    asm("PUSH IN2");
-    activate_current_process_stack_boundary();
-    asm("POP IN2");
+    // Saves the syscall result before switching back to the process stack
+    asm("STOREIN BAF IN2 4");
     asm("MOVE BAF SP");
+    activate_current_process_stack_boundary();
     asm("POP DS");
     asm("POP CS");
     asm("POP BAF");
-    asm("ADDI SP 1"); // Skip saved IN2
+    asm("POP IN2");
     asm("POP IN1");
     asm("ADDI SP 1"); // Skip saved ACC
     asm("MOVE IN2 ACC");

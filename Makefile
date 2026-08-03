@@ -496,7 +496,7 @@ run-firmware: kernel.reti system/init.bin user/shell.bin user/poweroff.bin
 	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
 
 bootload: firmware
-	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	reti_emulator -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
@@ -511,7 +511,7 @@ bootload-debug:
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 	reti_emulator -f /tmp -a kernel.reti
-	reti_emulator -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	reti_emulator -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 
 # ----------------------------------------------------------------------
