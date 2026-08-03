@@ -7,6 +7,15 @@
 
 #define INIT_ENVIRONMENT_CAPACITY 256
 
+void init_write_error(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDERR_FILENO, text, length);
+}
+
 bool read_environment(void) {
     char *contents;
     char *name;
@@ -15,32 +24,48 @@ bool read_environment(void) {
     int length;
     int index = 0;
 
-    contents = (char *)malloc(INIT_ENVIRONMENT_CAPACITY);
+    contents = (char *)malloc(INIT_ENVIRONMENT_CAPACITY + 1);
     if (contents == NULL) {
+        init_write_error("init: could not allocate environment buffer\n");
         return false;
     }
 
     file_descriptor = open("./opts/environment.txt", O_RDONLY);
     if (file_descriptor < 0) {
         free(contents);
+        init_write_error("init: could not open environment file\n");
         return false;
     }
     length = read(
         file_descriptor,
         contents,
-        INIT_ENVIRONMENT_CAPACITY - 1
+        INIT_ENVIRONMENT_CAPACITY
     );
     close(file_descriptor);
     if (length < 0) {
         free(contents);
+        init_write_error("init: could not read environment file\n");
+        return false;
+    }
+    if (length == INIT_ENVIRONMENT_CAPACITY) {
+        free(contents);
+        init_write_error("init: environment file is too long\n");
         return false;
     }
     contents[length] = 0;
 
     while (index < length) {
         name = contents + index;
-        while (contents[index] != '=') {
+        while (index < length &&
+               contents[index] != '=' &&
+               contents[index] != '\n' &&
+               contents[index] != '\r') {
             index = index + 1;
+        }
+        if (index == length || contents[index] != '=') {
+            free(contents);
+            init_write_error("init: invalid environment entry\n");
+            return false;
         }
         contents[index] = 0;
         index = index + 1;
@@ -55,6 +80,9 @@ bool read_environment(void) {
 
         if (setenv(name, value, true) != 0) {
             free(contents);
+            init_write_error(
+                "init: could not store environment variable\n"
+            );
             return false;
         }
 
@@ -81,6 +109,7 @@ int main(void) {
                 "true",
                 true
             ) != 0) {
+            init_write_error("init: could not configure loading bar\n");
             return 1;
         }
     }
@@ -88,10 +117,12 @@ int main(void) {
     while (1) {
         shell_pid = load("./user/shell.bin");
         if (shell_pid == 0) {
+            init_write_error("init: could not load shell\n");
             return 1;
         }
 
         if (!run(shell_pid, NULL, NULL)) {
+            init_write_error("init: could not start shell\n");
             return 1;
         }
 
