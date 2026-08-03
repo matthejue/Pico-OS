@@ -1761,19 +1761,16 @@ current file defines only `PATH=./user`; build-time
 [`opts/config.header`](opts/config.header) separately controls whether init
 adds `PICOOS_LOADING_BAR=true`.
 
-If the file is missing, cannot be read, or an environment allocation fails,
-`read_environment()` returns false and init returns status 1. Because no shell
-exists, the kernel eventually shuts down. Input beyond 255 bytes is silently
-truncated. A malformed line without `=` is not robustly validated and may scan
-past the buffer; configuration is expected to be well formed. This is a
-small-system limitation, not Linux-style configuration parsing.
+If the file is missing, cannot be read, exceeds 255 bytes, contains a malformed
+line without `=`, or an environment allocation fails, init prints an error and
+returns status 1. Because no shell exists, the kernel eventually shuts down.
 
 ## 11.4 Starting the shell
 
 Init directly requests `./user/shell.bin`; it does not use `PATH`. `load()`
 creates a `NEW` child, and `run(shell_pid, NULL, NULL)` supplies no extra
 arguments and inherits init's environment and standard descriptors. A load
-return of 0 or failed `run()` makes init exit with status 1.
+return of 0 or failed `run()` makes init print an error and exit with status 1.
 
 ## 11.5 Waiting for the shell with `waitpid()`
 
@@ -1884,10 +1881,10 @@ unexpected translated bytes.
 
 [`user/cat.picoc`](user/cat.picoc) opens each path argument read-only, reads
 64 cells at a time, and loops on `write(STDOUT_FILENO, ...)` until each chunk
-is complete. It closes each descriptor. An open, read, or write failure makes
-the final status 1, while successful files continue to be processed. With no
-arguments it prints nothing and returns 0; stdin concatenation and options are
-not implemented.
+is complete. It closes each descriptor. Missing operands and open, read, or
+write failures produce an error on standard error and make the final status 1,
+while successful files continue to be processed. Stdin concatenation and
+options are not implemented.
 
 # 13. Use in the operating systems and real-time operating systems lectures
 

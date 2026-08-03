@@ -1,16 +1,41 @@
-// dependencies: ../lib/signal/libsignal.reti_blocks
+// dependencies: ../lib/signal/libsignal.reti_blocks ../lib/unistd/libunistd.reti_blocks
 
 #include "../lib/signal/signal.header"
 #include "../lib/stdlib/stdlib.header"
+#include "../lib/unistd/unistd.header"
+
+void kill_write_error(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDERR_FILENO, text, length);
+}
 
 int main(int argc, char **argv) {
+    int process_id;
     int signal_number = SIGTERM;
 
     if (argc < 2 || argc > 3) {
+        kill_write_error("usage: kill.bin PID [SIGNAL]\n");
+        return 1;
+    }
+    process_id = atoi(argv[1]);
+    if (process_id <= 0) {
+        kill_write_error("kill: invalid process ID\n");
         return 1;
     }
     if (argc == 3) {
         signal_number = atoi(argv[2]);
     }
-    return kill(atoi(argv[1]), signal_number) == -1;
+    if (signal_number < 0 || signal_number >= SIGNAL_COUNT) {
+        kill_write_error("kill: invalid signal\n");
+        return 1;
+    }
+    if (kill(process_id, signal_number) == -1) {
+        kill_write_error("kill: process not found\n");
+        return 1;
+    }
+    return 0;
 }

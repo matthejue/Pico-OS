@@ -1,0 +1,16 @@
+load ./tests/shell_error_messages/missing.bin
+load
+run
+run 999
+unload
+unload 999
+export
+run-shell-tests
+list extra
+fg extra
+bg extra
+exit extra
+echo.bin "unterminated
+   
+load	./tests/shell_error_messages/missing.bin
+poweroff.bin
