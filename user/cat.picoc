@@ -7,6 +7,15 @@
 
 #define CAT_BUFFER_SIZE 64
 
+void print_string(int file_descriptor, char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(file_descriptor, text, length);
+}
+
 int print_file(char *path) {
     char buffer[CAT_BUFFER_SIZE];
     int file_descriptor = open(path, O_RDONLY);
@@ -15,6 +24,9 @@ int print_file(char *path) {
     int result;
 
     if (file_descriptor < 0) {
+        print_string(STDOUT_FILENO, "cat: ");
+        print_string(STDOUT_FILENO, path);
+        print_string(STDOUT_FILENO, ": file not found\n");
         return 1;
     }
 
