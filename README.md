@@ -1,10 +1,10 @@
 # PicoOS
 
 PicoOS is a small educational operating system for the RETI teaching CPU. It
-was developed primarily so that students can inspect a complete implementation
-while learning concepts from the real-time operating systems lecture:
+was developed primarily so that students can inspect implementations
+ of concepts from the real-time operating systems lecture like
 mutexes, process states, scheduling, the dispatcher, `waitpid()`, wait-queue
-`sleep()`, and `wakeup()`. It also connects topics from the operating systems
+`sleep()`, and `wakeup()` and it also connects to <!-- is it to or with? --> topics from the operating systems
 lecture: process loading and parent/child relationships, signals, interrupt
 vectors and service routines, software and hardware interrupts, file
 descriptors, and the implementation of `malloc()`/`free()` with heap-block
@@ -46,7 +46,7 @@ but it returns to that kernel work; it does not schedule a different process.
 
 ## Contents
 
-1. [Bootloading](#1-bootloading)
+1. [Bootloading](#1-bootloading) <!-- Also include subheadings in here -->
 2. [Kernel main loop](#2-kernel-main-loop)
 3. [Interrupts, system calls, and exceptions](#3-interrupt-vector-table-interrupts-system-calls-and-exceptions)
 4. [Processes](#4-processes)
@@ -252,7 +252,8 @@ It returns the complete file size as one big-endian 32-bit value, or
 the complete file size. The complete-file `<ESC>read <path><ESC>/` command
 remains available for clients that need it.
 
-`reti_emulator -a program.reti` builds `program.bin`. The `.bin` itself begins
+`./run_reti_emulator_isolated.sh -a program.reti` builds `program.bin`. The
+`.bin` itself begins
 with four big-endian 32-bit words copied from `program.sections`:
 
 | Header word | Meaning and receiver use |
@@ -271,8 +272,12 @@ build is:
 ```sh
 picoc_compiler program.picoc <libraries> -C lib/start/libstart.picoc \
     -O1 -i -w -s -g -v -o program.reti
-reti_emulator -f /tmp -a program.reti
+./run_reti_emulator_isolated.sh -a program.reti
 ```
+
+The wrapper gives every emulator process its own temporary peripheral files.
+This is required because sharing one `sram.bin` between an active OS and an
+assembler process can overwrite the OS interrupt vector table.
 
 Repository builds call `picoc_compiler --show-input-files` directly. Staged
 test and user-program builds compile each source into `.reti_blocks` and `.st`
@@ -2057,7 +2062,8 @@ content in the same `output.txt`. Fast shell evaluation temporarily captures
 
 `run_os_tests.py` compiles every `.picoc` in the directory, automatically
 expands dependency metadata, and assembles each with
-`reti_emulator -f /tmp -a`. It starts `kernel.reti`, waits for each
+`reti_emulator` in an isolated temporary peripheral directory. It starts
+`kernel.reti`, waits for each
 `PicoOS> ` prompt, injects one input line followed by carriage return, captures
 stdout in `raw_output.txt`, renders terminal control characters and removes
 prompts/loading UI into `output.txt`, then compares trimmed expected/actual

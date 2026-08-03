@@ -180,7 +180,7 @@ run_send_keypresses:
 		$(PICOC_BUILD) $$(cat ./opts/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
 		run_path="$$compiled_path"; \
 	fi; \
-	./send_keypresses.py --input ./opts/input.txt reti_emulator $$(cat ./opts/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
+	./send_keypresses.py --input ./opts/input.txt ./run_reti_emulator_isolated.sh $$(cat ./opts/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
 
 
 # ----------------------------------------------------------------------
@@ -401,7 +401,7 @@ system/init.reti: system/init.picoc opts/config.header common/loading_bar.header
 		-o system/init.reti
 
 system/init.bin: system/init.reti
-	reti_emulator -f /tmp -a system/init.reti
+	./run_reti_emulator_isolated.sh -a system/init.reti
 
 user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$(SHELL_SOURCES) $(USER_STARTUP_SOURCE))
@@ -420,7 +420,7 @@ system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPEND
 		-o $@
 
 system/%.bin: system/%.reti
-	reti_emulator -f /tmp -a $<
+	./run_reti_emulator_isolated.sh -a $<
 
 user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES) $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$< $(call picoc_dependency_sources,$<) $(USER_STARTUP_LIBRARY_SOURCES) $(USER_STARTUP_SOURCE))
@@ -431,7 +431,7 @@ user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCI
 		-o $@
 
 user/%.bin: user/%.reti
-	reti_emulator -f /tmp -a $<
+	./run_reti_emulator_isolated.sh -a $<
 
 KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \
@@ -485,7 +485,7 @@ kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.h
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 
 kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
-	reti_emulator -f /tmp -a kernel.reti
+	./run_reti_emulator_isolated.sh -a kernel.reti
 
 
 # ----------------------------------------------------------------------
@@ -493,10 +493,10 @@ kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
 # ----------------------------------------------------------------------
 
 run-firmware: kernel.reti system/init.bin user/shell.bin user/poweroff.bin
-	reti_emulator kernel.reti -d -c -O -r $(SRAM_SIZE) -f /tmp
+	./run_reti_emulator_isolated.sh kernel.reti -d -c -O -r $(SRAM_SIZE)
 
 bootload: firmware
-	reti_emulator -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	./run_reti_emulator_isolated.sh -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
@@ -510,8 +510,8 @@ bootload-debug:
 		-O1 -i -w -s -g -v \
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
-	reti_emulator -f /tmp -a kernel.reti
-	reti_emulator -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -f /tmp -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	./run_reti_emulator_isolated.sh -a kernel.reti
+	./run_reti_emulator_isolated.sh -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 
 # ----------------------------------------------------------------------

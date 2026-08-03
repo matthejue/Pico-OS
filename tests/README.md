@@ -48,7 +48,7 @@ Every `*.picoc` file in the test directory is compiled with `picoc_compiler`
 and assembled with:
 
 ```sh
-reti_emulator -f /tmp -a program.reti
+./run_reti_emulator_isolated.sh -a program.reti
 ```
 
 For an OS feature test, the resulting `launcher.bin` is loaded by the OS
