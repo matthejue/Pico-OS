@@ -1,0 +1,3 @@
+load tests/exception_heap_full/launcher.bin
+run 3
+poweroff.bin

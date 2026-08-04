@@ -13,3 +13,5 @@ void activate_kernel_stack_boundary(void);
 int process_stack_boundary(struct Process *process);
 void activate_current_process_stack_boundary(void);
 void handle_cpu_exception(int interrupted_kernel_cs_difference);
+void handle_process_heap_full_exception(void);
+void panic_kernel_heap_full(void);
