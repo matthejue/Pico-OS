@@ -1,9 +1,18 @@
 // dependencies: ../common/heap.reti_blocks
 
 #include "kmalloc.header"
+#include "exception.header"
 #include "memory_constants.header"
 
 struct Heap kernel_heap;
+
+void *require_kernel_heap_allocation(void *memory, int size) {
+    if (memory == NULL && size > 0) {
+        panic_kernel_heap_full();
+    }
+
+    return memory;
+}
 
 void init_kernel_heap(void) {
     int heap_start = KERNEL_HEAP_START;
@@ -12,11 +21,17 @@ void init_kernel_heap(void) {
 }
 
 void *kmalloc(int size) {
-    return heap_alloc_from(&kernel_heap, size);
+    return require_kernel_heap_allocation(
+        heap_alloc_from(&kernel_heap, size),
+        size
+    );
 }
 
 void *krealloc(void *ptr, int size) {
-    return heap_realloc_from(&kernel_heap, ptr, size);
+    return require_kernel_heap_allocation(
+        heap_realloc_from(&kernel_heap, ptr, size),
+        size
+    );
 }
 
 void kfree(void *ptr) {

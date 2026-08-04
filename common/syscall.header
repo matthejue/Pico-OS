@@ -33,6 +33,7 @@
 #define SYSCALL_SIGRETURN 28
 #define SYSCALL_PRCTL 29
 #define SYSCALL_SET_FOREGROUND_PROCESS 30
+#define SYSCALL_PROCESS_HEAP_FULL 31
 
 struct LoadProcessRequest {
     char *path;

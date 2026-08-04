@@ -437,19 +437,27 @@ additional kernel ISR.
 
 ## 3.4 Exception handlers
 
-The emulator and PicoOS implement exactly three synchronous exceptions:
+Four conditions terminate an affected user process with exception status 1:
 
-| Cause | Trigger | Detection |
-| ---: | --- | --- |
-| 1 | divide or modulo by zero | Emulator instruction interpreter |
-| 2 | an instruction would lower `SP` below the active boundary | Emulator register-write guard |
-| 3 | invalid encoded word or unsupported opcode | Emulator decoder/interpreter |
+| Condition | Kind and trigger | Kernel entry | Diagnostic |
+| --- | --- | --- | --- |
+| Divide or modulo by zero | CPU exception 1; detected by the emulator instruction interpreter | Vector 3 `cpu_exception_interrupt` → `handle_cpu_exception()` | `Process terminated: division by zero` |
+| Stack overflow | CPU exception 2; an instruction would lower `SP` below the active boundary, detected by the emulator register-write guard | Vector 3 `cpu_exception_interrupt` → `handle_cpu_exception()` | `Process terminated: stack overflow` |
+| Illegal instruction | CPU exception 3; invalid encoded word or unsupported opcode, detected by the emulator decoder/interpreter | Vector 3 `cpu_exception_interrupt` → `handle_cpu_exception()` | `Process terminated: illegal instruction` |
+| Process heap full | PicoOS-defined allocation failure; a positive-size `malloc()` or `realloc()` cannot allocate | Vector 0 syscall → `handle_syscall()` → `handle_process_heap_full_exception()` | `Process terminated: heap full` |
 
-Detection happens before the faulting instruction commits its register or
-memory result. The emulator sets read-only periphery cell 11, adjusts exception
-entry so `SP + 1` contains the faulting `PC - 1`, and selects vector 3.
-Returning would retry the instruction, but PicoOS never returns from these
-exceptions.
+The first three are CPU-synchronous exceptions. The emulator detects them
+before the faulting instruction commits its register or memory result, sets
+read-only periphery cell 11, adjusts exception entry so `SP + 1` contains the
+faulting `PC - 1`, and selects vector 3. Returning would retry the instruction,
+but PicoOS never returns from these exceptions.
+
+Process heap full is not a CPU exception and does not use vector 3,
+`cpu_exception_interrupt`, or `handle_cpu_exception()`. The userspace
+allocator deliberately invokes `SYSCALL_PROCESS_HEAP_FULL`, whose normal
+syscall path calls the separate `handle_process_heap_full_exception()`.
+Zero-size allocations keep the allocator's normal `NULL` result and do not
+invoke the syscall.
 
 The exception ISR preserves the interrupted `CS` in `BAF`, clears stack
 protection while changing stacks, restores kernel segments and stack, then
@@ -465,6 +473,9 @@ The exception entry itself saves only the retry PC automatically. PicoOS does
 not need to preserve the other faulty user registers because it terminates the
 process. See [`kernel/exception.picoc`](kernel/exception.picoc) and the
 emulator's [CPU exception contract](../RETI-Emulator/doc/cpu_exceptions.md).
+
+Kernel allocations are not recoverable: a failed positive-size `kmalloc()` or
+`krealloc()` prints `Kernel panic: kernel heap full` and shuts down PicoOS.
 
 ### Stack-overflow boundary
 
@@ -556,11 +567,12 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
 }
 ```
 
-There are 31 syscall numbers (`0..30`) in
+There are 32 syscall numbers (`0..31`) in
 [`common/syscall.header`](common/syscall.header). Some return normally through
 `syscall_interrupt_return`; blocking, exit, yield, and signal restoration may
 save or replace the process context and dispatch without returning through the
-same kernel call.
+same kernel call. `SYSCALL_PROCESS_HEAP_FULL` terminates its caller instead of
+returning.
 
 ```mermaid
 sequenceDiagram
@@ -1449,6 +1461,12 @@ Three interfaces select different `Heap` instances:
 
 Thus both complete process-region allocation and internal `malloc()` allocation
 are first-fit, but they are distinct heap instances at different levels.
+
+The shared allocator returns `NULL` for exhaustion, but its public callers
+apply their own policy: process `malloc()` and `realloc()` terminate the
+process for failed positive-size requests, while `kmalloc()` and `krealloc()`
+panic the kernel. `pmalloc()` and `prealloc()` retain the raw `NULL` result for
+the loader to handle.
 
 ## 8.3 `free()` and block merging
 
