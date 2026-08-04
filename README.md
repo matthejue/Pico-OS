@@ -4,11 +4,10 @@ PicoOS is a small educational operating system for the RETI teaching CPU. It
 was developed primarily so that students can inspect implementations
  of concepts from the real-time operating systems lecture like
 mutexes, process states, scheduling, the dispatcher, `waitpid()`, wait-queue
-`sleep()`, and `wakeup()` and it also connects to <!-- is it to or with? --> topics from the operating systems
-lecture: process loading and parent/child relationships, signals, interrupt
-vectors and service routines, software and hardware interrupts, file
-descriptors, and the implementation of `malloc()`/`free()` with heap-block
-splitting and merging.
+`sleep()`, and `wakeup()` and it also connects to<!-- is it to or with? --> topics from the operating systems
+lecture like process loading and parent/child relationships, signals, interrupt
+vector tables and interrupt service routines, software and hardware interrupts, filesystems (actually only file descriptors)<!-- nachdenken wegen Formulierumg hier -->, and the implementation of `malloc()`/`free()` with heap-block
+splitting and merging<!-- mention the operating systems lecture and it's examples first and then next the real-time operating systems lecture and it''s examples. Basically switch both in the order in which they appear in the text -->.
 
 PicoOS deliberately stays small. It is not Linux and is not a complete POSIX
 implementation. There is no virtual memory or on-device filesystem; processes
@@ -46,7 +45,7 @@ but it returns to that kernel work; it does not schedule a different process.
 
 ## Contents
 
-1. [Bootloading](#1-bootloading) <!-- Also include subheadings in here -->
+1. [Bootloading](#1-bootloading)<!-- Also include subheadings in here -->
 2. [Kernel main loop](#2-kernel-main-loop)
 3. [Interrupts, system calls, and exceptions](#3-interrupt-vector-table-interrupts-system-calls-and-exceptions)
 4. [Processes](#4-processes)
@@ -98,12 +97,13 @@ The compiler places it in EPROM. It:
 3. jumps to `boot_main()`.
 
 `boot_main()` sends the bytes of `<ESC>load kernel.bin<ESC>/` through UART,
-receives the file's word count and four-word binary header, then copies the
+receives the file's word count and five-word binary header, then copies the
 remaining words to the first SRAM cell. `start_loaded_kernel()` reads the
 saved header values from its bootloader frame, changes `CS` and `DS` from
 EPROM to the kernel's SRAM code/data bases, sets the kernel `SP` and `BAF`,
-and jumps to `CS`. The first kernel text routine is the compiler-generated
-`_start`, which calls [`kernel/main()`](kernel/kernel.picoc).
+and jumps to `CS`. The compiler-generated kernel `_start` then calls
+[`kernel/main()`](kernel/kernel.picoc). The kernel ignores the binary
+`heap_start` and `heap_size` fields and uses its generated memory constants.
 
 ```mermaid
 sequenceDiagram
@@ -166,10 +166,11 @@ The current generated
 | --- | ---: | --- |
 | `SRAM_BASE` | `-2147483648` | Absolute base selected by address bits `10` |
 | `SRAM_MAX_ADDRESS_IN_MEMORY_MAP` | `-2147221505` | Absolute last cell of the configured 2^18-cell SRAM |
-| `KERNEL_HEAP_START` | `-2147450821` | Absolute first cell after kernel static data |
+| `KERNEL_HEAP_START` | `-2147450459` | Absolute first cell after kernel static data |
+| `KERNEL_HEAP_SIZE` | `4096` | Kernel heap size in SRAM cells |
 | `PROCESS_MEMORY_START` | `-2147443647` | First cell after the configured kernel stack start |
 | `KERNEL_CS_START_ASM` | `LOADI32 CS -2147483644` | Kernel `.text` base |
-| `KERNEL_DS_START_ASM` | `LOADI32 DS -2147451242` | Kernel `.data` base |
+| `KERNEL_DS_START_ASM` | `LOADI32 DS -2147450943` | Kernel `.data` base |
 | `KERNEL_SP_START_ASM` | `LOADI32 SP -2147443648` | Kernel stack pointer (`SRAM_BASE + 40000`) |
 | `KERNEL_CS_ACC_ASM` | `LOADI32 ACC -2147483644` | Same code base loaded into `ACC` for comparisons |
 
@@ -178,7 +179,7 @@ The values are generated artifacts and may move when the kernel changes.
 overrides the compiler's normal `stack_start`; the Makefile patches
 `KERNEL_SP_START_ASM` and `PROCESS_MEMORY_START` consistently. With the
 currently generated [`kernel.sections`](kernel.sections), the relative
-boundaries are `.text = 4`, `.data = 32406`, heap start `32827`, and kernel
+boundaries are `.text = 4`, `.data = 32705`, heap start `33189`, and kernel
 stack start `40000`.
 
 The EPROM-mode header
@@ -254,18 +255,19 @@ remains available for clients that need it.
 
 `./run_reti_emulator_isolated.sh -a program.reti` builds `program.bin`. The
 `.bin` itself begins
-with four big-endian 32-bit words copied from `program.sections`:
+with five big-endian 32-bit words copied from `program.sections`:
 
 | Header word | Meaning and receiver use |
 | ---: | --- |
 | 0 `codesegment_start` | Process-relative `CS` and initial entry point |
 | 1 `datasegment_start` | Process-relative `DS` |
-| 2 `heap_start` | First cell after static data; user `malloc()` starts here |
-| 3 `stack_start` | Highest process-relative stack cell, or `-1` to request PicoOS defaults |
+| 2 `heap_start` | First cell after static data; process `malloc()` starts here; ignored by the kernel |
+| 3 `heap_size` | Process heap size in cells, or `-1` for its default; ignored by the kernel |
+| 4 `stack_start` | Highest process-relative stack cell, or `-1` to request PicoOS defaults |
 
-All four values are one 32-bit word. The emulator-prepended word count includes
-these four header words. Thus the kernel computes
-`payload_word_count = word_count - 4`, does **not** copy the header to process
+All five values are one 32-bit word. The emulator-prepended word count includes
+these five header words. Thus the kernel computes
+`payload_word_count = word_count - 5`, does **not** copy the header to process
 memory, and copies only the encoded program words. For normal programs the
 build is:
 
@@ -376,9 +378,13 @@ The compiler links three sections:
 - **`.data`** contains globals and other static data. With `-O1`, values known
   at compile time are emitted directly instead of assigned by startup code.
 
-The `.sections` JSON records their boundaries, plus `heap_start` and
-`stack_start`. Assembly mode encodes `.ivt`, `.text`, and `.data` as the
-payload after the four-word binary header.
+The `.sections` JSON records their boundaries, plus `heap_start`, `heap_size`,
+and `stack_start`. The compiler writes `-1` for `heap_size` and `stack_start`,
+so users can edit the generated `.sections` file before assembly when a process
+needs a more suitable heap or stack layout. The kernel ignores its binary heap
+fields and uses `KERNEL_HEAP_START` and `KERNEL_HEAP_SIZE` from
+`memory_constants.header`. Assembly mode encodes `.ivt`, `.text`, and `.data`
+as the payload after the five-word binary header.
 
 ```text
 SRAM relative, low addresses                                      high
@@ -483,7 +489,7 @@ Periphery cell 10 is an inclusive `stack_heap_boundary`; zero disables the
 check. PicoOS writes it, and the emulator reads it whenever an instruction
 would lower `SP`:
 
-- kernel boundary = `KERNEL_HEAP_START + 4096 - 1`;
+- kernel boundary = `KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1`;
 - process boundary = `base_address + heap_start + heap_size - 1`.
 
 `SP` denotes the free cell immediately below the lowest occupied stack cell,
@@ -785,7 +791,7 @@ The authoritative structure is
 | `pid`, `parent_pid` | Unique process ID and loader/parent PID (`0` means orphan) |
 | `state` | `NEW`, `READY`, `RUNNING`, `BLOCKED`, `STOPPED`, or `ZOMBIE` |
 | `base_address`, `size` | Absolute start and cell count of the complete SRAM region |
-| `heap_start`, `heap_size` | Process-relative heap offset and fixed 1000-cell user heap |
+| `heap_start`, `heap_size` | Process-relative heap offset and requested size, or the 1000-cell default |
 | `word_count`, `binary_path` | Load metadata and kernel-owned source path copy |
 | `activation` | Saved `IN1`, `IN2`, `ACC`, `SP`, `BAF`, `CS`, and `DS` |
 | `file_descriptors` | Per-process eight-entry descriptor table and stdin state |
@@ -859,8 +865,8 @@ sequenceDiagram
 
     C->>K: load(path)
     K->>E: ESC load path ESC /
-    E-->>K: word count + CS/DS/heap/stack header
-    K->>K: Choose 1000-cell heap and effective stack
+    E-->>K: word count + CS/DS/heap start/heap size/stack header
+    K->>K: Resolve default heap size and effective stack
     K->>PM: First-fit allocate complete region
     E-->>K: Encoded .ivt/.text/.data payload
     K->>K: Copy payload at absolute base
@@ -871,11 +877,12 @@ sequenceDiagram
     K->>PCB: NEW → READY
 ```
 
-If binary `stack_start == -1`, PicoOS chooses
-`heap_start + 1000 heap cells + 1000 stack cells`. An explicit stack start must
-not be below `heap_start + heap_size`. The allocated process size is
-`effective_stack_start + 1`. Loading and running are separate operations, so a
-successfully loaded process remains `NEW` until `run()`.
+If binary `heap_size == -1`, PicoOS uses the 1000-cell process default. If
+`stack_start == -1`, it chooses `heap_start + heap_size + 1000 stack cells`.
+An explicit stack start must not be below `heap_start + heap_size`. The
+allocated process size is `effective_stack_start + 1`. Loading and running are
+separate operations, so a successfully loaded process remains `NEW` until
+`run()`.
 
 ## 4.6 Program arguments and environment
 
@@ -1370,7 +1377,7 @@ The top two address bits select EPROM (`00`), periphery (`01`), or SRAM
 
 ```text
 SRAM offset
-0       4                         32406 32827      36923       40000 40001
+0       4                         32705 33189      37285       40000 40001
 ┌───────┬─────────────────────────┬─────┬──────────┬───────────┬─────┬─────────┐
 │ .ivt  │ kernel .text            │data │ kheap    │stack room │ SP  │ process │
 │4 cells│                         │     │4096 cells│  (free)   │ ↓   │ heap    │
@@ -1391,7 +1398,7 @@ base + 0                                                       base + stack_star
 │ .text          │ .data       │ malloc heap    │ free gap     │ stack         │
 │ CS points here │ DS points   │ grows upward → │              │ grows down ←  │
 └────────────────┴─────────────┴────────────────┴──────────────┴───────────────┘
-0                data_start    heap_start       heap+1000      initial args
+0                data_start    heap_start       heap+size      initial args
                                                  ↑ inclusive boundary is one cell before
 ```
 
@@ -1455,9 +1462,9 @@ Three interfaces select different `Heap` instances:
 
 | Interface | Region managed | Typical callers |
 | --- | --- | --- |
-| `kmalloc()` / `krealloc()` / `kfree()` | Fixed 4096-cell kernel heap beginning at generated `KERNEL_HEAP_START` | PCBs, paths, descriptors, shared-memory metadata |
+| `kmalloc()` / `krealloc()` / `kfree()` | Kernel heap defined by generated `KERNEL_HEAP_START` and `KERNEL_HEAP_SIZE` | PCBs, paths, descriptors, shared-memory metadata |
 | `pmalloc()` / `prealloc()` / `pfree()` | All SRAM after `PROCESS_MEMORY_START` | Kernel process loader and shared-memory backing blocks |
-| `malloc()` / `realloc()` / `free()` | Current process's fixed 1000-cell heap beginning at binary `heap_start` | Userspace libraries and applications |
+| `malloc()` / `realloc()` / `free()` | Current process heap beginning at binary `heap_start`; binary `heap_size` or the 1000-cell default | Userspace libraries and applications |
 
 Thus both complete process-region allocation and internal `malloc()` allocation
 are first-fit, but they are distinct heap instances at different levels.

@@ -2,8 +2,6 @@
 
 #include "../common/heap.header"
 
-#define DEFAULT_KERNEL_HEAP_CELLS 4096
-
 void init_kernel_heap(void);
 void *kmalloc(int size);
 void *krealloc(void *ptr, int size);

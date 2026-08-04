@@ -41,7 +41,6 @@ void boot_main(void) {
     int code_start;
     int data_start;
     int stack_start;
-    int heap_start;
     int word_count;
     int payload_word_count;
 
@@ -50,13 +49,14 @@ void boot_main(void) {
     word_count = receive_word();
     code_start = receive_word();
     data_start = receive_word();
-    heap_start = receive_word();
+    receive_word(); // Discards heap_start because the kernel uses memory_constants.header
+    receive_word(); // Discards heap_size because the kernel uses memory_constants.header
     stack_start = receive_word();
     if (stack_start == -1) {
         stack_start = SRAM_MAX_ADDRESS;
     }
 
-    payload_word_count = word_count - 4;
+    payload_word_count = word_count - 5;
     uart_print_loading_bar_label(
         loading_bar_enabled,
         "load ",
