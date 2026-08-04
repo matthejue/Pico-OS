@@ -62,10 +62,13 @@ int load_process(char *path, bool show_loading_bar) {
     code_start = receive_word();
     data_start = receive_word();
     heap_start = receive_word();
+    heap_size = receive_word();
     stack_start = receive_word();
-    heap_size = DEFAULT_PROCESS_HEAP_CELLS;
+    if (heap_size == -1) {
+        heap_size = DEFAULT_PROCESS_HEAP_CELLS;
+    }
 
-    payload_word_count = word_count - 4;
+    payload_word_count = word_count - 5;
     uart_print_loading_bar_label(show_loading_bar, "load ", path);
     effective_stack_start = loaded_process_stack_start(
         heap_start,

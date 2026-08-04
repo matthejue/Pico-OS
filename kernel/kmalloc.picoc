@@ -17,7 +17,7 @@ void *require_kernel_heap_allocation(void *memory, int size) {
 void init_kernel_heap(void) {
     int heap_start = KERNEL_HEAP_START;
 
-    heap_init_region(&kernel_heap, (void *)heap_start, DEFAULT_KERNEL_HEAP_CELLS);
+    heap_init_region(&kernel_heap, (void *)heap_start, KERNEL_HEAP_SIZE);
 }
 
 void *kmalloc(int size) {

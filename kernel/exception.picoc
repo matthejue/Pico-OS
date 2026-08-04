@@ -11,7 +11,7 @@
 void activate_kernel_stack_boundary(void) {
     periphery_write_register(
         STACK_HEAP_BOUNDARY_REGISTER,
-        KERNEL_HEAP_START + DEFAULT_KERNEL_HEAP_CELLS - 1
+        KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1
     );
 }
 
