@@ -77,3 +77,15 @@ void handle_cpu_exception(int interrupted_kernel_cs_difference) {
 
     exit_process(PROCESS_EXIT_STATUS_EXCEPTION);
 }
+
+void handle_process_heap_full_exception(void) {
+    write_process_exception_message(
+        "Process terminated: heap full\n"
+    );
+    exit_process(PROCESS_EXIT_STATUS_EXCEPTION);
+}
+
+void panic_kernel_heap_full(void) {
+    uart_print_string("Kernel panic: kernel heap full\n");
+    shutdown();
+}

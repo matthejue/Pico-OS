@@ -5,6 +5,16 @@
 
 struct Heap process_heap;
 
+void *require_process_heap_allocation(void *memory, int size) {
+    if (memory == NULL && size > 0) {
+        // SYSCALL_PROCESS_HEAP_FULL
+        asm("LOADI ACC 31");
+        asm("INT 0");
+    }
+
+    return memory;
+}
+
 void init_process_heap(void) {
     int heap_start;
     int heap_size;
@@ -23,11 +33,17 @@ void init_process_heap(void) {
 }
 
 void *malloc(int size) {
-    return heap_alloc_from(&process_heap, size);
+    return require_process_heap_allocation(
+        heap_alloc_from(&process_heap, size),
+        size
+    );
 }
 
 void *realloc(void *ptr, int size) {
-    return heap_realloc_from(&process_heap, ptr, size);
+    return require_process_heap_allocation(
+        heap_realloc_from(&process_heap, ptr, size),
+        size
+    );
 }
 
 void free(void *ptr) {
