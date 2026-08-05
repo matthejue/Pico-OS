@@ -9,7 +9,7 @@ MAX_EMULATOR_DURATION_SECONDS=5
 reti="${test%.picoc}.reti"
 output="${test%.picoc}.output"
 expected="${test%.picoc}.expected_output"
-temporary_root="/tmp/reti_emulator"
+temporary_root="/tmp"
 mkdir -p "$temporary_root" || exit 1
 peripherals_dir="$(mktemp -d -p "$temporary_root")" || exit 1
 
