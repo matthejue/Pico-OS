@@ -19,7 +19,7 @@ NOT_PASSED_TESTS_FILE = Path("opts/not_passed_os_tests.txt")
 MAX_EMULATOR_DURATION_SECONDS = 120
 SHELL_PROMPT = "PicoOS> "
 PRINT_LOCK = threading.Lock()
-TEMPORARY_ROOT = Path("/tmp/reti_emulator")
+TEMPORARY_ROOT = Path("/tmp")
 
 
 def positive_int(value):
