@@ -114,7 +114,7 @@ for test in "${paths[@]}"; do
   printf '%s' "$expected" > "${test%.picoc}.expected_output"
 done
 
-temporary_root="/tmp/reti_emulator"
+temporary_root="/tmp"
 mkdir -p "$temporary_root" || exit 1
 result_dir="$(mktemp -d -p "$temporary_root")"
 cleanup_result_dir() {
