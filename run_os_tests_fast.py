@@ -8,12 +8,14 @@ from pathlib import Path
 from run_os_tests import (
     append_summary,
     build_test_programs,
+    copy_staged_test_file,
     emulator_args_request_debug,
     outputs_match,
     print_heading,
     remove_if_exists,
     run_os_test,
     selected_test_dirs,
+    stage_test_directories,
     split_extra_args,
     is_os_feature_test,
     validate_test_dir,
@@ -168,6 +170,7 @@ def main():
     ready_eval_shell_paths = []
     ready_uart_shell_paths = []
 
+    stage_test_directories(paths)
     for test_dir in paths:
         print_heading(test_dir, args.columns)
         remove_if_exists(test_dir / "output.txt")
@@ -209,6 +212,12 @@ def main():
             ready_uart_shell_paths,
             extra_emu_args,
         )
+        for test_dir in ready_shared_paths:
+            copy_staged_test_file(test_dir, "output.txt")
+            copy_staged_test_file(
+                test_dir,
+                SHELL_TEST_CAPTURE_FILENAME,
+            )
         if session_status != "passed":
             for test_dir in ready_shared_paths:
                 statuses[test_dir] = session_status

@@ -14,6 +14,8 @@ OS_RUN_CPL_OPTS ?= $(shell cat ./config/os_run_cpl_opts.txt)
 OS_RUN_EMU_OPTS ?= $(shell cat ./config/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
 KERNEL_STACK_START ?= 40000
+BINARY_DIR := binary
+RELEASE_ARCHIVE ?= pico-os-runtime.tar.gz
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
@@ -80,18 +82,26 @@ compile_picoc_sources = set -e; $(foreach source,$(1),$(PICOC_BUILD) "$(source)"
 prepare_test_picoc_sources = $(if $(filter staged,$(TEST_BUILD_MODE)),$(call compile_picoc_sources,$(1)),:)
 test_picoc_inputs = $(if $(filter direct,$(TEST_BUILD_MODE)),$(1),$(call picoc_blocks,$(1)))
 
+define assemble_binary
+set -e; \
+temporary_reti="$(@:.bin=.reti)"; \
+ln -sf "$(abspath $<)" "$$temporary_reti"; \
+trap 'status=$$?; rm -f "$$temporary_reti"; if ((status != 0)); then rm -f "$@"; fi; exit $$status' EXIT; \
+./run_reti_emulator_isolated.sh -S "$(<:.reti=.sections)" -a "$$temporary_reti"
+endef
+
 
 # ----------------------------------------------------------------------
 # Phony targets
 # ----------------------------------------------------------------------
 
-.PHONY: help code-index FORCE
+.PHONY: help code-index FORCE ci-build ci-artifacts release-tree release-archive rebuild-release verify-release-tree test-runtime-tree system-binaries user-binaries
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
 .PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
-.PHONY: clean
+.PHONY: clean clean-binary
 
 FORCE:
 
@@ -117,11 +127,17 @@ help:
 	@echo "  make test-shell                 Run shell tests normally"
 	@echo "  make test-shell-fast            Run shell tests with one OS boot"
 	@echo "  make firmware                   Build bootloader and kernel artifacts"
-	@echo "  make bootload                   Build firmware and boot through startprogram.reti"
+	@echo "  make release-tree               Build and clean the complete release tree in binary"
+	@echo "  make release-archive            Build and archive the verified release tree"
+	@echo "  make rebuild-release            Clean and rebuild the release archive"
+	@echo "  make verify-release-tree        Verify all expected release files"
+	@echo "  make ci-build                   Build the complete release tree in binary"
+	@echo "  make ci-artifacts               Alias for make release-tree"
+	@echo "  make bootload                   Build the release tree and boot through binary/boot/bootloader.reti"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
 	@echo "  make run-kernel                 Build and run kernel.reti directly"
-	@echo "  make eprom                      Build boot/startprogram.reti"
-	@echo "  make kernel                     Build kernel/kernel.bin"
+	@echo "  make eprom                      Build boot/bootloader.reti"
+	@echo "  make kernel                     Build binary/kernel/kernel.bin"
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
@@ -168,9 +184,10 @@ code-index:
 run:
 	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
-run-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/kill.bin user/poweroff.bin
+run-os: test-runtime-tree
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	status=$$?; rm -rf binary/test; exit "$$status"
 
 run_send_keypresses:
 	@set -e; \
@@ -187,7 +204,7 @@ run_send_keypresses:
 # Tests
 # ----------------------------------------------------------------------
 
-test:
+test: release-tree
 	@test_jobs="$$(./select_test_jobs.sh)" || exit $$?; \
 	summary_file=$$(mktemp); \
 	status=0; \
@@ -206,7 +223,7 @@ test:
 	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys TEST_JOBS="$$test_jobs" || status=$$?; \
 	exit "$$status"
 
-test-fast:
+test-fast: release-tree
 	@test_jobs="$$(./select_test_jobs.sh)" || exit $$?; \
 	summary_file=$$(mktemp); \
 	status=0; \
@@ -247,22 +264,24 @@ test-sys:
 		"$$((duration / 60))" "$$((duration % 60))"; \
 	exit "$$status"
 
-test-os: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
+test-os: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
 	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-os completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
+	rm -rf binary/test; \
 	exit "$$status"
 
-test-shell: kernel.reti system/init.bin user/shell.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
+test-shell: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
 	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-shell completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
+	rm -rf binary/test; \
 	exit "$$status"
 
 test-sys-fast:
@@ -277,22 +296,26 @@ test-sys-fast:
 		"$$((duration / 60))" "$$((duration % 60))"; \
 	exit "$$status"
 
-test-os-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
+test-os-fast: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
+	$(MAKE) binary/system/fast_os_test_launcher.bin; \
 	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-os-fast completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
+	rm -f binary/system/fast_os_test_launcher.bin; rm -rf binary/test; \
 	exit "$$status"
 
-test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_launcher.bin user/cat.bin user/echo.bin user/kill.bin user/poweroff.bin
+test-shell-fast: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
+	$(MAKE) binary/system/fast_os_test_launcher.bin; \
 	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-shell-fast completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
+	rm -f binary/system/fast_os_test_launcher.bin; rm -rf binary/test; \
 	exit "$$status"
 
 
@@ -300,44 +323,116 @@ test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_
 # Firmware build
 # ----------------------------------------------------------------------
 
-firmware: boot/startprogram.reti kernel/kernel.bin system/init.bin user/shell.bin user/poweroff.bin
+firmware: release-tree
 
-eprom: boot/startprogram.reti
+eprom: boot/bootloader.reti
 
-kernel: kernel/kernel.bin
+kernel: binary/kernel/kernel.bin
 
 isrs: config/isrs.reti
 
-SYSTEM_PROGRAM_SOURCES := $(wildcard system/*.picoc)
-SYSTEM_PROGRAM_BINARIES := $(SYSTEM_PROGRAM_SOURCES:.picoc=.bin)
+SYSTEM_PROGRAM_SOURCES := $(filter-out system/fast_os_test_launcher.picoc,$(wildcard system/*.picoc))
+SYSTEM_PROGRAM_BINARIES := $(patsubst system/%.picoc,$(BINARY_DIR)/system/%.bin,$(SYSTEM_PROGRAM_SOURCES))
 USER_PROGRAM_SOURCES := $(wildcard user/*.picoc)
-USER_PROGRAM_BINARIES := $(USER_PROGRAM_SOURCES:.picoc=.bin)
+USER_PROGRAM_BINARIES := $(patsubst user/%.picoc,$(BINARY_DIR)/user/%.bin,$(USER_PROGRAM_SOURCES))
 
-system: $(SYSTEM_PROGRAM_BINARIES)
+system-binaries: $(SYSTEM_PROGRAM_BINARIES)
 
-user: $(USER_PROGRAM_BINARIES)
+user-binaries: $(USER_PROGRAM_BINARIES)
+
+system user: release-tree
+
+RUNTIME_FILES := \
+	$(BINARY_DIR)/config/environment.txt \
+	$(BINARY_DIR)/boot/bootloader.reti \
+	$(BINARY_DIR)/kernel/kernel.sections \
+	$(BINARY_DIR)/kernel/kernel.debuginfo \
+	$(BINARY_DIR)/start-picoos.sh \
+	$(BINARY_DIR)/start-picoos.ps1 \
+	$(BINARY_DIR)/README.md
+
+RELEASE_FILES := \
+	$(BINARY_DIR)/kernel/kernel.bin \
+	$(SYSTEM_PROGRAM_BINARIES) \
+	$(USER_PROGRAM_BINARIES) \
+	$(RUNTIME_FILES)
+
+RELEASE_ARCHIVE_FILES := $(patsubst $(BINARY_DIR)/%,%,$(RELEASE_FILES))
+RELEASE_FIND_EXCLUSIONS := $(foreach file,$(RELEASE_FILES),! -path '$(file)')
+
+release-tree: binary/kernel/kernel.bin system-binaries user-binaries $(RUNTIME_FILES)
+	find $(BINARY_DIR) \( -type f -o -type l \) \
+		$(RELEASE_FIND_EXCLUSIONS) -delete
+	find $(BINARY_DIR) -depth -mindepth 1 -type d -empty -delete
+
+test-runtime-tree: release-tree
+	mkdir -p $(BINARY_DIR)/test
+
+verify-release-tree: release-tree
+	@set -e; \
+	for file in $(RELEASE_FILES); do \
+		test -s "$$file" || { echo "Missing release file: $$file" >&2; exit 1; }; \
+	done; \
+	test -x $(BINARY_DIR)/start-picoos.sh; \
+	unexpected=$$(find $(BINARY_DIR) \( -type f -o -type l \) \
+		$(RELEASE_FIND_EXCLUSIONS) -print -quit); \
+	test -z "$$unexpected" || { echo "Unexpected release file: $$unexpected" >&2; exit 1; }
+
+release-archive: verify-release-tree
+	tar -C $(BINARY_DIR) -czf "$(abspath $(RELEASE_ARCHIVE))" $(RELEASE_ARCHIVE_FILES)
+
+rebuild-release:
+	$(MAKE) clean
+	$(MAKE) release-archive
+
+ci-build ci-artifacts: release-tree
+
+$(BINARY_DIR) $(BINARY_DIR)/boot $(BINARY_DIR)/config $(BINARY_DIR)/kernel $(BINARY_DIR)/system $(BINARY_DIR)/user:
+	mkdir -p $@
+
+binary/config/environment.txt: config/environment.txt | binary/config
+	cp $< $@
+
+binary/boot/bootloader.reti: boot/bootloader.reti | binary/boot
+	cp $< $@
+
+binary/kernel/kernel.sections: kernel.reti | binary/kernel
+	cp kernel.sections $@
+
+binary/kernel/kernel.debuginfo: kernel.reti | binary/kernel
+	cp kernel.debuginfo $@
+
+binary/start-picoos.sh: start-picoos.sh | binary
+	cp $< $@
+	chmod 755 $@
+
+binary/start-picoos.ps1: start-picoos.ps1 | binary
+	cp $< $@
+
+binary/README.md: .github/release/picoos-README.md | binary
+	cp $< $@
 
 user/echo.reti: library/stdio/libstdio.picoc library/stdio/stdio.picoc library/stdio/scanf.picoc library/stdio/stdio.header common/decimal.picoc common/decimal.header
 
 cat.reti: user/cat.reti
 
-cat.bin: user/cat.bin
+cat.bin: binary/user/cat.bin
 
 echo.reti: user/echo.reti
 
-echo.bin: user/echo.bin
+echo.bin: binary/user/echo.bin
 
 kill.reti: user/kill.reti
 
-kill.bin: user/kill.bin
+kill.bin: binary/user/kill.bin
 
 poweroff.reti: user/poweroff.reti
 
-poweroff.bin: user/poweroff.bin
+poweroff.bin: binary/user/poweroff.bin
 
 shell.reti: user/shell.reti
 
-shell.bin: user/shell.bin
+shell.bin: binary/user/shell.bin
 
 ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
@@ -376,11 +471,11 @@ boot/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) kernel/mem
 		-O1 -s -k eprom \
 		-o boot/memory_constants.header
 
-boot/startprogram.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) boot/memory_constants.header kernel/memory_constants.header
+boot/bootloader.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) boot/memory_constants.header kernel/memory_constants.header
 	$(PICOC_BUILD_DIRECT) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
-		-o boot/startprogram.reti
+		-o boot/bootloader.reti
 
 SYSTEM_LIBRARY_SOURCES := \
 	$(USER_STARTUP_LIBRARY_SOURCES) \
@@ -400,9 +495,6 @@ system/init.reti: system/init.picoc config/config.header common/loading_bar.head
 		-O1 -s -g \
 		-o system/init.reti
 
-system/init.bin: system/init.reti
-	./run_reti_emulator_isolated.sh -a system/init.reti
-
 user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header library/string/string.picoc library/string/string.header $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$(SHELL_SOURCES) $(USER_STARTUP_SOURCE))
 	$(PICOC_TEST_BUILD) \
@@ -419,8 +511,8 @@ system/%.reti: system/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPEND
 		-O1 -s -g \
 		-o $@
 
-system/%.bin: system/%.reti
-	./run_reti_emulator_isolated.sh -a $<
+binary/system/%.bin: system/%.reti | binary/system
+	@$(assemble_binary)
 
 user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCIES) $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$< $(call picoc_dependency_sources,$<) $(USER_STARTUP_LIBRARY_SOURCES) $(USER_STARTUP_SOURCE))
@@ -430,8 +522,8 @@ user/%.reti: user/%.picoc $(USER_STARTUP_DEPENDENCIES) $(USER_RUNTIME_DEPENDENCI
 		-O1 -s -g \
 		-o $@
 
-user/%.bin: user/%.reti
-	./run_reti_emulator_isolated.sh -a $<
+binary/user/%.bin: user/%.reti | binary/user
+	@$(assemble_binary)
 
 KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \
@@ -484,24 +576,19 @@ kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.h
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 
-kernel/kernel.bin: kernel.reti boot/startprogram.reti
-	@set -e; \
-	temporary_reti=kernel/.kernel.reti; \
-	ln -sf ../kernel.reti "$$temporary_reti"; \
-	trap 'rm -f "$$temporary_reti" kernel/.kernel.bin' EXIT; \
-	./run_reti_emulator_isolated.sh -S kernel.sections -a "$$temporary_reti"; \
-	mv kernel/.kernel.bin $@
+binary/kernel/kernel.bin: kernel.reti | binary/kernel
+	@$(assemble_binary)
 
 
 # ----------------------------------------------------------------------
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel.reti system/init.bin user/shell.bin user/poweroff.bin
-	./run_reti_emulator_isolated.sh kernel.reti -d -c -O -r $(SRAM_SIZE)
+run-firmware: kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt
+	cd binary && ../run_reti_emulator_isolated.sh ../kernel.reti -d -c -O -r $(SRAM_SIZE)
 
 bootload: firmware
-	./run_reti_emulator_isolated.sh -n 4 -e ./boot/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
@@ -509,19 +596,14 @@ bootload-debug:
 	$(PICOC_BUILD_DIRECT) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
-		-o boot/startprogram.reti
+		-o boot/bootloader.reti
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
-	@set -e; \
-	temporary_reti=kernel/.kernel.reti; \
-	ln -sf ../kernel.reti "$$temporary_reti"; \
-	trap 'rm -f "$$temporary_reti" kernel/.kernel.bin' EXIT; \
-	./run_reti_emulator_isolated.sh -S kernel.sections -a "$$temporary_reti"; \
-	mv kernel/.kernel.bin kernel/kernel.bin
-	./run_reti_emulator_isolated.sh -n 4 -e ./boot/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	$(MAKE) release-tree
+	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
 
 
 # ----------------------------------------------------------------------
@@ -537,8 +619,9 @@ clean-firmware:
 		! -name '.gitkeep' \
 		-delete
 	rm -f kernel.reti kernel/kernel.bin kernel.sections kernel.debuginfo
+	rm -rf binary/boot binary/kernel binary/system
 
-clean: clean-firmware
+clean: clean-binary
 	find . -type f \
 		! -path './.vscode/*' \
 		! -path './boot/*' \
@@ -585,3 +668,7 @@ clean: clean-firmware
 		\) -delete
 	find . -type f -path './.test_dependencies/*.d' -delete
 	find . -type d -path './.test_dependencies' -empty -delete
+
+clean-binary: clean-firmware
+	rm -rf binary/boot binary/config binary/kernel binary/system binary/user
+	rm -f binary/start-picoos.sh binary/start-picoos.ps1 binary/README.md
