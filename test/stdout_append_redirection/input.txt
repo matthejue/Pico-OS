@@ -1,0 +1,5 @@
+echo.bin first line > ./test/stdout_append_redirection/output.txt
+echo.bin second\nthird >> ./test/stdout_append_redirection/output.txt
+cat.bin ./test/stdout_append_redirection/output.txt
+exit
+poweroff.bin

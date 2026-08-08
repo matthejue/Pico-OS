@@ -1,0 +1,12 @@
+// dependencies: ../../library/stdlib/libstdlib.reti_blocks
+
+#include "../../library/stdlib/stdlib.header"
+
+int main(void) {
+    void *allocation = malloc(1);
+
+    while (allocation != NULL) {
+        allocation = malloc(1);
+    }
+    return 0;
+}

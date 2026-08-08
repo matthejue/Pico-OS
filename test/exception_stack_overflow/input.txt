@@ -1,0 +1,3 @@
+load test/exception_stack_overflow/launcher.bin
+run 3
+poweroff.bin

@@ -1,6 +1,6 @@
-// dependencies: ../lib/stdio/libstdio.reti_blocks
+// dependencies: ../library/stdio/libstdio.reti_blocks
 
-#include "../lib/stdio/stdio.header"
+#include "../library/stdio/stdio.header"
 
 void print_argument(char *argument) {
     int index = 0;

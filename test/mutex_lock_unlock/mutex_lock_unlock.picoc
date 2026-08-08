@@ -1,0 +1,20 @@
+// dependencies: ../../library/mutex/libmutex.reti_blocks ../../library/stdio/libstdio.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+#include "../../library/mutex/mutex.header"
+
+int main(void) {
+    struct mutex m;
+
+    mutex_init(&m);
+
+    mutex_lock(&m);
+    printf("%d ", 42);
+    mutex_unlock(&m);
+
+    mutex_lock(&m);
+    printf("%d ", 84);
+    mutex_unlock(&m);
+
+    return 0;
+}

@@ -1,7 +1,7 @@
-// dependencies: ../lib/unistd/libunistd.reti_blocks
+// dependencies: ../library/unistd/libunistd.reti_blocks
 
 #include "../common/syscall.header"
-#include "../lib/unistd/unistd.header"
+#include "../library/unistd/unistd.header"
 
 int main(void) {
     invoke_syscall(SYSCALL_SHUTDOWN, 0);

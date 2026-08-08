@@ -1,0 +1,29 @@
+// in:
+// expected:12 42
+// dependencies: ../library/stdlib/libstdlib.reti_blocks ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdio/stdio.header"
+#include "../library/stdlib/stdlib.header"
+
+int main() {
+    init_process_heap();
+
+    int *a = (int *)malloc(4);
+    int *b = (int *)malloc(4);
+    int *c = (int *)malloc(3);
+
+    c[0] = 3;
+    c[2] = 4;
+
+    free(a);
+    free(b);
+
+    int *d = (int *)malloc(11);
+    d[0] = 21;
+    d[10] = 2;
+
+    printf("%d ", c[0] * c[2]);
+    printf("%d ", d[0] * d[10]);
+
+    return 0;
+}

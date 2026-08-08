@@ -1,0 +1,16 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/prctl/libprctl.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/prctl/prctl.header"
+#include "../../library/schedule/schedule.header"
+#include "../../common/stddef.header"
+
+int main(void) {
+    int child;
+
+    prctl(PR_SET_PDEATHSIG, 0);
+    child = load("test/signals_waitpid/endless.bin");
+    run(child, NULL, NULL);
+    yield();
+    return child;
+}

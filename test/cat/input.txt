@@ -1,0 +1,4 @@
+cat.bin test/cat/first.txt test/cat/second.txt
+cat.bin test/cat/missing.txt
+exit
+poweroff.bin

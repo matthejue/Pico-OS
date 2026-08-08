@@ -1,3 +1,0 @@
-load tests/shared_memory/launcher.bin
-run 3
-poweroff.bin
