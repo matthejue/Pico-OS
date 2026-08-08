@@ -1,1 +1,1 @@
-/home/areo/Documents/Studium/PicoC-Compiler/run.py
+../PicoC-Compiler/run.py
