@@ -1,0 +1,25 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/stdlib/stdlib.header"
+
+int main(void) {
+    char *custom_environment[2];
+    int inherited_worker;
+    int custom_worker;
+
+    setenv("LAUNCHER_VARIABLE", "true", true);
+    custom_environment[0] = "WORKER_VARIABLE=true";
+    custom_environment[1] = NULL;
+
+    inherited_worker = load("test/process_environment/worker.bin");
+    custom_worker = load("test/process_environment/worker.bin");
+
+    run(inherited_worker, NULL, NULL);
+    waitpid(inherited_worker);
+
+    run(custom_worker, NULL, custom_environment);
+    waitpid(custom_worker);
+    return 0;
+}

@@ -1,0 +1,3 @@
+./test/stdio_files/stdio_files.bin
+exit
+poweroff.bin

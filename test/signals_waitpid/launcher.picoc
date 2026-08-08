@@ -1,0 +1,69 @@
+// dependencies: ../../library/stdio/libstdio.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/signal/libsignal.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/signal/signal.header"
+#include "../../library/schedule/schedule.header"
+#include "../../common/stddef.header"
+
+int sigchld_count = 0;
+
+void child_exited(int signal_number) {
+    if (signal_number == SIGCHLD) {
+        sigchld_count = sigchld_count + 1;
+    }
+}
+
+int run_and_yield(char *path) {
+    int pid = load(path);
+
+    run(pid, NULL, NULL);
+    yield();
+    return pid;
+}
+
+int main(void) {
+    int non_child;
+    int parent;
+    int pid;
+    int status;
+
+    pid = run_and_yield(
+        "test/signals_waitpid/sigterm_target.bin"
+    );
+    kill(pid, SIGTERM);
+    status = waitpid(pid);
+    printf("SIGTERM handler status: %d\n", status);
+
+    if (signal(SIGCHLD, child_exited) == SIG_ERR) {
+        return 1;
+    }
+
+    pid = run_and_yield(
+        "test/signals_waitpid/sigkill_target.bin"
+    );
+    kill(pid, SIGTERM);
+    printf("SIGKILL status: %d\n", waitpid(pid));
+    yield();
+    printf("SIGCHLD delivered: %d\n", sigchld_count);
+
+    pid = run_and_yield(
+        "test/signals_waitpid/stop_target.bin"
+    );
+    kill(pid, SIGTSTP);
+    status = waitpid(pid);
+    printf("SIGTSTP stopped: %d\n", WIFSTOPPED(status));
+    kill(pid, SIGCONT);
+    printf("SIGCONT status: %d\n", waitpid(pid));
+
+    parent = load(
+        "test/signals_waitpid/grandchild_parent.bin"
+    );
+    run(parent, NULL, NULL);
+    non_child = waitpid(parent);
+    printf("waitpid rejects non-child: %d\n",
+           waitpid(non_child) == -1);
+    kill(non_child, SIGKILL);
+    return 0;
+}

@@ -1,0 +1,3 @@
+load test/parent_death_signal/launcher.bin
+run 3
+poweroff.bin

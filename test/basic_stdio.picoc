@@ -1,0 +1,14 @@
+// in: 42 X
+// expected:ok 42 Z
+// dependencies: ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdio/stdio.header"
+
+int main() {
+    int value;
+
+    scanf("%d", &value);
+    printf("ok %d %c", value, 'Z');
+
+    return 0;
+}

@@ -1,11 +1,11 @@
-// dependencies: ../lib/fcntl/libfcntl.reti_blocks ../lib/unistd/libunistd.reti_blocks ../lib/sys/wait/libwait.reti_blocks
+// dependencies: ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks ../library/sys/wait/libwait.reti_blocks
 
 #include "../common/loading_bar.header"
 #include "../common/stddef.header"
-#include "../lib/fcntl/fcntl.header"
-#include "../lib/stdlib/stdlib.header"
-#include "../lib/sys/wait/wait.header"
-#include "../lib/unistd/unistd.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/stdlib/stdlib.header"
+#include "../library/sys/wait/wait.header"
+#include "../library/unistd/unistd.header"
 
 #define FAST_TEST_PATH_CAPACITY 160
 #define FAST_TEST_SAVED_STDOUT_FILENO 7

@@ -1,0 +1,10 @@
+// in:
+// expected:newline\n
+// dependencies: ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdio/stdio.header"
+
+int main() {
+    printf("newline\n");
+    return 0;
+}
