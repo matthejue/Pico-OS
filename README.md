@@ -78,7 +78,7 @@ make bootload
 kernel section/debug metadata, and a 2^18-cell SRAM. Press capital `V` to enter
 the UART terminal view; `Escape` returns to the TUI. `make bootload-debug`
 forces debug information for both bootloader and kernel. `make run-os
-OS_RUN_PATH=tests/hello_world` runs one configured OS scenario, while the
+OS_RUN_PATH=test/hello_world` runs one configured OS scenario, while the
 focused test targets are documented in [section 14](#14-test-system).
 Both bootload targets pass `-n 4` because PicoOS's four-entry interrupt vector
 table is copied into SRAM by the EPROM loader and therefore cannot be counted
@@ -89,14 +89,14 @@ when the emulator initially parses `startprogram.reti`.
 ## 1.1 Loading and starting the kernel
 
 The firmware entry point is the naked `_start()` in
-[`eprom_startprogram/startprogram.picoc`](eprom_startprogram/startprogram.picoc).
+[`boot/bootloader.picoc`](boot/bootloader.picoc).
 The compiler places it in EPROM. It:
 
 1. sets `SP` to the last SRAM cell (`-2^31 + 2^18 - 1`) and copies it to `BAF`;
 2. makes `DS` point at the bootloader's EPROM data section; and
 3. jumps to `boot_main()`.
 
-`boot_main()` sends the bytes of `<ESC>load kernel.bin<ESC>/` through UART,
+`boot_main()` sends the bytes of `<ESC>load kernel/kernel.bin<ESC>/` through UART,
 receives the file's word count and five-word binary header, then copies the
 remaining words to the first SRAM cell. `start_loaded_kernel()` reads the
 saved header values from its bootloader frame, changes `CS` and `DS` from
@@ -116,9 +116,9 @@ sequenceDiagram
 
     CPU->>EPROM: Begin at EPROM CS:0
     EPROM->>EPROM: Set boot SP/BAF and EPROM DS
-    EPROM->>UART: ESC load kernel.bin ESC /
+    EPROM->>UART: ESC load kernel/kernel.bin ESC /
     UART->>Emu: Raw output bytes
-    Emu->>UART: file word count + kernel.bin
+    Emu->>UART: file word count + kernel/kernel.bin
     UART->>EPROM: 4 section words, then payload
     loop each payload word
         EPROM->>SRAM: Store word at SRAM_BASE + index
@@ -134,7 +134,7 @@ and stack-overflow boundary are **not** initialized until `main()`. The EPROM
 stack used during loading is at the top of SRAM; the kernel changes to its
 dedicated stack before running.
 
-Useful sources: [bootloader](eprom_startprogram/startprogram.picoc),
+Useful sources: [bootloader](boot/bootloader.picoc),
 [word receiver](common/uart_protocol.picoc), and
 [SRAM copy loop](common/sram_loader.picoc).
 
@@ -143,7 +143,7 @@ Useful sources: [bootloader](eprom_startprogram/startprogram.picoc),
 The kernel has no process control block from which low-level code could obtain
 its segment and stack addresses. The compiler therefore provides
 `-k MODE` / `--kernelheader MODE`, documented in
-[PicoC-Compiler's kernel-header guide](../PicoC-Compiler/doc/kernel_header_option.md).
+[PicoC-Compiler's kernel-header guide](../PicoC-Compiler/documentation/kernel_header_option.md).
 This mode links far enough to know final section addresses and writes only the
 header selected by `-o`.
 
@@ -156,7 +156,7 @@ picoc_compiler <kernel sources> -O1 -s -k sram \
 
 # EPROM bootloader constants
 picoc_compiler <bootloader sources> -O1 -s -k eprom \
-    -o eprom_startprogram/memory_constants.header
+    -o boot/memory_constants.header
 ```
 
 The current generated
@@ -183,7 +183,7 @@ boundaries are `.text = 4`, `.data = 32705`, heap start `33189`, and kernel
 stack start `40000`.
 
 The EPROM-mode header
-[`eprom_startprogram/memory_constants.header`](eprom_startprogram/memory_constants.header)
+[`boot/memory_constants.header`](boot/memory_constants.header)
 contains `SRAM_MAX_ADDRESS`, `EPROM_DS_START_ASM`, and
 `EPROM_STACK_START_ASM`. It has no kernel heap or process-memory constants:
 the bootloader needs only its EPROM data base and a temporary SRAM-top stack.
@@ -207,7 +207,7 @@ exist. Normal shell input instead uses the UART hardware interrupt and the
 per-process input buffer described in [section 3.9](#39-uart-and-keypress-interrupt).
 
 See [`kernel/uart_hardware.picoc`](kernel/uart_hardware.picoc), the local
-[UART protocol notes](doc/uart_protocol.md), and the emulator's
+[UART protocol notes](documentation/uart_protocol.md), and the emulator's
 [UART documentation](../RETI-Emulator/README.md#uart).
 
 ## 1.4 File-loading protocol over UART
@@ -272,7 +272,7 @@ memory, and copies only the encoded program words. For normal programs the
 build is:
 
 ```sh
-picoc_compiler program.picoc <libraries> -C lib/start/libstart.picoc \
+picoc_compiler program.picoc <libraries> -C library/start/libstart.picoc \
     -O1 -i -w -s -g -v -o program.reti
 ./run_reti_emulator_isolated.sh -a program.reti
 ```
@@ -287,7 +287,7 @@ files before linking. The compiler itself decides whether those files can be
 reused from the cache metadata embedded in `.reti_blocks`; Make dependency
 files keep library-test header dependencies up to date without a separate
 Python cache check.
-See [Incremental PicoC compilation](doc/incremental_compilation.md) for the
+See [Incremental PicoC compilation](documentation/incremental_compilation.md) for the
 complete cache and invalidation behavior.
 
 The real big-endian receiver is intentionally simple:
@@ -311,7 +311,7 @@ int receive_word(void) {
 Sign-extending the first byte before three multiply/add steps reconstructs the
 signed 32-bit value. See
 [`common/uart_protocol.picoc`](common/uart_protocol.picoc) and the emulator's
-[section-file format](../RETI-Emulator/doc/section_file_entries.md).
+[section-file format](../RETI-Emulator/documentation/section_file_entries.md).
 
 # 2. Kernel main loop
 
@@ -478,7 +478,7 @@ passes the difference between interrupted and kernel `CS` to
 The exception entry itself saves only the retry PC automatically. PicoOS does
 not need to preserve the other faulty user registers because it terminates the
 process. See [`kernel/exception.picoc`](kernel/exception.picoc) and the
-emulator's [CPU exception contract](../RETI-Emulator/doc/cpu_exceptions.md).
+emulator's [CPU exception contract](../RETI-Emulator/documentation/cpu_exceptions.md).
 
 Kernel allocations are not recoverable: a failed positive-size `kmalloc()` or
 `krealloc()` prints `Kernel panic: kernel heap full` and shuts down PicoOS.
@@ -637,7 +637,7 @@ The requested claim that the caller now saves `BAF` does **not** match the
 implementation: the callee saves it. See the compiler's
 [stack-frame description](../PicoC-Compiler/README.md#function-calls-and-stack-frames)
 and `NewStackframe` lowering in
-[`reti_blocks_pass.py`](../PicoC-Compiler/src/passes/compilation/reti_blocks_pass.py).
+[`reti_blocks_pass.py`](../PicoC-Compiler/source/passes/compilation/reti_blocks_pass.py).
 
 At interrupt entry, the CPU and vector-0 hub create this user-stack image:
 
@@ -974,7 +974,7 @@ the strings onto the child's initial stack, so changes are inherited at start
 but are not shared afterward. A caller may instead supply its own
 null-terminated environment array.
 
-Init reads [`opts/environment.txt`](opts/environment.txt), currently:
+Init reads [`config/environment.txt`](config/environment.txt), currently:
 
 ```text
 PATH=./user
@@ -983,7 +983,7 @@ PATH=./user
 It uses `setenv()`, then starts the shell with inherited environment. The shell
 uses `PATH` to locate later programs; those programs inherit the shell's
 current copy. If `loading_bar_enabled` in
-[`opts/config.header`](opts/config.header) is true, init also sets
+[`config/config.header`](config/config.header) is true, init also sets
 `PICOOS_LOADING_BAR=true`, allowing one setting to control loader progress in
 all descendants.
 
@@ -1188,7 +1188,7 @@ control.
 
 ### Parent-death signal
 
-[`lib/sys/prctl`](lib/sys/prctl/prctl.picoc) supports exactly:
+[`library/sys/prctl`](library/sys/prctl/prctl.picoc) supports exactly:
 
 ```c
 prctl(PR_SET_PDEATHSIG, 0);
@@ -1257,7 +1257,7 @@ non-preemptive kernel.
 
 ## 6.5 `yield()`
 
-[`yield()`](lib/schedule/schedule.picoc) is syscall 13 through software
+[`yield()`](library/schedule/schedule.picoc) is syscall 13 through software
 `INT 0`. Unlike a timer interrupt it is voluntary and deterministic, but both
 paths call `dispatcher_switch_from_context()`. The running caller becomes
 `READY`, so another ready process can be chosen; if none exists, the caller
@@ -1583,18 +1583,18 @@ Public headers and principal facilities are:
 
 | Directory/header | Purpose |
 | --- | --- |
-| [`lib/unistd`](lib/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, process load/run/unload/list, PID, reset, foreground PID, wait queues |
-| [`lib/fcntl`](lib/fcntl/fcntl.header) | `open`, `creat`, access/create/truncate/append flags |
-| [`lib/sys/wait`](lib/sys/wait/wait.header) | exact-child `waitpid`, `WIFSTOPPED` |
-| [`lib/schedule`](lib/schedule/schedule.header) | voluntary `yield` |
-| [`lib/mutex`](lib/mutex/mutex.header) | `testset`, init, lock, unlock |
-| [`lib/signal`](lib/signal/signal.header) | `signal`, `kill`, default/ignore constants |
-| [`lib/sys/prctl`](lib/sys/prctl/prctl.header) | `PR_SET_PDEATHSIG` |
-| [`lib/sys/mman`](lib/sys/mman/mman.header) | named shared-memory open/map/unlink |
-| [`lib/stdlib`](lib/stdlib/stdlib.header) | heap allocation, `atoi`, environment APIs, `exit` |
-| [`lib/string`](lib/string/string.header) | `memcpy`, `memset`, copy/concatenate/compare/length |
-| [`lib/stdio`](lib/stdio/stdio.header) | streams, file open/close, character/string/formatted output, formatted input |
-| [`lib/start`](lib/start/start.picoc) | process `_start`, heap/environment initialization, `main`, exit |
+| [`library/unistd`](library/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, process load/run/unload/list, PID, reset, foreground PID, wait queues |
+| [`library/fcntl`](library/fcntl/fcntl.header) | `open`, `creat`, access/create/truncate/append flags |
+| [`library/sys/wait`](library/sys/wait/wait.header) | exact-child `waitpid`, `WIFSTOPPED` |
+| [`library/schedule`](library/schedule/schedule.header) | voluntary `yield` |
+| [`library/mutex`](library/mutex/mutex.header) | `testset`, init, lock, unlock |
+| [`library/signal`](library/signal/signal.header) | `signal`, `kill`, default/ignore constants |
+| [`library/sys/prctl`](library/sys/prctl/prctl.header) | `PR_SET_PDEATHSIG` |
+| [`library/sys/mman`](library/sys/mman/mman.header) | named shared-memory open/map/unlink |
+| [`library/stdlib`](library/stdlib/stdlib.header) | heap allocation, `atoi`, environment APIs, `exit` |
+| [`library/string`](library/string/string.header) | `memcpy`, `memset`, copy/concatenate/compare/length |
+| [`library/stdio`](library/stdio/stdio.header) | streams, file open/close, character/string/formatted output, formatted input |
+| [`library/start`](library/start/start.picoc) | process `_start`, heap/environment initialization, `main`, exit |
 
 Common ABI structures and constants live under [`common`](common), while
 kernel-private interfaces live under [`kernel`](kernel). The `.header`
@@ -1603,9 +1603,9 @@ compatibility.
 
 ## 9.2 Library organization
 
-An umbrella source such as `lib/stdio/libstdio.picoc` includes implementation
+An umbrella source such as `library/stdio/libstdio.picoc` includes implementation
 parts such as `stdio.picoc` and `scanf.picoc`. The Makefile passes umbrella
-sources to `picoc_compiler`, plus `-C lib/start/libstart.picoc` for process
+sources to `picoc_compiler`, plus `-C library/start/libstart.picoc` for process
 startup. Headers expose the source-level API.
 
 Low-level wrappers package multiple arguments into a stack-local request
@@ -1656,9 +1656,9 @@ fixed parameters from `+3`.
 
 ## 9.6 `libstart`
 
-[`lib/start/libstart.picoc`](lib/start/libstart.picoc) is the umbrella startup
+[`library/start/libstart.picoc`](library/start/libstart.picoc) is the umbrella startup
 translation unit. It includes the standard-library implementation and
-[`start.picoc`](lib/start/start.picoc). The compiler's `-C` option makes its
+[`start.picoc`](library/start/start.picoc). The compiler's `-C` option makes its
 custom `_start` replace the generated default and places it first in `.text`.
 
 ## 9.7 Start function
@@ -1784,11 +1784,11 @@ manage registers. The shell does not initialize global kernel structures.
 
 ## 11.3 Configuration file
 
-Init opens [`./opts/environment.txt`](opts/environment.txt), a newline/CRLF
+Init opens [`./config/environment.txt`](config/environment.txt), a newline/CRLF
 separated list of `NAME=value` entries. It reads at most 255 bytes into a
 256-cell buffer and calls `setenv(name, value, true)` for each entry. The
 current file defines only `PATH=./user`; build-time
-[`opts/config.header`](opts/config.header) separately controls whether init
+[`config/config.header`](config/config.header) separately controls whether init
 adds `PICOOS_LOADING_BAR=true`.
 
 If the file is missing, cannot be read, exceeds 255 bytes, contains a malformed
@@ -1937,8 +1937,8 @@ PicoOS provides compact, connected examples:
 
 Relevant sources include [`kernel/scheduler.picoc`](kernel/scheduler.picoc),
 [`kernel/dispatcher.picoc`](kernel/dispatcher.picoc),
-[`lib/mutex/mutex.picoc`](lib/mutex/mutex.picoc), and
-[`tests/shared_memory_mutual_exclusion`](tests/shared_memory_mutual_exclusion).
+[`library/mutex/mutex.picoc`](library/mutex/mutex.picoc), and
+[`test/shared_memory_mutual_exclusion`](test/shared_memory_mutual_exclusion).
 
 ## 13.2 Operating systems lecture
 
@@ -1966,16 +1966,16 @@ No actual lecture-sheet PDF for the requested `malloc`/`free` exercises is
 stored in the three repositories, so this README does not invent sheet titles.
 The checked-in teaching-related artifacts that can be named precisely are:
 
-- [`opts/sheet7ex1_fib_2.picoc`](opts/sheet7ex1_fib_2.picoc), a program named
+- [`config/sheet7ex1_fib_2.picoc`](config/sheet7ex1_fib_2.picoc), a program named
   for sheet 7, exercise 1;
-- [`tests/basic_malloc.picoc`](tests/basic_malloc.picoc),
-  [`basic_free.picoc`](tests/basic_free.picoc), and
-  [`basic_free_block_merging.picoc`](tests/basic_free_block_merging.picoc),
+- [`test/basic_malloc.picoc`](test/basic_malloc.picoc),
+  [`basic_free.picoc`](test/basic_free.picoc), and
+  [`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc),
   focused executable examples for allocation, reuse, and coalescing;
-- [`tests/process_memory_first_fit`](tests/process_memory_first_fit),
+- [`test/process_memory_first_fit`](test/process_memory_first_fit),
   which checks complete-process first-fit reuse;
 - PicoC-Compiler's generically named
-  [`example_exercise_from_sheets1.picoc`](../PicoC-Compiler/sys_tests/example_exercise_from_sheets1.picoc)
+  [`example_exercise_from_sheets1.picoc`](../PicoC-Compiler/sys_test/example_exercise_from_sheets1.picoc)
   through `example_exercise_from_sheets6.picoc`; and
 - the compiler's [pipeline documentation](../PicoC-Compiler/README.md#compiler-pipeline-overview)
   plus generated `.reti` files for teaching symbolic assembly and label
@@ -1988,12 +1988,12 @@ by their real title/path when added.
 
 Three test categories share the compiler/emulator toolchain:
 
-- single-file library tests directly in [`tests`](tests);
+- single-file library tests directly in [`test/`](test/);
 - OS feature directories identified by a canonical `launcher.picoc` and
   three-line `input.txt`; and
 - shell directories whose `input.txt` directly exercises command behavior.
 
-The detailed contributor guide is [`tests/README.md`](tests/README.md).
+The detailed contributor guide is [`test/README.md`](test/README.md).
 
 ## 14.1 `make test` and `make test-fast`
 
@@ -2031,9 +2031,9 @@ Library tests use exact top-of-file metadata:
 ```c
 // in: 42 X
 // expected:ok 42 Z
-// dependencies: ../lib/stdio/libstdio.picoc
+// dependencies: ../library/stdio/libstdio.picoc
 
-#include "../lib/stdio/stdio.header"
+#include "../library/stdio/stdio.header"
 
 int main() {
     int value;
@@ -2043,19 +2043,19 @@ int main() {
 }
 ```
 
-This is [`tests/basic_stdio.picoc`](tests/basic_stdio.picoc).
+This is [`test/basic_stdio.picoc`](test/basic_stdio.picoc).
 [`run_sys_tests.sh`](run_sys_tests.sh) reads the first two lines and creates
 same-basename `.input` and `.expected_output` side files. The parallel Make
 rules parse a leading `// dependencies: ...` line with shell-like quoting and
 resolve paths relative to the test source.
 
 [`run_sys_tests.sh`](run_sys_tests.sh) compiles each selected source using
-`opts/test_cpl_opts.txt`, runs it with `reti_emulator` and
-`opts/test_emu_opts.txt`, limits each emulator to five seconds, and compares
+`config/test_cpl_opts.txt`, runs it with `reti_emulator` and
+`config/test_emu_opts.txt`, limits each emulator to five seconds, and compares
 actual `.output` to `.expected_output` after stripping trailing whitespace per
 line. It reports compilation, emulator, timeout, missing-output, and diff
-failures; writes a summary to `tests/tests.res`; and records failed source
-paths in `opts/not_passed_tests.txt`.
+failures; writes a summary to `test/tests.res`; and records failed source
+paths in `config/not_passed_tests.txt`.
 
 ## 14.3 System and OS tests
 
@@ -2071,7 +2071,7 @@ The targets all exist and mean:
 | `make test-shell-fast` | shell only | one shared boot |
 
 A normal OS feature directory such as
-[`tests/hello_world`](tests/hello_world) contains:
+[`test/hello_world`](test/hello_world) contains:
 
 ```text
 launcher.picoc
@@ -2093,7 +2093,7 @@ expands dependency metadata, and assembles each with
 stdout in `raw_output.txt`, renders terminal control characters and removes
 prompts/loading UI into `output.txt`, then compares trimmed expected/actual
 text. This loads the kernel directly instead of booting through
-`eprom_startprogram/startprogram.reti`; the explicit `make bootload` target
+`boot/startprogram.reti`; the explicit `make bootload` target
 continues to test that boot path. A normal test has a 120-second limit.
 
 The fast runner builds manifests and starts one kernel:
@@ -2154,7 +2154,7 @@ AI tools have been used as development assistants for bounded tasks such as
 Makefile and Python test-runner work, repetitive implementation and test
 scaffolding, refactoring support, debugging suggestions, and documentation.
 The repository includes, for example, a saved
-[VS Code file-association conversation](doc/chats/ChatGPT-VSCode_File_Associations_C.md)
+[VS Code file-association conversation](documentation/chats/ChatGPT-VSCode_File_Associations_C.md)
 and workspace instructions used to keep automated edits and tests consistent.
 
 AI-assisted output is treated like any other proposed change: it is checked
@@ -2169,15 +2169,15 @@ Start with these files when following a subsystem:
 
 | Topic | PicoOS | Related project contract |
 | --- | --- | --- |
-| Boot and binary input | [`startprogram.picoc`](eprom_startprogram/startprogram.picoc), [`process_loader.picoc`](kernel/process/process_loader.picoc) | [binary sections](../RETI-Emulator/doc/section_file_entries.md) |
-| UART | [`uart_hardware.picoc`](kernel/uart_hardware.picoc), [`uart_protocol.picoc`](common/uart_protocol.picoc) | [emulator UART](../RETI-Emulator/doc/uart_protocol.md) |
-| IVT/ISRs | [`os_isrs.picoc`](interrupt_service_routines/os_isrs.picoc) | [compiler low-level attributes](../PicoC-Compiler/doc/reti_sections_low_level_picoc.md) |
+| Boot and binary input | [`bootloader.picoc`](boot/bootloader.picoc), [`process_loader.picoc`](kernel/process/process_loader.picoc) | [binary sections](../RETI-Emulator/documentation/section_file_entries.md) |
+| UART | [`uart_hardware.picoc`](kernel/uart_hardware.picoc), [`uart_protocol.picoc`](common/uart_protocol.picoc) | [emulator UART](../RETI-Emulator/documentation/uart_protocol.md) |
+| IVT/ISRs | [`os_isrs.picoc`](interrupt_service_routines/os_isrs.picoc) | [compiler low-level attributes](../PicoC-Compiler/documentation/reti_sections_low_level_picoc.md) |
 | Processes/waits | [`process.header`](kernel/process.header), [`process.picoc`](kernel/process/process.picoc) | [PicoC calls/frames](../PicoC-Compiler/README.md#function-calls-and-stack-frames) |
-| Scheduling/dispatch | [`scheduler.picoc`](kernel/scheduler.picoc), [`dispatcher.picoc`](kernel/dispatcher.picoc) | [`INT`/`RTI` interpreter](../RETI-Emulator/src/interpr.c) |
-| Exceptions | [`exception.picoc`](kernel/exception.picoc) | [CPU exceptions](../RETI-Emulator/doc/cpu_exceptions.md) |
-| Memory | [`heap.picoc`](common/heap.picoc), [`kmalloc.picoc`](kernel/kmalloc.picoc), [`pmalloc.picoc`](kernel/pmalloc.picoc) | [generated kernel constants](../PicoC-Compiler/doc/kernel_header_option.md) |
-| Files/descriptors | [`kernel/filesystem`](kernel/filesystem), [`lib/unistd`](lib/unistd) | [UART control frames](../RETI-Emulator/doc/uart_protocol.md#output-control-frames) |
-| Userspace lifecycle | [`start.picoc`](lib/start/start.picoc), [`init.picoc`](system/init.picoc), [`shell.picoc`](user/shell.picoc) | [compiler `-C`](../PicoC-Compiler/README.md#command-line-options) |
+| Scheduling/dispatch | [`scheduler.picoc`](kernel/scheduler.picoc), [`dispatcher.picoc`](kernel/dispatcher.picoc) | [`INT`/`RTI` interpreter](../RETI-Emulator/source/interpr.c) |
+| Exceptions | [`exception.picoc`](kernel/exception.picoc) | [CPU exceptions](../RETI-Emulator/documentation/cpu_exceptions.md) |
+| Memory | [`heap.picoc`](common/heap.picoc), [`kmalloc.picoc`](kernel/kmalloc.picoc), [`pmalloc.picoc`](kernel/pmalloc.picoc) | [generated kernel constants](../PicoC-Compiler/documentation/kernel_header_option.md) |
+| Files/descriptors | [`kernel/filesystem`](kernel/filesystem), [`library/unistd`](library/unistd) | [UART control frames](../RETI-Emulator/documentation/uart_protocol.md#output-control-frames) |
+| Userspace lifecycle | [`start.picoc`](library/start/start.picoc), [`init.picoc`](system/init.picoc), [`shell.picoc`](user/shell.picoc) | [compiler `-C`](../PicoC-Compiler/README.md#command-line-options) |
 
 Important deliberate limits to remember:
 

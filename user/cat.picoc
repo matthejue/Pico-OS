@@ -1,9 +1,9 @@
-// dependencies: ../lib/fcntl/libfcntl.reti_blocks ../lib/unistd/libunistd.reti_blocks
+// dependencies: ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks
 
 #include "../common/loading_bar.header"
-#include "../lib/fcntl/fcntl.header"
-#include "../lib/stdlib/stdlib.header"
-#include "../lib/unistd/unistd.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
 
 #define CAT_BUFFER_SIZE 64
 

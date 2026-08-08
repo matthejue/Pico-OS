@@ -1,0 +1,4 @@
+echo.bin redirected output > ./test/stdout_redirection/output.txt
+cat.bin ./test/stdout_redirection/output.txt
+exit
+poweroff.bin

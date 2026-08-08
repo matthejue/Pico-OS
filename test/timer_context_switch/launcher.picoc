@@ -1,0 +1,30 @@
+// dependencies: ../../library/stdio/libstdio.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+
+void set_timer_interval(int interval) {
+    asm("STOREIN BAF DS 0"); // Saves DS before switching address spaces
+    asm("LOADI DS 1048576"); // 2^20
+    asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADIN BAF ACC 3");
+    asm("STORE ACC 9"); // Timer interval register
+    asm("LOADIN BAF DS 0"); // Restores DS after periphery access
+}
+
+int main(void) {
+    int status;
+    int worker = load("test/timer_context_switch/worker.bin");
+
+    set_timer_interval(100);
+    run(worker, NULL, NULL);
+    status = waitpid(worker);
+    set_timer_interval(1000);
+    if (status == 0) {
+        printf("timer context switches survived\n");
+    } else {
+        printf("timer context switch failed\n");
+    }
+    return 0;
+}

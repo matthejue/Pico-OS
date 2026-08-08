@@ -1,3 +1,0 @@
-load tests/timer_context_switch/launcher.bin
-run 3
-poweroff.bin

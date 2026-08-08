@@ -1,4 +1,0 @@
-cat.bin tests/cat/first.txt tests/cat/second.txt
-cat.bin tests/cat/missing.txt
-exit
-poweroff.bin
