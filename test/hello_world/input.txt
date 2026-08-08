@@ -1,0 +1,3 @@
+load test/hello_world/launcher.bin
+run 3
+poweroff.bin

@@ -4,14 +4,14 @@ SHELL := /bin/bash
 # Normal test and program-run configuration
 # ----------------------------------------------------------------------
 
-TEST_PATTERN ?= $(shell cat ./opts/test_pattern.txt)
-RUN_PATH ?= $(shell cat ./opts/run_path.txt)
-OS_TEST_PATTERN ?= $(shell cat ./opts/os_test_pattern.txt)
-OS_RUN_PATH ?= $(shell cat ./opts/os_run_path.txt)
-OS_TEST_CPL_OPTS ?= $(shell cat ./opts/os_test_cpl_opts.txt)
-OS_TEST_EMU_OPTS ?= $(shell cat ./opts/os_test_emu_opts.txt)
-OS_RUN_CPL_OPTS ?= $(shell cat ./opts/os_run_cpl_opts.txt)
-OS_RUN_EMU_OPTS ?= $(shell cat ./opts/os_run_emu_opts.txt)
+TEST_PATTERN ?= $(shell cat ./config/test_pattern.txt)
+RUN_PATH ?= $(shell cat ./config/run_path.txt)
+OS_TEST_PATTERN ?= $(shell cat ./config/os_test_pattern.txt)
+OS_RUN_PATH ?= $(shell cat ./config/os_run_path.txt)
+OS_TEST_CPL_OPTS ?= $(shell cat ./config/os_test_cpl_opts.txt)
+OS_TEST_EMU_OPTS ?= $(shell cat ./config/os_test_emu_opts.txt)
+OS_RUN_CPL_OPTS ?= $(shell cat ./config/os_run_cpl_opts.txt)
+OS_RUN_EMU_OPTS ?= $(shell cat ./config/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
 KERNEL_STACK_START ?= 40000
 
@@ -26,39 +26,39 @@ endif
 TEST_BUILD_OPTION := $(if $(filter direct,$(TEST_BUILD_MODE)),--direct,)
 TEST_JOB_OPTION := $(if $(strip $(TEST_JOBS)),--jobs $(TEST_JOBS),)
 
-USER_STARTUP_SOURCE := lib/start/libstart.picoc
-USER_STARTUP_LIBRARY_SOURCES := lib/stdlib/libstdlib.picoc
+USER_STARTUP_SOURCE := library/start/libstart.picoc
+USER_STARTUP_LIBRARY_SOURCES := library/stdlib/libstdlib.picoc
 USER_STARTUP_DEPENDENCIES := \
 	$(USER_STARTUP_SOURCE) \
-	lib/start/start.picoc \
-	lib/stdlib/libstdlib.picoc \
-	lib/stdlib/malloc.picoc \
-	lib/stdlib/atoi.picoc \
-	lib/stdlib/env.picoc \
-	lib/stdlib/exit.picoc \
-	lib/stdlib/stdlib.header \
+	library/start/start.picoc \
+	library/stdlib/libstdlib.picoc \
+	library/stdlib/malloc.picoc \
+	library/stdlib/atoi.picoc \
+	library/stdlib/env.picoc \
+	library/stdlib/exit.picoc \
+	library/stdlib/stdlib.header \
 	common/heap.picoc \
 	common/heap.header
 USER_RUNTIME_SOURCES := \
-	lib/unistd/libunistd.picoc \
-	lib/fcntl/libfcntl.picoc \
-	lib/sys/wait/libwait.picoc \
-	lib/signal/libsignal.picoc \
-	lib/sys/prctl/libprctl.picoc
+	library/unistd/libunistd.picoc \
+	library/fcntl/libfcntl.picoc \
+	library/sys/wait/libwait.picoc \
+	library/signal/libsignal.picoc \
+	library/sys/prctl/libprctl.picoc
 USER_RUNTIME_DEPENDENCIES := \
 	$(USER_RUNTIME_SOURCES) \
-	lib/unistd/process.picoc \
-	lib/unistd/io.picoc \
-	lib/unistd/blocking.picoc \
-	lib/unistd/unistd.header \
-	lib/fcntl/fcntl.picoc \
-	lib/fcntl/fcntl.header \
-	lib/sys/wait/wait.picoc \
-	lib/sys/wait/wait.header \
-	lib/signal/signal.picoc \
-	lib/signal/signal.header \
-	lib/sys/prctl/prctl.picoc \
-	lib/sys/prctl/prctl.header \
+	library/unistd/process.picoc \
+	library/unistd/io.picoc \
+	library/unistd/blocking.picoc \
+	library/unistd/unistd.header \
+	library/fcntl/fcntl.picoc \
+	library/fcntl/fcntl.header \
+	library/sys/wait/wait.picoc \
+	library/sys/wait/wait.header \
+	library/signal/signal.picoc \
+	library/signal/signal.header \
+	library/sys/prctl/prctl.picoc \
+	library/sys/prctl/prctl.header \
 	common/syscall.header \
 	common/signal.header \
 	common/prctl.header \
@@ -109,7 +109,7 @@ help:
 	@echo "  make test-fast                  Run library tests, then fast OS feature and shell test groups"
 	@echo "  make test-lib                   Run library tests using TEST_PATTERN"
 	@echo "  make test-all                   Alias for make test"
-	@echo "  make test_not_passed            Run library paths from ./opts/not_passed_tests.txt"
+	@echo "  make test_not_passed            Run library paths from ./config/not_passed_tests.txt"
 	@echo "  make test-sys                   Run OS feature and shell tests normally"
 	@echo "  make test-sys-fast              Run OS feature and shell tests with one boot per group"
 	@echo "  make test-os                    Run OS feature tests normally"
@@ -120,8 +120,8 @@ help:
 	@echo "  make bootload                   Build firmware and boot through startprogram.reti"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
 	@echo "  make run-kernel                 Build and run kernel.reti directly"
-	@echo "  make eprom                      Build eprom_startprogram/startprogram.reti"
-	@echo "  make kernel                     Build kernel.bin"
+	@echo "  make eprom                      Build boot/startprogram.reti"
+	@echo "  make kernel                     Build kernel/kernel.bin"
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
@@ -140,10 +140,10 @@ help:
 	@echo "  RUN_PATH=<path>                 Override configured run path"
 	@echo "  OS_TEST_PATTERN=<pattern>       Override the configured OS test pattern"
 	@echo "  OS_RUN_PATH=<path>              Override configured OS run path"
-	@echo "  OS_TEST_CPL_OPTS='<arguments>'  Override ./opts/os_test_cpl_opts.txt"
-	@echo "  OS_TEST_EMU_OPTS='<arguments>'  Override ./opts/os_test_emu_opts.txt"
-	@echo "  OS_RUN_CPL_OPTS='<arguments>'   Override ./opts/os_run_cpl_opts.txt"
-	@echo "  OS_RUN_EMU_OPTS='<arguments>'   Override ./opts/os_run_emu_opts.txt"
+	@echo "  OS_TEST_CPL_OPTS='<arguments>'  Override ./config/os_test_cpl_opts.txt"
+	@echo "  OS_TEST_EMU_OPTS='<arguments>'  Override ./config/os_test_emu_opts.txt"
+	@echo "  OS_RUN_CPL_OPTS='<arguments>'   Override ./config/os_run_cpl_opts.txt"
+	@echo "  OS_RUN_EMU_OPTS='<arguments>'   Override ./config/os_run_emu_opts.txt"
 	@echo "  EXTRA_CPL_ARGS='<arguments>'    Additional compiler arguments for normal runs/tests"
 	@echo "  EXTRA_EMU_ARGS='<arguments>'    Additional emulator arguments for normal runs/tests"
 	@echo "  TEST_BUILD_MODE=staged|direct   Select staged or direct test compilation (default: staged)"
@@ -177,10 +177,10 @@ run_send_keypresses:
 	run_path="$(RUN_PATH)"; \
 	if [[ "$$run_path" == *.picoc ]]; then \
 		compiled_path="$${run_path%.picoc}.reti"; \
-		$(PICOC_BUILD) $$(cat ./opts/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
+		$(PICOC_BUILD) $$(cat ./config/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
 		run_path="$$compiled_path"; \
 	fi; \
-	./send_keypresses.py --input ./opts/input.txt ./run_reti_emulator_isolated.sh $$(cat ./opts/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
+	./send_keypresses.py --input ./config/input.txt ./run_reti_emulator_isolated.sh $$(cat ./config/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
 
 
 # ----------------------------------------------------------------------
@@ -225,7 +225,7 @@ test-fast:
 	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys-fast TEST_JOBS="$$test_jobs" || status=$$?; \
 	exit "$$status"
 
-test-lib: opts/isrs.reti
+test-lib: config/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
 	TEST_JOBS="$(TEST_JOBS)" ./run_sys_tests.sh $(TEST_BUILD_OPTION) "$${COLUMNS:-120}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
 
@@ -300,13 +300,13 @@ test-shell-fast: kernel.reti system/init.bin user/shell.bin system/fast_os_test_
 # Firmware build
 # ----------------------------------------------------------------------
 
-firmware: eprom_startprogram/startprogram.reti kernel.bin system/init.bin user/shell.bin user/poweroff.bin
+firmware: boot/startprogram.reti kernel/kernel.bin system/init.bin user/shell.bin user/poweroff.bin
 
-eprom: eprom_startprogram/startprogram.reti
+eprom: boot/startprogram.reti
 
-kernel: kernel.bin
+kernel: kernel/kernel.bin
 
-isrs: opts/isrs.reti
+isrs: config/isrs.reti
 
 SYSTEM_PROGRAM_SOURCES := $(wildcard system/*.picoc)
 SYSTEM_PROGRAM_BINARIES := $(SYSTEM_PROGRAM_SOURCES:.picoc=.bin)
@@ -317,7 +317,7 @@ system: $(SYSTEM_PROGRAM_BINARIES)
 
 user: $(USER_PROGRAM_BINARIES)
 
-user/echo.reti: lib/stdio/libstdio.picoc lib/stdio/stdio.picoc lib/stdio/scanf.picoc lib/stdio/stdio.header common/decimal.picoc common/decimal.header
+user/echo.reti: library/stdio/libstdio.picoc library/stdio/stdio.picoc library/stdio/scanf.picoc library/stdio/stdio.header common/decimal.picoc common/decimal.header
 
 cat.reti: user/cat.reti
 
@@ -343,56 +343,56 @@ ISRS_PICOC_SOURCES := \
 	interrupt_service_routines/isrs.picoc \
 	kernel/uart_hardware.picoc
 
-opts/isrs.reti: $(ISRS_PICOC_SOURCES)
+config/isrs.reti: $(ISRS_PICOC_SOURCES)
 	$(PICOC_BUILD_DIRECT) \
 		$(ISRS_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
-		-o opts/isrs.reti
+		-o config/isrs.reti
 
 EPROM_PICOC_SOURCES := \
-	eprom_startprogram/startprogram.picoc \
+	boot/bootloader.picoc \
 	common/loading_bar.picoc \
 	common/sram_loader.picoc \
 	kernel/uart_hardware.picoc \
 	common/uart_protocol.picoc
 
 EPROM_HEADERS := \
-	opts/config.header \
+	config/config.header \
 	common/loading_bar.header
 
-eprom_startprogram/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) kernel/memory_constants.header
+boot/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) kernel/memory_constants.header
 	# The -k build creates memory_constants.header if none exists.
 	# This earlier placeholder is only needed because preprocessing
-	# startprogram.picoc requires the include before -k can compute addresses.
-	@if [ ! -f eprom_startprogram/memory_constants.header ]; then \
+	# bootloader.picoc requires the include before -k can compute addresses.
+	@if [ ! -f boot/memory_constants.header ]; then \
 		printf '%s\n' \
 			'#define SRAM_MAX_ADDRESS 0' \
 			'#define EPROM_DS_START_ASM "LOADI32 DS 0"' \
 			'#define EPROM_STACK_START_ASM "LOADI32 SP 0"' \
-			> eprom_startprogram/memory_constants.header; \
+			> boot/memory_constants.header; \
 	fi
 	$(PICOC_BUILD_DIRECT) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -s -k eprom \
-		-o eprom_startprogram/memory_constants.header
+		-o boot/memory_constants.header
 
-eprom_startprogram/startprogram.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) eprom_startprogram/memory_constants.header kernel/memory_constants.header
+boot/startprogram.reti: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) boot/memory_constants.header kernel/memory_constants.header
 	$(PICOC_BUILD_DIRECT) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -v \
-		-o eprom_startprogram/startprogram.reti
+		-o boot/startprogram.reti
 
 SYSTEM_LIBRARY_SOURCES := \
 	$(USER_STARTUP_LIBRARY_SOURCES) \
 	$(USER_RUNTIME_SOURCES) \
-	lib/string/libstring.picoc
+	library/string/libstring.picoc
 SHELL_LIBRARY_SOURCES := \
 	$(SYSTEM_LIBRARY_SOURCES) \
 	common/decimal.picoc
 SYSTEM_INIT_SOURCES := system/init.picoc $(SYSTEM_LIBRARY_SOURCES)
 SHELL_SOURCES := user/shell.picoc $(SHELL_LIBRARY_SOURCES)
 
-system/init.reti: system/init.picoc opts/config.header common/loading_bar.header $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) lib/stdio/stdio.header lib/string/string.picoc lib/string/string.header $(TEST_BUILD_FORCE)
+system/init.reti: system/init.picoc config/config.header common/loading_bar.header $(SYSTEM_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) library/stdio/stdio.header library/string/string.picoc library/string/string.header $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$(SYSTEM_INIT_SOURCES) $(USER_STARTUP_SOURCE))
 	$(PICOC_TEST_BUILD) \
 		$(call test_picoc_inputs,$(SYSTEM_INIT_SOURCES)) \
@@ -403,7 +403,7 @@ system/init.reti: system/init.picoc opts/config.header common/loading_bar.header
 system/init.bin: system/init.reti
 	./run_reti_emulator_isolated.sh -a system/init.reti
 
-user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header lib/string/string.picoc lib/string/string.header $(TEST_BUILD_FORCE)
+user/shell.reti: user/shell.picoc $(SHELL_LIBRARY_SOURCES) $(USER_RUNTIME_DEPENDENCIES) $(USER_STARTUP_DEPENDENCIES) common/decimal.header library/string/string.picoc library/string/string.header $(TEST_BUILD_FORCE)
 	@$(call prepare_test_picoc_sources,$(SHELL_SOURCES) $(USER_STARTUP_SOURCE))
 	$(PICOC_TEST_BUILD) \
 		$(call test_picoc_inputs,$(SHELL_SOURCES)) \
@@ -484,8 +484,13 @@ kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.h
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 
-kernel.bin: kernel.reti eprom_startprogram/startprogram.reti
-	./run_reti_emulator_isolated.sh -a kernel.reti
+kernel/kernel.bin: kernel.reti boot/startprogram.reti
+	@set -e; \
+	temporary_reti=kernel/.kernel.reti; \
+	ln -sf ../kernel.reti "$$temporary_reti"; \
+	trap 'rm -f "$$temporary_reti" kernel/.kernel.bin' EXIT; \
+	./run_reti_emulator_isolated.sh -S kernel.sections -a "$$temporary_reti"; \
+	mv kernel/.kernel.bin $@
 
 
 # ----------------------------------------------------------------------
@@ -496,22 +501,27 @@ run-firmware: kernel.reti system/init.bin user/shell.bin user/poweroff.bin
 	./run_reti_emulator_isolated.sh kernel.reti -d -c -O -r $(SRAM_SIZE)
 
 bootload: firmware
-	./run_reti_emulator_isolated.sh -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	./run_reti_emulator_isolated.sh -n 4 -e ./boot/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
-	$(MAKE) eprom_startprogram/memory_constants.header
+	$(MAKE) boot/memory_constants.header
 	$(PICOC_BUILD_DIRECT) \
 		$(EPROM_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
-		-o eprom_startprogram/startprogram.reti
+		-o boot/startprogram.reti
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		-o kernel.reti
 	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
-	./run_reti_emulator_isolated.sh -a kernel.reti
-	./run_reti_emulator_isolated.sh -n 4 -e ./eprom_startprogram/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
+	@set -e; \
+	temporary_reti=kernel/.kernel.reti; \
+	ln -sf ../kernel.reti "$$temporary_reti"; \
+	trap 'rm -f "$$temporary_reti" kernel/.kernel.bin' EXIT; \
+	./run_reti_emulator_isolated.sh -S kernel.sections -a "$$temporary_reti"; \
+	mv kernel/.kernel.bin kernel/kernel.bin
+	./run_reti_emulator_isolated.sh -n 4 -e ./boot/startprogram.reti -d -c -O -r $(SRAM_SIZE) -S kernel.sections -D kernel.debuginfo
 
 
 # ----------------------------------------------------------------------
@@ -521,17 +531,17 @@ bootload-debug:
 rebuild-firmware: clean-firmware firmware
 
 clean-firmware:
-	find common eprom_startprogram interrupt_service_routines kernel system -type f \
+	find common boot interrupt_service_routines kernel system -type f \
 		! -name '*.picoc' \
 		! -name '*.header' \
 		! -name '.gitkeep' \
 		-delete
-	rm -f kernel.reti kernel.bin kernel.sections kernel.debuginfo
+	rm -f kernel.reti kernel/kernel.bin kernel.sections kernel.debuginfo
 
 clean: clean-firmware
 	find . -type f \
 		! -path './.vscode/*' \
-		! -path './eprom_startprogram/*' \
+		! -path './boot/*' \
 		! -path './interrupt_service_routines/*' \
 		! -path './kernel/*' \
 		! -name 'compile_commands.json' \

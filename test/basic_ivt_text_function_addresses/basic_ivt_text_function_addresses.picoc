@@ -1,0 +1,25 @@
+// in:
+// expected: 3
+// dependencies: ../../library/stdio/libstdio.reti_blocks
+#include "../../library/stdio/stdio.header"
+
+int text_fun(void) {
+  return 1;
+}
+
+__attribute__((section("ivt")))
+int ivt_caller(void) {
+  return text_fun();
+}
+
+__attribute__((section("ivt")))
+int ivt_target(void) {
+  return 2;
+}
+
+int main(void) {
+  int (*fp)(void);
+  fp = ivt_target;
+  printf(" %d", ivt_caller() + fp());
+  return 0;
+}

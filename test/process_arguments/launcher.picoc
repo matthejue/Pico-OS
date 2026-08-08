@@ -1,0 +1,12 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+
+int main(void) {
+    int pid = load("test/process_arguments/process_arguments.bin");
+
+    run(pid, "42 beta gamma", NULL);
+    waitpid(pid);
+    return 0;
+}

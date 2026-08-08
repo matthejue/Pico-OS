@@ -1,9 +1,9 @@
-#include "../lib/unistd/unistd.header"
-#include "../lib/fcntl/fcntl.header"
-#include "../lib/sys/wait/wait.header"
-#include "../lib/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/sys/wait/wait.header"
+#include "../library/stdlib/stdlib.header"
 #include "../common/loading_bar.header"
-#include "../opts/config.header"
+#include "../config/config.header"
 
 #define INIT_ENVIRONMENT_CAPACITY 256
 
@@ -30,7 +30,7 @@ bool read_environment(void) {
         return false;
     }
 
-    file_descriptor = open("./opts/environment.txt", O_RDONLY);
+    file_descriptor = open("./config/environment.txt", O_RDONLY);
     if (file_descriptor < 0) {
         free(contents);
         init_write_error("init: could not open environment file\n");
