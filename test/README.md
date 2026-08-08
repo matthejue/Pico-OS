@@ -27,12 +27,17 @@ input.txt                required
 expected_output.txt      required
 ```
 
-During a test run, generated files are written next to the test input files,
-including:
+During a test run, the fixture is copied to `binary/test/<test-name>` and its
+generated program files are written there:
 
 ```text
 program.reti
 program.bin
+```
+
+The comparison files remain next to the source fixture:
+
+```text
 output.txt
 raw_output.txt
 ```
@@ -45,10 +50,10 @@ these control frames instead of writing them to stdout.
 ## PicoC Programs
 
 Every `*.picoc` file in the test directory is compiled with `picoc_compiler`
-and assembled with:
+and assembled below `binary/test` with:
 
 ```sh
-./run_reti_emulator_isolated.sh -a program.reti
+reti_emulator -a binary/test/<test-name>/program.reti
 ```
 
 For an OS feature test, the resulting `launcher.bin` is loaded by the OS

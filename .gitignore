@@ -2,6 +2,7 @@ bak/
 __pycache__/
 .test_dependencies/
 binary/
+pico-os-runtime.tar.gz
 dist_old/
 dist_old_2/
 dist_old_3/
