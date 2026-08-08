@@ -1,0 +1,3 @@
+./test/file_descriptors/file_descriptors.bin
+exit
+poweroff.bin

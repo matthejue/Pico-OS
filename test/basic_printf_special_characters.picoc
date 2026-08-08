@@ -1,0 +1,11 @@
+// in:
+// expected:newline:\n carriage-return:\r delete:\d127
+// dependencies: ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdio/stdio.header"
+
+int main() {
+    printf("newline:\n carriage-return:\r delete:%c", 127);
+
+    return 0;
+}

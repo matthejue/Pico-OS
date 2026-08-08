@@ -1,0 +1,71 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
+
+#include "../../common/stddef.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+
+int main(void) {
+    int worker_1;
+    int worker_2;
+    int worker_3;
+    int worker_4;
+    int worker_5;
+    int worker_6;
+    int worker_7;
+    int worker_8;
+    int address_1;
+    int address_4;
+    int address_6;
+    int address_7;
+    int address_8;
+    int first_fit_1;
+    int first_fit_2;
+    int first_fit_3;
+    int first_fit_4;
+    int first_fit_5;
+    char result[10];
+
+    worker_1 = load("test/process_memory_first_fit/worker.bin");
+    worker_2 = load("test/process_memory_first_fit/worker.bin");
+    worker_3 = load("test/process_memory_first_fit/worker.bin");
+    worker_4 = load("test/process_memory_first_fit/worker.bin");
+    worker_5 = load("test/process_memory_first_fit/worker.bin");
+    worker_6 = load("test/process_memory_first_fit/worker.bin");
+
+    unload(worker_2);
+    unload(worker_3);
+    unload(worker_5);
+
+    worker_7 = load("test/process_memory_first_fit/worker.bin");
+    worker_8 = load("test/process_memory_first_fit/worker.bin");
+
+    run(worker_1, NULL, NULL);
+    address_1 = waitpid(worker_1);
+    run(worker_7, NULL, NULL);
+    address_7 = waitpid(worker_7);
+    run(worker_8, NULL, NULL);
+    address_8 = waitpid(worker_8);
+    run(worker_4, NULL, NULL);
+    address_4 = waitpid(worker_4);
+    run(worker_6, NULL, NULL);
+    address_6 = waitpid(worker_6);
+
+    first_fit_1 = address_1 < address_7;
+    first_fit_2 = address_7 < address_8;
+    first_fit_3 = address_8 < address_4;
+    first_fit_4 = address_4 < address_6;
+    first_fit_5 = address_8 < address_6;
+
+    result[0] = first_fit_1 + '0';
+    result[1] = ' ';
+    result[2] = first_fit_2 + '0';
+    result[3] = ' ';
+    result[4] = first_fit_3 + '0';
+    result[5] = ' ';
+    result[6] = first_fit_4 + '0';
+    result[7] = ' ';
+    result[8] = first_fit_5 + '0';
+    result[9] = '\n';
+    write(STDOUT_FILENO, result, 10);
+    return 0;
+}

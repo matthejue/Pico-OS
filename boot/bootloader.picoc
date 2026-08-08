@@ -1,0 +1,73 @@
+#include "memory_constants.header"
+#include "../kernel/memory_constants.header"
+#include "../common/loading_bar.header"
+#include "../common/sram_loader.header"
+#include "../common/uart_protocol.header"
+#include "../config/config.header"
+
+__attribute__((naked))
+void _start(void) {
+    asm(EPROM_STACK_START_ASM); // LOADI32 SP eprom_stack_start
+    asm("MOVE SP BAF"); // BAF = eprom_stack_start
+    asm(EPROM_DS_START_ASM); // LOADI32 DS eprom_ds_start
+    asm("ADD DS CS"); // DS = CS + eprom_ds_start
+    asm("LOADI32 ACC boot_main"); // ACC = boot_main in EPROM
+    asm("ADD ACC CS"); // ACC = CS + boot_main
+    asm("MOVE ACC PC"); // JUMP to boot_main in EPROM
+}
+
+__attribute__((naked))
+void start_loaded_kernel(void) {
+    // BAF points behind the kernel metadata
+    asm("LOADIN BAF ACC 0"); // ACC = code_start
+    asm("LOADIN BAF IN1 -1"); // IN1 = data_start
+    asm("LOADIN BAF IN2 -2"); // IN2 = stack_start
+
+    asm("LOADI32 CS -2147483648"); // -2^31, SRAM base
+    asm("MOVE CS DS"); // DS = SRAM base
+    asm("MOVE CS SP"); // SP = SRAM base
+
+    asm("ADD CS ACC"); // CS = SRAM base + code_start
+
+    asm("ADD DS IN1"); // DS = SRAM base + data_start
+
+    asm("ADD SP IN2"); // SP = SRAM base + stack_start
+    asm("MOVE SP BAF"); // BAF = SP
+
+    asm("MOVE CS PC"); // JUMP to CS
+}
+
+void boot_main(void) {
+    int code_start;
+    int data_start;
+    int stack_start;
+    int word_count;
+    int payload_word_count;
+
+    uart_send_file_command("load ", "kernel/kernel.bin");
+
+    word_count = receive_word();
+    code_start = receive_word();
+    data_start = receive_word();
+    receive_word(); // Discards heap_start because the kernel uses memory_constants.header
+    receive_word(); // Discards heap_size because the kernel uses memory_constants.header
+    stack_start = receive_word();
+    if (stack_start == -1) {
+        stack_start = SRAM_MAX_ADDRESS;
+    }
+
+    payload_word_count = word_count - 5;
+    uart_print_loading_bar_label(
+        loading_bar_enabled,
+        "load ",
+        "kernel/kernel.bin"
+    );
+    receive_words_to_sram(
+        SRAM_BASE,
+        payload_word_count,
+        loading_bar_enabled
+    );
+    asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
+    asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in SRAM
+    asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in SRAM
+}

@@ -1,7 +1,0 @@
-argc=4
-arg0=tests/process_arguments/process_arguments.bin
-arg1=42
-arg2=beta
-arg3=gamma
-argv_end=NULL
-number=42

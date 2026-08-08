@@ -1,0 +1,8 @@
+// dependencies: ../../library/stdio/libstdio.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+
+int main(void) {
+    printf("hello world");
+    return 0;
+}

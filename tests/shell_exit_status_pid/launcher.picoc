@@ -1,9 +1,0 @@
-// dependencies: ../../lib/stdio/libstdio.reti_blocks ../../lib/unistd/libunistd.reti_blocks
-
-#include "../../lib/stdio/stdio.header"
-#include "../../lib/unistd/unistd.header"
-
-int main(void) {
-    printf("%d\n", getpid());
-    return 42;
-}
