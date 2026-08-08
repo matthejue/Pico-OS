@@ -1,0 +1,15 @@
+// dependencies: ../../library/sys/prctl/libprctl.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "../../library/sys/prctl/prctl.header"
+#include "../../library/schedule/schedule.header"
+
+int main(void) {
+    if (prctl(PR_SET_PDEATHSIG, 0) == -1) {
+        return 1;
+    }
+
+    yield();
+    while (1) {
+        yield();
+    }
+}

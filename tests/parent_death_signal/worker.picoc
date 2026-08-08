@@ -1,9 +1,0 @@
-// dependencies: ../../lib/schedule/libschedule.reti_blocks
-
-#include "../../lib/schedule/schedule.header"
-
-int main(void) {
-    while (1) {
-        yield();
-    }
-}

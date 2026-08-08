@@ -1,7 +1,7 @@
 bak/
 __pycache__/
 .test_dependencies/
-dist/
+binary/
 dist_old/
 dist_old_2/
 dist_old_3/
@@ -29,7 +29,7 @@ README.txt
 *.reti_blocks
 *.reti_patch
 *.reti
-sys_tests/*.reti
+test/*.reti
 *.picoc_typing
 *.picoc_symbol
 *.error

@@ -1,1 +1,0 @@
--m -i ./opts/isrs.reti -v -d -u -c -I 30 -K -r 65536

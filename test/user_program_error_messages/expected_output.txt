@@ -1,0 +1,7 @@
+cat: missing file operand
+cat: test/user_program_error_messages/missing.txt: could not open file
+cat: user: could not open file
+usage: kill.bin PID [SIGNAL]
+kill: process not found
+kill: invalid signal
+kill: invalid process ID

@@ -1,8 +1,8 @@
-// dependencies: ../lib/signal/libsignal.reti_blocks ../lib/unistd/libunistd.reti_blocks
+// dependencies: ../library/signal/libsignal.reti_blocks ../library/unistd/libunistd.reti_blocks
 
-#include "../lib/signal/signal.header"
-#include "../lib/stdlib/stdlib.header"
-#include "../lib/unistd/unistd.header"
+#include "../library/signal/signal.header"
+#include "../library/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
 
 void kill_write_error(char *text) {
     int length = 0;

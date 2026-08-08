@@ -1,0 +1,3 @@
+load test/shared_memory_mutual_exclusion/launcher.bin
+run 3
+poweroff.bin

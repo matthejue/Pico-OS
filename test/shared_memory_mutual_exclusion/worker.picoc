@@ -1,0 +1,72 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/mutex/libmutex.reti_blocks ../../library/schedule/libschedule.reti_blocks ../../library/sys/mman/libmman.reti_blocks
+
+#include "shared.header"
+#include "../../library/stdlib/stdlib.header"
+#include "../../library/schedule/schedule.header"
+#include "../../library/sys/mman/mman.header"
+#include "../../library/unistd/unistd.header"
+
+void write_text(char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(STDOUT_FILENO, text, length);
+}
+
+void write_worker_message(
+    int worker_number,
+    char *first_worker_message,
+    char *second_worker_message
+) {
+    if (worker_number == 1) {
+        write_text(first_worker_message);
+    } else {
+        write_text(second_worker_message);
+    }
+}
+
+int main(int argc, char **argv) {
+    int worker_number = atoi(argv[1]);
+    int shared_memory_id = atoi(argv[2]);
+    struct SharedState *shared_state;
+
+    shared_state = (struct SharedState *)mmap(shared_memory_id);
+    if (shared_state == NULL) {
+        return 1;
+    }
+
+    write_worker_message(
+        worker_number,
+        "worker 1: trying to lock mutex\n",
+        "worker 2: trying to lock mutex\n"
+    );
+    mutex_lock(&(shared_state->mutex));
+    write_worker_message(
+        worker_number,
+        "worker 1: acquired mutex\n",
+        "worker 2: acquired mutex\n"
+    );
+
+    shared_state->value = worker_number;
+    write_worker_message(
+        worker_number,
+        "worker 1: shared value = 1\n",
+        "worker 2: shared value = 2\n"
+    );
+
+    if (worker_number == 1) {
+        write_text("worker 1: yielding while holding mutex\n");
+        yield();
+        write_text("worker 1: resumed\n");
+    }
+
+    mutex_unlock(&(shared_state->mutex));
+    write_worker_message(
+        worker_number,
+        "worker 1: unlocked mutex\n",
+        "worker 2: unlocked mutex\n"
+    );
+    return 0;
+}

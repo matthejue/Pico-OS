@@ -1,0 +1,17 @@
+// in:
+// expected:whatever
+// dependencies: ../library/stdlib/libstdlib.reti_blocks ../library/stdio/libstdio.reti_blocks ../library/string/libstring.reti_blocks
+
+#include "../library/stdlib/stdlib.header"
+#include "../library/stdio/stdio.header"
+#include "../library/string/string.header"
+
+int main() {
+  init_process_heap();
+
+  char *heap_str = (char *)malloc(10);
+  strcpy(heap_str, "whatever");
+  printf(heap_str);
+
+  return 0;
+}

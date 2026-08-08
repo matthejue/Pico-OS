@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-NOT_PASSED_TESTS_FILE="./opts/not_passed_tests.txt"
-RESULT_FILE="./tests/tests.res"
+NOT_PASSED_TESTS_FILE="./config/not_passed_tests.txt"
+RESULT_FILE="./test/tests.res"
 use_not_passed_tests=false
 direct_compile=false
 
@@ -90,11 +90,11 @@ if [[ "$use_not_passed_tests" == true ]]; then
       sed '/^[[:space:]]*$/d'
   )
 elif [[ "$test_pattern" == all ]]; then
-  paths=(./tests/*.picoc)
+  paths=(./test/*.picoc)
 elif [[ -n "$test_pattern" ]]; then
-  paths=(./tests/*"$test_pattern"*.picoc)
+  paths=(./test/*"$test_pattern"*.picoc)
 else
-  paths=(./tests/*.picoc)
+  paths=(./test/*.picoc)
 fi
 
 if (( ${#paths[@]} == 0 )); then
@@ -132,8 +132,8 @@ export TEST_CPL_OPTIONS
 export TEST_EMU_OPTIONS
 export EXTRA_CPL_ARGS="$extra_cpl_args"
 export EXTRA_EMU_ARGS="$extra_emu_args"
-TEST_CPL_OPTIONS="$(< ./opts/test_cpl_opts.txt)"
-TEST_EMU_OPTIONS="$(< ./opts/test_emu_opts.txt)"
+TEST_CPL_OPTIONS="$(< ./config/test_cpl_opts.txt)"
+TEST_EMU_OPTIONS="$(< ./config/test_emu_opts.txt)"
 
 if ! test_jobs="$(./select_test_jobs.sh)"; then
   exit 2
@@ -144,7 +144,7 @@ TEST_JOBS="$test_jobs" COLUMNS="$columns" make \
   --output-sync=target \
   --keep-going \
   --jobs "$test_jobs" \
-  -f ./tests/Makefile \
+  -f ./test/Makefile \
   TEST_BUILD_MODE="$test_build_mode" \
   TEST_SOURCES="${paths[*]}" \
   RESULT_DIR="$result_dir" \

@@ -1,0 +1,16 @@
+// dependencies: ../../library/stdio/libstdio.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+#include "../../library/schedule/schedule.header"
+
+int main(int argc, char **argv) {
+    int count = 0;
+
+    while (count < 4) {
+        printf("%s\n", argv[1]);
+        yield();
+        count = count + 1;
+    }
+
+    return 0;
+}
