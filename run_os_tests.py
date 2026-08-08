@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import select
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,17 @@ MAX_EMULATOR_DURATION_SECONDS = 120
 SHELL_PROMPT = "PicoOS> "
 PRINT_LOCK = threading.Lock()
 TEMPORARY_ROOT = Path("/tmp")
+BINARY_TEST_ROOT = Path("binary/test")
+RUNTIME_BOOT_ARGUMENTS = (
+    "-n",
+    "4",
+    "-e",
+    "./boot/bootloader.reti",
+    "-S",
+    "kernel/kernel.sections",
+    "-D",
+    "kernel/kernel.debuginfo",
+)
 
 
 def positive_int(value):
@@ -152,6 +164,35 @@ def remove_if_exists(path):
         pass
 
 
+def staged_test_directory(test_dir):
+    return BINARY_TEST_ROOT / test_dir.relative_to("test")
+
+
+def stage_test_directories(test_dirs):
+    BINARY_TEST_ROOT.mkdir(parents=True, exist_ok=True)
+    for test_dir in test_dirs:
+        destination = staged_test_directory(test_dir)
+        if destination.exists():
+            shutil.rmtree(destination)
+        shutil.copytree(
+            test_dir,
+            destination,
+            ignore=shutil.ignore_patterns(
+                "*.bin",
+                "*.reti",
+                "output.txt",
+                "raw_output.txt",
+                ".fast_shell_output.txt",
+            ),
+        )
+
+
+def copy_staged_test_file(test_dir, filename):
+    source = staged_test_directory(test_dir) / filename
+    if source.is_file():
+        shutil.copy2(source, test_dir / filename)
+
+
 def declared_dependency_sources(source, seen=None):
     if seen is None:
         seen = set()
@@ -217,8 +258,10 @@ def split_compilation_args(arguments):
 
 
 def compile_and_assemble(picoc_file, extra_cpl_args, direct_compile=False):
-    reti_file = picoc_file.with_suffix(".reti")
-    bin_file = picoc_file.with_suffix(".bin")
+    output_directory = staged_test_directory(picoc_file.parent)
+    output_directory.mkdir(parents=True, exist_ok=True)
+    reti_file = output_directory / picoc_file.with_suffix(".reti").name
+    bin_file = reti_file.with_suffix(".bin")
 
     for path in (reti_file, bin_file):
         remove_if_exists(path)
@@ -432,7 +475,7 @@ def run_os_test_interactive(test_dir, extra_emu_args):
             *extra_emu_args,
             "-f",
             directory,
-            "kernel.reti",
+            *RUNTIME_BOOT_ARGUMENTS,
         ]
 
         print(
@@ -441,7 +484,7 @@ def run_os_test_interactive(test_dir, extra_emu_args):
         print(
             "input.txt is not piped in debug mode because ncurses needs stdin."
         )
-        result = run_command(command)
+        result = run_command(command, cwd="binary")
         return "passed" if result.returncode == 0 else "failed"
 
 
@@ -480,7 +523,7 @@ def run_os_test_with_peripherals(
         *extra_emu_args,
         "-f",
         str(peripherals_dir),
-        "kernel.reti",
+        *RUNTIME_BOOT_ARGUMENTS,
     ]
 
     input_lines = input_file.read_text(encoding="utf-8").splitlines()
@@ -489,6 +532,7 @@ def run_os_test_with_peripherals(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        cwd="binary",
     )
     stdout = bytearray()
     stderr = bytearray()
@@ -683,6 +727,7 @@ def run_one_test_dir(
     direct_compile=False,
 ):
     print_heading(test_dir, columns)
+    stage_test_directories([test_dir])
 
     if not build_test_programs(test_dir, extra_cpl_args, direct_compile):
         return "failed"
@@ -734,6 +779,7 @@ def run_matching_tests(args, extra_cpl_args, extra_emu_args):
 
     statuses = {}
     ready_paths = []
+    stage_test_directories(paths)
     for test_dir in paths:
         print_heading(test_dir, args.columns)
         if build_test_programs(test_dir, extra_cpl_args, args.direct):
