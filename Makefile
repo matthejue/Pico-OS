@@ -13,7 +13,11 @@ OS_TEST_EMU_OPTS ?= $(shell cat ./config/os_test_emu_opts.txt)
 OS_RUN_CPL_OPTS ?= $(shell cat ./config/os_run_cpl_opts.txt)
 OS_RUN_EMU_OPTS ?= $(shell cat ./config/os_run_emu_opts.txt)
 SRAM_SIZE ?= 262144 # 2^18
-KERNEL_STACK_START ?= 40000
+KERNEL_HEAP_SIZE ?= 4096
+KERNEL_STACK_SIZE ?= 2715
+KERNEL_MEMORY_OPTIONS = \
+	--heap-size $(KERNEL_HEAP_SIZE) \
+	--stack-size $(KERNEL_STACK_SIZE)
 BINARY_DIR := binary
 RELEASE_ARCHIVE ?= pico-os-runtime.tar.gz
 
@@ -559,22 +563,15 @@ kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefi
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -s -k sram \
+		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel/memory_constants.header
-	@stack_address=$$((-2147483648 + $(KERNEL_STACK_START))); \
-	process_memory_start=$$((stack_address + 1)); \
-	sed -i -E \
-		"s/^#define PROCESS_MEMORY_START .*/#define PROCESS_MEMORY_START $$process_memory_start \\/\\/ -2^31 + stack_start + 1/" \
-		kernel/memory_constants.header; \
-	sed -i -E \
-		"s/^#define KERNEL_SP_START_ASM .*/#define KERNEL_SP_START_ASM \\\"LOADI32 SP $$stack_address\\\" \\/\\/ -2^31 + stack_start/" \
-		kernel/memory_constants.header
 
 kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.header Makefile
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
+		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel.reti
-	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 
 binary/kernel/kernel.bin: kernel.reti | binary/kernel
 	@$(assemble_binary)
@@ -600,8 +597,8 @@ bootload-debug:
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
+		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel.reti
-	sed -i -E 's/"stack_start": *-?[0-9]+/"stack_start": $(KERNEL_STACK_START)/' kernel.sections
 	$(MAKE) release-tree
 	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
 
