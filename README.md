@@ -152,6 +152,7 @@ The Makefile uses:
 ```sh
 # Kernel constants
 picoc_compiler <kernel sources> -O1 -s -k sram \
+    --heap-size 4096 --stack-size 2715 \
     -o kernel/memory_constants.header
 
 # EPROM bootloader constants
@@ -174,10 +175,13 @@ The current generated
 | `KERNEL_SP_START_ASM` | `LOADI32 SP -2147443648` | Kernel stack pointer (`SRAM_BASE + 40000`) |
 | `KERNEL_CS_ACC_ASM` | `LOADI32 ACC -2147483644` | Same code base loaded into `ACC` for comparisons |
 
-The values are generated artifacts and may move when the kernel changes.
-`KERNEL_STACK_START ?= 40000` in the [Makefile](Makefile) deliberately
-overrides the compiler's normal `stack_start`; the Makefile patches
-`KERNEL_SP_START_ASM` and `PROCESS_MEMORY_START` consistently. With the
+The values are generated artifacts and may move when the kernel changes. The
+[Makefile](Makefile) supplies a 4096-cell kernel heap and a 2715-cell kernel
+stack. After linking determines `heap_start`, the compiler calculates
+`stack_start = heap_start + heap_size + stack_size`, then uses that layout for
+both `kernel.sections` and `kernel/memory_constants.header`. It also adds the
+SRAM base to `stack_start` for `KERNEL_SP_START_ASM` and adds one more cell for
+`PROCESS_MEMORY_START`; no generated file is patched afterward. With the
 currently generated [`kernel.sections`](kernel.sections), the relative
 boundaries are `.text = 4`, `.data = 32705`, heap start `33189`, and kernel
 stack start `40000`.
