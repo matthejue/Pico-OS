@@ -7,6 +7,7 @@
 
 __attribute__((naked))
 void _start(void) {
+    asm("LOADI CS 0"); // Sets CS to the EPROM base
     asm(EPROM_STACK_START_ASM); // LOADI32 SP eprom_stack_start
     asm("MOVE SP BAF"); // BAF = eprom_stack_start
     asm(EPROM_DS_START_ASM); // LOADI32 DS eprom_ds_start
@@ -68,6 +69,6 @@ void boot_main(void) {
         loading_bar_enabled
     );
     asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
-    asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in SRAM
-    asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in SRAM
+    asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in EPROM
+    asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in EPROM
 }
