@@ -52,13 +52,38 @@ jobs:
           echo "$GITHUB_WORKSPACE/.ci-bin" >> "$GITHUB_PATH"
 
       - name: Build all PicoOS outputs
-        run: make rebuild-release
+        run: make release-tree
 
       - name: Verify complete runtime artifact set
         run: make verify-release-tree
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload PicoOS runtime
+        uses: actions/upload-artifact@v7
         with:
-          name: pico-os-runtime.tar.gz
-          path: pico-os-runtime.tar.gz
+          name: pico-os-runtime
+          path: binary/
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release for version tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: pico-os-runtime
+          path: release-tree
+
+      - name: Create release archive
+        run: |
+          chmod 755 release-tree/start-picoos.sh
+          tar -C release-tree -czf pico-os-runtime.tar.gz \
+            boot config kernel system user \
+            README.md start-picoos.sh start-picoos.ps1
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pico-os-runtime.tar.gz
