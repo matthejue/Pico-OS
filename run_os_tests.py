@@ -455,7 +455,20 @@ def normalize_os_output(output):
 
 
 def decode_test_input(line):
-    return line.replace("\\b", "\x7f")
+    return (
+        line.replace("\\up", "\x1b[A")
+        .replace("\\down", "\x1b[B")
+        .replace("\\right", "\x1b[C")
+        .replace("\\left", "\x1b[D")
+        .replace("\\home", "\x1b[H")
+        .replace("\\esc", "\x1b")
+        .replace("\\ctrlU", "\x15")
+        .replace("\\ctrlW", "\x17")
+        .replace("\\ctrlC", "\x03")
+        .replace("\\ctrlZ", "\x1a")
+        .replace("\\ctrlL", "\x0c")
+        .replace("\\b", "\x7f")
+    )
 
 
 def emulator_args_request_debug(extra_emu_args):

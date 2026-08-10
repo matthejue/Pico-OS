@@ -69,8 +69,11 @@ The current generated `.bin` sizes, including their five-word headers, are:
 | Image | 32-bit words | Size |
 | --- | ---: | ---: |
 | Kernel | 33,194 | 0.132776 MB |
-| `echo` | 11,626 | 0.046504 MB |
 | `cat` | 7,904 | 0.031616 MB |
+<!-- | `echo` | 11,626 | 0.046504 MB | -->
+<!-- please call those kernel.bin, cat.bin etc. -->
+<!-- You're not connecting this properly like I intended. The reason for mentioning this was in order to make the point why 2^18 32-bit memory addresses are more than enough -->
+<!-- Please make a calulation how man cat.bin program fit into the remaining 1MB after substracting kernel.bin -->
 
 PicoOS is used together with two sibling projects:
 
@@ -194,10 +197,11 @@ so the kernel itself needs no locks.
 12. [User applications](#12-user-applications)
     - [12.1 Shell](#121-shell)
     - [12.2 `echo`](#122-echo)
-    - [12.3 `cat`](#123-cat)
-    - [12.4 `kill`](#124-kill)
-    - [12.5 `poweroff`](#125-poweroff)
-    - [12.6 Actionable command errors](#126-actionable-command-errors)
+    - [12.3 `count`](#123-count)
+    - [12.4 `cat`](#124-cat)
+    - [12.5 `kill`](#125-kill)
+    - [12.6 `poweroff`](#126-poweroff)
+    - [12.7 Actionable command errors](#127-actionable-command-errors)
 13. [Use in lectures](#13-use-in-the-operating-systems-and-real-time-operating-systems-lectures)
     - [13.1 Real-time operating systems lecture](#131-real-time-operating-systems-lecture)
     - [13.2 Operating systems lecture](#132-operating-systems-lecture)
@@ -557,8 +561,50 @@ Metadata operations use a separate request:
 It returns the complete file size as one big-endian 32-bit value, or
 `UINT32_MAX` for a missing or unreadable file. PicoOS's `file_exists()` and
 `SEEK_END` use this command, so normal ranged reads do not repeatedly transfer
-the complete file size. The complete-file `<ESC>read <path><ESC>/` command
-remains available for clients that need it.
+the complete file size.
+
+Creating, truncating, and writing host-backed files uses output selection. This
+request creates or truncates the file and routes subsequent ordinary UART output
+bytes to it:
+
+```text
+<ESC>write <path><ESC>/
+```
+
+This variant creates the file if necessary, preserves its existing contents,
+and routes subsequent ordinary UART output bytes to its end:
+
+```text
+<ESC>append <path><ESC>/
+```
+
+The kernel selects `write` briefly for `O_TRUNC` or creation, and selects
+`append` while implementing a regular-file `write()`. It then restores normal
+terminal output with:
+
+```text
+<ESC>write stdout<ESC>/
+```
+
+Writing file descriptor 2 temporarily selects the emulator's standard error
+stream instead:
+
+```text
+<ESC>write stderr<ESC>/
+```
+
+Both standard-stream requests close any selected output file. Control frames
+themselves are consumed by the emulator; only ordinary UART bytes sent after an
+output-selection frame are redirected.
+
+The emulator also accepts a host-shell request:
+
+```text
+<ESC>!<terminal_command><ESC>/
+```
+
+It runs the command in the emulator process's working directory and provides no
+structured result over UART. PicoOS does not currently emit this request.
 
 `./run_reti_emulator_isolated.sh -a program.reti` builds `program.bin`. The
 `.bin` itself begins
@@ -1041,6 +1087,11 @@ sequenceDiagram
     Shell->>Out: write() echoes printable byte
 ```
 
+The terminal input owner remains stable across scheduler switches, so the bytes
+of one escape sequence cannot land in different process buffers. The shell owns
+input while displaying its prompt, transfers ownership to a foreground child,
+and takes it back when the child exits or stops.
+
 `read(STDIN_FILENO, ...)` first disables the UART mapping briefly, preventing
 a lost wakeup between checking the buffer and enqueueing the reader. If no
 byte is available, it records the destination/count in the descriptor table,
@@ -1064,9 +1115,9 @@ complete_pending_stdin_read(process, table);
 
 The shell treats `\n` and `\r` as line completion, echoes one `\n`, and handles
 backspace (`\b`) or delete (`127`) by outputting backspace-space-backspace.
-Printable input is appended and echoed. Escape followed by `c`/`C` or `z`/`Z`
-is intercepted by the kernel as `SIGTERM` or `SIGTSTP` for the foreground
-process rather than passed to the shell.
+Printable input is appended and echoed. Control bytes `Ctrl+C` (3) and
+`Ctrl+Z` (26) are intercepted by the kernel as `SIGTERM` or `SIGTSTP` for the
+foreground process rather than passed to the shell.
 
 # 4. Processes
 
@@ -1509,10 +1560,12 @@ handler entry, restorer address, and signal number. Only one handler context is
 saved at a time. Returning through the restorer invokes `SIGRETURN` and
 restores `signal_saved_activation`.
 
-Terminal escape sequences `ESC c` and `ESC z` become `SIGTERM` and `SIGTSTP`
+Control bytes `Ctrl+C` (3) and `Ctrl+Z` (26) become `SIGTERM` and `SIGTSTP`
 for the PID registered by the shell as foreground. The shell implements basic
 background execution plus `fg` and `bg`; this is much smaller than POSIX job
-control.
+control. In the RETI-Emulator debugger these shortcuts require `(V)iew raw
+terminal`, because the normal `(v)iew terminal` keeps host control-key handling
+active.
 
 ### Parent-death signal
 
@@ -2230,6 +2283,9 @@ double quotes are removed rather than used to preserve embedded whitespace.
 Foreground children are registered for terminal signals and waited for.
 Background children are not waited for immediately; `$!`, `fg`, and `bg`
 track only the most recent one. Exit statuses are available through `$?`.
+The shell reports each successfully created process. It also starts a new line
+and reports when a foreground process is stopped by `SIGTSTP` or terminated by
+`SIGTERM` or `SIGKILL`, so output ending with `\r` cannot run into the prompt.
 
 Built-ins are `exit`, `eval`, `run-shell-test`, `export`, `load`, `run`,
 `unload`, `list`, `fg`, and `bg`. Everything else is treated as an external
@@ -2258,13 +2314,17 @@ wait; `$!` retains the most recently started background PID, whereas `$?`
 retains the most recent foreground exit or stopped status. Starting a
 background command does not replace `$?`.
 
-### Newline, carriage return, and backspace
+### Newline and line editing
 
 Both `\n` and `\r` complete input and are echoed as one newline. Backspace
 byte 8 and delete byte 127 remove one buffered character and output
-`\b`, space, `\b` to erase it visually. Other accepted bytes are stored and
-echoed. This behavior sits above the UART receive interrupt and blocking
-`read()` path from [section 3.9](#39-uart-and-keypress-interrupt).
+`\b`, space, `\b` to erase it visually. `Ctrl+U` erases the complete current
+line, while `Ctrl+W` erases trailing whitespace and the previous word. Up and
+Down select entries from the bounded command history; Left and Right are
+ignored because cursor movement is not implemented. Unsupported escape
+sequences are discarded without echoing the raw Escape byte to the host
+terminal. This behavior sits above the UART receive interrupt and blocking `read()` path from
+[section 3.9](#39-uart-and-keypress-interrupt).
 
 ### Output redirection
 
@@ -2309,7 +2369,15 @@ The shell itself passes `\n` through unchanged; conversion belongs to `echo`,
 which makes the boundary testable and keeps other programs from receiving
 unexpected translated bytes.
 
-## 12.3 `cat`
+## 12.3 `count`
+
+[`user/count.picoc`](user/count.picoc) counts upward forever, returning to the
+start of the current line with `\r` before each value. `count.bin DELAY` sets
+the number of busy-loop iterations between values; without an argument it uses
+25,000 iterations. A negative delay or more than one argument produces an
+error. The program yields after each value so other ready processes can run.
+
+## 12.4 `cat`
 
 [`user/cat.picoc`](user/cat.picoc) opens each path argument read-only, reads
 64 cells at a time, and loops on `write(STDOUT_FILENO, ...)` until each chunk
@@ -2318,7 +2386,7 @@ write failures produce an error on standard error and make the final status 1,
 while successful files continue to be processed. Stdin concatenation and
 options are not implemented.
 
-## 12.4 `kill`
+## 12.5 `kill`
 
 [`user/kill.picoc`](user/kill.picoc) sends `SIGTERM` by default or accepts one
 explicit numeric signal:
@@ -2334,7 +2402,7 @@ processes print a specific error and return status 1. `SIGKILL` cannot be
 caught or ignored; the other signal semantics are listed in
 [section 5.6](#56-signals).
 
-## 12.5 `poweroff`
+## 12.6 `poweroff`
 
 [`user/poweroff.picoc`](user/poweroff.picoc) invokes the shutdown syscall.
 This differs from the shell's `exit` built-in: `exit` ends only the current
@@ -2346,7 +2414,7 @@ $ poweroff.bin
 
 shuts PicoOS down and lets the emulator halt.
 
-## 12.6 Actionable command errors
+## 12.7 Actionable command errors
 
 The shell validates built-in argument counts, quoting, redirection, process
 lookup, and external command lookup before continuing. Errors name the failed
