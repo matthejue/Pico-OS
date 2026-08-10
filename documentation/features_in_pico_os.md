@@ -354,6 +354,18 @@ programs. Options such as `-n` are not implemented.
 
 Relevant commits: `285fec05bd52`, `36979558d57e`, `87ffd61d28e8`
 
+## Count command
+
+```text
+PicoOS> count.bin
+PicoOS> count.bin 10000
+```
+
+`count.bin` counts upward forever on one terminal line. Its optional argument
+sets the busy-loop iterations between values; the default is 25,000. The
+program is useful for trying terminal job control: Ctrl+Z stops it, `fg`
+continues it, and Ctrl+C terminates it.
+
 ## Boolean type and constants for PicoC code
 
 ```c
@@ -439,10 +451,19 @@ The shell adds line editing on top:
 | Printable character | Store and echo it |
 | Enter or carriage return | Finish the line |
 | Backspace or Delete | Remove and erase the previous character |
+| Ctrl+U | Remove and erase the complete current line |
+| Ctrl+W | Remove and erase trailing whitespace and the previous word |
+| Up or Down | Select the previous or next command-history entry |
+| Left or Right | Ignore the unsupported cursor movement |
+| Escape or another unsupported escape sequence | Ignore it without echoing raw control bytes |
+| Other ASCII control byte | Ignore it without echoing it |
 
 UART interrupts are briefly disabled around the empty-buffer check and wait
 queue insertion, preventing a byte from arriving in the gap and leaving the
-reader asleep.
+reader asleep. Each UART byte is routed to a stable terminal-input owner rather
+than whichever process happens to be running. The shell owns input at its
+prompt, transfers ownership to a foreground child, and takes ownership back
+after waiting for that child.
 
 Relevant commits: `55337da52a41`, `52310640f2eb`
 
@@ -594,9 +615,16 @@ prctl(PR_SET_PDEATHSIG, SIGTERM);
 | `SIGCONT` | Continue a stopped process |
 | `SIGTSTP` | Stop a process |
 
-Alt+C sends `SIGTERM` to the foreground process; Alt+Z sends `SIGTSTP`. `fg`
-and `bg` resume the most recently tracked job with `SIGCONT`. A configured
+Ctrl+C sends `SIGTERM` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
+and `bg` resume the most recently tracked job with `SIGCONT`. In debugger mode,
+these shortcuts require RETI-Emulator's `(V)iew raw terminal`; its normal
+`(v)iew terminal` keeps host control-key handling active. A configured
 parent-death signal is inherited by later children.
+
+PicoOS defines `SIGKILL`, `SIGTERM`, `SIGCHLD`, `SIGCONT`, and `SIGTSTP`.
+`SIGINT` and `SIGSTOP` are not defined; the terminal uses `SIGTERM` and
+`SIGTSTP` for the corresponding interactive actions. The shell reports process
+creation and signal-driven foreground stops or termination on separate lines.
 
 Relevant commit: `068f84d75f19`
 

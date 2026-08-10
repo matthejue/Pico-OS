@@ -121,11 +121,10 @@ void complete_pending_stdin_read(
 }
 
 void handle_uart_interrupt(void) {
-    struct Process *process = current_process();
+    struct Process *process = terminal_input_process();
     struct FileDescriptorTable *table;
     int value;
     int status;
-    int terminal_signal_status;
 
     value = periphery_read_register(UART_RECEIVE_REGISTER) & 255;
     status = periphery_read_register(UART_STATUS_REGISTER);
@@ -138,16 +137,11 @@ void handle_uart_interrupt(void) {
         return;
     }
 
-    terminal_signal_status =
-        handle_terminal_signal_character(value);
-    if (terminal_signal_status == 1) {
+    if (handle_terminal_signal_character(value)) {
         return;
     }
 
     table = process->file_descriptors;
-    if (terminal_signal_status == -1) {
-        enqueue_stdin_byte(table, 27);
-    }
     enqueue_stdin_byte(table, value);
     complete_pending_stdin_read(process, table);
 }

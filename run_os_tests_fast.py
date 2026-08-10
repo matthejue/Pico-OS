@@ -51,7 +51,24 @@ def parse_args():
 
 
 def is_uart_shell_test(test_dir):
-    return "\\b" in (test_dir / "input.txt").read_text(encoding="utf-8")
+    input_text = (test_dir / "input.txt").read_text(encoding="utf-8")
+    return any(
+        sequence in input_text
+        for sequence in (
+            "\\b",
+            "\\up",
+            "\\down",
+            "\\left",
+            "\\right",
+            "\\home",
+            "\\esc",
+            "\\ctrlU",
+            "\\ctrlW",
+            "\\ctrlC",
+            "\\ctrlZ",
+            "\\ctrlL",
+        )
+    )
 
 
 def write_manifest(path, test_dirs):
