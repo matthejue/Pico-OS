@@ -1,2 +1,42 @@
 error: unknown command
+process 3 created
+history-one
+process 4 created
+history-two
+process 5 created
+history-two
+process 6 created
+history-one
+process 7 created
+history-one
+process 8 created
+draft
+process 9 created
+capacity-one
+process 10 created
+capacity-two
+process 11 created
+capacity-three
+process 12 created
+capacity-four
+process 13 created
+history-one
+process 14 created
+control-u
+process 15 created
+first third
+process 16 created
+direct-control
+process 17 created
+escape-safe
+process 18 created
+unsupported-safe
+process 19 created
+left-right
+process 20 created
+right-arrow
+process 21 created
+control-character
+process 23 created
 before-after
+process 24 created
