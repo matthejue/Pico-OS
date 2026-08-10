@@ -1,5 +1,24 @@
 quit
 export SHELL_EXIT_TEST=preserved
+echo.bin history-one
+echo.bin history-two
+\up
+\up\up
+\up\up\down
+echo.bin draft\up\down
+echo.bin capacity-one
+echo.bin capacity-two
+echo.bin capacity-three
+echo.bin capacity-four
+\up\up\up\up\up\up\up\up\up
+echo.bin removed\ctrlUecho.bin control-u
+echo.bin first second   \ctrlWthird
+echo.bin direct\ctrlZ\ctrlC-control
+echo\esc.bin escape-safe
+echo.bin unsupported\home-safe
+echo.bin left\left-right
+echo.bin right\right-arrow
+echo.bin control\ctrlL-character
 exut\b\bit
 echo.bin before$SHELL_EXIT_TEST-after
 poweroff.bin

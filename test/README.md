@@ -72,6 +72,9 @@ so the kernel can schedule another process and wake any waiters.
 `input.txt` contains the ASCII command stream typed into the shell. An OS
 feature test loads and runs its launcher, then finishes with `poweroff.bin`.
 Shell tests contain the commands whose parsing or shell state they exercise.
+The raw shell-test encodings `\b`, `\up`, `\down`, `\left`, `\right`, `\home`,
+`\esc`, `\ctrlU`, `\ctrlW`, `\ctrlC`, `\ctrlZ`, and `\ctrlL` send their
+corresponding key input instead of literal characters.
 
 Example:
 

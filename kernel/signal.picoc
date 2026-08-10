@@ -4,8 +4,11 @@
 #include "../common/prctl.header"
 #include "../common/signal.header"
 
+#define TERMINAL_INTERRUPT_CHARACTER 3
+#define TERMINAL_STOP_CHARACTER 26
+
 int foreground_process_id = 0;
-bool terminal_escape_pending = false;
+int terminal_input_process_id = 0;
 
 bool signal_number_is_valid(int signal_number) {
     return signal_number > 0 && signal_number < SIGNAL_COUNT;
@@ -286,6 +289,7 @@ int set_foreground_process(int pid) {
 
     if (pid == 0) {
         foreground_process_id = 0;
+        terminal_input_process_id = current_process()->pid;
         return 0;
     }
 
@@ -296,39 +300,43 @@ int set_foreground_process(int pid) {
     }
 
     foreground_process_id = pid;
+    terminal_input_process_id = pid;
     return 0;
 }
 
-int handle_terminal_signal_character(int value) {
+struct Process *terminal_input_process(void) {
+    struct Process *process;
+
+    if (terminal_input_process_id != 0) {
+        process = find_process_by_pid(terminal_input_process_id);
+        if (process != NULL &&
+            process->state != PROCESS_STATE_ZOMBIE) {
+            return process;
+        }
+    }
+    return current_process();
+}
+
+bool handle_terminal_signal_character(int value) {
     struct Process *foreground_process;
-    int signal_number = 0;
+    int signal_number;
 
-    if (terminal_escape_pending) {
-        terminal_escape_pending = false;
-        if (value == 'c' || value == 'C') {
-            signal_number = SIGTERM;
-        } else if (value == 'z' || value == 'Z') {
-            signal_number = SIGTSTP;
-        } else {
-            // Tells stdin to preserve an escape that was not a shortcut
-            return -1;
-        }
+    if (value == TERMINAL_INTERRUPT_CHARACTER) {
+        signal_number = SIGTERM;
+    } else if (value == TERMINAL_STOP_CHARACTER) {
+        signal_number = SIGTSTP;
+    } else {
+        return false;
+    }
 
-        foreground_process = find_process_by_pid(
-            foreground_process_id
+    foreground_process = find_process_by_pid(
+        foreground_process_id
+    );
+    if (foreground_process != NULL) {
+        send_signal_to_process(
+            foreground_process,
+            signal_number
         );
-        if (foreground_process != NULL) {
-            send_signal_to_process(
-                foreground_process,
-                signal_number
-            );
-        }
-        return true;
     }
-
-    if (value == 27) {
-        terminal_escape_pending = true;
-        return true;
-    }
-    return 0;
+    return true;
 }

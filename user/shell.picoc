@@ -9,6 +9,9 @@
 #include "../common/loading_bar.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
+#define SHELL_COMMAND_HISTORY_CAPACITY 8
+#define SHELL_CTRL_U 21
+#define SHELL_CTRL_W 23
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
 #define SHELL_SAVED_STDOUT_FILENO 7
 #define SHELL_TEST_SAVED_STDOUT_FILENO 6
@@ -20,6 +23,13 @@
 int last_foreground_exit_status = 0;
 int last_background_process_id = 0;
 char **initial_shell_environment = NULL;
+// Keeps bounded command storage outside the process stack
+char command_history[
+    SHELL_COMMAND_HISTORY_CAPACITY
+][SHELL_COMMAND_BUFFER_CAPACITY];
+char command_history_draft[SHELL_COMMAND_BUFFER_CAPACITY];
+int command_history_start = 0;
+int command_history_count = 0;
 
 bool eval(char *command);
 
@@ -34,6 +44,154 @@ void shell_write_string(char *text) {
         length = length + 1;
     }
     write(STDOUT_FILENO, text, length);
+}
+
+void shell_write_decimal(int value) {
+    char buffer[12];
+    int length = append_decimal(buffer, value);
+
+    write(STDOUT_FILENO, buffer, length);
+}
+
+void report_process_created(int pid) {
+    shell_write_string("process ");
+    shell_write_decimal(pid);
+    shell_write_string(" created\n");
+}
+
+void report_foreground_process_status(int pid, int status) {
+    char *signal_name = NULL;
+    char *action = NULL;
+
+    if (WIFSTOPPED(status)) {
+        action = "stopped";
+        signal_name = "SIGTSTP";
+    } else if (status == SIGNAL_EXIT_STATUS_BASE + SIGKILL) {
+        action = "terminated";
+        signal_name = "SIGKILL";
+    } else if (status == SIGNAL_EXIT_STATUS_BASE + SIGTERM) {
+        action = "terminated";
+        signal_name = "SIGTERM";
+    }
+
+    if (signal_name != NULL) {
+        shell_write_character('\n');
+        shell_write_string("process ");
+        shell_write_decimal(pid);
+        shell_write_character(' ');
+        shell_write_string(action);
+        shell_write_string(" by ");
+        shell_write_string(signal_name);
+        shell_write_character('\n');
+    }
+}
+
+int erase_shell_line_suffix(int length, int retained_length) {
+    while (length > retained_length) {
+        shell_write_character('\b');
+        shell_write_character(' ');
+        shell_write_character('\b');
+        length = length - 1;
+    }
+    return length;
+}
+
+int command_history_index(int position) {
+    return (
+        command_history_start + command_history_count - position
+    ) % SHELL_COMMAND_HISTORY_CAPACITY;
+}
+
+void remember_shell_command(char *command) {
+    int index;
+
+    if (command_history_count > 0 && strcmp(
+        command_history[command_history_index(1)],
+        command
+    ) == 0) {
+        return;
+    }
+
+    if (command_history_count < SHELL_COMMAND_HISTORY_CAPACITY) {
+        index = (
+            command_history_start + command_history_count
+        ) % SHELL_COMMAND_HISTORY_CAPACITY;
+        command_history_count = command_history_count + 1;
+    } else {
+        index = command_history_start;
+        command_history_start = (
+            command_history_start + 1
+        ) % SHELL_COMMAND_HISTORY_CAPACITY;
+    }
+    strcpy(command_history[index], command);
+}
+
+int replace_shell_line(
+    char *buffer,
+    int length,
+    char *replacement,
+    int capacity
+) {
+    int replacement_length = 0;
+
+    length = erase_shell_line_suffix(length, 0);
+    while (
+        replacement[replacement_length] != 0 &&
+        replacement_length < capacity - 1
+    ) {
+        buffer[replacement_length] = replacement[replacement_length];
+        shell_write_character(replacement[replacement_length]);
+        replacement_length = replacement_length + 1;
+    }
+    buffer[replacement_length] = 0;
+    return replacement_length;
+}
+
+int navigate_command_history(
+    char *buffer,
+    int length,
+    int capacity,
+    int *history_position,
+    int direction
+) {
+    int index;
+    int new_position = *history_position + direction;
+    char *replacement;
+
+    if (new_position < 0 || new_position > command_history_count) {
+        return length;
+    }
+    if (*history_position == 0 && direction == 1) {
+        buffer[length] = 0;
+        strcpy(command_history_draft, buffer);
+    }
+    *history_position = new_position;
+    if (*history_position == 0) {
+        replacement = command_history_draft;
+    } else {
+        index = command_history_index(*history_position);
+        replacement = command_history[index];
+    }
+    return replace_shell_line(
+        buffer,
+        length,
+        replacement,
+        capacity
+    );
+}
+
+int append_shell_line_character(
+    char *buffer,
+    int length,
+    int capacity,
+    char character
+) {
+    if (length < capacity - 1) {
+        buffer[length] = character;
+        shell_write_character(character);
+        return length + 1;
+    }
+    return length;
 }
 
 void shell_yield(void) {
@@ -63,26 +221,100 @@ int is_line_whitespace(char value) {
 
 int read_line(char *buffer, int capacity) {
     int length = 0;
+    int history_position = 0;
+    int escape_sequence_state = 0;
     char character;
+    int retained_length;
     bool complete = false;
+    bool process_character;
 
     shell_write_string("PicoOS> ");
     while (!complete) {
         if (read(STDIN_FILENO, &character, 1) == 1) {
-            if (character == '\n' || character == '\r') {
-                shell_write_character('\n');
-                complete = true;
-            } else if (character == '\b' || character == 127) {
-                if (length > 0) {
-                    length = length - 1;
-                    shell_write_character('\b');
-                    shell_write_character(' ');
-                    shell_write_character('\b');
+            process_character = true;
+            if (escape_sequence_state == 1) {
+                if (character == '[' || character == 'O') {
+                    escape_sequence_state = 2;
+                    process_character = false;
+                } else {
+                    escape_sequence_state = 0;
                 }
-            } else if (length < capacity - 1) {
-                buffer[length] = character;
-                length = length + 1;
-                shell_write_character(character);
+            } else if (escape_sequence_state == 2) {
+                escape_sequence_state = 0;
+                if (character == 'A') {
+                    length = navigate_command_history(
+                        buffer,
+                        length,
+                        capacity,
+                        &history_position,
+                        1
+                    );
+                    process_character = false;
+                } else if (character == 'B') {
+                    length = navigate_command_history(
+                        buffer,
+                        length,
+                        capacity,
+                        &history_position,
+                        -1
+                    );
+                    process_character = false;
+                } else if (character == 'C' || character == 'D') {
+                    process_character = false;
+                } else {
+                    process_character = false;
+                }
+            } else if (character == 27) {
+                escape_sequence_state = 1;
+                process_character = false;
+            }
+
+            if (process_character) {
+                if (character == '\n' || character == '\r') {
+                    shell_write_character('\n');
+                    complete = true;
+                } else if (character == '\b' || character == 127) {
+                    if (length > 0) {
+                        length = erase_shell_line_suffix(
+                            length,
+                            length - 1
+                        );
+                    }
+                } else if (character == SHELL_CTRL_U) {
+                    length = erase_shell_line_suffix(length, 0);
+                } else if (character == SHELL_CTRL_W) {
+                    retained_length = length;
+                    while (
+                        retained_length > 0 &&
+                        is_line_whitespace(
+                            buffer[retained_length - 1]
+                        )
+                    ) {
+                        retained_length = retained_length - 1;
+                    }
+                    while (
+                        retained_length > 0 &&
+                        !is_line_whitespace(
+                            buffer[retained_length - 1]
+                        )
+                    ) {
+                        retained_length = retained_length - 1;
+                    }
+                    length = erase_shell_line_suffix(
+                        length,
+                        retained_length
+                    );
+                } else if (
+                    character == '\t' ||
+                    character >= ' '
+                ) {
+                    length = append_shell_line_character(
+                        buffer,
+                        length,
+                        capacity,
+                        character
+                    );
+                }
             }
         }
     }
@@ -451,6 +683,10 @@ bool run_process(
         set_foreground_process(pid);
         last_foreground_exit_status = waitpid(pid);
         set_foreground_process(0);
+        report_foreground_process_status(
+            pid,
+            last_foreground_exit_status
+        );
         if (WIFSTOPPED(last_foreground_exit_status)) {
             last_background_process_id = pid;
         } else if (last_background_process_id == pid) {
@@ -473,6 +709,10 @@ void continue_background_process(bool foreground) {
         set_foreground_process(pid);
         last_foreground_exit_status = waitpid(pid);
         set_foreground_process(0);
+        report_foreground_process_status(
+            pid,
+            last_foreground_exit_status
+        );
         if (!WIFSTOPPED(last_foreground_exit_status)) {
             last_background_process_id = 0;
         }
@@ -716,8 +956,13 @@ bool eval(char *command) {
         raw_arguments = command_operand(command, "load");
         if (raw_arguments == NULL) {
             shell_write_string("error: load requires a path\n");
-        } else if (load(raw_arguments) == 0) {
-            shell_write_string("error: could not load process\n");
+        } else {
+            pid = load(raw_arguments);
+            if (pid == 0) {
+                shell_write_string("error: could not load process\n");
+            } else {
+                report_process_created(pid);
+            }
         }
     } else if (command_matches(command, "run")) {
         raw_arguments = command_operand(command, "run");
@@ -801,6 +1046,7 @@ bool eval(char *command) {
             if (pid == 0) {
                 shell_write_string("error: unknown command\n");
             } else {
+                report_process_created(pid);
                 run_process(
                     pid,
                     raw_arguments,
@@ -816,6 +1062,7 @@ bool eval(char *command) {
 
 int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
+    int command_length;
 
     set_foreground_process(0);
     if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
@@ -828,7 +1075,12 @@ int main(int argc, char **argv) {
         return 1;
     }
     while (1) {
-        if (read_line(command, SHELL_COMMAND_BUFFER_CAPACITY) > 0) {
+        command_length = read_line(
+            command,
+            SHELL_COMMAND_BUFFER_CAPACITY
+        );
+        if (command_length > 0) {
+            remember_shell_command(command);
             if (!eval(command)) {
                 return 0;
             }
