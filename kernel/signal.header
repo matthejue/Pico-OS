@@ -14,4 +14,5 @@ bool prepare_process_signal(struct Process *process);
 void restore_signal_context(void);
 int set_parent_death_signal(struct PrctlRequest *request);
 int set_foreground_process(int pid);
-int handle_terminal_signal_character(int value);
+struct Process *terminal_input_process(void);
+bool handle_terminal_signal_character(int value);
