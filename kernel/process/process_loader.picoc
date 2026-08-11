@@ -55,7 +55,11 @@ int load_process(char *path, bool show_loading_bar) {
     uart_send_file_command("load ", path);
 
     word_count = receive_word();
-    if (word_count == 0) {
+    if (word_count == -1) {
+        return 0;
+    }
+    if (word_count < 5) {
+        drain_process_words(word_count, false);
         return 0;
     }
 
