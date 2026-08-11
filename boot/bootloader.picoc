@@ -48,6 +48,14 @@ void boot_main(void) {
     uart_send_file_command("load ", "kernel/kernel.bin");
 
     word_count = receive_word();
+    if (word_count == -1) {
+        uart_print_string("error: could not load kernel\n");
+        asm("JUMP 0");
+    }
+    if (word_count < 5) {
+        uart_print_string("error: invalid kernel image\n");
+        asm("JUMP 0");
+    }
     code_start = receive_word();
     data_start = receive_word();
     receive_word(); // Discards heap_start because the kernel uses memory_constants.header
