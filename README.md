@@ -1552,6 +1552,17 @@ PicoOS-specific model:
 | `SIGCONT` (18) | continue | Restores a stopped process; default otherwise ignores |
 | `SIGTSTP` (20) | stop | Parent waiters receive stopped status `128 + 20` |
 
+PicoOS implements `SIGTSTP` and `SIGTERM`, but deliberately does not implement
+`SIGSTOP` or `SIGINT`. A full operating system distinguishes these pairs:
+`SIGTSTP` is the terminal stop request that a program may handle or ignore,
+whereas `SIGSTOP` is an unconditional stop; `SIGTERM` is a catchable
+termination request, whereas `SIGINT` represents an interactive interrupt and
+is commonly handled separately. For this educational operating system, the
+extra distinctions are intentionally omitted because the ordinary actions are
+already covered by `SIGTSTP` and `SIGTERM`; the specialized signals would only
+be needed by programs that require those distinct handling rules. Consequently,
+PicoOS maps `Ctrl+Z` to `SIGTSTP` and `Ctrl+C` to `SIGTERM`.
+
 `signal()` installs one handler plus the library's naked
 `signal_restorer()`. `kill(pid, 0)` checks existence without delivery.
 Pending signals are bits in the PCB. Before dispatch, the kernel either
