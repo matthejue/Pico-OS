@@ -54,7 +54,7 @@ char *copy_process_path(char *path) {
         length = length + 1;
     }
 
-    // The loader's path buffer need not outlive the process, so the PCB owns a copy
+    // The caller's path buffer need not outlive the process, so the PCB owns a copy
     copy = (char *)kmalloc(length + 1);
     if (copy == NULL) {
         return NULL;
@@ -130,6 +130,17 @@ struct Process *create_process(
     if (parent != NULL) {
         process->parent_pid = parent->pid;
         process->parent_death_signal = parent->parent_death_signal;
+        process->working_directory = copy_process_path(
+            parent->working_directory
+        );
+    } else {
+        process->working_directory = copy_process_path("");
+    }
+    if (process->working_directory == NULL) {
+        destroy_file_descriptor_table(process->file_descriptors);
+        kfree(process->binary_path);
+        kfree(process);
+        return NULL;
     }
     process->exit_status = 0;
     process->stopped_from_state = PROCESS_STATE_READY;
@@ -236,6 +247,7 @@ void remove_process(struct Process *process) {
     pfree(candidate->base_address);
     destroy_file_descriptor_table(candidate->file_descriptors);
     kfree(candidate->binary_path);
+    kfree(candidate->working_directory);
     kfree(candidate);
 }
 

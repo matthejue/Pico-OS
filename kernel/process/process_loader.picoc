@@ -2,8 +2,10 @@
 #include "../process.header"
 #include "../pmalloc.header"
 #include "../../common/loading_bar.header"
+#include "../../common/file.header"
 #include "../../common/uart_protocol.header"
 #include "../../common/sram_loader.header"
+#include "../filesystem/host_filesystem.header"
 
 int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
     if (stack_start == -1) {
@@ -40,6 +42,8 @@ void drain_process_words(
 }
 
 int load_process(char *path, bool show_loading_bar) {
+    char absolute_path[512];
+    char *host_path = path;
     int word_count;
     int code_start;
     int data_start;
@@ -52,7 +56,13 @@ int load_process(char *path, bool show_loading_bar) {
     int base_address;
     struct Process *process;
 
-    uart_send_file_command("load ", path);
+    if (current_process() != NULL) {
+        if (!build_process_path(path, absolute_path, PATH_MAX)) {
+            return 0;
+        }
+        host_path = absolute_path;
+    }
+    uart_send_file_command("load ", host_path);
 
     word_count = receive_word();
     if (word_count == -1) {
@@ -73,7 +83,7 @@ int load_process(char *path, bool show_loading_bar) {
     }
 
     payload_word_count = word_count - 5;
-    uart_print_loading_bar_label(show_loading_bar, "load ", path);
+    uart_print_loading_bar_label(show_loading_bar, "load ", host_path);
     effective_stack_start = loaded_process_stack_start(
         heap_start,
         heap_size,
@@ -106,7 +116,7 @@ int load_process(char *path, bool show_loading_bar) {
         heap_start,
         heap_size,
         word_count,
-        path
+        host_path
     );
 
     if (process == NULL) {

@@ -1,9 +1,23 @@
-// dependencies: ../library/unistd/libunistd.reti_blocks
+// dependencies: ../common/user_command.reti_blocks ../library/unistd/libunistd.reti_blocks
 
+#include "../common/user_command.header"
 #include "../common/syscall.header"
 #include "../library/unistd/unistd.header"
 
-int main(void) {
+void poweroff_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: poweroff.bin\n");
+    command_write(file_descriptor, "Shut down PicoOS.\n");
+}
+
+int main(int argc, char **argv) {
+    if (argc == 2 && command_is_help(argv[1])) {
+        poweroff_usage(STDOUT_FILENO);
+        return 0;
+    }
+    if (argc != 1) {
+        poweroff_usage(STDERR_FILENO);
+        return 1;
+    }
     invoke_syscall(SYSCALL_SHUTDOWN, 0);
     return 0;
 }

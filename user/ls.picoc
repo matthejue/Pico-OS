@@ -1,0 +1,46 @@
+// dependencies: ../common/user_command.reti_blocks ../library/dirent/libdirent.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/user_command.header"
+#include "../library/dirent/dirent.header"
+#include "../library/unistd/unistd.header"
+
+void ls_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: ls.bin [DIRECTORY]\n");
+    command_write(file_descriptor, "List every entry in a directory.\n");
+}
+
+int main(int argc, char **argv) {
+    char *path = ".";
+    DIR *directory;
+    struct dirent *entry;
+
+    if (argc == 2 && command_is_help(argv[1])) {
+        ls_usage(STDOUT_FILENO);
+        return 0;
+    }
+    if (argc > 2) {
+        ls_usage(STDERR_FILENO);
+        return 1;
+    }
+    if (argc == 2) {
+        path = argv[1];
+    }
+    directory = opendir(path);
+    if (directory == NULL) {
+        command_write(STDERR_FILENO, "ls: could not open directory\n");
+        return 1;
+    }
+    entry = readdir(directory);
+    while (entry != NULL) {
+        if (entry->d_type == DT_DIR) {
+            command_write(STDOUT_FILENO, "d ");
+        } else {
+            command_write(STDOUT_FILENO, "- ");
+        }
+        command_write(STDOUT_FILENO, entry->d_name);
+        command_write(STDOUT_FILENO, "\n");
+        entry = readdir(directory);
+    }
+    closedir(directory);
+    return 0;
+}

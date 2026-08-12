@@ -18,6 +18,11 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+#define PATH_MAX 512
+
+#define FILE_TYPE_REGULAR 1
+#define FILE_TYPE_DIRECTORY 2
+
 struct OpenRequest {
     char *path;
     int flags;

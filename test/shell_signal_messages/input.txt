@@ -1,0 +1,3 @@
+kill.bin SIGTERM 3
+kill.bin SIGKILL 4
+poweroff.bin
