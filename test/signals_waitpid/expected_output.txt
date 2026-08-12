@@ -1,3 +1,4 @@
+process with pid 3 created
 SIGTERM cleanup finished
 SIGTERM handler status: 23
 SIGKILL status: 137
@@ -5,3 +6,4 @@ SIGCHLD delivered: 1
 SIGTSTP stopped: 1
 SIGCONT status: 6
 waitpid rejects non-child: 1
+process with pid 9 created

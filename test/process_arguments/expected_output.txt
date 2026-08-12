@@ -1,3 +1,4 @@
+process with pid 3 created
 argc=4
 arg0=test/process_arguments/process_arguments.bin
 arg1=42
@@ -5,3 +6,4 @@ arg2=beta
 arg3=gamma
 argv_end=NULL
 number=42
+process with pid 5 created

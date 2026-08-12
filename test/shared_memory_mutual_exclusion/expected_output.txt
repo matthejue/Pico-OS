@@ -1,3 +1,4 @@
+process with pid 3 created
 launcher: shared value = 0
 worker 1: trying to lock mutex
 worker 1: acquired mutex
@@ -10,3 +11,4 @@ worker 2: acquired mutex
 worker 2: shared value = 2
 worker 2: unlocked mutex
 launcher: final shared value = 2
+process with pid 6 created
