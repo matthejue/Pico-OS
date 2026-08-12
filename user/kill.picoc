@@ -1,41 +1,101 @@
-// dependencies: ../library/signal/libsignal.reti_blocks ../library/unistd/libunistd.reti_blocks
+// dependencies: ../common/user_command.reti_blocks ../library/schedule/libschedule.reti_blocks ../library/signal/libsignal.reti_blocks ../library/unistd/libunistd.reti_blocks
 
+#include "../common/user_command.header"
+#include "../library/schedule/schedule.header"
 #include "../library/signal/signal.header"
 #include "../library/stdlib/stdlib.header"
 #include "../library/unistd/unistd.header"
 
-void kill_write_error(char *text) {
-    int length = 0;
+bool kill_text_matches(char *left, char *right) {
+    int index = 0;
 
-    while (text[length] != 0) {
-        length = length + 1;
+    while (left[index] != 0 && left[index] == right[index]) {
+        index = index + 1;
     }
-    write(STDERR_FILENO, text, length);
+    return left[index] == right[index];
+}
+
+int parse_signal(char *value) {
+    int index = 0;
+
+    if (kill_text_matches(value, "SIGKILL")) {
+        return SIGKILL;
+    } else if (kill_text_matches(value, "SIGTERM")) {
+        return SIGTERM;
+    } else if (kill_text_matches(value, "SIGCHLD")) {
+        return SIGCHLD;
+    } else if (kill_text_matches(value, "SIGCONT")) {
+        return SIGCONT;
+    } else if (kill_text_matches(value, "SIGTSTP")) {
+        return SIGTSTP;
+    }
+    if (value[0] == 0) {
+        return -1;
+    }
+    while (value[index] >= '0' && value[index] <= '9') {
+        index = index + 1;
+    }
+    if (value[index] != 0) {
+        return -1;
+    }
+    return atoi(value);
+}
+
+int parse_process_id(char *value) {
+    int index = 0;
+
+    while (value[index] >= '0' && value[index] <= '9') {
+        index = index + 1;
+    }
+    if (index == 0 || value[index] != 0) {
+        return -1;
+    }
+    return atoi(value);
+}
+
+void kill_write_usage(int file_descriptor) {
+    command_write(
+        file_descriptor,
+        "Usage: kill.bin [SIGNAL] PID\n"
+    );
+    command_write(
+        file_descriptor,
+        "SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.\n"
+    );
 }
 
 int main(int argc, char **argv) {
     int process_id;
     int signal_number = SIGTERM;
 
-    if (argc < 2 || argc > 3) {
-        kill_write_error("usage: kill.bin PID [SIGNAL]\n");
-        return 1;
+    if (argc == 2 && command_is_help(argv[1])) {
+        kill_write_usage(STDOUT_FILENO);
+        return 0;
     }
-    process_id = atoi(argv[1]);
-    if (process_id <= 0) {
-        kill_write_error("kill: invalid process ID\n");
+    if (argc < 2 || argc > 3) {
+        kill_write_usage(STDERR_FILENO);
         return 1;
     }
     if (argc == 3) {
-        signal_number = atoi(argv[2]);
+        signal_number = parse_signal(argv[1]);
+        process_id = parse_process_id(argv[2]);
+    } else {
+        process_id = parse_process_id(argv[1]);
+    }
+    if (process_id <= 0) {
+        command_write(STDERR_FILENO, "kill: invalid process ID\n");
+        kill_write_usage(STDERR_FILENO);
+        return 1;
     }
     if (signal_number < 0 || signal_number >= SIGNAL_COUNT) {
-        kill_write_error("kill: invalid signal\n");
+        command_write(STDERR_FILENO, "kill: invalid signal\n");
+        kill_write_usage(STDERR_FILENO);
         return 1;
     }
     if (kill(process_id, signal_number) == -1) {
-        kill_write_error("kill: process not found\n");
+        command_write(STDERR_FILENO, "kill: process not found\n");
         return 1;
     }
+    yield();
     return 0;
 }

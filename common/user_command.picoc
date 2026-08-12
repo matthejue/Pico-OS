@@ -1,0 +1,27 @@
+#include "user_command.header"
+#include "../library/unistd/unistd.header"
+
+void command_write(int file_descriptor, char *text) {
+    int length = 0;
+
+    while (text[length] != 0) {
+        length = length + 1;
+    }
+    write(file_descriptor, text, length);
+}
+
+bool command_is_help(char *argument) {
+    return (
+        argument[0] == '-' &&
+        argument[1] == 'h' &&
+        argument[2] == 0
+    ) || (
+        argument[0] == '-' &&
+        argument[1] == '-' &&
+        argument[2] == 'h' &&
+        argument[3] == 'e' &&
+        argument[4] == 'l' &&
+        argument[5] == 'p' &&
+        argument[6] == 0
+    );
+}

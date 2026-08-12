@@ -36,6 +36,7 @@ struct Process {
     int heap_size;
     int word_count;
     char *binary_path;
+    char *working_directory;
     struct ActivationRecord activation;
     // Kept after activation because the dispatcher loads that record by fixed offsets
     struct FileDescriptorTable *file_descriptors;

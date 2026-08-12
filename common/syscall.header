@@ -34,6 +34,12 @@
 #define SYSCALL_PRCTL 29
 #define SYSCALL_SET_FOREGROUND_PROCESS 30
 #define SYSCALL_PROCESS_HEAP_FULL 31
+#define SYSCALL_CHDIR 32
+#define SYSCALL_GETCWD 33
+#define SYSCALL_MKDIR 34
+#define SYSCALL_READ_DIRECTORY 35
+#define SYSCALL_UNLINK 36
+#define SYSCALL_RMDIR 37
 
 struct LoadProcessRequest {
     char *path;
@@ -70,4 +76,15 @@ struct PrctlRequest {
 struct ShmOpenRequest {
     char *name;
     size_t size;
+};
+
+struct GetCwdRequest {
+    char *buffer;
+    int size;
+};
+
+struct ReadDirectoryRequest {
+    char *path;
+    char *buffer;
+    int capacity;
 };

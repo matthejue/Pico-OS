@@ -1,0 +1,11 @@
+#pragma once
+
+#include "../../common/syscall.header"
+
+bool build_process_path(char *path, char *result, int capacity);
+int change_working_directory(char *path);
+int get_working_directory(struct GetCwdRequest *request);
+int make_host_directory(char *path);
+int read_host_directory(struct ReadDirectoryRequest *request);
+int unlink_host_file(char *path);
+int remove_host_directory(char *path);

@@ -1,0 +1,25 @@
+#pragma once
+
+#include "../../common/file.header"
+
+#define DT_REG FILE_TYPE_REGULAR
+#define DT_DIR FILE_TYPE_DIRECTORY
+#define DIRENT_NAME_MAX 128
+
+struct dirent {
+    int d_type;
+    char d_name[DIRENT_NAME_MAX];
+};
+
+struct DirectoryStream {
+    char *contents;
+    int length;
+    int offset;
+    struct dirent entry;
+};
+
+typedef struct DirectoryStream DIR;
+
+DIR *opendir(char *path);
+struct dirent *readdir(DIR *directory);
+int closedir(DIR *directory);
