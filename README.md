@@ -451,7 +451,7 @@ process-memory, and maximum-address constants. Use `eprom` for the bootloader
 header, which contains its EPROM data-section start and its temporary SRAM-top
 stack. A generated header gives both programs their constants directly and
 efficiently. The kernel bootloader could instead pass some kernel bases that it
-already read from `kernel.sections` through the `.bin` header, but that adds a
+already read from `kernel/kernel.sections` through the `.bin` header, but that adds a
 runtime handoff for compile-time facts and still cannot solve the bootloader's
 own first-program layout problem.
 
@@ -489,10 +489,10 @@ The values are generated artifacts and may move when the kernel changes. The
 [Makefile](Makefile) supplies a 4096-cell kernel heap and a 2715-cell kernel
 stack. After linking determines `heap_start`, the compiler calculates
 `stack_start = heap_start + heap_size + stack_size`, then uses that layout for
-both `kernel.sections` and `kernel/memory_constants.header`. It also adds the
+both `kernel/kernel.sections` and `kernel/memory_constants.header`. It also adds the
 SRAM base to `stack_start` for `KERNEL_SP_START_ASM` and adds one more cell for
 `PROCESS_MEMORY_START`; no generated file is patched afterward. With the
-currently generated [`kernel.sections`](kernel.sections), the relative
+currently generated [`kernel/kernel.sections`](kernel/kernel.sections), the relative
 boundaries are `.text = 4`, `.data = 32705`, heap start `33189`, and kernel
 stack start `40000`.
 
@@ -2650,7 +2650,7 @@ visible.
 
 PicoC-Compiler retains symbolic block/function labels until its final RETI
 passes resolve addresses. Generated `.reti` files such as
-[`kernel.reti`](kernel.reti) allow students to compare PicoC source, symbolic
+[`kernel/kernel.reti`](kernel/kernel.reti) allow students to compare PicoC source, symbolic
 assembly, section metadata, and executable words.
 
 ## 13.3 Exercise sheets and teaching material
