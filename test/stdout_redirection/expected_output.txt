@@ -1,1 +1,4 @@
+process with pid 3 created
+process with pid 4 created
 redirected output
+process with pid 6 created
