@@ -1,0 +1,5 @@
+process with pid 3 created
+process with pid 3 terminated by signal SIGTERM
+process with pid 4 created
+process with pid 4 terminated by signal SIGKILL
+process with pid 5 created

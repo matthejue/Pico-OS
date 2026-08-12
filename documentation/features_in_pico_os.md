@@ -366,6 +366,46 @@ sets the busy-loop iterations between values; the default is 25,000. The
 program is useful for trying terminal job control: Ctrl+Z stops it, `fg`
 continues it, and Ctrl+C terminates it.
 
+## Host directory commands
+
+```text
+PicoOS> pwd.bin
+PicoOS> ls.bin
+PicoOS> cd /tmp
+PicoOS> ls.bin > files.txt
+PicoOS> mkdir.bin new-directory
+PicoOS> rm.bin files.txt
+PicoOS> rmdir.bin new-directory
+```
+
+Every PCB owns an inherited absolute working-directory string. Init obtains the
+emulator startup directory with `getcwd()`, and the shell records that inherited
+directory when it starts. Relative `PATH` entries are looked up from this shell
+startup directory, so commands such as `echo.bin` remain available after
+`cd /tmp`. The kernel prefixes the calling process's current directory to
+other relative load and file paths.
+
+`ls.bin`, `mkdir.bin`, `pwd.bin`, `rm.bin`, and `rmdir.bin` call PicoOS library
+functions. `ls.bin` uses the `opendir()`, `readdir()`, and
+`closedir()` functions from `library/dirent`; it always includes hidden entries
+and prints only `d name` or `- name`. The syscalls use bounded `is-directory`,
+`ls`, `mkdir`, `pwd`, `unlink`, and `rmdir` UART frames. For `chdir()`, the
+kernel combines the argument with the calling process's PCB directory and
+removes `.` and `..` components. It sends the resulting absolute path through
+`is-directory`; the emulator only checks whether that directory exists and
+returns success or failure. After success, PicoOS stores the already-built path
+in the calling process's PCB. The emulator keeps its own working directory
+unchanged.
+
+For example, a PCB directory of `/opt/picoos/binary/user` and the argument
+`.././kernel` produce `/opt/picoos/binary/kernel`. PicoOS validates that path
+and then stores it in the caller's PCB. `cd` is implemented as a shell built-in
+so this caller is the shell itself. Starting an ordinary child for `cd` would
+only change the child's PCB and would have no lasting effect on the shell.
+
+`ls` and `pwd` output passes through ordinary process stdout, including `>` and
+`>>`.
+
 ## Boolean type and constants for PicoC code
 
 ```c
@@ -633,11 +673,13 @@ Relevant commit: `068f84d75f19`
 | Command | Signal sent |
 | --- | --- |
 | `kill.bin 3` | `SIGTERM` |
-| `kill.bin 3 9` | `SIGKILL` |
+| `kill.bin SIGKILL 3` | `SIGKILL` |
+| `kill.bin SIGTERM 3` | `SIGTERM` |
+| `kill.bin 0 3` | Check existence without sending a signal |
 
-The second argument may select any implemented numeric signal. Invalid PIDs,
-invalid signal numbers, unknown processes, and incorrect argument counts print
-an error and return status 1.
+The optional first argument may name an implemented signal or give its number.
+Invalid PIDs, invalid signals, unknown processes, and incorrect argument counts
+print an error and short usage help, then return status 1.
 
 Relevant commits: `432568fd9a97`, `fbe915710f14`
 

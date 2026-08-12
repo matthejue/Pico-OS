@@ -1,0 +1,20 @@
+#include "unistd.header"
+#include "../../common/syscall.header"
+
+int chdir(char *path) {
+    if (path == NULL) {
+        return -1;
+    }
+    return invoke_syscall(SYSCALL_CHDIR, (int)path);
+}
+
+char *getcwd(char *buffer, int size) {
+    struct GetCwdRequest request;
+
+    request.buffer = buffer;
+    request.size = size;
+    if (invoke_syscall(SYSCALL_GETCWD, (int)&request) < 0) {
+        return NULL;
+    }
+    return buffer;
+}

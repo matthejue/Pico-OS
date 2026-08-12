@@ -1,7 +1,20 @@
+process with pid 3 created
 cat: missing file operand
+Usage: cat.bin FILE...
+Print one or more files.
 cat: test/user_program_error_messages/missing.txt: could not open file
 cat: user: could not open file
-usage: kill.bin PID [SIGNAL]
+Usage: kill.bin [SIGNAL] PID
+SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+kill: process not found
 kill: process not found
 kill: invalid signal
+Usage: kill.bin [SIGNAL] PID
+SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
 kill: invalid process ID
+Usage: kill.bin [SIGNAL] PID
+SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+kill: invalid signal
+Usage: kill.bin [SIGNAL] PID
+SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+process with pid 13 created
