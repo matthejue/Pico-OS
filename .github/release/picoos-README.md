@@ -1,8 +1,12 @@
 # PicoOS release
 
-- Linux and macOS: run `./start-picoos.sh`
-- Windows: run `.\start-picoos.ps1` in PowerShell
-- Android: install Termux, then run `./start-picoos.sh`
+- Linux and macOS: run `./download-tools.sh`, then `./start-picoos.sh`
+- Windows: run `.\download-tools.ps1`, then `.\start-picoos.ps1` in PowerShell
+- Android: install Termux, then run `./download-tools.sh` and `./start-picoos.sh`
+
+The download scripts select the current operating system and architecture, then
+install the latest RETI Emulator and PicoC Compiler GitHub release binaries in
+this directory. Run the download script again at any time to update both tools.
 
 The launchers look for `reti_emulator` in this directory and then in `PATH`.
 Use `--reti-emulator PATH` with the shell script or `-RetiEmulator PATH` with
