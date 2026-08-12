@@ -362,6 +362,8 @@ RUNTIME_FILES := \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
 	$(BINARY_DIR)/kernel/kernel.debuginfo \
+	$(BINARY_DIR)/download-tools.sh \
+	$(BINARY_DIR)/download-tools.ps1 \
 	$(BINARY_DIR)/start-picoos.sh \
 	$(BINARY_DIR)/start-picoos.ps1 \
 	$(BINARY_DIR)/README.md
@@ -389,6 +391,7 @@ verify-release-tree: release-tree
 		test -s "$$file" || { echo "Missing release file: $$file" >&2; exit 1; }; \
 	done; \
 	test -x $(BINARY_DIR)/start-picoos.sh; \
+	test -x $(BINARY_DIR)/download-tools.sh; \
 	unexpected=$$(find $(BINARY_DIR) \( -type f -o -type l \) \
 		$(RELEASE_FIND_EXCLUSIONS) -print -quit); \
 	test -z "$$unexpected" || { echo "Unexpected release file: $$unexpected" >&2; exit 1; }
@@ -422,6 +425,13 @@ binary/start-picoos.sh: start-picoos.sh | binary
 	chmod 755 $@
 
 binary/start-picoos.ps1: start-picoos.ps1 | binary
+	cp $< $@
+
+binary/download-tools.sh: download-tools.sh | binary
+	cp $< $@
+	chmod 755 $@
+
+binary/download-tools.ps1: download-tools.ps1 | binary
 	cp $< $@
 
 binary/README.md: .github/release/picoos-README.md | binary
@@ -701,4 +711,4 @@ clean: clean-binary
 
 clean-binary: clean-firmware
 	rm -rf binary/boot binary/config binary/kernel binary/system binary/user
-	rm -f binary/start-picoos.sh binary/start-picoos.ps1 binary/README.md
+	rm -f binary/download-tools.sh binary/download-tools.ps1 binary/start-picoos.sh binary/start-picoos.ps1 binary/README.md
