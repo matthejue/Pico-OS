@@ -1,24 +1,35 @@
-// dependencies: ../library/stdio/libstdio.reti_blocks ../library/schedule/libschedule.reti_blocks
+// dependencies: ../common/user_command.reti_blocks ../library/stdio/libstdio.reti_blocks ../library/schedule/libschedule.reti_blocks ../library/unistd/libunistd.reti_blocks
 
+#include "../common/user_command.header"
 #include "../library/stdio/stdio.header"
 #include "../library/schedule/schedule.header"
 #include "../library/stdlib/stdlib.header"
 
 #define DEFAULT_COUNT_DELAY 25000
 
+void count_usage(void) {
+    printf("Usage: count.bin [DELAY]\n");
+    printf("Count upward with an optional busy-loop delay.\n");
+}
+
 int main(int argc, char **argv) {
     int count = 0;
     int count_delay = DEFAULT_COUNT_DELAY;
     int delay;
 
+    if (argc == 2 && command_is_help(argv[1])) {
+        count_usage();
+        return 0;
+    }
     if (argc > 2) {
-        printf("usage: count.bin [DELAY]\n");
+        count_usage();
         return 1;
     }
     if (argc == 2) {
         count_delay = atoi(argv[1]);
         if (count_delay < 0) {
             printf("count: delay must not be negative\n");
+            count_usage();
             return 1;
         }
     }

@@ -1,0 +1,240 @@
+#include "host_filesystem.header"
+#include "../kmalloc.header"
+#include "../process.header"
+#include "../../common/file.header"
+#include "../../common/uart_protocol.header"
+
+int receive_byte_over_uart(void);
+
+int string_length(char *value) {
+    int length = 0;
+
+    while (value[length] != 0) {
+        length = length + 1;
+    }
+    return length;
+}
+
+int receive_uart_string(char *buffer, int capacity) {
+    int byte_count = receive_word();
+    int index = 0;
+    int value;
+
+    if (byte_count < 0) {
+        if (capacity > 0) {
+            buffer[0] = 0;
+        }
+        return -1;
+    }
+    while (index < byte_count) {
+        value = receive_byte_over_uart();
+        if (index < capacity - 1) {
+            buffer[index] = value;
+        }
+        index = index + 1;
+    }
+    if (capacity > 0) {
+        if (byte_count < capacity) {
+            buffer[byte_count] = 0;
+        } else {
+            buffer[capacity - 1] = 0;
+        }
+    }
+    if (byte_count >= capacity) {
+        return -1;
+    }
+    return byte_count;
+}
+
+bool append_path_segments(
+    char *path,
+    char *result,
+    int *result_length,
+    int capacity
+) {
+    int index = 0;
+    int segment_start;
+    int segment_length;
+    int copy_index;
+
+    while (path[index] != 0) {
+        while (path[index] == '/') {
+            index = index + 1;
+        }
+        segment_start = index;
+        while (path[index] != 0 && path[index] != '/') {
+            index = index + 1;
+        }
+        segment_length = index - segment_start;
+        if (segment_length > 0 && !(
+                segment_length == 1 && path[segment_start] == '.'
+            )) {
+            if (segment_length == 2 &&
+                path[segment_start] == '.' &&
+                path[segment_start + 1] == '.') {
+                while (*result_length > 1 &&
+                       result[*result_length - 1] != '/') {
+                    *result_length = *result_length - 1;
+                }
+                if (*result_length > 1) {
+                    *result_length = *result_length - 1;
+                }
+            } else {
+                if (*result_length > 1) {
+                    if (*result_length + segment_length + 1 >= capacity) {
+                        return false;
+                    }
+                    result[*result_length] = '/';
+                    *result_length = *result_length + 1;
+                } else if (*result_length + segment_length >= capacity) {
+                    return false;
+                }
+                copy_index = 0;
+                while (copy_index < segment_length) {
+                    result[*result_length] = path[segment_start + copy_index];
+                    *result_length = *result_length + 1;
+                    copy_index = copy_index + 1;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool build_process_path(char *path, char *result, int capacity) {
+    int result_length = 1;
+
+    if (path == NULL || result == NULL || capacity < 2) {
+        return false;
+    }
+    result[0] = '/';
+    if (path[0] != '/') {
+        if (!append_path_segments(
+                current_process()->working_directory,
+                result,
+                &result_length,
+                capacity
+            )) {
+            return false;
+        }
+    }
+    if (!append_path_segments(
+            path,
+            result,
+            &result_length,
+            capacity
+        )) {
+        return false;
+    }
+    result[result_length] = 0;
+    return true;
+}
+
+bool set_process_working_directory(char *path) {
+    struct Process *process = current_process();
+    int length = string_length(path);
+    int index = 0;
+    char *copy = (char *)kmalloc(length + 1);
+
+    if (copy == NULL) {
+        return false;
+    }
+    while (index <= length) {
+        copy[index] = path[index];
+        index = index + 1;
+    }
+    kfree(process->working_directory);
+    process->working_directory = copy;
+    return true;
+}
+
+int initialize_working_directory(void) {
+    char path[512];
+
+    uart_send_file_command("pwd", "");
+    if (receive_uart_string(path, PATH_MAX) < 0 ||
+        !set_process_working_directory(path)) {
+        return -1;
+    }
+    return 0;
+}
+
+int get_working_directory(struct GetCwdRequest *request) {
+    char *working_directory;
+    int length;
+    int index = 0;
+
+    if (request == NULL || request->buffer == NULL || request->size <= 0) {
+        return -1;
+    }
+    if (current_process()->working_directory[0] == 0 &&
+        initialize_working_directory() < 0) {
+        return -1;
+    }
+    working_directory = current_process()->working_directory;
+    length = string_length(working_directory);
+    if (length >= request->size) {
+        return -1;
+    }
+    while (index <= length) {
+        request->buffer[index] = working_directory[index];
+        index = index + 1;
+    }
+    return 0;
+}
+
+int change_working_directory(char *path) {
+    char absolute_path[512];
+
+    if (!build_process_path(path, absolute_path, PATH_MAX)) {
+        return -1;
+    }
+    uart_send_file_command("is-directory ", absolute_path);
+    if (receive_word() < 0) {
+        return -1;
+    }
+    if (!set_process_working_directory(absolute_path)) {
+        return -1;
+    }
+    return 0;
+}
+
+int make_host_directory(char *path) {
+    char absolute_path[512];
+
+    if (!build_process_path(path, absolute_path, PATH_MAX)) {
+        return -1;
+    }
+    uart_send_file_command("mkdir ", absolute_path);
+    return receive_word();
+}
+
+int read_host_directory(struct ReadDirectoryRequest *request) {
+    char absolute_path[512];
+
+    if (request == NULL || request->buffer == NULL ||
+        request->capacity <= 0 ||
+        !build_process_path(request->path, absolute_path, PATH_MAX)) {
+        return -1;
+    }
+    uart_send_file_command("ls ", absolute_path);
+    return receive_uart_string(request->buffer, request->capacity);
+}
+
+int remove_host_path(char *command, char *path) {
+    char absolute_path[512];
+
+    if (!build_process_path(path, absolute_path, PATH_MAX)) {
+        return -1;
+    }
+    uart_send_file_command(command, absolute_path);
+    return receive_word();
+}
+
+int unlink_host_file(char *path) {
+    return remove_host_path("unlink ", path);
+}
+
+int remove_host_directory(char *path) {
+    return remove_host_path("rmdir ", path);
+}

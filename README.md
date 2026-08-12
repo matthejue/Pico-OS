@@ -40,7 +40,7 @@ design, including VAT; component and shipping prices can change.
   with the same address and control signals therefore makes them one 256K ×
   32-bit SRAM. It provides 2^18 = 262,144 individually addressable 32-bit
   words, addressed from 0 through 2^18 - 1, for 1,048,576 bytes (1.048576 MB,
-  or 1 MiB). For comparison, 2^18 bytes alone are 0.262144 MB.
+  or 1 MiB). For comparison, 2^18 bytes alone are 0.262144 MB.<!-- Please show shortly the calculation how this 1MiB is calculated from 262,144 individually addressable 32-bit words -->
 - **USB-to-UART: [SparkFun Serial Basic Breakout with CH340C and
   USB-C](https://www.digikey.de/short/h83tqvbw)**
   ([product sheet](https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/739/DEV-15096_Web.pdf),
@@ -52,11 +52,12 @@ design, including VAT; component and shipping prices can change.
   the CH340C as a serial port on the host. The host and FPGA use the same baud
   rate and serial format, and UART transfers each request and response as a
   sequence of bytes.
+  <!-- Please add to the prizes a date whet the prize was last checked in () or so -->
 
 The FPGA, SRAM interfaces, and USB-to-UART signals can all use 3.3 V logic, so
 no level converter is required between them. The example total is **€57.25 +
 2 × €8.50 + €11.23 = €85.48 including VAT**. This excludes USB cables,
-wires, connectors, a PCB or other interconnection hardware, and shipping.
+wires, connectors, a PCB<!-- write out the full name Printed Circuit Board and mention that it has also funnely the same abbreviation PCB as Process Control Block --> or other interconnection hardware, and shipping.
 
 PicoOS has no resident storage device or filesystem. In emulator use, UART
 escape sequences ask `reti_emulator` to access files in the host directory
@@ -125,7 +126,7 @@ so the kernel itself needs no locks.
    - [1.1 Loading and starting the kernel](#11-loading-and-starting-the-kernel)
    - [1.2 Generated memory constants](#12-generated-memory-constants)
    - [1.3 UART hardware interface](#13-uart-hardware-interface)
-   - [1.4 File-loading protocol over UART](#14-file-loading-protocol-over-uart)
+   - [1.4 Host services over UART](#14-host-services-over-uart)
 2. [Kernel main loop](#2-kernel-main-loop)
    - [2.1 Kernel initialization](#21-kernel-initialization)
    - [2.2 Transition from bootloading to normal execution](#22-transition-from-bootloading-to-normal-execution)
@@ -187,6 +188,7 @@ so the kernel itself needs no locks.
     - [10.4 Output redirection with `>`](#104-output-redirection-with-)
     - [10.5 `dup2()`](#105-dup2)
     - [10.6 Output appending with `>>`](#106-output-appending-with-)
+    - [10.7 Working directories and host metadata](#107-working-directories-and-host-metadata)
 11. [Init process](#11-init-process)
     - [11.1 Purpose of init](#111-purpose-of-init)
     - [11.2 Separation of responsibilities](#112-separation-of-responsibilities)
@@ -199,9 +201,10 @@ so the kernel itself needs no locks.
     - [12.2 `echo`](#122-echo)
     - [12.3 `count`](#123-count)
     - [12.4 `cat`](#124-cat)
-    - [12.5 `kill`](#125-kill)
-    - [12.6 `poweroff`](#126-poweroff)
-    - [12.7 Actionable command errors](#127-actionable-command-errors)
+    - [12.5 Host-backed directory commands](#125-host-backed-directory-commands)
+    - [12.6 `kill`](#126-kill)
+    - [12.7 `poweroff`](#127-poweroff)
+    - [12.8 Actionable command errors](#128-actionable-command-errors)
 13. [Use in lectures](#13-use-in-the-operating-systems-and-real-time-operating-systems-lectures)
     - [13.1 Real-time operating systems lecture](#131-real-time-operating-systems-lecture)
     - [13.2 Operating systems lecture](#132-operating-systems-lecture)
@@ -348,6 +351,14 @@ void boot_main(void) {
     uart_send_file_command("load ", "kernel/kernel.bin");
 
     word_count = receive_word();
+    if (word_count == -1) {
+        uart_print_string("error: could not load kernel\n");
+        asm("JUMP 0");
+    }
+    if (word_count < 5) {
+        uart_print_string("error: invalid kernel image\n");
+        asm("JUMP 0");
+    }
     code_start = receive_word();
     data_start = receive_word();
     receive_word();
@@ -374,11 +385,12 @@ void boot_main(void) {
 }
 ```
 
-`boot_main()` requests the image, separates its five-word loader header from
-the payload, substitutes the SRAM-top default when no stack start was encoded,
-copies the payload, and finally jumps to the naked handoff routine. The two
-unassigned `receive_word()` calls discard the kernel image's `heap_start` and
-`heap_size`.
+`boot_main()` requests the image and stops with an error if the emulator reports
+`UINT32_MAX` or the image is too short to contain its five-word header. It then
+separates that header from the payload, substitutes the SRAM-top default when no
+stack start was encoded, copies the payload, and finally jumps to the naked
+handoff routine. The two unassigned `receive_word()` calls discard the kernel
+image's `heap_start` and `heap_size`.
 
 ```c
 __attribute__((naked))
@@ -514,14 +526,14 @@ the byte. To receive synchronously, PicoOS clears bit 1, polls until the
 emulator places a byte in `uart_receive` and sets bit 1, and then reads that
 byte. The linked bootloader always uses these polling routines; its design does
 not configure interrupts or create processes. Keypress interrupts provide
-input to the shell through the UART hardware interrupt and the per-process
+input through the UART hardware interrupt and the terminal owner's per-process
 input buffer described in [section 3.9](#39-uart-and-keypress-interrupt).
 
 See [`kernel/uart_hardware.picoc`](kernel/uart_hardware.picoc), the local
 [UART protocol notes](documentation/uart_protocol.md), and the emulator's
 [UART documentation](../RETI-Emulator/README.md#uart).
 
-## 1.4 File-loading protocol over UART
+## 1.4 Host services over UART
 
 UART itself transports only raw bytes. PicoOS creates a higher-level request by
 writing this ASCII escape sequence as output:
@@ -530,16 +542,45 @@ writing this ASCII escape sequence as output:
 <ESC>load <path><ESC>/
 ```
 
-`<ESC>` is byte 27. The emulator consumes the complete escape sequence instead of
-displaying it, opens `<path>` relative to its working directory (unless the
-path is absolute), and appends to its UART input buffer:
+`<ESC>` is byte 27. The emulator consumes the complete escape sequence instead
+of displaying it. After init has established its working directory, the kernel
+sends an absolute `<path>` derived from the calling process's PCB and appends to
+the UART input buffer:
 
 1. a 32-bit **big-endian word count** for the file;
 2. the exact file bytes.
 
-For `load`, an unreadable file produces a zero count. The count lets the
-receiver distinguish protocol metadata from payload; neither the escape sequence
-nor a datatype marker appears in the input payload.
+For `load`, `UINT32_MAX` reports a missing or unreadable path, a non-regular
+file, or a file whose word count cannot be represented. An existing empty
+regular file returns a zero word count, so receivers can distinguish it from a
+failed request.
+
+Working-directory and directory services use these frames:
+
+```text
+<ESC>pwd<ESC>/
+<ESC>is-directory <path><ESC>/
+<ESC>mkdir <path><ESC>/
+<ESC>ls<ESC>/
+<ESC>ls <path><ESC>/
+<ESC>unlink <path><ESC>/
+<ESC>rmdir <path><ESC>/
+```
+
+`pwd` calls the emulator's `getcwd()` and returns one big-endian 32-bit byte
+count followed by the absolute path bytes. Init uses it once to store the
+emulator startup directory in its PCB. `is-directory` checks whether an
+absolute path names a directory and returns `0` or `UINT32_MAX`. `chdir()`
+stores that path in the calling process's PCB only after this check succeeds;
+it never changes the emulator's working directory.
+
+`mkdir`, `unlink`, and `rmdir` call the matching host operations and return `0`
+or `UINT32_MAX`. A bare `ls` lists the emulator's current directory; PicoOS
+normally supplies an absolute path. Its response is a byte count followed by
+one line per directory entry in the host's natural order. Each line begins
+with `d ` for a directory or `- ` for a file, followed by its name. Hidden
+entries, including `.` and `..`, are always included. `UINT32_MAX` reports an
+unreadable directory.
 
 Host-backed filesystem operations use the following ranged request:
 
@@ -597,14 +638,8 @@ Both standard-stream requests close any selected output file. Control frames
 themselves are consumed by the emulator; only ordinary UART bytes sent after an
 output-selection frame are redirected.
 
-The emulator also accepts a host-shell request:
-
-```text
-<ESC>!<terminal_command><ESC>/
-```
-
-It runs the command in the emulator process's working directory and provides no
-structured result over UART. PicoOS does not currently emit this request.
+There is no generic host-command frame. Each supported operation has a bounded
+request and calls the matching C filesystem function directly.
 
 `./run_reti_emulator_isolated.sh -a program.reti` builds `program.bin`. The
 `.bin` itself begins
@@ -1129,10 +1164,12 @@ tail pointers. PIDs begin at 1 and increase monotonically, except that the
 fast-test reset deliberately restores the next PID to 3 while init (1) and
 the shell (2) remain.
 
-`create_process()` allocates a PCB, path copy, and descriptor table with
-`kmalloc()` and appends it. `remove_process()` unlinks wait-queue and global
-list links, releases shared-memory attachments, frees the complete process
-region with `pfree()`, destroys descriptors, and frees the path and PCB.
+`create_process()` allocates a PCB, binary-path copy, working-directory copy,
+and descriptor table with `kmalloc()` and appends it. A child copies the
+current process's absolute working-directory string. `remove_process()`
+unlinks wait-queue and global list links, releases shared-memory attachments,
+frees the complete process region with `pfree()`, destroys descriptors, and
+frees both strings and the PCB.
 
 The kernel has no entry because it does not use a user code/data region,
 parent, descriptors, or schedulable user state. Low-level kernel addresses
@@ -1150,6 +1187,7 @@ The authoritative structure is
 | `base_address`, `size` | Absolute start and cell count of the complete SRAM region |
 | `heap_start`, `heap_size` | Process-relative heap offset and requested size, or the 1000-cell default |
 | `word_count`, `binary_path` | Load metadata and kernel-owned source path copy |
+| `working_directory` | Kernel-owned absolute host path inherited from the loading process |
 | `activation` | Saved `IN1`, `IN2`, `ACC`, `SP`, `BAF`, `CS`, and `DS` |
 | `file_descriptors` | Per-process eight-entry descriptor table and stdin state |
 | `waiting_status_ptr` | Pointer into this process's suspended `waitpid()` frame |
@@ -1168,6 +1206,13 @@ There is no separate PCB field for the program counter: the interrupt return
 PC remains at `activation.sp + 1` on the process stack. There is also no PCB
 environment table. `argv`/`envp` begin on the initial process stack, after
 which `libstdlib` clones environment strings onto the process heap.
+
+Relative paths do not depend on the emulator's C working directory. Before
+`load`, `open`, `read-range`,
+`file-size`, `write`, `append`, `mkdir`, `ls`, `unlink`, or `rmdir`, the kernel
+prefixes a relative operand with the calling PCB's absolute directory. It
+removes repeated separators and resolves `.` and `..` components before
+sending the absolute path, so emulator load messages contain clean paths.
 
 ## 4.3 Activation records and stack frames
 
@@ -1828,7 +1873,7 @@ another 1000 stack cells above the effective heap, while an explicit stack may
 not overlap the heap. A numeric program image containing an interrupt vector
 table may additionally define `interrupt_service_routines_start`. Assembly
 copies the five required fields into the binary header described in
-[section 1.4](#14-file-loading-protocol-over-uart); kernel binaries use that
+[section 1.4](#14-host-services-over-uart); kernel binaries use that
 same header but take their heap range from generated kernel constants.
 
 ## 8.2 Heap implementation
@@ -2006,13 +2051,15 @@ Public headers and principal facilities are:
 
 | Directory/header | Purpose |
 | --- | --- |
-| [`library/unistd`](library/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, process load/run/unload/list, PID, reset, foreground PID, wait queues |
+| [`library/unistd`](library/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, `chdir`, `getcwd`, `unlink`, `rmdir`, process load/run/unload/list, PID, reset, foreground PID, wait queues |
 | [`library/fcntl`](library/fcntl/fcntl.header) | `open`, `creat`, access/create/truncate/append flags |
 | [`library/sys/wait`](library/sys/wait/wait.header) | exact-child `waitpid`, `WIFSTOPPED` |
 | [`library/schedule`](library/schedule/schedule.header) | voluntary `yield` |
 | [`library/mutex`](library/mutex/mutex.header) | `testset`, init, lock, unlock |
 | [`library/signal`](library/signal/signal.header) | `signal`, `kill`, default/ignore constants |
 | [`library/sys/prctl`](library/sys/prctl/prctl.header) | `PR_SET_PDEATHSIG` |
+| [`library/sys/stat`](library/sys/stat/stat.header) | `mkdir` |
+| [`library/dirent`](library/dirent/dirent.header) | `opendir`, `readdir`, `closedir`, directory entries |
 | [`library/sys/mman`](library/sys/mman/mman.header) | named shared-memory open/map/unlink |
 | [`library/stdlib`](library/stdlib/stdlib.header) | heap allocation, `atoi`, environment APIs, `exit` |
 | [`library/string`](library/string/string.header) | `memcpy`, `memset`, `strcpy`, `strcat`, `strcmp`, `strncmp`, `strlen` |
@@ -2123,8 +2170,8 @@ process.
 
 # 10. Filesystem
 
-PicoOS's "filesystem" is a kernel descriptor layer over files in the emulator
-host's working directory. Data reads use UART
+PicoOS's "filesystem" is a kernel descriptor layer over the emulator host
+filesystem. Each process has an absolute working-directory string. Data reads use UART
 `read-range <offset> <count> <path>` escape sequences, metadata queries use
 `file-size <path>`, and writes use `write` or `append`. It is not an on-SRAM
 filesystem.
@@ -2157,7 +2204,8 @@ refuses descriptors below 3, although `dup2()` may replace standard entries.
 ## 10.3 File operations
 
 Implemented calls are `open()`, `creat()`, `close()`, `read()`, `write()`,
-`lseek()`, and `dup2()`.
+`lseek()`, `dup2()`, `chdir()`, `getcwd()`, `mkdir()`, `unlink()`, `rmdir()`,
+`opendir()`, `readdir()`, and `closedir()`.
 
 - `open` validates access mode and allocates the first free entry from 3.
   A `file-size` request checks existence without transferring file contents.
@@ -2205,6 +2253,60 @@ The parser distinguishes a second `>` and opens with
 then passes stdout to the child. Since kernel regular writes use the emulator's
 `append` escape sequence, existing content remains and new output is added at the end.
 
+## 10.7 Working directories and directory operations
+
+`chdir(path)` and `getcwd(buffer, size)` are provided by
+[`library/unistd`](library/unistd). A `chdir()` request works as follows:
+
+1. The kernel combines a relative argument with the directory stored in the
+   calling process's PCB. It removes repeated `/` characters and resolves `.`
+   and `..` components while building the absolute path.
+2. PicoOS sends `<ESC>is-directory <absolute-path><ESC>/` to the emulator.
+3. The emulator checks whether the path is an existing directory and returns
+   `0` for success or `UINT32_MAX` for failure. It does not change its own
+   working directory.
+4. After a successful check, PicoOS stores the already-built absolute path in
+   the calling process's PCB. On failure, the old PCB path remains unchanged.
+
+For example, if the process PCB contains `/opt/picoos/binary/user`, then
+`chdir(".././kernel")` builds `/opt/picoos/binary/kernel` and sends:
+
+```text
+<ESC>is-directory /opt/picoos/binary/kernel<ESC>/
+```
+
+The complete successful request is:
+
+```mermaid
+sequenceDiagram
+    participant Process as PicoOS process
+    participant Kernel as PicoOS kernel
+    participant Emulator as RETI-Emulator
+    Process->>Kernel: chdir(".././kernel")
+    Kernel->>Kernel: Build /opt/picoos/binary/kernel
+    Kernel->>Emulator: is-directory /opt/picoos/binary/kernel
+    Emulator->>Emulator: Check directory with stat()
+    Emulator-->>Kernel: 0
+    Kernel->>Kernel: Update only this process's PCB
+    Kernel-->>Process: 0
+```
+
+`chdir` returns `0` on success and `-1` on failure. `getcwd` returns the
+directory stored in the PCB through the supplied buffer, or `NULL`. PID 1
+initializes from `<ESC>pwd<ESC>/`; later calls only copy the PCB string.
+
+[`library/sys/stat`](library/sys/stat) follows PicoC's library layout and
+exposes the simple `mkdir(path)` call. PicoOS does not provide `stat()` or
+`fstat()`.
+
+[`library/dirent`](library/dirent) provides `opendir()`, `readdir()`, and
+`closedir()`. `opendir()` obtains one bounded directory listing through the
+kernel, `readdir()` returns its entries one by one from a reusable
+`struct dirent`, and `closedir()` releases the stream buffer. An entry contains
+only `d_type` (`DT_DIR` or `DT_REG`) and `d_name`; there is no size or other
+metadata. `unlink()` and `rmdir()` are provided by
+[`library/unistd`](library/unistd).
+
 # 11. Init process
 
 ## 11.1 Purpose of init
@@ -2228,12 +2330,21 @@ manage registers. The shell does not initialize global kernel structures.
 
 ## 11.3 Configuration file
 
-Init opens [`./config/environment.txt`](config/environment.txt), a newline/CRLF
+Init first calls `getcwd()` with a `PATH_MAX` buffer. Because PID 1 has no
+parent directory to inherit, the kernel sends `<ESC>pwd<ESC>/`, stores the
+returned emulator startup directory in init's PCB, and copies it to the user
+buffer. Init then opens [`./config/environment.txt`](config/environment.txt), a newline/CRLF
 separated list of `NAME=value` entries. It reads at most 255 bytes into a
 256-cell buffer and calls `setenv(name, value, true)` for each entry. The
 current file defines only `PATH=./user`; build-time
 [`config/config.header`](config/config.header) separately controls whether init
 adds `PICOOS_LOADING_BAR=true`.
+
+The shell records its inherited directory during startup. When it searches a
+relative `PATH` entry, it resolves that entry from this startup directory.
+Consequently, the configured `PATH=./user` remains unchanged and still finds
+the installed applications after the shell changes directory, without a
+special loader protocol.
 
 If the file is missing, cannot be read, exceeds 255 bytes, contains a malformed
 line without `=`, or an environment allocation fails, init prints an error and
@@ -2242,9 +2353,11 @@ returns status 1. Because no shell exists, the kernel eventually shuts down.
 ## 11.4 Starting the shell
 
 Init directly requests `./user/shell.bin`; it does not use `PATH`. `load()`
-creates a `NEW` child, and `run(shell_pid, NULL, NULL)` supplies no extra
-arguments and inherits init's environment and standard descriptors. A load
-return of 0 or failed `run()` makes init print an error and exit with status 1.
+prefixes this relative path with init's directory and creates a `NEW` child.
+The child PCB inherits the same directory. `run(shell_pid, NULL, NULL)`
+supplies no extra arguments and inherits init's environment and standard
+descriptors. A load return of 0 or failed `run()` makes init print an error and
+exit with status 1.
 
 ## 11.5 Waiting for the shell with `waitpid()`
 
@@ -2284,7 +2397,8 @@ one byte at a time, performs simple line editing, then:
 3. separates the command name from a whitespace-delimited raw argument string;
 4. expands `$NAME`, `$?` (last foreground status), and `$!` (last background
    PID), and removes double-quote characters;
-5. loads an explicit `./path` or searches colon-separated `PATH`; and
+5. loads a command containing `/` as a path or searches colon-separated
+   `PATH`; and
 6. starts the child with inherited environment and standard descriptors.
 
 Tokenization is intentionally limited: the kernel later separates process
@@ -2294,14 +2408,16 @@ double quotes are removed rather than used to preserve embedded whitespace.
 Foreground children are registered for terminal signals and waited for.
 Background children are not waited for immediately; `$!`, `fg`, and `bg`
 track only the most recent one. Exit statuses are available through `$?`.
-The shell reports each successfully created process. It also starts a new line
-and reports when a foreground process is stopped by `SIGTSTP` or terminated by
-`SIGTERM` or `SIGKILL`, so output ending with `\r` cannot run into the prompt.
+The shell reports each successful load as `process with pid <pid> created`. It
+also starts a new line and reports signal results as
+`process with pid <pid> <action> by signal <signal>`, so output ending with
+`\r` cannot run into the prompt.
 
 Built-ins are `exit`, `eval`, `run-shell-test`, `export`, `load`, `run`,
-`unload`, `list`, `fg`, and `bg`. Everything else is treated as an external
-program. `load path` loads without starting, and `run PID` starts a previously
-loaded PCB.
+`unload`, `list`, `fg`, `bg`, and `cd`. Everything else is treated as an
+external program. `load path` loads without starting, and `run PID` starts a
+previously loaded PCB. The shell implements `cd` itself because a normal child
+can change only its own PCB directory, not its parent's.
 
 A short session shows direct paths, `PATH` lookup, environment expansion, and
 the status values maintained by the shell:
@@ -2397,23 +2513,69 @@ write failures produce an error on standard error and make the final status 1,
 while successful files continue to be processed. Stdin concatenation and
 options are not implemented.
 
-## 12.5 `kill`
+## 12.5 Host-backed directory commands
 
-[`user/kill.picoc`](user/kill.picoc) sends `SIGTERM` by default or accepts one
-explicit numeric signal:
+[`user/ls.picoc`](user/ls.picoc), [`user/mkdir.picoc`](user/mkdir.picoc),
+[`user/pwd.picoc`](user/pwd.picoc),
+[`user/rm.picoc`](user/rm.picoc), and [`user/rmdir.picoc`](user/rmdir.picoc)
+are small clients of the `dirent` functions, `mkdir()`, `getcwd()`, `unlink()`,
+and `rmdir()`. Those calls enter the kernel, which uses the bounded host-service
+frames from [section 1.4](#14-host-services-over-uart). No host program is
+launched.<!-- please give short examples for all those user applications / shell builtins . E.g. show the output of the ls.bin command for e.g. the ./binary directory -->
+
+`ls.bin [DIRECTORY]` deliberately has no display options. It always lists
+hidden entries and prints one `d name` or `- name` line, with no file sizes.
+`mkdir.bin` creates each named directory, `rm.bin` removes files, and
+`rmdir.bin` removes empty directories. Ordinary PicoOS `write()` prints `ls`
+and `pwd` results, so both shell redirection forms work normally:
+
+```console
+$ ls.bin
+$ pwd.bin
+$ ls.bin > files.txt
+$ pwd.bin >> files.txt
+$ mkdir.bin new-directory
+$ rm.bin files.txt
+$ rmdir.bin new-directory
+```
+
+`cd` is a shell built-in. The shell calls `chdir()` itself instead of starting
+a child process. This is necessary because each process has its own PCB
+directory: a normal child could change only its own directory and would exit
+without changing the shell.
+
+For example:
+
+```text
+PicoOS> pwd.bin
+/opt/picoos/binary
+PicoOS> cd ./user/../kernel
+PicoOS> pwd.bin
+/opt/picoos/binary/kernel
+```
+
+The shell resolves configured relative `PATH` entries from the directory it
+recorded at startup, so programs remain discoverable after `cd /tmp`. Each
+utility prints a short help page for `-h`/`--help` or invalid argument counts.
+
+## 12.6 `kill`
+
+[`user/kill.picoc`](user/kill.picoc) sends `SIGTERM` by default or accepts a
+signal name or number before the PID:
 
 | Command | Result |
 | --- | --- |
 | `$ kill.bin 3` | Send `SIGTERM` to PID 3 |
-| `$ kill.bin 3 9` | Send `SIGKILL` to PID 3 |
-| `$ kill.bin 3 0` | Check whether PID 3 exists without delivering a signal |
+| `$ kill.bin SIGKILL 3` | Send `SIGKILL` to PID 3 |
+| `$ kill.bin SIGTERM 3` | Send `SIGTERM` to PID 3 |
+| `$ kill.bin 0 3` | Check whether PID 3 exists without delivering a signal |
 
 Incorrect argument counts, invalid PIDs or signal numbers, and unknown
 processes print a specific error and return status 1. `SIGKILL` cannot be
 caught or ignored; the other signal semantics are listed in
 [section 5.6](#56-signals).
 
-## 12.6 `poweroff`
+## 12.7 `poweroff`
 
 [`user/poweroff.picoc`](user/poweroff.picoc) invokes the shutdown syscall.
 This differs from the shell's `exit` built-in: `exit` ends only the current
@@ -2425,7 +2587,7 @@ $ poweroff.bin
 
 shuts PicoOS down and lets the emulator halt.
 
-## 12.7 Actionable command errors
+## 12.8 Actionable command errors
 
 The shell validates built-in argument counts, quoting, redirection, process
 lookup, and external command lookup before continuing. Errors name the failed
@@ -2441,10 +2603,11 @@ error: unmatched double quote
 ```
 
 Init separately reports missing, unreadable, oversized, or malformed
-environment configuration. `cat.bin` reports missing operands and file I/O
-failures, while `kill.bin` distinguishes usage, PID, signal, and process
-lookup errors. These commands return failure where appropriate, making the
-result visible through `$?`.
+environment configuration. Applications print short usage help when a required
+operand is missing or an argument is invalid. `cat.bin` also reports file I/O
+failures, while `kill.bin` distinguishes PID, signal, and process lookup
+errors. These commands return failure where appropriate, making the result
+visible through `$?`.
 
 # 13. Use in the operating systems and real-time operating systems lectures
 
@@ -2727,7 +2890,7 @@ Start with these files when following a subsystem:
 | Scheduling/dispatch | [`scheduler.picoc`](kernel/scheduler.picoc), [`dispatcher.picoc`](kernel/dispatcher.picoc) | [`INT`/`RTI` interpreter](../RETI-Emulator/source/interpr.c) |
 | Exceptions | [`exception.picoc`](kernel/exception.picoc) | [CPU exceptions](../RETI-Emulator/documentation/cpu_exceptions.md) |
 | Memory | [`heap.picoc`](common/heap.picoc), [`kmalloc.picoc`](kernel/kmalloc.picoc), [`pmalloc.picoc`](kernel/pmalloc.picoc) | [generated kernel constants](../PicoC-Compiler/documentation/kernel_header_option.md) |
-| Files/descriptors | [`kernel/filesystem`](kernel/filesystem), [`library/unistd`](library/unistd) | [UART escape sequences](../RETI-Emulator/documentation/uart_protocol.md#output-control-frames) |
+| Files/descriptors | [`kernel/filesystem`](kernel/filesystem), [`library/unistd`](library/unistd) | [UART escape sequences](../RETI-Emulator/documentation/uart_protocol.md#uart-control-frames) |
 | Userspace lifecycle | [`start.picoc`](library/start/start.picoc), [`init.picoc`](system/init.picoc), [`shell.picoc`](user/shell.picoc) | [compiler `-C`](../PicoC-Compiler/README.md#command-line-options) |
 
 Important deliberate limits to remember:
