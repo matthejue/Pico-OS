@@ -13,7 +13,7 @@ int main(void) {
     mutex_unlock(&m);
 
     mutex_lock(&m);
-    printf("%d ", 84);
+    printf("%d\n", 84);
     mutex_unlock(&m);
 
     return 0;

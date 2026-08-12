@@ -1,2 +1,4 @@
+process with pid 3 created
 worker inherited launcher environment
 worker received custom environment
+process with pid 6 created

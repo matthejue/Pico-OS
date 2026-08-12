@@ -1,3 +1,5 @@
+process with pid 3 created
 value 42
 more
 stdio ok
+process with pid 5 created
