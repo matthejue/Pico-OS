@@ -145,7 +145,7 @@ help:
 	@echo "  make ci-artifacts               Alias for make release-tree"
 	@echo "  make bootload                   Build the release tree and boot through binary/boot/bootloader.reti"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
-	@echo "  make run-kernel                 Build and run kernel.reti directly"
+	@echo "  make run-kernel                 Build and run kernel/kernel.reti directly"
 	@echo "  make eprom                      Build boot/bootloader.reti"
 	@echo "  make kernel                     Build binary/kernel/kernel.bin"
 	@echo "  make isrs                       Build the UART-only test ISR table"
@@ -411,11 +411,11 @@ binary/config/environment.txt: config/environment.txt | binary/config
 binary/boot/bootloader.reti: boot/bootloader.reti | binary/boot
 	cp $< $@
 
-binary/kernel/kernel.sections: kernel.reti | binary/kernel
-	cp kernel.sections $@
+binary/kernel/kernel.sections: kernel/kernel.reti | binary/kernel
+	cp kernel/kernel.sections $@
 
-binary/kernel/kernel.debuginfo: kernel.reti | binary/kernel
-	cp kernel.debuginfo $@
+binary/kernel/kernel.debuginfo: kernel/kernel.reti | binary/kernel
+	cp kernel/kernel.debuginfo $@
 
 binary/start-picoos.sh: start-picoos.sh | binary
 	cp $< $@
@@ -598,14 +598,14 @@ kernel/memory_constants.header: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) Makefi
 		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel/memory_constants.header
 
-kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.header Makefile
+kernel/kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_constants.header Makefile
 	$(PICOC_BUILD_DIRECT) \
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		$(KERNEL_MEMORY_OPTIONS) \
-		-o kernel.reti
+		-o kernel/kernel.reti
 
-binary/kernel/kernel.bin: kernel.reti | binary/kernel
+binary/kernel/kernel.bin: kernel/kernel.reti | binary/kernel
 	@$(assemble_binary)
 
 
@@ -613,8 +613,8 @@ binary/kernel/kernel.bin: kernel.reti | binary/kernel
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt
-	cd binary && ../run_reti_emulator_isolated.sh ../kernel.reti -d -c -O -r $(SRAM_SIZE)
+run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt
+	cd binary && ../run_reti_emulator_isolated.sh ../kernel/kernel.reti -d -c -O -r $(SRAM_SIZE)
 
 bootload: firmware
 	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
@@ -630,7 +630,7 @@ bootload-debug:
 		$(KERNEL_PICOC_SOURCES) \
 		-O1 -i -w -s -g -v \
 		$(KERNEL_MEMORY_OPTIONS) \
-		-o kernel.reti
+		-o kernel/kernel.reti
 	$(MAKE) release-tree
 	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
 
@@ -647,7 +647,8 @@ clean-firmware:
 		! -name '*.header' \
 		! -name '.gitkeep' \
 		-delete
-	rm -f kernel.reti kernel/kernel.bin kernel.sections kernel.debuginfo
+	rm -f kernel.reti kernel.debuginfo kernel.sections kernel.reti_patch kernel.st \
+		kernel_combined.reti_blocks kernel_startprogram.reti_blocks kernel/kernel.bin
 	rm -rf binary/boot binary/kernel binary/system
 
 clean: clean-binary
