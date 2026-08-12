@@ -1,1 +1,3 @@
+process with pid 3 created
 shared memory: 10 20 30
+process with pid 7 created

@@ -1,3 +1,4 @@
+process with pid 3 created
 red
 green
 blue
@@ -10,3 +11,4 @@ blue
 red
 green
 blue
+process with pid 7 created
