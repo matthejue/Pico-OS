@@ -50,6 +50,7 @@ resolve_emulator() {
     emulator_path=$(command -v reti_emulator)
   else
     echo "RETI Emulator not found in the release directory or PATH" >&2
+    echo "Run ./download-tools.sh to download the latest release" >&2
     echo "Use --reti-emulator PATH to select it explicitly" >&2
     exit 1
   fi
