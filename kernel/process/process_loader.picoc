@@ -116,7 +116,7 @@ int load_process(char *path, bool show_loading_bar) {
         heap_start,
         heap_size,
         word_count,
-        host_path
+        path
     );
 
     if (process == NULL) {

@@ -1,2 +1,4 @@
+process with pid 3 created
 parent terminated both children: 1
 child disabled parent-death signal: 1
+process with pid 9 created
