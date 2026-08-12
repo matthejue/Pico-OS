@@ -1325,20 +1325,14 @@ process->activation.sp = (int)entry_pc_cell - 1;
 
 The initial `BAF` is set two cells below the entry PC, making
 `BAF + 3 == argc` and `BAF + 4 == argv[0]`. Naked userspace `_start` receives
-those locations under the normal parameter convention and calls:
-
-```c
-void start_process(int argc, char **argv) {
-    init_process_heap();
-    initialize_environment(argv + argc + 1);
-    exit(main(argc, argv));
-}
-```
+those locations under the normal parameter convention. The startup runtime
+initializes the process heap and environment, calls `main(argc, argv)`, and
+passes its result to `exit()`.
 
 Thus `envp` begins immediately after `argv[argc] == NULL`, and `main()` receives
 standard `argc`/`argv`. `main()` has no direct third `envp` parameter in the
-current startup API; library environment functions use the cloned global
-`environ`.
+current startup API; the application-facing environment functions use the
+process-local global `environ`.
 
 ## 4.7 Initial process stack
 
@@ -1358,10 +1352,10 @@ created its outer caller frame. Subsequent calls use the ordinary convention.
 ## 4.8 Environment variables
 
 Environment entries are heap-owned `NAME=value` strings in a null-terminated
-`char **environ`. `initialize_environment()` clones the initial stack entries.
-`getenv()` returns the value portion; `setenv()`, `unsetenv()`, `putenv()`, and
-`clearenv()` update the process-local copy. `clone_environment()` is used by
-the shell test reset machinery.
+`char **environ`. Startup clones the initial stack entries. `getenv()` returns
+the value portion; `setenv()`, `unsetenv()`, `putenv()`, and `clearenv()` update
+the process-local copy. The shell test reset machinery privately snapshots and
+restores this environment.
 
 `run(pid, arguments, NULL)` passes the caller's `environ`; the kernel copies
 the strings onto the child's initial stack, so changes are inherited at start
@@ -1424,7 +1418,8 @@ shared_counter = shared_counter + 1;
 mutex_unlock(&lock);
 ```
 
-If `testset` finds the mutex locked, `mutex_lock()` sleeps on its wait queue.
+If the atomic test-and-set finds the mutex locked, `mutex_lock()` sleeps on its
+wait queue.
 `mutex_unlock()` wakes at most the first waiter, which competes for the lock
 when the scheduler next runs it.
 
@@ -2047,24 +2042,26 @@ sequenceDiagram
 
 ## 9.1 Implemented libraries
 
-Public headers and principal facilities are:
+Public headers and principal application-facing facilities are listed below.
+Low-level syscall wrappers, startup plumbing, test hooks, and implementation
+helpers are intentionally omitted from this API overview.
 
 | Directory/header | Purpose |
 | --- | --- |
-| [`library/unistd`](library/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, `chdir`, `getcwd`, `unlink`, `rmdir`, process load/run/unload/list, PID, reset, foreground PID, wait queues |
+| [`library/unistd`](library/unistd/unistd.header) | `read`, `write`, `close`, `dup2`, `lseek`, `chdir`, `getcwd`, `unlink`, `rmdir`, `load`, `run`, `unload`, `list`, `getpid` |
 | [`library/fcntl`](library/fcntl/fcntl.header) | `open`, `creat`, access/create/truncate/append flags |
 | [`library/sys/wait`](library/sys/wait/wait.header) | exact-child `waitpid`, `WIFSTOPPED` |
 | [`library/schedule`](library/schedule/schedule.header) | voluntary `yield` |
-| [`library/mutex`](library/mutex/mutex.header) | `testset`, init, lock, unlock |
+| [`library/mutex`](library/mutex/mutex.header) | `mutex_init`, `mutex_lock`, `mutex_unlock` |
 | [`library/signal`](library/signal/signal.header) | `signal`, `kill`, default/ignore constants |
-| [`library/sys/prctl`](library/sys/prctl/prctl.header) | `PR_SET_PDEATHSIG` |
+| [`library/sys/prctl`](library/sys/prctl/prctl.header) | `prctl(PR_SET_PDEATHSIG, signal)` |
 | [`library/sys/stat`](library/sys/stat/stat.header) | `mkdir` |
 | [`library/dirent`](library/dirent/dirent.header) | `opendir`, `readdir`, `closedir`, directory entries |
-| [`library/sys/mman`](library/sys/mman/mman.header) | named shared-memory open/map/unlink |
-| [`library/stdlib`](library/stdlib/stdlib.header) | heap allocation, `atoi`, environment APIs, `exit` |
+| [`library/sys/mman`](library/sys/mman/mman.header) | `shm_open`, `mmap`, `shm_unlink` |
+| [`library/stdlib`](library/stdlib/stdlib.header) | `malloc`, `realloc`, `free`, `atoi`, `getenv`, `setenv`, `unsetenv`, `putenv`, `clearenv`, `exit` |
 | [`library/string`](library/string/string.header) | `memcpy`, `memset`, `strcpy`, `strcat`, `strcmp`, `strncmp`, `strlen` |
-| [`library/stdio`](library/stdio/stdio.header) | streams, file open/close, character/string/formatted output, formatted input |
-| [`library/start`](library/start/start.picoc) | process `_start`, heap/environment initialization, `main`, exit |
+| [`library/stdio`](library/stdio/stdio.header) | `stdin`, `stdout`, `stderr`, `fopen`, `fclose`, `fputc`, `fputs`, `fprintf`, `printf`, `scanf` |
+| [`library/start`](library/start/start.picoc) | automatic process startup before `main`; applications do not call it directly |
 
 Common ABI structures and constants live under [`common`](common), while
 kernel-private interfaces live under [`kernel`](kernel). The `.header`
@@ -2155,14 +2152,13 @@ custom `_start` replace the generated default and places it first in `.text`.
 ## 9.7 Start function
 
 The naked `_start(int argc, char *first_argument)` avoids creating another
-frame before it has interpreted the kernel-built outer frame. It passes
-`argc` and `&first_argument` (the address of `argv[0]`) to `start_process()`.
-That function:
+frame before it has interpreted the kernel-built outer frame. The startup
+runtime uses `argc` and `&first_argument` (the address of `argv[0]`) to:
 
-1. initializes the local `malloc()` heap using kernel-reported start/size;
-2. clones the `envp` table found at `argv + argc + 1`;
-3. calls `main(argc, argv)`; and
-4. passes `main`'s return value to `exit()`, syscall 9.
+1. initialize the local `malloc()` heap using kernel-reported start/size;
+2. clone the `envp` table found at `argv + argc + 1`;
+3. call `main(argc, argv)`; and
+4. pass `main`'s return value to `exit()`, syscall 9.
 
 The exit path marks the process zombie or removes it, wakes an exact waiting
 parent, sends `SIGCHLD`, cleans children as appropriate, and dispatches another
@@ -2833,10 +2829,11 @@ flowchart LR
 
 [`system/fast_os_test_launcher.picoc`](system/fast_os_test_launcher.picoc)
 redirects stdout to each test's `output.txt`, loads and runs its
-`launcher.bin`, waits for it, restores stdout, and invokes `reset_processes()`.
-That removes all processes except init, shell, and the syscall caller and
-destroys their descriptor tables. The launcher also removes the loading-bar
-variable. This reuses the expensive boot while isolating process state.
+`launcher.bin`, waits for it, restores stdout, and requests a process-state
+reset. That removes all processes except init, shell, and the syscall caller
+and destroys their descriptor tables. The launcher also removes the
+loading-bar variable. This reuses the expensive boot while isolating process
+state.
 
 ## 14.4 Shell test
 
