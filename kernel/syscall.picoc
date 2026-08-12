@@ -3,6 +3,7 @@
 #include "exception.header"
 #include "filesystem/file_descriptor.header"
 #include "filesystem/filesystem.header"
+#include "filesystem/host_filesystem.header"
 #include "filesystem/standard_input.header"
 #include "kernel.header"
 #include "process.header"
@@ -98,6 +99,20 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
         );
     } else if (syscall_number == SYSCALL_SET_FOREGROUND_PROCESS) {
         return set_foreground_process(argument);
+    } else if (syscall_number == SYSCALL_CHDIR) {
+        return change_working_directory((char *)argument);
+    } else if (syscall_number == SYSCALL_GETCWD) {
+        return get_working_directory((struct GetCwdRequest *)argument);
+    } else if (syscall_number == SYSCALL_MKDIR) {
+        return make_host_directory((char *)argument);
+    } else if (syscall_number == SYSCALL_READ_DIRECTORY) {
+        return read_host_directory(
+            (struct ReadDirectoryRequest *)argument
+        );
+    } else if (syscall_number == SYSCALL_UNLINK) {
+        return unlink_host_file((char *)argument);
+    } else if (syscall_number == SYSCALL_RMDIR) {
+        return remove_host_directory((char *)argument);
     } else if (syscall_number == SYSCALL_PROCESS_HEAP_FULL) {
         handle_process_heap_full_exception();
         return 1;

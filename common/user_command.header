@@ -1,0 +1,6 @@
+#pragma once
+
+#include "file.header"
+
+void command_write(int file_descriptor, char *text);
+bool command_is_help(char *argument);
