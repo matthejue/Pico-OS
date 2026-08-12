@@ -56,6 +56,7 @@ USER_RUNTIME_DEPENDENCIES := \
 	library/unistd/process.picoc \
 	library/unistd/io.picoc \
 	library/unistd/blocking.picoc \
+	library/unistd/file_removal.picoc \
 	library/unistd/unistd.header \
 	library/fcntl/fcntl.picoc \
 	library/fcntl/fcntl.header \
@@ -65,6 +66,11 @@ USER_RUNTIME_DEPENDENCIES := \
 	library/signal/signal.header \
 	library/sys/prctl/prctl.picoc \
 	library/sys/prctl/prctl.header \
+	library/sys/stat/stat.picoc \
+	library/sys/stat/stat.header \
+	library/dirent/libdirent.picoc \
+	library/dirent/dirent.picoc \
+	library/dirent/dirent.header \
 	common/syscall.header \
 	common/signal.header \
 	common/prctl.header \
@@ -104,7 +110,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti poweroff.bin poweroff.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti poweroff.bin poweroff.reti pwd.bin pwd.reti rm.bin rm.reti rmdir.bin rmdir.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -149,7 +155,12 @@ help:
 	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make kill.bin                   Build the kill user program binary"
+	@echo "  make ls.bin                     Build the ls user program binary"
+	@echo "  make mkdir.bin                  Build the mkdir user program binary"
 	@echo "  make poweroff.bin               Build the poweroff user program binary"
+	@echo "  make pwd.bin                    Build the pwd user program binary"
+	@echo "  make rm.bin                     Build the rm user program binary"
+	@echo "  make rmdir.bin                  Build the rmdir user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -430,9 +441,29 @@ kill.reti: user/kill.reti
 
 kill.bin: binary/user/kill.bin
 
+ls.reti: user/ls.reti
+
+ls.bin: binary/user/ls.bin
+
+mkdir.reti: user/mkdir.reti
+
+mkdir.bin: binary/user/mkdir.bin
+
 poweroff.reti: user/poweroff.reti
 
 poweroff.bin: binary/user/poweroff.bin
+
+pwd.reti: user/pwd.reti
+
+pwd.bin: binary/user/pwd.bin
+
+rm.reti: user/rm.reti
+
+rm.bin: binary/user/rm.bin
+
+rmdir.reti: user/rmdir.reti
+
+rmdir.bin: binary/user/rmdir.bin
 
 shell.reti: user/shell.reti
 
@@ -547,6 +578,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/signal.picoc \
 	kernel/filesystem/file_descriptor.picoc \
 	kernel/filesystem/filesystem.picoc \
+	kernel/filesystem/host_filesystem.picoc \
 	kernel/filesystem/standard_input.picoc \
 	kernel/process/process_arguments.picoc \
 	kernel/scheduler.picoc \

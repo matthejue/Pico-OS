@@ -1,0 +1,73 @@
+#include "dirent.header"
+#include "../stdlib/stdlib.header"
+#include "../unistd/unistd.header"
+#include "../../common/syscall.header"
+
+#define DIRECTORY_BUFFER_CAPACITY 512
+
+DIR *opendir(char *path) {
+    struct ReadDirectoryRequest request;
+    DIR *directory;
+
+    if (path == NULL) {
+        return NULL;
+    }
+    directory = (DIR *)malloc(sizeof(struct DirectoryStream));
+    if (directory == NULL) {
+        return NULL;
+    }
+    directory->contents = (char *)malloc(DIRECTORY_BUFFER_CAPACITY);
+    if (directory->contents == NULL) {
+        free(directory);
+        return NULL;
+    }
+    request.path = path;
+    request.buffer = directory->contents;
+    request.capacity = DIRECTORY_BUFFER_CAPACITY;
+    directory->length = invoke_syscall(
+        SYSCALL_READ_DIRECTORY,
+        (int)&request
+    );
+    if (directory->length < 0) {
+        free(directory->contents);
+        free(directory);
+        return NULL;
+    }
+    directory->offset = 0;
+    return directory;
+}
+
+struct dirent *readdir(DIR *directory) {
+    int name_index = 0;
+
+    if (directory == NULL || directory->offset >= directory->length) {
+        return NULL;
+    }
+    if (directory->contents[directory->offset] == 'd') {
+        directory->entry.d_type = DT_DIR;
+    } else {
+        directory->entry.d_type = DT_REG;
+    }
+    directory->offset = directory->offset + 2;
+    while (directory->offset < directory->length &&
+           directory->contents[directory->offset] != '\n') {
+        if (name_index < DIRENT_NAME_MAX - 1) {
+            directory->entry.d_name[name_index] =
+                directory->contents[directory->offset];
+            name_index = name_index + 1;
+        }
+        directory->offset = directory->offset + 1;
+    }
+    directory->entry.d_name[name_index] = 0;
+    directory->offset = directory->offset + 1;
+    return &directory->entry;
+}
+
+int closedir(DIR *directory) {
+    if (directory == NULL) {
+        return -1;
+    }
+    free(directory->contents);
+    free(directory);
+    return 0;
+}

@@ -23,6 +23,8 @@
 int last_foreground_exit_status = 0;
 int last_background_process_id = 0;
 char **initial_shell_environment = NULL;
+char initial_shell_working_directory[PATH_MAX];
+char shell_executable_path[PATH_MAX];
 // Keeps bounded command storage outside the process stack
 char command_history[
     SHELL_COMMAND_HISTORY_CAPACITY
@@ -54,7 +56,7 @@ void shell_write_decimal(int value) {
 }
 
 void report_process_created(int pid) {
-    shell_write_string("process ");
+    shell_write_string("process with pid ");
     shell_write_decimal(pid);
     shell_write_string(" created\n");
 }
@@ -76,11 +78,11 @@ void report_foreground_process_status(int pid, int status) {
 
     if (signal_name != NULL) {
         shell_write_character('\n');
-        shell_write_string("process ");
+        shell_write_string("process with pid ");
         shell_write_decimal(pid);
         shell_write_character(' ');
         shell_write_string(action);
-        shell_write_string(" by ");
+        shell_write_string(" by signal ");
         shell_write_string(signal_name);
         shell_write_character('\n');
     }
@@ -212,7 +214,8 @@ bool shell_reset(void) {
     last_foreground_exit_status = 0;
     last_background_process_id = 0;
     return initial_shell_environment != NULL &&
-        restore_environment(initial_shell_environment) == 0;
+        restore_environment(initial_shell_environment) == 0 &&
+        chdir(initial_shell_working_directory) == 0;
 }
 
 int is_line_whitespace(char value) {
@@ -506,6 +509,18 @@ bool command_matches(char *command, char *name) {
          is_line_whitespace(command[name_length]));
 }
 
+bool command_contains_path(char *command) {
+    int index = 0;
+
+    while (command[index] != 0) {
+        if (command[index] == '/') {
+            return true;
+        }
+        index = index + 1;
+    }
+    return false;
+}
+
 char *command_operand(char *command, char *name) {
     char *operand = skip_line_whitespace(command + strlen(name));
 
@@ -513,6 +528,32 @@ char *command_operand(char *command, char *name) {
         return NULL;
     }
     return operand;
+}
+
+int single_command_operand(
+    char *command,
+    char *name,
+    char **operand
+) {
+    char *end;
+
+    *operand = command_operand(command, name);
+    if (*operand == NULL) {
+        return 0;
+    }
+    end = *operand;
+    while (*end != 0 && !is_line_whitespace(*end)) {
+        end = end + 1;
+    }
+    if (*end == 0) {
+        return 1;
+    }
+    *end = 0;
+    end = skip_line_whitespace(end + 1);
+    if (*end == 0) {
+        return 1;
+    }
+    return -1;
 }
 
 bool quotes_are_balanced(char *command) {
@@ -726,8 +767,32 @@ void build_executable_path(char *directory, char *name, char *result) {
     strcat(result, name);
 }
 
+bool build_path_executable_path(
+    char *directory,
+    char *name,
+    char *result
+) {
+    int length = strlen(directory) + strlen(name) + 2;
+
+    if (directory[0] != '/') {
+        length = length + strlen(initial_shell_working_directory) + 1;
+    }
+    if (length > PATH_MAX) {
+        return false;
+    }
+    if (directory[0] == '/') {
+        build_executable_path(directory, name, result);
+        return true;
+    }
+    strcpy(result, initial_shell_working_directory);
+    strcat(result, "/");
+    strcat(result, directory);
+    strcat(result, "/");
+    strcat(result, name);
+    return true;
+}
+
 int load_from_path(char *name) {
-    char executable_path[SHELL_EXECUTABLE_PATH_CAPACITY];
     char *executable_search_path = getenv("PATH");
     int directory_start = 0;
     int path_index = 0;
@@ -744,15 +809,18 @@ int load_from_path(char *name) {
         // Temporarily terminates this entry so normal string helpers can use it
         separator = executable_search_path[path_index];
         executable_search_path[path_index] = 0;
-        build_executable_path(
+        if (build_path_executable_path(
             executable_search_path + directory_start,
             name,
-            executable_path
-        );
+            shell_executable_path
+        )) {
+            pid = load(shell_executable_path);
+        } else {
+            pid = 0;
+        }
         executable_search_path[path_index] = separator;
 
         // Returns the first process found in PATH order
-        pid = load(executable_path);
         if (pid != 0 || separator == 0) {
             return pid;
         }
@@ -905,6 +973,7 @@ bool eval(char *command) {
     int export_status;
     int pid;
     int redirection_status;
+    int operand_status;
     bool append_stdout;
     bool background;
 
@@ -951,6 +1020,26 @@ bool eval(char *command) {
                     "error: could not store environment variable\n"
                 );
             }
+        }
+    } else if (command_matches(command, "cd")) {
+        operand_status = single_command_operand(
+            command,
+            "cd",
+            &raw_arguments
+        );
+        if (operand_status != 1) {
+            shell_write_string("Usage: cd DIRECTORY\n");
+            shell_write_string(
+                "Change the shell's working directory.\n"
+            );
+        } else if (strcmp(raw_arguments, "--help") == 0 ||
+                   strcmp(raw_arguments, "-h") == 0) {
+            shell_write_string("Usage: cd DIRECTORY\n");
+            shell_write_string(
+                "Change the shell's working directory.\n"
+            );
+        } else if (chdir(raw_arguments) < 0) {
+            shell_write_string("cd: could not change directory\n");
         }
     } else if (command_matches(command, "load")) {
         raw_arguments = command_operand(command, "load");
@@ -1037,7 +1126,7 @@ bool eval(char *command) {
         } else {
             raw_arguments = command_arguments(command);
 
-            if (strncmp(command, "./", 2) == 0 && command[2] != 0) {
+            if (command_contains_path(command)) {
                 pid = load(command);
             } else {
                 pid = load_from_path(command);
@@ -1072,6 +1161,10 @@ int main(int argc, char **argv) {
     initial_shell_environment = clone_environment();
     if (initial_shell_environment == NULL) {
         shell_write_string("error: could not save shell environment\n");
+        return 1;
+    }
+    if (getcwd(initial_shell_working_directory, PATH_MAX) == NULL) {
+        shell_write_string("error: could not save working directory\n");
         return 1;
     }
     while (1) {

@@ -1,0 +1,34 @@
+// dependencies: ../common/user_command.reti_blocks ../library/sys/stat/libstat.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/user_command.header"
+#include "../library/sys/stat/stat.header"
+#include "../library/unistd/unistd.header"
+
+void mkdir_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: mkdir.bin DIRECTORY...\n");
+    command_write(file_descriptor, "Create one or more directories.\n");
+}
+
+int main(int argc, char **argv) {
+    int index = 1;
+    int result = 0;
+
+    if (argc == 2 && command_is_help(argv[1])) {
+        mkdir_usage(STDOUT_FILENO);
+        return 0;
+    }
+    if (argc < 2) {
+        mkdir_usage(STDERR_FILENO);
+        return 1;
+    }
+    while (index < argc) {
+        if (mkdir(argv[index]) < 0) {
+            command_write(STDERR_FILENO, "mkdir: could not create ");
+            command_write(STDERR_FILENO, argv[index]);
+            command_write(STDERR_FILENO, "\n");
+            result = 1;
+        }
+        index = index + 1;
+    }
+    return result;
+}

@@ -1,0 +1,12 @@
+cd
+cd ./test/host_commands/work/../work
+pwd.bin > current.txt
+mkdir.bin created
+ls.bin list
+rm.bin current.txt list/marker.txt
+rmdir.bin created list
+ls.bin
+../../../user/echo.bin normalized
+cd --help
+cd ../../..
+poweroff.bin
