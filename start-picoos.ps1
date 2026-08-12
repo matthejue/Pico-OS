@@ -39,7 +39,7 @@ function Resolve-Tool {
     if ($Command) {
         return $Command.Source
     }
-    throw "$CommandName was not found in the release directory or PATH"
+    throw "$CommandName was not found in the release directory or PATH. Run .\download-tools.ps1 to download the latest release"
 }
 
 $Emulator = Resolve-Tool `
