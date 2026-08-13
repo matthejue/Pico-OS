@@ -66,6 +66,12 @@ jobs:
             .ci-bin/reti_emulator
           echo "$GITHUB_WORKSPACE/Pico-OS/.ci-bin" >> "$GITHUB_PATH"
 
+      - name: Select GitHub host-command output
+        run: |
+          rm test/host_commands/expected_output.txt
+          mv test/host_commands/expected_output_github.txt \
+            test/host_commands/expected_output.txt
+
       - name: Run tests
         run: make test TEST_BUILD_MODE=direct TEST_JOBS="$(nproc)"
 
