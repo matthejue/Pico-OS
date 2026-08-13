@@ -66,6 +66,4 @@ jobs:
           echo "$GITHUB_WORKSPACE/Pico-OS/.ci-bin" >> "$GITHUB_PATH"
 
       - name: Run tests
-        env:
-          TEST_JOBS: "2"
-        run: make test TEST_BUILD_MODE=direct
+        run: make test TEST_BUILD_MODE=direct TEST_JOBS="$(nproc)"
