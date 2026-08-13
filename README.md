@@ -23,41 +23,46 @@ interfaces. There is no virtual memory, on-device filesystem, or hard drive.
 The intended physical setup uses an Alchitry Cu V2 FPGA board, two ISSI
 IS61WV25616BLL-10TLI SRAM chips, and a SparkFun Serial Basic USB-to-UART
 adapter. The prices below are the example parts-list prices used for this
-design, including VAT; component and shipping prices can change.
+design, including VAT. They were last checked at DigiKey Germany on 12 August
+2026; component and shipping prices can change.
 
 - **FPGA: [Alchitry Cu V2](https://www.digikey.de/short/8cmz0qnc) with Lattice
   iCE40-HX8K** ([board schematic](https://cdn.sparkfun.com/assets/2/f/9/9/3/CuSchematic.pdf),
   [FPGA datasheet](https://www.latticesemi.com/~/media/latticesemi/documents/datasheets/ice/ice40lphxfamilydatasheet.pdf)):
-  **€57.25**. The FPGA implements the educational 32-bit CPU, interrupt
-  controller, UART controller, and SRAM interface.
+  **€55.66** (checked 12 August 2026). The FPGA implements the educational
+  32-bit CPU, interrupt controller, UART controller, and SRAM interface.
 - **SRAM: two [ISSI
   IS61WV25616BLL-10TLI](https://www.digikey.de/short/075fh38w) chips**
   ([datasheet](https://www.issi.com/WW/pdf/61-64WV25616.pdf)):
-  **2 × €8.50 = €17.00**. Each asynchronous SRAM is organized as 256K ×
-  16 bits. Both chips share the FPGA's 18 address lines, chip enable, output
-  enable, write enable, and byte-enable control. One chip connects its 16 data
-  pins to CPU data bits 0–15 and the other to bits 16–31. Driving both chips
-  with the same address and control signals therefore makes them one 256K ×
-  32-bit SRAM. It provides 2^18 = 262,144 individually addressable 32-bit
-  words, addressed from 0 through 2^18 - 1, for 1,048,576 bytes (1.048576 MB,
-  or 1 MiB). For comparison, 2^18 bytes alone are 0.262144 MB.<!-- Please show shortly the calculation how this 1MiB is calculated from 262,144 individually addressable 32-bit words -->
+  **2 × €5.80 = €11.60** (checked 12 August 2026). Each asynchronous SRAM is
+  organized as 256K × 16 bits. Both chips share the FPGA's 18 address lines,
+  chip enable, output enable, write enable, and byte-enable control. One chip
+  connects its 16 data pins to CPU data bits 0–15 and the other to bits 16–31.
+  Driving both chips with the same address and control signals therefore makes
+  them one 256K × 32-bit SRAM. It provides 2^18 = 262,144 individually
+  addressable 32-bit words, addressed from 0 through 2^18 - 1. Each word holds
+  four bytes, so the total is
+  `262,144 words × 4 bytes = 1,048,576 bytes = 1 MiB`. For comparison, 2^18
+  bytes alone would be only 0.262144 MB.
 - **USB-to-UART: [SparkFun Serial Basic Breakout with CH340C and
   USB-C](https://www.digikey.de/short/h83tqvbw)**
   ([product sheet](https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/739/DEV-15096_Web.pdf),
   [CH340C datasheet](https://cdn.sparkfun.com/assets/5/0/a/8/5/CH340DS1.PDF),
   [board schematic](https://cdn.sparkfun.com/assets/learn_tutorials/8/3/7/Serial-Basic-CH340C_Datasheet.pdf)):
-  **€11.23**. With the adapter configured for its default 3.3 V logic, its
-  `TXO` pin connects to the FPGA UART's receive pin, its `RXI` pin connects to
-  the FPGA UART's transmit pin, and their grounds are connected. USB exposes
-  the CH340C as a serial port on the host. The host and FPGA use the same baud
-  rate and serial format, and UART transfers each request and response as a
-  sequence of bytes.
-  <!-- Please add to the prizes a date whet the prize was last checked in () or so -->
+  **€10.92** (checked 12 August 2026). With the adapter configured for its
+  default 3.3 V logic, its `TXO` pin connects to the FPGA UART's receive pin,
+  its `RXI` pin connects to the FPGA UART's transmit pin, and their grounds are
+  connected. USB exposes the CH340C as a serial port on the host. The host and
+  FPGA use the same baud rate and serial format, and UART transfers each
+  request and response as a sequence of bytes.
 
 The FPGA, SRAM interfaces, and USB-to-UART signals can all use 3.3 V logic, so
-no level converter is required between them. The example total is **€57.25 +
-2 × €8.50 + €11.23 = €85.48 including VAT**. This excludes USB cables,
-wires, connectors, a PCB<!-- write out the full name Printed Circuit Board and mention that it has also funnely the same abbreviation PCB as Process Control Block --> or other interconnection hardware, and shipping.
+no level converter is required between them. The example total is **€55.66 +
+2 × €5.80 + €10.92 = €78.18 including VAT**. This excludes USB cables,
+wires, connectors, a printed circuit board (PCB), other interconnection
+hardware, and shipping. In the rest of this README, PCB usually means
+*process control block*; the shared abbreviation is a slightly amusing
+coincidence.
 
 PicoOS has no resident storage device or filesystem. In emulator use, UART
 escape sequences ask `reti_emulator` to access files in the host directory
@@ -65,16 +70,22 @@ where it is running. On the physical FPGA, a companion host program must read
 the same requests from the USB serial port, perform the requested operations
 on the host filesystem, and return byte counts and file data over UART.
 
-The current generated `.bin` sizes, including their five-word headers, are:
+The generated binaries also show why 1 MiB is ample for this project. These
+sizes include each file's five-word header:
 
 | Image | 32-bit words | Size |
 | --- | ---: | ---: |
-| Kernel | 33,194 | 0.132776 MB |
-| `cat` | 7,904 | 0.031616 MB |
-<!-- | `echo` | 11,626 | 0.046504 MB | -->
-<!-- please call those kernel.bin, cat.bin etc. -->
-<!-- You're not connecting this properly like I intended. The reason for mentioning this was in order to make the point why 2^18 32-bit memory addresses are more than enough -->
-<!-- Please make a calulation how man cat.bin program fit into the remaining 1MB after substracting kernel.bin -->
+| `kernel.bin` | 37,179 | 0.148716 MB |
+| `cat.bin` | 8,772 | 0.035088 MB |
+| `echo.bin` | 11,626 | 0.046504 MB |
+
+A conservative calculation can count the headers as if they also occupied
+SRAM. After one `kernel.bin`, `262,144 - 37,179 = 224,965` words remain.
+That space could hold `floor(224,965 / 8,772) = 25` copies of `cat.bin`, with
+5,665 words left over. The loader actually keeps the five header words out of
+the copied program image. This is only an image-size comparison—a running
+process also needs heap and stack space—but it gives a useful scale for the
+available memory.
 
 PicoOS is used together with two sibling projects:
 
@@ -151,7 +162,7 @@ so the kernel itself needs no locks.
    - [4.8 Environment variables](#48-environment-variables)
 5. [Blocking, waiting, synchronization, and signals](#5-process-blocking-waiting-synchronization-and-signals)
    - [5.1 Wait queues](#51-wait-queues)
-   - [5.2 `waitpid()` and preserved waiting-process state](#52-waitpid-and-the-preserved-waiting-process-explanation)
+   - [5.2 `waitpid()` and saved wait state](#52-waitpid-and-saved-wait-state)
    - [5.3 `sleep()`](#53-sleep)
    - [5.4 `wakeup()`](#54-wakeup)
    - [5.5 Blocked-to-ready transitions](#55-blocked-to-ready-transitions)
@@ -188,7 +199,7 @@ so the kernel itself needs no locks.
     - [10.4 Output redirection with `>`](#104-output-redirection-with-)
     - [10.5 `dup2()`](#105-dup2)
     - [10.6 Output appending with `>>`](#106-output-appending-with-)
-    - [10.7 Working directories and host metadata](#107-working-directories-and-host-metadata)
+    - [10.7 Working directories and directory operations](#107-working-directories-and-directory-operations)
 11. [Init process](#11-init-process)
     - [11.1 Purpose of init](#111-purpose-of-init)
     - [11.2 Separation of responsibilities](#112-separation-of-responsibilities)
@@ -212,10 +223,10 @@ so the kernel itself needs no locks.
 14. [Test system](#14-test-system)
     - [14.1 `make test` and `make test-fast`](#141-make-test-and-make-test-fast)
     - [14.2 `make test-lib`](#142-make-test-lib)
-    - [14.3 System and OS test](#143-system-and-os-test)
-    - [14.4 Shell test](#144-shell-test)
+    - [14.3 System and OS tests](#143-system-and-os-tests)
+    - [14.4 Shell tests](#144-shell-tests)
 15. [Use of AI](#15-use-of-ai-in-the-project)
-16. [Source map and limitations](#16-source-map-and-deliberate-limitations)
+16. [Source map and limitations](#16-source-map-and-limitations)
 - [Appendix: Inspecting `.bin` files with `hexyl`](#appendix-inspecting-bin-files-with-hexyl)
 
 ## Build and run
@@ -707,8 +718,8 @@ signed 32-bit value. See
 
 ## 2.1 Kernel initialization
 
-[`kernel/kernel.picoc`](kernel/kernel.picoc) performs the complete
-initialization in a deliberately visible order:
+[`kernel/kernel.picoc`](kernel/kernel.picoc) initializes the kernel in this
+order:
 
 ```mermaid
 flowchart TD
@@ -905,9 +916,9 @@ sequenceDiagram
     S-->>P: Faulty process is never resumed
 ```
 
-This design keeps the boundary policy in PicoOS while putting the check at the
-only place that can reliably see every `SP` write: the emulator's instruction
-interpreter. Periphery cell 11 exposes the emulator's read-only
+PicoOS chooses the boundary, while the emulator's instruction interpreter
+checks it because that is where every `SP` write can be seen. Periphery cell 11
+exposes the emulator's read-only
 `cpu_exception_cause`; PicoOS reads it to select the diagnostic, and writes are
 ignored. The bootload command declares all four vector entries with `-n 4`, so
 the emulator knows that exception slot 3 exists even though the EPROM loader
@@ -1020,8 +1031,7 @@ return address, and gave each call a symbolic continuation label. Consequently:
 - variadic arguments follow fixed arguments at increasing addresses; and
 - hand-written wrappers and ISRs use the same offsets.
 
-The requested claim that the caller now saves `BAF` does **not** match the
-implementation: the callee saves it. See the compiler's
+The callee, not the caller, saves `BAF`. See the compiler's
 [stack-frame description](../PicoC-Compiler/README.md#function-calls-and-stack-frames)
 and `NewStackframe` lowering in
 [`reti_blocks_pass.py`](../PicoC-Compiler/source/passes/compilation/reti_blocks_pass.py).
@@ -1069,7 +1079,7 @@ Otherwise it disables stack protection, changes to the kernel stack, passes
 the user frame to the dispatcher, and never returns along that ISR call path:
 the dispatcher eventually `RTI`s into the selected process.
 
-The decisive kernel/user branch is visible in the naked ISR:
+The naked ISR distinguishes kernel and user execution as follows:
 
 ```c
 asm(KERNEL_CS_ACC_ASM); // ACC = kernel code-segment start
@@ -1177,7 +1187,7 @@ come from `memory_constants.header`.
 
 ## 4.2 Process structure
 
-The authoritative structure is
+The structure is defined in
 [`kernel/process.header`](kernel/process.header). Important fields are:
 
 | Field | Meaning |
@@ -1446,12 +1456,11 @@ Wait queues are kernel-visible absolute memory structures even when a mutex
 placed them in shared process memory. This works because PicoOS has one
 physical address space and no virtual-memory protection.
 
-## 5.2 `waitpid()` and the preserved waiting-process explanation
+## 5.2 `waitpid()` and saved wait state
 
-The current public API has only `waitpid(pid)`, which waits for one exact child.
-There is no general `wait()` wrapper and no `waitpid` options argument. The
-following existing project diagram is preserved and corrected to include
-zombie handling:
+The public API has only `waitpid(pid)`, which waits for one exact child. There
+is no general `wait()` wrapper and no `waitpid` options argument. The diagram
+also shows the two cases where the child has already stopped or exited:
 
 ```mermaid
 sequenceDiagram
@@ -1581,8 +1590,8 @@ blocked process. `SIGTSTP` stops it while preserving its queue membership.
 
 ## 5.6 Signals
 
-PicoOS uses five familiar Unix numbers but implements a deliberately small,
-PicoOS-specific model:
+PicoOS uses five familiar Unix signal numbers, with a much smaller set of
+semantics:
 
 | Signal | Default action | Notes |
 | --- | --- | --- |
@@ -1592,16 +1601,13 @@ PicoOS-specific model:
 | `SIGCONT` (18) | continue | Restores a stopped process; default otherwise ignores |
 | `SIGTSTP` (20) | stop | Parent waiters receive stopped status `128 + 20` |
 
-PicoOS implements `SIGTSTP` and `SIGTERM`, but deliberately does not implement
-`SIGSTOP` or `SIGINT`. A full operating system distinguishes these pairs:
+PicoOS does not implement `SIGSTOP` or `SIGINT`. A full operating system
+distinguishes these from `SIGTSTP` and `SIGTERM`:
 `SIGTSTP` is the terminal stop request that a program may handle or ignore,
 whereas `SIGSTOP` is an unconditional stop; `SIGTERM` is a catchable
 termination request, whereas `SIGINT` represents an interactive interrupt and
-is commonly handled separately. For this educational operating system, the
-extra distinctions are intentionally omitted because the ordinary actions are
-already covered by `SIGTSTP` and `SIGTERM`; the specialized signals would only
-be needed by programs that require those distinct handling rules. Consequently,
-PicoOS maps `Ctrl+Z` to `SIGTSTP` and `Ctrl+C` to `SIGTERM`.
+is commonly handled separately. PicoOS uses the two signals it already has for
+these terminal actions: `Ctrl+Z` sends `SIGTSTP`, and `Ctrl+C` sends `SIGTERM`.
 
 `signal()` installs one handler plus the library's naked
 `signal_restorer()`. `kill(pid, 0)` checks existence without delivery.
@@ -1684,8 +1690,8 @@ candidate. `RTI` consumes its saved PC.
 
 The timer ISR detects kernel execution by comparing `CS` to generated kernel
 `CS`. It restores and returns without calling the scheduler in that case.
-This is the precise distinction between preemptive user scheduling and a
-non-preemptive kernel.
+The timer therefore preempts userspace but never schedules another process
+while the kernel is running.
 
 ## 6.5 `yield()`
 
@@ -2409,7 +2415,7 @@ also starts a new line and reports signal results as
 `process with pid <pid> <action> by signal <signal>`, so output ending with
 `\r` cannot run into the prompt.
 
-Built-ins are `exit`, `eval`, `run-shell-test`, `export`, `load`, `run`,
+Built-ins are `exit`, `eval`, `run-shell-tests`, `export`, `load`, `run`,
 `unload`, `list`, `fg`, `bg`, and `cd`. Everything else is treated as an
 external program. `load path` loads without starting, and `run PID` starts a
 previously loaded PCB. The shell implements `cd` itself because a normal child
@@ -2478,36 +2484,58 @@ prctl(PR_SET_PDEATHSIG, SIGTERM);
 ```
 
 The child creation path inherits this field, so shell descendants receive
-`SIGTERM` if the shell terminates. See [section 5.6](#56-signals) for the
-important distinction between inherited shell policy and an OS-wide default.
+`SIGTERM` if the shell terminates. This is a policy chosen by the shell, not an
+OS-wide default; [section 5.6](#56-signals) describes the inheritance rules.
 
 ## 12.2 `echo`
 
 [`user/echo.picoc`](user/echo.picoc) prints `argv[1..argc-1]` separated by one
-space and always adds a final newline. Within each argument, the two-character
-sequence backslash-`n` becomes a newline. No options such as `-n` or other
-escape sequences are supported. It returns status 0.
+space and adds a newline at the end. Calling it without arguments therefore
+prints an empty line. Within an argument, the two characters backslash-`n` are
+printed as a real newline:
 
-The shell itself passes `\n` through unchanged; conversion belongs to `echo`,
-which makes the boundary testable and keeps other programs from receiving
-unexpected translated bytes.
+```console
+$ echo.bin one two\nthree
+one two
+three
+```
+
+The shell does not perform this conversion; it passes the argument text to
+`echo.bin` unchanged. Options such as `-n` and escape sequences other than
+`\n` are not implemented. `echo.bin` always returns status 0.
 
 ## 12.3 `count`
 
 [`user/count.picoc`](user/count.picoc) counts upward forever, returning to the
 start of the current line with `\r` before each value. `count.bin DELAY` sets
 the number of busy-loop iterations between values; without an argument it uses
-25,000 iterations. A negative delay or more than one argument produces an
-error. The program yields after each value so other ready processes can run.
+25,000 iterations:
+
+```console
+$ count.bin 10000
+```
+
+The delay is a loop count, not a time in milliseconds, so its speed depends on
+the emulator or hardware. The program calls `yield()` after every number so
+other ready processes can run. `Ctrl+C` terminates it when it owns the
+foreground. A negative delay or more than one argument prints help and returns
+status 1; `-h` and `--help` print the same help and return 0.
 
 ## 12.4 `cat`
 
 [`user/cat.picoc`](user/cat.picoc) opens each path argument read-only, reads
-64 cells at a time, and loops on `write(STDOUT_FILENO, ...)` until each chunk
-is complete. It closes each descriptor. Missing operands and open, read, or
-write failures produce an error on standard error and make the final status 1,
-while successful files continue to be processed. Stdin concatenation and
-options are not implemented.
+64 cells at a time, and writes the files to standard output in argument order:
+
+```console
+$ cat.bin config/environment.txt README.md
+```
+
+Each descriptor is closed before the next file is opened. If one file cannot
+be opened or read, `cat.bin` reports that path on standard error, continues
+with the remaining files, and eventually returns status 1. A write failure
+also returns status 1. It requires at least one path and does not read from
+standard input; the usual `cat` options are not implemented. `-h` and
+`--help` print its usage when supplied as the only argument.
 
 ## 12.5 Host-backed directory commands
 
@@ -2517,22 +2545,93 @@ options are not implemented.
 are small clients of the `dirent` functions, `mkdir()`, `getcwd()`, `unlink()`,
 and `rmdir()`. Those calls enter the kernel, which uses the bounded host-service
 frames from [section 1.4](#14-host-services-over-uart). No host program is
-launched.<!-- please give short examples for all those user applications / shell builtins . E.g. show the output of the ls.bin command for e.g. the ./binary directory -->
+launched.
 
-`ls.bin [DIRECTORY]` deliberately has no display options. It always lists
-hidden entries and prints one `d name` or `- name` line, with no file sizes.
-`mkdir.bin` creates each named directory, `rm.bin` removes files, and
-`rmdir.bin` removes empty directories. Ordinary PicoOS `write()` prints `ls`
-and `pwd` results, so both shell redirection forms work normally:
+PicoOS builds **11 userspace application binaries**: the interactive shell and
+ten standalone commands. This is the complete list:
+
+| Userspace application | Example | Purpose |
+| --- | --- | --- |
+| [`shell.bin`](user/shell.picoc) | `./user/shell.bin` | Run the interactive PicoOS shell |
+| [`echo.bin`](user/echo.picoc) | `echo.bin hello PicoOS` | Print its arguments |
+| [`count.bin`](user/count.picoc) | `count.bin 10000` | Count indefinitely with a configurable delay |
+| [`cat.bin`](user/cat.picoc) | `cat.bin README.md` | Print one or more files |
+| [`ls.bin`](user/ls.picoc) | `ls.bin ./user` | List a directory and distinguish files from directories |
+| [`mkdir.bin`](user/mkdir.picoc) | `mkdir.bin demo` | Create one or more directories |
+| [`pwd.bin`](user/pwd.picoc) | `pwd.bin` | Print the process working directory |
+| [`rm.bin`](user/rm.picoc) | `rm.bin notes.txt` | Remove one or more files |
+| [`rmdir.bin`](user/rmdir.picoc) | `rmdir.bin demo` | Remove one or more empty directories |
+| [`kill.bin`](user/kill.picoc) | `kill.bin SIGTERM 3` | Send a signal to a process |
+| [`poweroff.bin`](user/poweroff.picoc) | `poweroff.bin` | Shut PicoOS down |
+
+The shell additionally implements **11 built-ins**. They execute inside the
+shell when they need to change shell state or directly manage processes:
+
+| Shell built-in | Example | Purpose |
+| --- | --- | --- |
+| `exit` | `exit` | End the current shell session |
+| `eval` | `eval echo.bin hello` | Evaluate a command line in the current shell |
+| `run-shell-tests` | `run-shell-tests manifest.txt` | Run the shell-test directories named by a manifest |
+| `export` | `export MODE=debug` | Set an environment variable after expansion |
+| `cd` | `cd ./kernel` | Change the shell working directory |
+| `load` | `load ./user/count.bin` | Load a program without starting it |
+| `run` | `run 3 10000` | Start a previously loaded process |
+| `unload` | `unload 3` | Unload a process |
+| `list` | `list` | Display the process list |
+| `fg` | `fg` | Continue the most recent background process in the foreground |
+| `bg` | `bg` | Continue the most recently tracked background process |
+
+All five directory commands use the calling process's PicoOS working directory
+and the host operations described in [section 10.7](#107-working-directories-and-directory-operations).
+They do not start similarly named programs on the host.
+
+`ls.bin [DIRECTORY]` lists the current directory when no path is given. It
+prints entries in the order returned by the host, including hidden entries and
+`.`/`..`. A directory is prefixed with `d`; every other entry is prefixed with
+`-`. There are no sorting, filtering, long-format, or recursive options.
+Failure to open the directory is reported on standard error and returns status
+1.
+
+`mkdir.bin DIRECTORY...` creates every named directory. It continues after a
+failure, naming the directory that could not be created, and returns status 1
+if any operation failed. Parent creation and `-p` are not implemented.
+
+`pwd.bin` prints the working directory stored in the process control block. It
+accepts no operands. This is the PicoOS path used to resolve relative files,
+not a fresh query of the emulator process's own working directory.
+
+`rm.bin FILE...` calls `unlink()` for each path. It removes files only: there
+is no recursive or forced mode. `rmdir.bin DIRECTORY...` removes empty
+directories and leaves non-empty ones untouched. Both commands keep processing
+later operands after an error and return status 1 if at least one removal
+failed.
+
+All five commands accept `-h` or `--help` as their sole argument. Their normal
+output goes through PicoOS `write()`, so `>` and `>>` redirection work. A short
+session using the release directory looks like this:
 
 ```console
-$ ls.bin
-$ pwd.bin
-$ ls.bin > files.txt
-$ pwd.bin >> files.txt
-$ mkdir.bin new-directory
-$ rm.bin files.txt
-$ rmdir.bin new-directory
+PicoOS> ls.bin .
+d .
+d ..
+- README.md
+d boot
+d config
+- download-tools.ps1
+- download-tools.sh
+d kernel
+- start-picoos.ps1
+- start-picoos.sh
+d system
+d test
+d user
+PicoOS> pwd.bin
+/opt/picoos/binary
+PicoOS> ls.bin > files.txt
+PicoOS> pwd.bin >> files.txt
+PicoOS> mkdir.bin new-directory
+PicoOS> rm.bin files.txt
+PicoOS> rmdir.bin new-directory
 ```
 
 `cd` is a shell built-in. The shell calls `chdir()` itself instead of starting
@@ -2551,13 +2650,14 @@ PicoOS> pwd.bin
 ```
 
 The shell resolves configured relative `PATH` entries from the directory it
-recorded at startup, so programs remain discoverable after `cd /tmp`. Each
-utility prints a short help page for `-h`/`--help` or invalid argument counts.
+recorded at startup, so programs remain discoverable after `cd /tmp`.
 
 ## 12.6 `kill`
 
 [`user/kill.picoc`](user/kill.picoc) sends `SIGTERM` by default or accepts a
-signal name or number before the PID:
+signal name or number before the PID. The accepted names are `SIGKILL`,
+`SIGTERM`, `SIGCHLD`, `SIGCONT`, and `SIGTSTP`; signal 0 checks whether the
+process exists without delivering a signal.
 
 | Command | Result |
 | --- | --- |
@@ -2569,19 +2669,23 @@ signal name or number before the PID:
 Incorrect argument counts, invalid PIDs or signal numbers, and unknown
 processes print a specific error and return status 1. `SIGKILL` cannot be
 caught or ignored; the other signal semantics are listed in
-[section 5.6](#56-signals).
+[section 5.6](#56-signals). After a successful call, `kill.bin` yields once so
+the signalled process can be scheduled promptly. `-h` and `--help` list the
+accepted forms.
 
 ## 12.7 `poweroff`
 
 [`user/poweroff.picoc`](user/poweroff.picoc) invokes the shutdown syscall.
 This differs from the shell's `exit` built-in: `exit` ends only the current
-shell session and init starts a new shell, while:
+shell session and init starts a new shell. In contrast:
 
 ```console
 $ poweroff.bin
 ```
 
-shuts PicoOS down and lets the emulator halt.
+shuts PicoOS down and lets the emulator halt. The command accepts no operands;
+`-h` and `--help` print help without shutting down, and other arguments return
+status 1.
 
 ## 12.8 Actionable command errors
 
@@ -2609,20 +2713,21 @@ visible through `$?`.
 
 ## 13.1 Real-time operating systems lecture
 
-PicoOS provides compact, connected examples:
+The real-time operating systems topics can be followed directly in the source:
 
-- `PROCESS_STATE_*`, the process-list scan, and the dispatcher show the
-  difference between state, policy, and mechanism.
-- Timer interrupts demonstrate user preemption; `yield()` demonstrates a
-  voluntary switch through the same context-save path.
-- Wait queues show event blocking without busy-waiting in the process.
-- `sleep(queue)` and `wakeup(queue)` show FIFO suspension/resumption; their name
-  difference from timed sleep is itself a useful API-design discussion.
-- `TSL`, `mutex_lock()`, and `mutex_unlock()` connect atomic test-and-set to
-  wait queues and scheduling.
-- Shared-memory test show why communication storage needs synchronization.
-- The non-preemptive kernel/user-preemptive distinction exposes a concrete
-  scheduling design tradeoff.
+- `PROCESS_STATE_*`, the process-list scan, and the dispatcher separate process
+  state from the choice and execution of the next process.
+- Timer interrupts preempt userspace, while `yield()` requests a voluntary
+  switch through the same context-saving code.
+- Wait queues block a process until an event occurs. `sleep(queue)` and
+  `wakeup(queue)` provide FIFO suspension and resumption rather than timed
+  sleeping.
+- `TSL`, `mutex_lock()`, and `mutex_unlock()` show how an atomic test-and-set
+  instruction can be combined with wait queues instead of continuous spinning.
+- The shared-memory mutual-exclusion test demonstrates why processes sharing
+  data also need synchronization.
+- The kernel is non-preemptive even though userspace is timer-preempted, which
+  gives students a small example of that scheduling choice.
 
 Relevant sources include [`kernel/scheduler.picoc`](kernel/scheduler.picoc),
 [`kernel/dispatcher.picoc`](kernel/dispatcher.picoc),
@@ -2631,18 +2736,18 @@ Relevant sources include [`kernel/scheduler.picoc`](kernel/scheduler.picoc),
 
 ## 13.2 Operating systems lecture
 
-The bootloader and process loader connect executable sections, symbolic labels,
-binary headers, relocation bases, and initial stacks. Parent/child PIDs,
-zombies, exact-child waiting, signals, init, and shell job handling form a
-small process-lifecycle case study. The vector table and four ISR paths make
-software interrupts, hardware interrupts, synchronous exceptions, register
-saving, and return semantics inspectable end to end.
+The bootloader and process loader provide examples of executable sections,
+symbolic labels, binary headers, relocation bases, and initial stacks.
+Parent/child PIDs, zombies, exact-child waiting, signals, init, and the shell
+cover the lifetime of a process. The vector table and four ISR paths can be
+used to trace software interrupts, hardware interrupts, synchronous
+exceptions, register saving, and return from an interrupt.
 
-The three heap instances let students compare allocation scopes while reusing
-the same first-fit/split/coalesce implementation. The host-backed descriptor
-layer demonstrates per-process descriptor tables, standard descriptors,
-inheritance, seeking, and redirection while also making its simplifications
-visible.
+The kernel heap, process-memory heap, and userspace heaps all reuse the same
+first-fit allocator, making their different scopes easy to compare. The
+host-backed file layer covers per-process descriptor tables, standard
+descriptors, inheritance, seeking, and redirection without requiring an
+on-device filesystem.
 
 PicoC-Compiler retains symbolic block/function labels until its final RETI
 passes resolve addresses. Generated `.reti` files such as
@@ -2651,9 +2756,8 @@ assembly, section metadata, and executable words.
 
 ## 13.3 Exercise sheets and teaching material
 
-No actual lecture-sheet PDF for the requested `malloc`/`free` exercises is
-stored in the three repositories, so this README does not invent sheet titles.
-The checked-in teaching-related artifacts that can be named precisely are:
+The course handouts themselves are not stored in these repositories, but the
+following teaching examples are checked in:
 
 - [`config/sheet7ex1_fib_2.picoc`](config/sheet7ex1_fib_2.picoc), a program named
   for sheet 7, exercise 1;
@@ -2670,30 +2774,29 @@ The checked-in teaching-related artifacts that can be named precisely are:
   plus generated `.reti` files for teaching symbolic assembly and label
   resolution.
 
-If course handouts live outside these repositories, they should be linked here
-by their real title/path when added.
+Course handouts can be linked here later if they are added to the project.
 
 # 14. Test system
 
-The current tree contains **38 test** across three categories. These are
+The current tree contains **38 tests** across three categories. These are
 logical test cases; an OS feature directory may compile a launcher plus one or
 more worker programs.
 
 | Category | Count | Discovery and execution |
 | --- | ---: | --- |
 | Library | 12 | Top-level `test/*.picoc`; each runs directly in RETI-Emulator with the UART-only test ISR table |
-| OS feature | 17 | Directories with `launcher.picoc` and the canonical three-line load/run/poweroff input; each exercises the kernel, init, shell, and one feature scenario |
-| Shell | 9 | Remaining valid test directories; `input.txt` directly exercises shell commands, descriptors, files, or line editing |
+| OS feature | 17 | Directories with `launcher.picoc` and the standard three-line load/run/poweroff input; each exercises the kernel, init, shell, and one feature scenario |
+| Shell | 9 | Other valid test directories; `input.txt` directly exercises shell commands, descriptors, files, or line editing |
 | **Total** | **38** | The default `make test` inventory |
 
 The test runners use the same discovery rules for normal and fast mode:
 
 ```mermaid
 flowchart TD
-    T["make test<br/>38 test"] --> L["make test-lib<br/>12 library test"]
-    T --> S["make test-sys<br/>26 OS-backed test"]
-    S --> O["make test-os<br/>17 OS feature test"]
-    S --> H["make test-shell<br/>9 shell test"]
+    T["make test<br/>38 tests"] --> L["make test-lib<br/>12 library tests"]
+    T --> S["make test-sys<br/>26 OS-backed tests"]
+    S --> O["make test-os<br/>17 OS feature tests"]
+    S --> H["make test-shell<br/>9 shell tests"]
     L --> C["compile → emulate → compare metadata output"]
     O --> K["compile/assemble programs → boot kernel → inject input → compare"]
     H --> K
@@ -2713,11 +2816,11 @@ $(MAKE) test-lib
 $(MAKE) test-sys
 ```
 
-It runs the configured library test, then OS feature and shell test normally.
+It runs the configured library tests, then the OS feature and shell tests.
 `make test-fast` runs `make test-lib` followed by `make test-sys-fast`, which
 uses one shared OS boot for each of the OS feature and shell test groups.
-Normal OS and shell test run independent emulator instances in parallel;
-fast OS and shell test run serially inside their shared session. Therefore,
+Normal OS and shell tests run independent emulator instances in parallel;
+fast OS and shell tests run serially inside their shared session. Therefore,
 `TEST_JOBS` only affects the library-test part of `make test-fast`.
 `make test-all` is an alias for `make test`. The Makefile also supports pattern
 variables and separate compiler/emulator option files under [`opts`](opts).
@@ -2735,7 +2838,7 @@ $ make test TEST_BUILD_MODE=direct
 
 ## 14.2 `make test-lib`
 
-Library test use exact top-of-file metadata:
+Library tests use exact top-of-file metadata:
 
 ```c
 // in: 42 X
@@ -2766,9 +2869,9 @@ line. It reports compilation, emulator, timeout, missing-output, and diff
 failures; writes a summary to `test/test.res`; and records failed source
 paths in `config/not_passed_tests.txt`.
 
-## 14.3 System and OS test
+## 14.3 System and OS tests
 
-The targets all exist and mean:
+The available targets are:
 
 | Target | Categories | Boots |
 | --- | --- | ---: |
@@ -2835,16 +2938,16 @@ and destroys their descriptor tables. The launcher also removes the
 loading-bar variable. This reuses the expensive boot while isolating process
 state.
 
-## 14.4 Shell test
+## 14.4 Shell tests
 
-Shell test have `input.txt` and `expected_output.txt` but no canonical
+Shell tests have `input.txt` and `expected_output.txt` but no standard
 launcher input pattern. Normal `make test-shell` injects their commands
 through UART exactly as a user would, producing `raw_output.txt` and normalized
 `output.txt`.
 
-Fast shell test normally run inside the already-running shell:
+Fast shell tests normally run inside the already-running shell:
 `run_os_tests_fast.py` creates a manifest, the shell's
-`run-shell-test` built-in reads each `input.txt`, calls `eval()` per line, and
+`run-shell-tests` built-in reads each `input.txt`, calls `eval()` per line, and
 captures each directory's `.fast_shell_output.txt`. Before and after each test,
 `shell_reset()`:
 
@@ -2861,20 +2964,16 @@ selected test when computing the shared session limit.
 
 # 15. Use of AI in the project
 
-AI tools have been used as development assistants for bounded tasks such as
-Makefile and Python test-runner work, repetitive implementation and test
-scaffolding, refactoring support, debugging suggestions, and documentation.
-The repository includes, for example, a saved
-[VS Code file-association conversation](documentation/chats/ChatGPT-VSCode_File_Associations_C.md)
-and workspace instructions used to keep automated edits and test consistent.
+I used AI tools while working on parts of the Makefile and Python test runners,
+for repetitive code and test setup, and for help with refactoring, debugging,
+and documentation. One example kept in the repository is a
+[conversation about VS Code file associations](documentation/chats/ChatGPT-VSCode_File_Associations_C.md).
 
-AI-assisted output is treated like any other proposed change: it is checked
-against PicoOS, PicoC-Compiler, and RETI-Emulator source and the focused test.
-The system architecture, educational scope, RETI/PicoC contracts, and final
-technical decisions remain project decisions; describing assistance does not
-imply that an AI autonomously designed or validated the operating system.
+I reviewed the resulting changes against the PicoOS, PicoC-Compiler, and
+RETI-Emulator source and ran the relevant tests. The architecture, project
+scope, and final technical decisions were still my responsibility.
 
-# 16. Source map and deliberate limitations
+# 16. Source map and limitations
 
 Start with these files when following a subsystem:
 
@@ -2890,7 +2989,7 @@ Start with these files when following a subsystem:
 | Files/descriptors | [`kernel/filesystem`](kernel/filesystem), [`library/unistd`](library/unistd) | [UART escape sequences](../RETI-Emulator/documentation/uart_protocol.md#uart-control-frames) |
 | Userspace lifecycle | [`start.picoc`](library/start/start.picoc), [`init.picoc`](system/init.picoc), [`shell.picoc`](user/shell.picoc) | [compiler `-C`](../PicoC-Compiler/README.md#command-line-options) |
 
-Important deliberate limits to remember:
+The main limitations are:
 
 - one physical SRAM address space, no MMU or process isolation;
 - host-backed UART files rather than a resident filesystem;
