@@ -1,0 +1,18 @@
+Usage: cd DIRECTORY
+Change the shell's working directory.
+process with pid 3 created
+process with pid 4 created
+process with pid 5 created
+d .
+- marker.txt
+d ..
+process with pid 6 created
+process with pid 7 created
+process with pid 8 created
+d .
+d ..
+process with pid 9 created
+normalized
+Usage: cd DIRECTORY
+Change the shell's working directory.
+process with pid 10 created
