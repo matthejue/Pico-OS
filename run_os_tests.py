@@ -77,7 +77,7 @@ def parse_args():
     parser.add_argument(
         "--jobs",
         type=positive_int,
-        help="Set parallel emulator jobs without prompting.",
+        help="Set parallel test jobs without prompting.",
     )
     parser.add_argument(
         "--direct",
@@ -791,39 +791,32 @@ def run_matching_tests(args, extra_cpl_args, extra_emu_args):
         test_jobs = select_test_jobs()
 
     statuses = {}
-    ready_paths = []
     stage_test_directories(paths)
     for test_dir in paths:
         print_heading(test_dir, args.columns)
-        if build_test_programs(test_dir, extra_cpl_args, args.direct):
-            ready_paths.append(test_dir)
-        else:
-            statuses[test_dir] = "failed"
 
-    def run_prepared_test(test_dir):
+    def run_test(test_dir):
+        if not build_test_programs(test_dir, extra_cpl_args, args.direct):
+            return "failed"
         status = run_os_test(test_dir, extra_emu_args)
         if status != "passed":
             return status
         return "passed" if outputs_match(test_dir) else "not-passed"
 
-    if ready_paths:
-        max_workers = test_jobs or 2
-        max_workers = min(max_workers, len(ready_paths))
-        with ThreadPoolExecutor(
-            max_workers=max_workers
-        ) as executor:
-            futures = {
-                executor.submit(run_prepared_test, path): path
-                for path in ready_paths
-            }
-            for future in as_completed(futures):
-                test_dir = futures[future]
-                try:
-                    statuses[test_dir] = future.result()
-                except Exception as error:
-                    with PRINT_LOCK:
-                        print(f"Test runner failed for {test_dir}: {error}")
-                    statuses[test_dir] = "failed"
+    max_workers = min(test_jobs or 2, len(paths))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(run_test, path): path
+            for path in paths
+        }
+        for future in as_completed(futures):
+            test_dir = futures[future]
+            try:
+                statuses[test_dir] = future.result()
+            except Exception as error:
+                with PRINT_LOCK:
+                    print(f"Test runner failed for {test_dir}: {error}")
+                statuses[test_dir] = "failed"
 
     failing = [path for path in paths if statuses[path] == "failed"]
     not_passed = [path for path in paths if statuses[path] != "passed"]
