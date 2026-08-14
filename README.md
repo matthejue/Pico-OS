@@ -373,11 +373,11 @@ deliberately inline so the implemented surface can be scanned quickly.
 | Inspectable startup blocks | `*_startprogram.reti_blocks`, `*_combined.reti_blocks` |
 | Interrupt-vector entries | `IVTE timer_interrupt` resolves to a tagged SRAM address |
 | Compile-time global data | `-O1` writes known globals, strings, structs, arrays, and function addresses directly into data |
-| **Interrupt-vector placement** | `__attribute__((section("ivt")))` emits the vector table first in `.ivt` at address `0` |
+| Interrupt-vector placement | `__attribute__((section("ivt")))` emits the vector table first in `.ivt` at address `0` |
 | Linking without `main` | libraries and partial units can be linked without inventing `_start` |
 | RETI `NOP` | `asm("NOP");` and RETI-block `NOP` are emitted directly |
 | Shared function epilogue | all `return` paths jump to one generated restore/return block |
-| **Naked low-level functions** | `__attribute__((naked)) void _start(void)` or an ISR emits no compiler prologue/epilogue |
+| Naked low-level functions | `__attribute__((naked)) void _start(void)` or an ISR emits no compiler prologue/epilogue |
 | Linked labels in `asm` | `asm("JUMP32 signal_epilogue");` resolves after final layout |
 | Loader metadata | `.sections` records ISR/code/data starts, `heap_start`, `heap_size`, and `stack_start` |
 | Kernel headers | `-k sram` / `-k eprom → memory_constants.header` |
