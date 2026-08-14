@@ -16,6 +16,24 @@
             "runOptions": {
                 "runOn": "folderOpen"
             }
+        },
+        {
+            "label": "PicoOS: Create README PDF",
+            "type": "process",
+            "command": "make",
+            "args": [
+                "readme-pdf"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "clear": true
+            }
         }
     ]
 }
