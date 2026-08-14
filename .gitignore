@@ -54,6 +54,7 @@ test/*.reti
 *.venv/
 .virtualenv/
 .codex
+.readme-pdf/
 .bak/dispatcher.header
 .bak/dispatcher.picoc
 .bak/isrs.picoc
