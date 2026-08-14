@@ -53,6 +53,7 @@ test/*.reti
 *.gdb_history
 *.venv/
 .virtualenv/
+.readme-pdf/
 .bak/dispatcher.header
 .bak/dispatcher.picoc
 .bak/isrs.picoc
