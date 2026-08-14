@@ -20,6 +20,9 @@ KERNEL_MEMORY_OPTIONS = \
 	--stack-size $(KERNEL_STACK_SIZE)
 BINARY_DIR := binary
 RELEASE_ARCHIVE ?= pico-os-runtime.tar.gz
+README_PDF ?= README.pdf
+README_PDF_TOOL_DIR ?= .readme-pdf
+README_PDF_MERMAID ?= $(README_PDF_TOOL_DIR)/node_modules/.bin/mmdc
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
@@ -105,7 +108,7 @@ endef
 # Phony targets
 # ----------------------------------------------------------------------
 
-.PHONY: help code-index FORCE ci-build ci-artifacts release-tree release-archive rebuild-release verify-release-tree test-runtime-tree system-binaries user-binaries
+.PHONY: help code-index readme-pdf FORCE ci-build ci-artifacts release-tree release-archive rebuild-release verify-release-tree test-runtime-tree system-binaries user-binaries
 .PHONY: run run_send_keypresses run-os
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
@@ -165,6 +168,7 @@ help:
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
 	@echo "  make code-index                 Refresh VS Code navigation for PicoC files"
+	@echo "  make readme-pdf                 Create README.pdf with clickable contents and bookmarks"
 	@echo ""
 	@echo "Variables:"
 	@echo "  TEST_PATTERN=<pattern>          Override the configured test pattern"
@@ -190,6 +194,34 @@ help:
 
 code-index:
 	./update_code_index.py
+
+readme-pdf:
+	@set -euo pipefail; \
+	build_dir="$$(mktemp -d)"; \
+	trap 'rm -rf "$$build_dir"' EXIT; \
+	if [[ ! -x "$(README_PDF_MERMAID)" ]]; then \
+		mkdir -p "$(README_PDF_TOOL_DIR)"; \
+		PUPPETEER_SKIP_DOWNLOAD=true yarn --cwd "$(README_PDF_TOOL_DIR)" add --no-lockfile @mermaid-js/mermaid-cli puppeteer; \
+	fi; \
+	PUPPETEER_EXECUTABLE_PATH="$$(command -v chromium)" \
+	PUPPETEER_SKIP_DOWNLOAD=true \
+	MERMAID_CLI='$(README_PDF_MERMAID)' \
+	MERMAID_OUTPUT_DIR="$$build_dir" \
+	pandoc README.md \
+		--from=gfm \
+		--standalone \
+		--toc \
+		--toc-depth=3 \
+		--pdf-engine=xelatex \
+		--lua-filter=documentation/readme_pdf_mermaid.lua \
+		--include-in-header=documentation/readme_pdf_header.tex \
+		--highlight-style=tango \
+		--resource-path=. \
+		--variable=geometry:margin=18mm \
+		--variable=colorlinks=true \
+		--variable=linkcolor:blue \
+		--variable=urlcolor:blue \
+		--output="$(README_PDF)"
 
 
 # ----------------------------------------------------------------------
