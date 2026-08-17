@@ -2,20 +2,12 @@
 #include "../kmalloc.header"
 #include "../process.header"
 #include "../../common/file.header"
+#include "../../common/string.header"
 #include "../../common/uart_protocol.header"
 
 int receive_byte_over_uart(void);
 
-int string_length(char *value) {
-    int length = 0;
-
-    while (value[length] != 0) {
-        length = length + 1;
-    }
-    return length;
-}
-
-int receive_uart_string(char *buffer, int capacity) {
+int uart_receive_string(char *buffer, int capacity) {
     int byte_count = receive_word();
     int index = 0;
     int value;
@@ -152,7 +144,7 @@ int initialize_working_directory(void) {
     char path[512];
 
     uart_send_file_command("pwd", "");
-    if (receive_uart_string(path, PATH_MAX) < 0 ||
+    if (uart_receive_string(path, PATH_MAX) < 0 ||
         !set_process_working_directory(path)) {
         return -1;
     }
@@ -218,7 +210,7 @@ int read_host_directory(struct ReadDirectoryRequest *request) {
         return -1;
     }
     uart_send_file_command("ls ", absolute_path);
-    return receive_uart_string(request->buffer, request->capacity);
+    return uart_receive_string(request->buffer, request->capacity);
 }
 
 int remove_host_path(char *command, char *path) {
