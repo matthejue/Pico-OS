@@ -24,11 +24,11 @@ bool file_exists(char *path) {
 }
 
 void select_uart_output(char *command, char *path) {
-    uart_send_file_command(command, path);
+    uart_send_host_request(command, path);
 }
 
 void restore_uart_output(void) {
-    uart_send_file_command("write ", "stdout");
+    uart_send_host_request("write ", "stdout");
 }
 
 int free_file_descriptor(struct FileDescriptorTable *table) {
