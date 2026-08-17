@@ -1,0 +1,10 @@
+#include "string.header"
+
+int string_length(char *value) {
+    int length = 0;
+
+    while (value[length] != 0) {
+        length = length + 1;
+    }
+    return length;
+}
