@@ -1,0 +1,3 @@
+#pragma once
+
+int string_length(char *value);

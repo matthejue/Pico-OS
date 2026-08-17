@@ -606,6 +606,7 @@ KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \
 	common/loading_bar.picoc \
 	common/sram_loader.picoc \
+	common/string.picoc \
 	kernel/uart_hardware.picoc \
 	common/uart_protocol.picoc \
 	kernel/kernel.picoc \
