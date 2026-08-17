@@ -898,7 +898,7 @@ void boot_main(void) {
     int word_count;
     int payload_word_count;
 
-    uart_send_file_command("load ", "kernel/kernel.bin");
+    uart_send_host_request("load ", "kernel/kernel.bin");
 
     word_count = receive_word();
     if (word_count == -1) {

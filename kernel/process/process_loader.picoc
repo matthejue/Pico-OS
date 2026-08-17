@@ -62,7 +62,7 @@ int load_process(char *path, bool show_loading_bar) {
         }
         host_path = absolute_path;
     }
-    uart_send_file_command("load ", host_path);
+    uart_send_host_request("load ", host_path);
 
     word_count = receive_word();
     if (word_count == -1) {
