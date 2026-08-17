@@ -143,7 +143,7 @@ bool set_process_working_directory(char *path) {
 int initialize_working_directory(void) {
     char path[512];
 
-    uart_send_file_command("pwd", "");
+    uart_send_host_request("pwd", "");
     if (uart_receive_string(path, PATH_MAX) < 0 ||
         !set_process_working_directory(path)) {
         return -1;
@@ -181,7 +181,7 @@ int change_working_directory(char *path) {
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return -1;
     }
-    uart_send_file_command("is-directory ", absolute_path);
+    uart_send_host_request("is-directory ", absolute_path);
     if (receive_word() < 0) {
         return -1;
     }
@@ -197,7 +197,7 @@ int make_host_directory(char *path) {
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return -1;
     }
-    uart_send_file_command("mkdir ", absolute_path);
+    uart_send_host_request("mkdir ", absolute_path);
     return receive_word();
 }
 
@@ -209,7 +209,7 @@ int read_host_directory(struct ReadDirectoryRequest *request) {
         !build_process_path(request->path, absolute_path, PATH_MAX)) {
         return -1;
     }
-    uart_send_file_command("ls ", absolute_path);
+    uart_send_host_request("ls ", absolute_path);
     return uart_receive_string(request->buffer, request->capacity);
 }
 
@@ -219,7 +219,7 @@ int remove_host_path(char *command, char *path) {
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return -1;
     }
-    uart_send_file_command(command, absolute_path);
+    uart_send_host_request(command, absolute_path);
     return receive_word();
 }
 
