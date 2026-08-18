@@ -23,14 +23,6 @@ bool file_exists(char *path) {
     return true;
 }
 
-void select_uart_output(char *command, char *path) {
-    uart_send_host_request(command, path);
-}
-
-void restore_uart_output(void) {
-    uart_send_host_request("write ", "stdout");
-}
-
 int free_file_descriptor(struct FileDescriptorTable *table) {
     int index = 3;
 
@@ -80,15 +72,15 @@ int open_file_descriptor(struct OpenRequest *request) {
             kfree(path);
             return -1;
         }
-        select_uart_output("write ", path);
-        restore_uart_output();
+        uart_send_host_request("write ", path);
+        uart_send_host_request("write ", "stdout");
     } else if (!file_exists(path)) {
         if ((request->flags & O_CREAT) == 0) {
             kfree(path);
             return -1;
         }
-        select_uart_output("write ", path);
-        restore_uart_output();
+        uart_send_host_request("write ", path);
+        uart_send_host_request("write ", "stdout");
     }
 
     descriptor = table->entries + file_descriptor;
@@ -208,16 +200,16 @@ int write_file_descriptor(struct IoRequest *request) {
     }
 
     if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
-        select_uart_output("write ", "stderr");
+        uart_send_host_request("write ", "stderr");
     } else if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
-        select_uart_output("append ", descriptor->path);
+        uart_send_host_request("append ", descriptor->path);
     } else if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
         return -1;
     }
 
     write_uart_bytes(request->buffer, request->count);
     if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
-        restore_uart_output();
+        uart_send_host_request("write ", "stdout");
     }
     descriptor->offset = descriptor->offset + request->count;
     return request->count;
