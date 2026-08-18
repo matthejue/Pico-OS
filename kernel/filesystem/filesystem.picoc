@@ -10,7 +10,7 @@
 int receive_byte_over_uart(void);
 
 int receive_file_size(char *path) {
-    uart_send_file_size_command(path);
+    uart_send_host_request("file-size ", path);
     return receive_word();
 }
 
