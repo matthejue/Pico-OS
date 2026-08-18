@@ -122,8 +122,7 @@ bool build_process_path(char *path, char *result, int capacity) {
     return true;
 }
 
-bool set_process_working_directory(char *path) {
-    struct Process *process = current_process();
+bool set_process_working_directory(struct Process *process, char *path) {
     int length = string_length(path);
     int index = 0;
     char *copy = (char *)kmalloc(length + 1);
@@ -135,17 +134,19 @@ bool set_process_working_directory(char *path) {
         copy[index] = path[index];
         index = index + 1;
     }
-    kfree(process->working_directory);
+    if (process->working_directory != NULL) {
+        kfree(process->working_directory);
+    }
     process->working_directory = copy;
     return true;
 }
 
-int initialize_working_directory(void) {
+int initialize_working_directory(struct Process *process) {
     char path[512];
 
     uart_send_host_request("pwd", "");
     if (uart_receive_string(path, PATH_MAX) < 0 ||
-        !set_process_working_directory(path)) {
+        !set_process_working_directory(process, path)) {
         return -1;
     }
     return 0;
@@ -157,10 +158,6 @@ int get_working_directory(struct GetCwdRequest *request) {
     int index = 0;
 
     if (request == NULL || request->buffer == NULL || request->size <= 0) {
-        return -1;
-    }
-    if (current_process()->working_directory[0] == 0 &&
-        initialize_working_directory() < 0) {
         return -1;
     }
     working_directory = current_process()->working_directory;
@@ -185,7 +182,7 @@ int change_working_directory(char *path) {
     if (receive_word() < 0) {
         return -1;
     }
-    if (!set_process_working_directory(absolute_path)) {
+    if (!set_process_working_directory(current_process(), absolute_path)) {
         return -1;
     }
     return 0;

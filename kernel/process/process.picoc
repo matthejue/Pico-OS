@@ -7,6 +7,7 @@
 #include "../signal.header"
 #include "../dispatcher.header"
 #include "../filesystem/file_descriptor.header"
+#include "../filesystem/host_filesystem.header"
 #include "../../common/uart_protocol.header"
 
 struct Process *process_list_head = NULL;
@@ -134,7 +135,8 @@ struct Process *create_process(
             parent->working_directory
         );
     } else {
-        process->working_directory = copy_process_path("");
+        process->working_directory = NULL;
+        initialize_working_directory(process);
     }
     if (process->working_directory == NULL) {
         destroy_file_descriptor_table(process->file_descriptors);

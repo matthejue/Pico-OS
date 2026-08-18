@@ -2,7 +2,10 @@
 
 #include "../../common/syscall.header"
 
+struct Process;
+
 bool build_process_path(char *path, char *result, int capacity);
+int initialize_working_directory(struct Process *process);
 int change_working_directory(char *path);
 int get_working_directory(struct GetCwdRequest *request);
 int make_host_directory(char *path);
