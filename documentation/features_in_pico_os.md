@@ -378,9 +378,9 @@ PicoOS> rm.bin files.txt
 PicoOS> rmdir.bin new-directory
 ```
 
-Every PCB owns an inherited absolute working-directory string. Init obtains the
-emulator startup directory with `getcwd()`, and the shell records that inherited
-directory when it starts. Relative `PATH` entries are looked up from this shell
+Every PCB owns an inherited absolute working-directory string. The kernel gives
+PID 1 the emulator startup directory while creating it, and the shell records
+that inherited directory when it starts. Relative `PATH` entries are looked up from this shell
 startup directory, so commands such as `echo.bin` remain available after
 `cd /tmp`. The kernel prefixes the calling process's current directory to
 other relative load and file paths.
