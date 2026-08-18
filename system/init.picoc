@@ -98,13 +98,8 @@ bool read_environment(void) {
 }
 
 int main(void) {
-    char startup_directory[PATH_MAX];
     int shell_pid;
 
-    if (getcwd(startup_directory, PATH_MAX) == NULL) {
-        init_write_error("init: could not get startup directory\n");
-        return 1;
-    }
     if (!read_environment()) {
         return 1;
     }
