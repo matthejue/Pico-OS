@@ -8,6 +8,7 @@
 #include "kmalloc.header"
 #include "pmalloc.header"
 #include "shared_memory.header"
+#include "filesystem/terminal.header"
 
 void shutdown(void) {
     asm("JUMP 0");
@@ -20,6 +21,7 @@ int main(void) {
     activate_kernel_stack_boundary();
     debug;
     init_kernel_heap();
+    initialize_terminal();
     initialize_process_table();
     init_process_memory_heap();
     initialize_shared_memory();

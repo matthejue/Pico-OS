@@ -3,7 +3,7 @@
 #include "../kernel/dispatcher.header"
 #include "../kernel/exception.header"
 #include "../kernel/interrupt_controller.header"
-#include "../kernel/filesystem/standard_input.header"
+#include "../kernel/filesystem/terminal.header"
 #include "../kernel/syscall.header"
 
 #define OS_INTERRUPT_VECTOR_COUNT 4
