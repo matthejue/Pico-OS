@@ -76,7 +76,7 @@ jobs:
         run: |
           chmod 755 release-tree/download-tools.sh release-tree/start-picoos.sh
           tar -C release-tree -czf pico-os-runtime.tar.gz \
-            boot config kernel system user \
+            boot config device kernel system user \
             README.md download-tools.sh download-tools.ps1 \
             start-picoos.sh start-picoos.ps1
 
