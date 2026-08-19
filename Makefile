@@ -444,8 +444,8 @@ $(BINARY_DIR) $(BINARY_DIR)/boot $(BINARY_DIR)/config $(BINARY_DIR)/device $(BIN
 binary/config/environment.txt: config/environment.txt | binary/config
 	cp $< $@
 
-binary/device/terminal.dev: device/terminal.dev | binary/device
-	cp $< $@
+binary/device/terminal.dev: | binary/device
+	printf 'PicoOS kernel terminal device\n' > $@
 
 binary/boot/bootloader.reti: boot/bootloader.reti | binary/boot
 	cp $< $@
@@ -660,10 +660,10 @@ binary/kernel/kernel.bin: kernel/kernel.reti | binary/kernel
 # Firmware bootload and direct kernel run
 # ----------------------------------------------------------------------
 
-run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt
+run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt binary/device/terminal.dev
 	cd binary && ../run_reti_emulator_isolated.sh ../kernel/kernel.reti -d -c -O -r $(SRAM_SIZE)
 
-bootload: firmware
+bootload: firmware binary/device/terminal.dev
 	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
 
 bootload-debug:
