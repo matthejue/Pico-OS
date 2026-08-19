@@ -74,4 +74,6 @@ filesystem recognizes that path and enters the shared `Terminal`, which is
 initialized once by the kernel. The UART ISR enters `handle_uart_interrupt()`
 in `terminal.picoc`; descriptor-based terminal reads and the single-character
 input syscall both enter `begin_terminal_read()` there. The release-tree marker
-for this virtual device is [`device/terminal.dev`](../device/terminal.dev).
+for this virtual device is
+[`binary/device/terminal.dev`](../binary/device/terminal.dev). The Makefile
+creates it as part of the runtime tree.
