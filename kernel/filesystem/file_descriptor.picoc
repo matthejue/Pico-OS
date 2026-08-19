@@ -1,4 +1,5 @@
 #include "file_descriptor.header"
+#include "terminal.header"
 #include "../kmalloc.header"
 #include "../process.header"
 
@@ -49,10 +50,7 @@ struct FileDescriptorTable *create_file_descriptor_table(void) {
     table->entries = (struct FileDescriptor *)kmalloc(
         sizeof(struct FileDescriptor) * FILE_DESCRIPTOR_COUNT
     );
-    table->stdin_buffer = (char *)kmalloc(STDIN_BUFFER_CAPACITY);
-    if (table->entries == NULL || table->stdin_buffer == NULL) {
-        kfree(table->entries);
-        kfree(table->stdin_buffer);
+    if (table->entries == NULL) {
         kfree(table);
         return NULL;
     }
@@ -81,41 +79,62 @@ struct FileDescriptorTable *create_file_descriptor_table(void) {
         FILE_DESCRIPTOR_STDERR,
         O_WRONLY
     );
-
-    table->stdin_head = 0;
-    table->stdin_tail = 0;
-    table->stdin_count = 0;
-    table->stdin_waiters.head = NULL;
-    table->stdin_waiters.tail = NULL;
-    table->pending_read_buffer = NULL;
-    table->pending_read_count = 0;
-    table->pending_character_read = false;
+    table->entries[STDIN_FILENO].path = copy_file_path(
+        TERMINAL_DEVICE_PATH
+    );
+    table->entries[STDOUT_FILENO].path = copy_file_path(
+        TERMINAL_DEVICE_PATH
+    );
+    table->entries[STDERR_FILENO].path = copy_file_path(
+        TERMINAL_DEVICE_PATH
+    );
+    if (table->entries[STDIN_FILENO].path == NULL ||
+        table->entries[STDOUT_FILENO].path == NULL ||
+        table->entries[STDERR_FILENO].path == NULL) {
+        destroy_file_descriptor_table(table);
+        return NULL;
+    }
     return table;
 }
 
-struct FileDescriptorTable *inherit_standard_file_descriptors(
+bool copy_file_descriptor(
+    struct FileDescriptor *source,
+    struct FileDescriptor *target
+) {
+    char *path = NULL;
+
+    if (source->path != NULL) {
+        path = copy_file_path(source->path);
+        if (path == NULL) {
+            return false;
+        }
+    }
+
+    kfree(target->path);
+    target->kind = source->kind;
+    target->flags = source->flags;
+    target->offset = source->offset;
+    target->path = path;
+    return true;
+}
+
+struct FileDescriptorTable *inherit_file_descriptors(
     struct FileDescriptorTable *source
 ) {
     struct FileDescriptorTable *copy = create_file_descriptor_table();
     int index = 0;
 
-    if (copy == NULL || source == NULL) {
-        return copy;
+    if (copy == NULL) {
+        return NULL;
     }
 
-    // Only standard descriptors pass to a newly started process
-    while (index <= STDERR_FILENO) {
-        copy->entries[index].kind = source->entries[index].kind;
-        copy->entries[index].flags = source->entries[index].flags;
-        copy->entries[index].offset = source->entries[index].offset;
-        if (source->entries[index].path != NULL) {
-            copy->entries[index].path = copy_file_path(
-                source->entries[index].path
-            );
-            if (copy->entries[index].path == NULL) {
-                destroy_file_descriptor_table(copy);
-                return NULL;
-            }
+    while (index < FILE_DESCRIPTOR_COUNT) {
+        if (!copy_file_descriptor(
+                source->entries + index,
+                copy->entries + index
+            )) {
+            destroy_file_descriptor_table(copy);
+            return NULL;
         }
         index = index + 1;
     }
@@ -125,16 +144,11 @@ struct FileDescriptorTable *inherit_standard_file_descriptors(
 void destroy_file_descriptor_table(struct FileDescriptorTable *table) {
     int index = 0;
 
-    if (table == NULL) {
-        return;
-    }
-
     while (index < FILE_DESCRIPTOR_COUNT) {
         kfree(table->entries[index].path);
         index = index + 1;
     }
     kfree(table->entries);
-    kfree(table->stdin_buffer);
     kfree(table);
 }
 
@@ -159,8 +173,7 @@ int close_file_descriptor(int file_descriptor) {
     struct FileDescriptorTable *table = current_process()->file_descriptors;
     struct FileDescriptor *descriptor;
 
-    if (file_descriptor < 3 ||
-        !file_descriptor_is_valid(file_descriptor)) {
+    if (!file_descriptor_is_valid(file_descriptor)) {
         return -1;
     }
 
@@ -177,10 +190,8 @@ int duplicate_file_descriptor(struct Dup2Request *request) {
     struct FileDescriptorTable *table = current_process()->file_descriptors;
     struct FileDescriptor *source;
     struct FileDescriptor *target;
-    char *path = NULL;
 
-    if (request == NULL ||
-        !file_descriptor_is_valid(request->old_file_descriptor) ||
+    if (!file_descriptor_is_valid(request->old_file_descriptor) ||
         !file_descriptor_is_valid(request->new_file_descriptor)) {
         return -1;
     }
@@ -193,18 +204,9 @@ int duplicate_file_descriptor(struct Dup2Request *request) {
         return request->new_file_descriptor;
     }
 
-    if (source->path != NULL) {
-        path = copy_file_path(source->path);
-        if (path == NULL) {
-            return -1;
-        }
-    }
-
     target = table->entries + request->new_file_descriptor;
-    kfree(target->path);
-    target->kind = source->kind;
-    target->flags = source->flags;
-    target->offset = source->offset;
-    target->path = path;
+    if (!copy_file_descriptor(source, target)) {
+        return -1;
+    }
     return request->new_file_descriptor;
 }
