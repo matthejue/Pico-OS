@@ -1,0 +1,174 @@
+#include "terminal.header"
+#include "../dispatcher.header"
+#include "../interrupt_controller.header"
+#include "../periphery.header"
+#include "../process.header"
+#include "../signal.header"
+
+#define UART_RECEIVE_REGISTER 1
+#define UART_STATUS_REGISTER 2
+#define UART_RECEIVE_READY 2
+
+struct Terminal terminal;
+
+void initialize_terminal(void) {
+    terminal.input_head = 0;
+    terminal.input_tail = 0;
+    terminal.input_count = 0;
+    terminal.input_waiters.head = NULL;
+    terminal.input_waiters.tail = NULL;
+    terminal.pending_read_buffer = NULL;
+    terminal.pending_read_count = 0;
+    terminal.pending_character_read = false;
+}
+
+struct Terminal *kernel_terminal(void) {
+    return &terminal;
+}
+
+bool is_terminal_device_path(char *path) {
+    int index = 0;
+
+    while (path[index] == TERMINAL_DEVICE_PATH[index] &&
+           path[index] != 0) {
+        index = index + 1;
+    }
+    return path[index] == TERMINAL_DEVICE_PATH[index];
+}
+
+int pop_terminal_byte(struct Terminal *terminal) {
+    int value = terminal->input_buffer[terminal->input_head];
+
+    terminal->input_head =
+        (terminal->input_head + 1) % TERMINAL_INPUT_BUFFER_CAPACITY;
+    terminal->input_count = terminal->input_count - 1;
+    return value;
+}
+
+int copy_terminal_bytes(
+    struct Terminal *terminal,
+    char *buffer,
+    int count
+) {
+    int copied = 0;
+
+    while (copied < count && terminal->input_count > 0) {
+        buffer[copied] = pop_terminal_byte(terminal);
+        copied = copied + 1;
+    }
+    return copied;
+}
+
+void enqueue_terminal_byte(struct Terminal *terminal, int value) {
+    if (terminal->input_count == TERMINAL_INPUT_BUFFER_CAPACITY) {
+        terminal->input_head =
+            (terminal->input_head + 1) % TERMINAL_INPUT_BUFFER_CAPACITY;
+        terminal->input_count = terminal->input_count - 1;
+    }
+
+    terminal->input_buffer[terminal->input_tail] = value;
+    terminal->input_tail =
+        (terminal->input_tail + 1) % TERMINAL_INPUT_BUFFER_CAPACITY;
+    terminal->input_count = terminal->input_count + 1;
+}
+
+int begin_terminal_read(
+    struct Terminal *terminal,
+    char *buffer,
+    int count,
+    bool character_read,
+    int *caller_context
+) {
+    int uart_interrupt_index;
+    int uart_interrupt_priority;
+
+    uart_interrupt_index = periphery_read_register(
+        INTERRUPT_CONTROLLER_UART_DEVICE_TO_ISR_REGISTER
+    );
+    uart_interrupt_priority = periphery_read_register(
+        INTERRUPT_CONTROLLER_UART_DEVICE_PRIORITY_REGISTER
+    );
+    interrupt_controller_disable_device(INTERRUPT_DEVICE_UART);
+
+    if (terminal->input_count > 0) {
+        interrupt_controller_assign_device(
+            INTERRUPT_DEVICE_UART,
+            uart_interrupt_index,
+            uart_interrupt_priority
+        );
+        if (character_read) {
+            return pop_terminal_byte(terminal);
+        }
+        return copy_terminal_bytes(terminal, buffer, count);
+    }
+
+    terminal->pending_read_buffer = buffer;
+    terminal->pending_read_count = count;
+    terminal->pending_character_read = character_read;
+    enqueue_current_process_on_wait_queue(&(terminal->input_waiters));
+    interrupt_controller_assign_device(
+        INTERRUPT_DEVICE_UART,
+        uart_interrupt_index,
+        uart_interrupt_priority
+    );
+    dispatcher_switch_from_context(caller_context);
+    return 1;
+}
+
+int read_stdin_character(int *caller_context) {
+    return begin_terminal_read(
+        kernel_terminal(),
+        NULL,
+        1,
+        true,
+        caller_context
+    );
+}
+
+void complete_pending_terminal_read(
+    struct Process *process,
+    struct Terminal *terminal
+) {
+    int result;
+
+    if (terminal->input_waiters.head == NULL) {
+        return;
+    }
+
+    if (terminal->pending_character_read) {
+        result = pop_terminal_byte(terminal);
+    } else {
+        result = copy_terminal_bytes(
+            terminal,
+            terminal->pending_read_buffer,
+            terminal->pending_read_count
+        );
+    }
+
+    process->activation.acc = result;
+    terminal->pending_read_buffer = NULL;
+    terminal->pending_read_count = 0;
+    terminal->pending_character_read = false;
+    wakeup_wait_queue(&(terminal->input_waiters));
+}
+
+void handle_uart_interrupt(void) {
+    struct Process *process = terminal_input_process();
+    struct Terminal *terminal = kernel_terminal();
+    int value;
+    int status;
+
+    value = periphery_read_register(UART_RECEIVE_REGISTER) & 255;
+    status = periphery_read_register(UART_STATUS_REGISTER);
+    periphery_write_register(
+        UART_STATUS_REGISTER,
+        status | UART_RECEIVE_READY
+    );
+
+    if (handle_terminal_signal_character(value)) {
+        return;
+    }
+
+    enqueue_terminal_byte(terminal, value);
+    complete_pending_terminal_read(process, terminal);
+}

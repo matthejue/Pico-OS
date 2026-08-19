@@ -391,6 +391,7 @@ system user: release-tree
 
 RUNTIME_FILES := \
 	$(BINARY_DIR)/config/environment.txt \
+	$(BINARY_DIR)/device/terminal.dev \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
 	$(BINARY_DIR)/kernel/kernel.debuginfo \
@@ -437,10 +438,13 @@ rebuild-release:
 
 ci-build ci-artifacts: release-tree
 
-$(BINARY_DIR) $(BINARY_DIR)/boot $(BINARY_DIR)/config $(BINARY_DIR)/kernel $(BINARY_DIR)/system $(BINARY_DIR)/user:
+$(BINARY_DIR) $(BINARY_DIR)/boot $(BINARY_DIR)/config $(BINARY_DIR)/device $(BINARY_DIR)/kernel $(BINARY_DIR)/system $(BINARY_DIR)/user:
 	mkdir -p $@
 
 binary/config/environment.txt: config/environment.txt | binary/config
+	cp $< $@
+
+binary/device/terminal.dev: device/terminal.dev | binary/device
 	cp $< $@
 
 binary/boot/bootloader.reti: boot/bootloader.reti | binary/boot
@@ -622,7 +626,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/filesystem/file_descriptor.picoc \
 	kernel/filesystem/filesystem.picoc \
 	kernel/filesystem/host_filesystem.picoc \
-	kernel/filesystem/standard_input.picoc \
+	kernel/filesystem/terminal.picoc \
 	kernel/process/process_arguments.picoc \
 	kernel/scheduler.picoc \
 	kernel/dispatcher.picoc \
@@ -743,5 +747,5 @@ clean: clean-binary
 	find . -type d -path './.test_dependencies' -empty -delete
 
 clean-binary: clean-firmware
-	rm -rf binary/boot binary/config binary/kernel binary/system binary/user
+	rm -rf binary/boot binary/config binary/device binary/kernel binary/system binary/user
 	rm -f binary/download-tools.sh binary/download-tools.ps1 binary/start-picoos.sh binary/start-picoos.ps1 binary/README.md

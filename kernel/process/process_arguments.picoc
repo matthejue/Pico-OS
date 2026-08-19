@@ -215,7 +215,6 @@ void store_process_arguments(
 bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
     struct Process *process;
     struct FileDescriptorTable *file_descriptors;
-    struct FileDescriptorTable *parent_file_descriptors = NULL;
 
     // Only a newly created process can be started
     process = find_process_by_pid(request->pid);
@@ -225,16 +224,15 @@ bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
     }
 
     if (current_process() != NULL) {
-        parent_file_descriptors = current_process()->file_descriptors;
+        file_descriptors = inherit_file_descriptors(
+            current_process()->file_descriptors
+        );
+        if (file_descriptors == NULL) {
+            return false;
+        }
+        destroy_file_descriptor_table(process->file_descriptors);
+        process->file_descriptors = file_descriptors;
     }
-    file_descriptors = inherit_standard_file_descriptors(
-        parent_file_descriptors
-    );
-    if (file_descriptors == NULL) {
-        return false;
-    }
-    destroy_file_descriptor_table(process->file_descriptors);
-    process->file_descriptors = file_descriptors;
 
     // Arguments and environment must be placed on the process stack first
     store_process_arguments(
