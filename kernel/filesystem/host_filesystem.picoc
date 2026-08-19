@@ -13,9 +13,7 @@ int uart_receive_string(char *buffer, int capacity) {
     int value;
 
     if (byte_count < 0) {
-        if (capacity > 0) {
-            buffer[0] = 0;
-        }
+        buffer[0] = 0;
         return -1;
     }
     while (index < byte_count) {
@@ -25,12 +23,10 @@ int uart_receive_string(char *buffer, int capacity) {
         }
         index = index + 1;
     }
-    if (capacity > 0) {
-        if (byte_count < capacity) {
-            buffer[byte_count] = 0;
-        } else {
-            buffer[capacity - 1] = 0;
-        }
+    if (byte_count < capacity) {
+        buffer[byte_count] = 0;
+    } else {
+        buffer[capacity - 1] = 0;
     }
     if (byte_count >= capacity) {
         return -1;
@@ -96,9 +92,6 @@ bool append_path_segments(
 bool build_process_path(char *path, char *result, int capacity) {
     int result_length = 1;
 
-    if (path == NULL || result == NULL || capacity < 2) {
-        return false;
-    }
     result[0] = '/';
     if (path[0] != '/') {
         if (!append_path_segments(
@@ -157,7 +150,7 @@ int get_working_directory(struct GetCwdRequest *request) {
     int length;
     int index = 0;
 
-    if (request == NULL || request->buffer == NULL || request->size <= 0) {
+    if (request->size <= 0) {
         return -1;
     }
     working_directory = current_process()->working_directory;
@@ -201,8 +194,7 @@ int make_host_directory(char *path) {
 int read_host_directory(struct ReadDirectoryRequest *request) {
     char absolute_path[512];
 
-    if (request == NULL || request->buffer == NULL ||
-        request->capacity <= 0 ||
+    if (request->capacity <= 0 ||
         !build_process_path(request->path, absolute_path, PATH_MAX)) {
         return -1;
     }
