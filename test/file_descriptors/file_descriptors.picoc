@@ -1,40 +1,77 @@
-// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks
+// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
 
 #include "../../library/fcntl/fcntl.header"
 #include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
 
 #define TEST_PATH "/tmp/pico_os_file_descriptors.txt"
+#define TEST_BINARY "test/file_descriptors/file_descriptors.bin"
+#define TERMINAL_PATH "/device/terminal"
 
-int main(void) {
+int main(int argc, char **argv) {
     char buffer[32];
     int file_descriptor;
     int count;
+    int child_pid;
+
+    if (argc > 1) {
+        if (write(3, " beta", 5) != 5) {
+            return 1;
+        }
+        return 0;
+    }
 
     file_descriptor = creat(TEST_PATH, 0);
-    if (file_descriptor < 0) {
+    if (file_descriptor != 3) {
         return 1;
     }
     write(file_descriptor, "alpha", 5);
+
+    child_pid = load(TEST_BINARY);
+    if (child_pid == 0 || !run(child_pid, "inherited", NULL)) {
+        close(file_descriptor);
+        return 2;
+    }
+    waitpid(child_pid);
     close(file_descriptor);
 
     file_descriptor = open(TEST_PATH, O_WRONLY | O_APPEND);
     if (file_descriptor < 0) {
-        return 2;
+        return 3;
     }
     write(file_descriptor, " beta", 5);
     close(file_descriptor);
 
     file_descriptor = open(TEST_PATH, O_RDONLY);
     if (file_descriptor < 0) {
-        return 3;
+        return 4;
     }
     count = read(file_descriptor, buffer, 32);
     close(file_descriptor);
 
-    if (count != 10) {
-        return 4;
+    if (count != 15) {
+        return 5;
     }
     write(STDOUT_FILENO, buffer, count);
     write(STDOUT_FILENO, "\n", 1);
+
+    if (close(STDIN_FILENO) != 0) {
+        return 6;
+    }
+    file_descriptor = open(TERMINAL_PATH, O_WRONLY);
+    if (file_descriptor != STDIN_FILENO) {
+        return 7;
+    }
+    if (write(file_descriptor, "", 0) != 0 ||
+        lseek(file_descriptor, 0, SEEK_SET) != -1) {
+        return 8;
+    }
+    close(file_descriptor);
+
+    file_descriptor = open(TEST_PATH, O_RDONLY);
+    if (file_descriptor != STDIN_FILENO) {
+        return 9;
+    }
+    close(file_descriptor);
     return 0;
 }
