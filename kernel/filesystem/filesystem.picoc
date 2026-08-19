@@ -1,6 +1,6 @@
 #include "filesystem.header"
 #include "file_descriptor.header"
-#include "standard_input.header"
+#include "terminal.header"
 #include "host_filesystem.header"
 #include "../kmalloc.header"
 #include "../process.header"
@@ -24,7 +24,7 @@ bool file_exists(char *path) {
 }
 
 int free_file_descriptor(struct FileDescriptorTable *table) {
-    int index = 3;
+    int index = 0;
 
     while (index < FILE_DESCRIPTOR_COUNT) {
         if (table->entries[index].kind == FILE_DESCRIPTOR_FREE) {
@@ -42,10 +42,6 @@ int open_file_descriptor(struct OpenRequest *request) {
     char *path;
     int file_descriptor;
     int access_mode;
-
-    if (request == NULL || request->path == NULL) {
-        return -1;
-    }
 
     access_mode = request->flags & O_ACCMODE;
     if (access_mode != O_RDONLY &&
@@ -67,20 +63,22 @@ int open_file_descriptor(struct OpenRequest *request) {
         return -1;
     }
 
-    if ((request->flags & O_TRUNC) != 0) {
-        if (access_mode == O_RDONLY) {
-            kfree(path);
-            return -1;
+    if (!is_terminal_device_path(path)) {
+        if ((request->flags & O_TRUNC) != 0) {
+            if (access_mode == O_RDONLY) {
+                kfree(path);
+                return -1;
+            }
+            uart_send_host_request("write ", path);
+            uart_send_host_request("write ", "stdout");
+        } else if (!file_exists(path)) {
+            if ((request->flags & O_CREAT) == 0) {
+                kfree(path);
+                return -1;
+            }
+            uart_send_host_request("write ", path);
+            uart_send_host_request("write ", "stdout");
         }
-        uart_send_host_request("write ", path);
-        uart_send_host_request("write ", "stdout");
-    } else if (!file_exists(path)) {
-        if ((request->flags & O_CREAT) == 0) {
-            kfree(path);
-            return -1;
-        }
-        uart_send_host_request("write ", path);
-        uart_send_host_request("write ", "stdout");
     }
 
     descriptor = table->entries + file_descriptor;
@@ -140,10 +138,7 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
     struct FileDescriptorTable *table = current_process()->file_descriptors;
     struct FileDescriptor *descriptor;
 
-    if (request == NULL ||
-        request->count < 0 ||
-        (request->count > 0 && request->buffer == NULL) ||
-        !file_descriptor_is_valid(request->file_descriptor)) {
+    if (!file_descriptor_is_valid(request->file_descriptor)) {
         return -1;
     }
     if (request->count == 0) {
@@ -151,12 +146,13 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
     }
 
     descriptor = table->entries + request->file_descriptor;
-    if (!file_descriptor_can_read(descriptor)) {
+    if (descriptor->kind == FILE_DESCRIPTOR_FREE ||
+        !file_descriptor_can_read(descriptor)) {
         return -1;
     }
-    if (descriptor->kind == FILE_DESCRIPTOR_STDIN) {
-        return begin_stdin_read(
-            table,
+    if (is_terminal_device_path(descriptor->path)) {
+        return begin_terminal_read(
+            kernel_terminal(),
             request->buffer,
             request->count,
             false,
@@ -187,10 +183,7 @@ int write_file_descriptor(struct IoRequest *request) {
     struct FileDescriptorTable *table = current_process()->file_descriptors;
     struct FileDescriptor *descriptor;
 
-    if (request == NULL ||
-        request->count < 0 ||
-        (request->count > 0 && request->buffer == NULL) ||
-        !file_descriptor_is_valid(request->file_descriptor)) {
+    if (!file_descriptor_is_valid(request->file_descriptor)) {
         return -1;
     }
 
@@ -199,16 +192,19 @@ int write_file_descriptor(struct IoRequest *request) {
         return -1;
     }
 
-    if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
-        uart_send_host_request("write ", "stderr");
+    if (is_terminal_device_path(descriptor->path)) {
+        if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
+            uart_send_host_request("write ", "stderr");
+        }
     } else if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
         uart_send_host_request("append ", descriptor->path);
-    } else if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
+    } else {
         return -1;
     }
 
     write_uart_bytes(request->buffer, request->count);
-    if (descriptor->kind != FILE_DESCRIPTOR_STDOUT) {
+    if (descriptor->kind == FILE_DESCRIPTOR_STDERR ||
+        !is_terminal_device_path(descriptor->path)) {
         uart_send_host_request("write ", "stdout");
     }
     descriptor->offset = descriptor->offset + request->count;
@@ -220,13 +216,13 @@ int seek_file_descriptor(struct SeekRequest *request) {
     struct FileDescriptor *descriptor;
     int offset;
 
-    if (request == NULL ||
-        !file_descriptor_is_valid(request->file_descriptor)) {
+    if (!file_descriptor_is_valid(request->file_descriptor)) {
         return -1;
     }
 
     descriptor = table->entries + request->file_descriptor;
-    if (descriptor->kind != FILE_DESCRIPTOR_FILE) {
+    if (descriptor->kind != FILE_DESCRIPTOR_FILE ||
+        is_terminal_device_path(descriptor->path)) {
         return -1;
     }
 

@@ -1,0 +1,38 @@
+#pragma once
+
+#include "../../common/stddef.header"
+#include "../../common/wait_queue.header"
+
+#define TERMINAL_INPUT_BUFFER_CAPACITY 128
+#define TERMINAL_DEVICE_PATH "/device/terminal"
+
+struct Terminal {
+    char input_buffer[TERMINAL_INPUT_BUFFER_CAPACITY];
+    int input_head;
+    int input_tail;
+    int input_count;
+    struct wait_queue input_waiters;
+    char *pending_read_buffer;
+    int pending_read_count;
+    bool pending_character_read;
+};
+
+void initialize_terminal(void);
+struct Terminal *kernel_terminal(void);
+bool is_terminal_device_path(char *path);
+int pop_terminal_byte(struct Terminal *terminal);
+int copy_terminal_bytes(
+    struct Terminal *terminal,
+    char *buffer,
+    int count
+);
+void enqueue_terminal_byte(struct Terminal *terminal, int value);
+int begin_terminal_read(
+    struct Terminal *terminal,
+    char *buffer,
+    int count,
+    bool character_read,
+    int *caller_context
+);
+int read_stdin_character(int *caller_context);
+void handle_uart_interrupt(void);

@@ -22,3 +22,7 @@ underscore-prefixed functions where necessary; directory listing requires the
 `dirent` compatibility supplied by the supported MSYS2 build environment.
 Native Windows emulator builds without that compatibility are not supported
 for these host-filesystem services.
+
+`device/terminal.dev` is a dummy release marker for PicoOS's kernel terminal.
+Programs access the terminal through the virtual path `/device/terminal`; the
+dummy file does not contain terminal data.
