@@ -1,0 +1,118 @@
+// dependencies: ../common/user_command.reti_blocks ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/loading_bar.header"
+#include "../common/user_command.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
+
+bool line_contains(char *line, int line_length, char *pattern, int pattern_length) {
+    int line_index = 0;
+    int pattern_index;
+
+    while (line_index + pattern_length <= line_length) {
+        pattern_index = 0;
+        while (pattern_index < pattern_length &&
+               line[line_index + pattern_index] == pattern[pattern_index]) {
+            pattern_index = pattern_index + 1;
+        }
+        if (pattern_index == pattern_length) {
+            return true;
+        }
+        line_index = line_index + 1;
+    }
+    return false;
+}
+
+void write_replacement(char *text) {
+    command_write(STDOUT_FILENO, text);
+    command_write(STDOUT_FILENO, "\n");
+}
+
+int main(int argc, char **argv) {
+    char *expression;
+    char *contents;
+    char *replacement;
+    char *pattern = NULL;
+    int pattern_length = 0;
+    int addressed_line = 0;
+    int command_index = 0;
+    int file_descriptor;
+    int file_size;
+    int start = 0;
+    int end;
+    int line_number = 1;
+    int line_length;
+    bool selected;
+    char command;
+
+    if (argc != 3) {
+        command_write(STDERR_FILENO, "Usage: sed.bin EXPRESSION FILE\n");
+        return 1;
+    }
+    unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
+    expression = argv[1];
+    if (expression[0] == '/') {
+        pattern = expression + 1;
+        command_index = 1;
+        while (expression[command_index] != '/') {
+            command_index = command_index + 1;
+        }
+        pattern_length = command_index - 1;
+        command_index = command_index + 1;
+    } else {
+        while (expression[command_index] >= '0' &&
+               expression[command_index] <= '9') {
+            addressed_line = addressed_line * 10 +
+                expression[command_index] - '0';
+            command_index = command_index + 1;
+        }
+    }
+    command = expression[command_index];
+    replacement = expression + command_index + 1;
+
+    file_descriptor = open(argv[2], O_RDONLY);
+    if (file_descriptor < 0) {
+        command_write(STDERR_FILENO, "sed: could not open file\n");
+        return 1;
+    }
+    file_size = lseek(file_descriptor, 0, SEEK_END);
+    lseek(file_descriptor, 0, SEEK_SET);
+    contents = (char *)malloc(file_size + 1);
+    file_size = read(file_descriptor, contents, file_size);
+    close(file_descriptor);
+    contents[file_size] = 0;
+
+    while (start < file_size) {
+        end = start;
+        while (end < file_size && contents[end] != '\n') {
+            end = end + 1;
+        }
+        line_length = end - start;
+        if (end < file_size) {
+            end = end + 1;
+        }
+        selected = addressed_line == line_number ||
+            (pattern != NULL && line_contains(
+                contents + start,
+                line_length,
+                pattern,
+                pattern_length
+            ));
+        if (selected && command == 'i') {
+            write_replacement(replacement);
+        }
+        if (!selected || command != 'c') {
+            write(STDOUT_FILENO, contents + start, end - start);
+        } else {
+            write_replacement(replacement);
+        }
+        if (selected && command == 'a') {
+            write_replacement(replacement);
+        }
+        start = end;
+        line_number = line_number + 1;
+    }
+    free(contents);
+    return 0;
+}

@@ -1,0 +1,4 @@
+touch.bin test/touch/created.txt test/touch/kept.txt
+cat.bin test/touch/kept.txt
+ls.bin test/touch
+poweroff.bin

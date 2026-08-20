@@ -59,9 +59,6 @@ int open_file_descriptor(struct OpenRequest *request) {
         return -1;
     }
     path = copy_file_path(absolute_path);
-    if (path == NULL) {
-        return -1;
-    }
 
     if (!is_terminal_device_path(path)) {
         if ((request->flags & O_TRUNC) != 0) {

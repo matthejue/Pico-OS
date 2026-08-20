@@ -443,9 +443,6 @@ char *expand_variables(char *arguments, char *result, int capacity) {
                 value_index = value_index + 1;
             }
             argument_index = name_end;
-        } else if (arguments[argument_index] == '"') {
-            // Removes shell quotes before passing arguments to the process
-            argument_index = argument_index + 1;
         } else {
             // Copies any other character unchanged and advances both indices
             result[result_index] = arguments[argument_index];
@@ -552,15 +549,18 @@ int single_command_operand(
 
 bool quotes_are_balanced(char *command) {
     int index = 0;
-    bool inside_quotes = false;
+    char quote = 0;
 
     while (command[index] != 0) {
-        if (command[index] == '"') {
-            inside_quotes = !inside_quotes;
+        if (quote == 0 &&
+            (command[index] == '"' || command[index] == '\'')) {
+            quote = command[index];
+        } else if (command[index] == quote) {
+            quote = 0;
         }
         index = index + 1;
     }
-    return !inside_quotes;
+    return quote == 0;
 }
 
 bool strip_background_operator(char *command) {
@@ -977,7 +977,7 @@ bool eval(char *command) {
         return true;
     }
     if (!quotes_are_balanced(command)) {
-        shell_write_string("error: unmatched double quote\n");
+        shell_write_string("error: unmatched quote\n");
         return true;
     }
 
@@ -1090,12 +1090,6 @@ bool eval(char *command) {
             if (!unload(pid)) {
                 shell_write_string("error: could not unload process\n");
             }
-        }
-    } else if (command_matches(command, "list")) {
-        if (command_operand(command, "list") != NULL) {
-            shell_write_string("error: list does not accept arguments\n");
-        } else {
-            list();
         }
     } else if (command_matches(command, "fg")) {
         if (command_operand(command, "fg") != NULL) {

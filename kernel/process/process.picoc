@@ -57,10 +57,6 @@ char *copy_process_path(char *path) {
 
     // The caller's path buffer need not outlive the process, so the PCB owns a copy
     copy = (char *)kmalloc(length + 1);
-    if (copy == NULL) {
-        return NULL;
-    }
-
     while (index < length) {
         copy[index] = path[index];
         index = index + 1;
@@ -84,10 +80,6 @@ struct Process *create_process(
     int signal_number = 0;
     int stack_pointer = base_address + size - 1;
 
-    if (process == NULL) {
-        return NULL;
-    }
-
     process->pid = next_process_id;
     next_process_id = next_process_id + 1;
     process->state = PROCESS_STATE_NEW;
@@ -97,16 +89,7 @@ struct Process *create_process(
     process->heap_size = heap_size;
     process->word_count = word_count;
     process->binary_path = copy_process_path(binary_path);
-    if (process->binary_path == NULL) {
-        kfree(process);
-        return NULL;
-    }
     process->file_descriptors = create_file_descriptor_table();
-    if (process->file_descriptors == NULL) {
-        kfree(process->binary_path);
-        kfree(process);
-        return NULL;
-    }
 
     process->activation.in1 = 0;
     process->activation.in2 = 0;
@@ -380,10 +363,6 @@ void remove_test_processes(void) {
 bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context) {
     struct Process *process = current_process();
     struct Process *waited_process;
-
-    if (request == NULL || request->status == NULL) {
-        return true;
-    }
 
     waited_process = find_process_by_pid(request->pid);
     if (waited_process == NULL ||

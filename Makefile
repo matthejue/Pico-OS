@@ -113,7 +113,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti poweroff.bin poweroff.reti pwd.bin pwd.reti rm.bin rm.reti rmdir.bin rmdir.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -156,14 +156,19 @@ help:
 	@echo "  make user                       Build user programs"
 	@echo "  make shell.bin                  Build the shell user program binary"
 	@echo "  make cat.bin                    Build the cat user program binary"
+	@echo "  make cp.bin                     Build the cp user program binary"
 	@echo "  make echo.bin                   Build the echo user program binary"
 	@echo "  make kill.bin                   Build the kill user program binary"
 	@echo "  make ls.bin                     Build the ls user program binary"
 	@echo "  make mkdir.bin                  Build the mkdir user program binary"
+	@echo "  make mv.bin                     Build the mv user program binary"
 	@echo "  make poweroff.bin               Build the poweroff user program binary"
+	@echo "  make ps.bin                     Build the ps user program binary"
 	@echo "  make pwd.bin                    Build the pwd user program binary"
 	@echo "  make rm.bin                     Build the rm user program binary"
 	@echo "  make rmdir.bin                  Build the rmdir user program binary"
+	@echo "  make sed.bin                    Build the sed user program binary"
+	@echo "  make touch.bin                  Build the touch user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -479,6 +484,10 @@ cat.reti: user/cat.reti
 
 cat.bin: binary/user/cat.bin
 
+cp.reti: user/cp.reti
+
+cp.bin: binary/user/cp.bin
+
 echo.reti: user/echo.reti
 
 echo.bin: binary/user/echo.bin
@@ -495,9 +504,17 @@ mkdir.reti: user/mkdir.reti
 
 mkdir.bin: binary/user/mkdir.bin
 
+mv.reti: user/mv.reti
+
+mv.bin: binary/user/mv.bin
+
 poweroff.reti: user/poweroff.reti
 
 poweroff.bin: binary/user/poweroff.bin
+
+ps.reti: user/ps.reti
+
+ps.bin: binary/user/ps.bin
 
 pwd.reti: user/pwd.reti
 
@@ -510,6 +527,14 @@ rm.bin: binary/user/rm.bin
 rmdir.reti: user/rmdir.reti
 
 rmdir.bin: binary/user/rmdir.bin
+
+sed.reti: user/sed.reti
+
+sed.bin: binary/user/sed.bin
+
+touch.reti: user/touch.reti
+
+touch.bin: binary/user/touch.bin
 
 shell.reti: user/shell.reti
 

@@ -1,0 +1,5 @@
+sed.bin '5iNEW LINE' test/sed/file.txt
+sed.bin '5cNEW LINE' test/sed/file.txt
+sed.bin '5aNEW LINE' test/sed/file.txt
+sed.bin '/very simple pattern/iNEW LINE' test/sed/file.txt
+poweroff.bin

@@ -25,8 +25,6 @@ int print_file(char *path) {
     char buffer[CAT_BUFFER_SIZE];
     int file_descriptor = open(path, O_RDONLY);
     int count;
-    int written;
-    int result;
 
     if (file_descriptor < 0) {
         print_path_error(path, "could not open file");
@@ -35,23 +33,7 @@ int print_file(char *path) {
 
     count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);
     while (count > 0) {
-        written = 0;
-        while (written < count) {
-            result = write(
-                STDOUT_FILENO,
-                buffer + written,
-                count - written
-            );
-            if (result <= 0) {
-                close(file_descriptor);
-                command_write(
-                    STDERR_FILENO,
-                    "cat: could not write output\n"
-                );
-                return 1;
-            }
-            written = written + result;
-        }
+        write(STDOUT_FILENO, buffer, count);
         count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);
     }
 

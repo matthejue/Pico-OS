@@ -1,0 +1,40 @@
+// dependencies: ../common/user_command.reti_blocks ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/loading_bar.header"
+#include "../common/user_command.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
+
+#define COPY_BUFFER_SIZE 64
+
+int main(int argc, char **argv) {
+    char buffer[COPY_BUFFER_SIZE];
+    int source;
+    int destination;
+    int count;
+
+    if (argc != 3) {
+        command_write(STDERR_FILENO, "Usage: cp.bin SOURCE DESTINATION\n");
+        return 1;
+    }
+    unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
+    source = open(argv[1], O_RDONLY);
+    if (source < 0) {
+        command_write(STDERR_FILENO, "cp: could not open file\n");
+        return 1;
+    }
+    destination = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC);
+    if (destination < 0) {
+        command_write(STDERR_FILENO, "cp: could not open file\n");
+        return 1;
+    }
+    count = read(source, buffer, COPY_BUFFER_SIZE);
+    while (count > 0) {
+        write(destination, buffer, count);
+        count = read(source, buffer, COPY_BUFFER_SIZE);
+    }
+    close(source);
+    close(destination);
+    return count < 0;
+}

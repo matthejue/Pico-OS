@@ -6,11 +6,11 @@ unload
 unload 999
 export
 run-shell-tests
-list extra
 fg extra
 bg extra
 exit extra
 echo.bin "unterminated
+echo.bin 'unterminated
    
 load	./test/shell_error_messages/missing.bin
 poweroff.bin

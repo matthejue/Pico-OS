@@ -136,9 +136,8 @@ void send_signal_to_process(
 int send_signal_by_pid(struct KillRequest *request) {
     struct Process *process;
 
-    if (request == NULL ||
-        (request->signal_number != 0 &&
-         !signal_number_is_valid(request->signal_number))) {
+    if (request->signal_number != 0 &&
+        !signal_number_is_valid(request->signal_number)) {
         return -1;
     }
 
@@ -156,8 +155,7 @@ int install_signal_handler(struct SignalRequest *request) {
     struct Process *process = current_process();
     int previous_handler;
 
-    if (request == NULL ||
-        !signal_number_is_valid(request->signal_number) ||
+    if (!signal_number_is_valid(request->signal_number) ||
         request->signal_number == SIGKILL) {
         return -1;
     }
@@ -273,8 +271,7 @@ void restore_signal_context(void) {
 }
 
 int set_parent_death_signal(struct PrctlRequest *request) {
-    if (request == NULL ||
-        request->option != PR_SET_PDEATHSIG ||
+    if (request->option != PR_SET_PDEATHSIG ||
         (request->argument != 0 &&
          !signal_number_is_valid(request->argument))) {
         return -1;

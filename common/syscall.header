@@ -40,6 +40,8 @@
 #define SYSCALL_READ_DIRECTORY 35
 #define SYSCALL_UNLINK 36
 #define SYSCALL_RMDIR 37
+#define SYSCALL_MOVE 38
+#define SYSCALL_TOUCH 39
 
 struct LoadProcessRequest {
     char *path;
@@ -87,4 +89,9 @@ struct ReadDirectoryRequest {
     char *path;
     char *buffer;
     int capacity;
+};
+
+struct MoveRequest {
+    char *old_path;
+    char *new_path;
 };
