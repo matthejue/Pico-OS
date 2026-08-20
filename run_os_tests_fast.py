@@ -10,6 +10,7 @@ from run_os_tests import (
     build_test_programs,
     copy_staged_test_file,
     emulator_args_request_debug,
+    normalize_os_output,
     outputs_match,
     print_heading,
     remove_if_exists,
@@ -148,6 +149,35 @@ def collect_results(paths, statuses):
     return failing, not_passed, timed_out
 
 
+def is_process_created_line(line):
+    return line.startswith("process with pid ") and line.endswith(" created")
+
+
+def fast_expected_output(test_dir, os_feature_test, uart_shell_test):
+    expected = (test_dir / "expected_output.txt").read_text(
+        encoding="utf-8"
+    )
+    lines = expected.rstrip().splitlines()
+
+    if os_feature_test and lines and is_process_created_line(lines[0]):
+        lines.pop(0)
+    if lines and is_process_created_line(lines[-1]):
+        if os_feature_test or not uart_shell_test:
+            lines.pop()
+    if not lines:
+        return ""
+    return "\n".join(lines) + "\n"
+
+
+def normalize_captured_output(test_dir):
+    output_path = test_dir / "output.txt"
+    if output_path.is_file():
+        output_path.write_text(
+            normalize_os_output(output_path.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
+
+
 def main():
     start_time = time.monotonic()
     args = parse_args()
@@ -251,9 +281,17 @@ def main():
             for test_dir in ready_shared_paths:
                 if statuses.get(test_dir) == "failed":
                     continue
+                normalize_captured_output(test_dir)
                 statuses[test_dir] = (
                     "passed"
-                    if outputs_match(test_dir)
+                    if outputs_match(
+                        test_dir,
+                        fast_expected_output(
+                            test_dir,
+                            test_dir in os_feature_paths,
+                            test_dir in uart_shell_paths,
+                        ),
+                    )
                     else "not-passed"
                 )
 

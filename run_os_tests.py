@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import difflib
 import os
 import select
 import shlex
@@ -641,23 +642,36 @@ def run_os_test_with_peripherals(
     return "passed"
 
 
-def outputs_match(test_dir):
+def outputs_match(test_dir, expected_output=None):
     expected_file = test_dir / "expected_output.txt"
     output_file = test_dir / "output.txt"
+    file_expected_output = expected_file.read_text(encoding="utf-8")
 
-    expected = expected_file.read_text(encoding="utf-8").rstrip()
+    if expected_output is None:
+        expected_output = file_expected_output
+    expected = expected_output.rstrip()
     actual = output_file.read_text(encoding="utf-8").rstrip()
 
     if expected == actual:
         return True
 
-    result = run_command(
-        ["diff", "-u", str(expected_file), str(output_file)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
     with PRINT_LOCK:
-        print_process_output(result)
+        if expected_output == file_expected_output:
+            result = run_command(
+                ["diff", "-u", str(expected_file), str(output_file)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            print_process_output(result)
+        else:
+            print("".join(difflib.unified_diff(
+                expected_output.splitlines(keepends=True),
+                output_file.read_text(encoding="utf-8").splitlines(
+                    keepends=True
+                ),
+                fromfile=str(expected_file),
+                tofile=str(output_file),
+            )), end="")
     return False
 
 

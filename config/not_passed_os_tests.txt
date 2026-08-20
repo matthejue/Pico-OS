@@ -1,0 +1,1 @@
+test/cat test/file_descriptors test/host_commands test/shell_environment_variables test/shell_error_messages test/shell_exit_status_pid test/shell_line_editing test/shell_signal_messages test/stdio_files test/stdout_append_redirection test/stdout_redirection

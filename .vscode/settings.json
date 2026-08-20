@@ -16,5 +16,8 @@
         "-I.",
         "-Dasm(...)=",
         "-Ddebug="
-    ]
+    ],
+    "markdown.preview.doubleClickToSwitchToEditor": true,
+    "markdown.preview.scrollPreviewWithEditor": true,
+    "markdown.preview.scrollEditorWithPreview": false
 }
