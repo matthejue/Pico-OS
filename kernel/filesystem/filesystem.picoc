@@ -182,6 +182,7 @@ void write_uart_bytes(char *buffer, int count) {
 int write_file_descriptor(struct IoRequest *request) {
     struct FileDescriptorTable *table = current_process()->file_descriptors;
     struct FileDescriptor *descriptor;
+    int write_offset;
 
     if (!file_descriptor_is_valid(request->file_descriptor)) {
         return -1;
@@ -197,7 +198,14 @@ int write_file_descriptor(struct IoRequest *request) {
             uart_send_host_request("write ", "stderr");
         }
     } else if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
-        uart_send_host_request("append ", descriptor->path);
+        write_offset = descriptor->offset;
+        if ((descriptor->flags & O_APPEND) != 0) {
+            write_offset = receive_file_size(descriptor->path);
+            if (write_offset < 0) {
+                return -1;
+            }
+        }
+        uart_send_file_write_command(descriptor->path, write_offset);
     } else {
         return -1;
     }
@@ -207,7 +215,11 @@ int write_file_descriptor(struct IoRequest *request) {
         !is_terminal_device_path(descriptor->path)) {
         uart_send_host_request("write ", "stdout");
     }
-    descriptor->offset = descriptor->offset + request->count;
+    if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
+        descriptor->offset = write_offset + request->count;
+    } else {
+        descriptor->offset = descriptor->offset + request->count;
+    }
     return request->count;
 }
 

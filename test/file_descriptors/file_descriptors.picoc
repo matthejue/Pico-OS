@@ -42,35 +42,51 @@ int main(int argc, char **argv) {
     write(file_descriptor, " beta", 5);
     close(file_descriptor);
 
+    file_descriptor = open(TEST_PATH, O_WRONLY);
+    if (file_descriptor < 0 ||
+        lseek(file_descriptor, 6, SEEK_SET) != 6 ||
+        write(file_descriptor, "BETA", 4) != 4) {
+        return 4;
+    }
+    close(file_descriptor);
+
+    file_descriptor = open(TEST_PATH, O_WRONLY | O_APPEND);
+    if (file_descriptor < 0 ||
+        lseek(file_descriptor, 0, SEEK_SET) != 0 ||
+        write(file_descriptor, "!", 1) != 1) {
+        return 5;
+    }
+    close(file_descriptor);
+
     file_descriptor = open(TEST_PATH, O_RDONLY);
     if (file_descriptor < 0) {
-        return 4;
+        return 6;
     }
     count = read(file_descriptor, buffer, 32);
     close(file_descriptor);
 
-    if (count != 15) {
-        return 5;
+    if (count != 16) {
+        return 7;
     }
     write(STDOUT_FILENO, buffer, count);
     write(STDOUT_FILENO, "\n", 1);
 
     if (close(STDIN_FILENO) != 0) {
-        return 6;
+        return 8;
     }
     file_descriptor = open(TERMINAL_PATH, O_WRONLY);
     if (file_descriptor != STDIN_FILENO) {
-        return 7;
+        return 9;
     }
     if (write(file_descriptor, "", 0) != 0 ||
         lseek(file_descriptor, 0, SEEK_SET) != -1) {
-        return 8;
+        return 10;
     }
     close(file_descriptor);
 
     file_descriptor = open(TEST_PATH, O_RDONLY);
     if (file_descriptor != STDIN_FILENO) {
-        return 9;
+        return 11;
     }
     close(file_descriptor);
     return 0;
