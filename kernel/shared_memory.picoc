@@ -34,10 +34,6 @@ char *copy_shared_memory_name(char *name) {
     }
 
     copy = (char *)kmalloc(length + 1);
-    if (copy == NULL) {
-        return NULL;
-    }
-
     while (index < length) {
         copy[index] = name[index];
         index = index + 1;
@@ -112,15 +108,7 @@ int open_shared_memory(struct ShmOpenRequest *request) {
     entry = (struct SharedMemoryEntry *)kmalloc(
         sizeof(struct SharedMemoryEntry)
     );
-    if (entry == NULL) {
-        return -1;
-    }
-
     entry->name = copy_shared_memory_name(request->name);
-    if (entry->name == NULL) {
-        kfree(entry);
-        return -1;
-    }
 
     address = pmalloc(request->size);
     if (address == PMALLOC_INVALID_START) {
@@ -153,9 +141,6 @@ void *map_shared_memory(int shared_memory_id) {
     attachment = (struct SharedMemoryAttachment *)kmalloc(
         sizeof(struct SharedMemoryAttachment)
     );
-    if (attachment == NULL) {
-        return NULL;
-    }
 
     attachment->entry = entry;
     attachment->next = process->shared_memory_attachments;
@@ -189,10 +174,6 @@ void release_process_shared_memory(struct Process *process) {
     struct SharedMemoryAttachment *attachment;
     struct SharedMemoryAttachment *next;
     struct SharedMemoryEntry *entry;
-
-    if (process == NULL) {
-        return;
-    }
 
     attachment = process->shared_memory_attachments;
     process->shared_memory_attachments = NULL;

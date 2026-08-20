@@ -192,7 +192,7 @@ The shell exposes the same stages:
 
 ```text
 PicoOS> load ./user/echo.bin
-PicoOS> list
+PicoOS> ps.bin
 PicoOS> run 3 hello PicoOS
 PicoOS> unload 3
 ```
@@ -691,11 +691,8 @@ Common invalid input names the failed operation:
 PicoOS> load
 error: load requires a path
 
-PicoOS> list extra
-error: list does not accept arguments
-
 PicoOS> echo.bin "unfinished
-error: unmatched double quote
+error: unmatched quote
 ```
 
 Init likewise distinguishes a missing, unreadable, oversized, or malformed

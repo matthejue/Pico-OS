@@ -602,6 +602,8 @@ protocol on top of it. Requests start with escape byte 27 and end with
 | `<ESC>ls <path><ESC>/` | Length-prefixed directory listing |
 | `<ESC>unlink <path><ESC>/` | Remove a file |
 | `<ESC>rmdir <path><ESC>/` | Remove an empty directory |
+| `<ESC>move <old path>\n<new path><ESC>/` | Move or rename a file or directory |
+| `<ESC>touch <path><ESC>/` | Create a file or update its timestamps |
 
 These are fixed operations, not a generic host-command mechanism. The emulator
 debugger additionally shows RETI registers, EPROM, SRAM, periphery state, PicoC
@@ -842,7 +844,7 @@ void syscall_interrupt(void) {
 }
 ```
 
-[`handle_syscall()`](kernel/syscall.picoc) has 38 selectors, numbered 0–37.
+[`handle_syscall()`](kernel/syscall.picoc) has 40 selectors, numbered 0–39.
 It is a dispatch hub rather than the owner of subsystem state:
 
 ```c
@@ -883,7 +885,7 @@ process instead.
 | 24–25 | Descriptor `dup2` and test-only process reset |
 | 26–30 | Signal install/send/return, parent-death control, and foreground/input owner |
 | 31 | Userspace heap-exhaustion exception path |
-| 32–37 | Working-directory, directory-list/create, file unlink, and directory removal |
+| 32–39 | Working-directory, directory-list/create, file unlink, directory removal, move, and touch |
 
 Multi-argument calls use stack-local request structures such as
 `LoadProcessRequest`, `RunProcessRequest`, `WaitPidRequest`, `SignalRequest`,
@@ -1996,9 +1998,11 @@ struct Terminal {
 | `pending_read_count` | Maximum requested byte count |
 | `pending_character_read` | Single-character syscall versus buffered `read()` |
 
-`kernel_terminal()` returns `&terminal`. When the ring is full, a new byte
-discards the oldest. A read copies as many available bytes as possible and
-need not fill the requested count.
+The PicoC compiler does not implement usable `extern` variable declarations,
+so other kernel files cannot declare `terminal` directly. `kernel_terminal()`
+provides the pointer to the single global instance instead. When the ring is
+full, a new byte discards the oldest. A read copies as many available bytes as
+possible and need not fill the requested count.
 
 The descriptor layer reaches this object through the hardcoded virtual path
 `/device/terminal`. Opening that path skips host-file requests, terminal reads
@@ -2140,7 +2144,7 @@ root, and enforces `PATH_MAX`.
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
 | `build_process_path(char *path, char *result, int capacity)` | Success | Reads PCB directory and writes normalized local result |
-| `set_process_working_directory(struct Process *process, char *path)` | Success | Allocates new kernel copy, frees old string, replaces PCB pointer |
+| `set_process_working_directory(struct Process *process, char *path)` | `void` | Allocates new kernel copy, frees old string, replaces PCB pointer |
 | `initialize_working_directory(struct Process *process)` | 0 or `-1` | Receives host `pwd` and sets first PCB directory |
 | `get_working_directory(struct GetCwdRequest *request)` | 0 or `-1` | Copies PCB string into caller buffer |
 | `change_working_directory(char *path)` | 0 or `-1` | Validates host directory and replaces current PCB string |
@@ -2197,6 +2201,7 @@ struct PrctlRequest { int option; int argument; };
 struct ShmOpenRequest { char *name; size_t size; };
 struct GetCwdRequest { char *buffer; int size; };
 struct ReadDirectoryRequest { char *path; char *buffer; int capacity; };
+struct MoveRequest { char *old_path; char *new_path; };
 
 struct OpenRequest { char *path; int flags; };
 struct IoRequest {
@@ -2264,6 +2269,8 @@ because the caller's stack is suspended.
 | `ReadDirectoryRequest.path` | Directory to list | `opendir()` / syscall 35; normalized for the host request |
 | `ReadDirectoryRequest.buffer` | Userspace listing buffer | Receives `d name\n` / `- name\n` records from the host |
 | `ReadDirectoryRequest.capacity` | Maximum returned cells | Bounds the UART response and copy |
+| `MoveRequest.old_path` | Existing file or directory | Normalized and sent as the first `move` host-request path |
+| `MoveRequest.new_path` | New file or directory path | Normalized and sent as the second `move` host-request path |
 
 Single-argument calls do not need a request: PID selectors, descriptor close,
 `mmap(id)`, `shm_unlink(name)`, path-only operations, wait-queue pointers, and
@@ -2298,7 +2305,7 @@ kernel until it needs I/O or a process service.
 | `int load(char *path)` | PID, or 0; creates a `NEW` process | 3, `LoadProcessRequest` |
 | `bool run(int pid, char *arguments, char **environment)` | Whether a `NEW` process was initialized and made `READY`; `NULL` environment means current `environ` | 8, `RunProcessRequest` |
 | `bool unload(int pid)` | Whether a non-current target was terminated/removed | 5, PID directly |
-| `void list(void)` | Prints all known PIDs and binary paths | 4, no request |
+| `void list_processes(void)` | Prints all known PIDs and binary paths | 4, no request |
 | `int getpid(void)` | Current PCB's PID | 14, no request |
 | `void reset_processes(void)` | Test hook that removes non-system processes and resets related state | 25, no request |
 | `int set_foreground_process(int pid)` | 0 or `-1`; gives terminal input/signals to a direct child, or back to the shell for PID 0 | 30, PID directly |
@@ -2311,6 +2318,8 @@ kernel until it needs I/O or a process service.
 | `char *getcwd(char *buffer, int size)` | Buffer or `NULL` | 33, `GetCwdRequest` |
 | `int unlink(char *path)` | Host status for removing a file | 36, path pointer directly |
 | `int rmdir(char *path)` | Host status for removing an empty directory | 37, path pointer directly |
+| `int move(char *old_path, char *new_path)` | Host status for moving or renaming a file or directory | 38, `MoveRequest` |
+| `int touch(char *path)` | Host status for creating a file or updating its timestamps | 39, path pointer directly |
 | `void wait_queue_init(struct wait_queue *queue)` | Initializes embedded `head`/`tail` locally | No syscall |
 | `void sleep(struct wait_queue *queue)` | Blocks caller on the intrusive queue | 11, queue pointer directly |
 | `void wakeup(struct wait_queue *queue)` | Wakes at most the FIFO head | 12, queue pointer directly |
@@ -2641,7 +2650,7 @@ stores nonempty commands in history, and sends them to `eval()`. Only the
 | --- | --- | --- |
 | `int read_line(char *buffer, int capacity)` | Command length | Repeatedly calls `read(0, ..., 1)`, edits the stack buffer, and updates history-navigation state |
 | `void remember_shell_command(char *command)` | `void` | Mutates the global eight-entry history ring; skips consecutive duplicates |
-| `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals; removes double quotes |
+| `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
 | `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
 | `bool run_process(int pid, char *arguments, bool background, char *stdout_path, bool append)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
 | `void continue_background_process(bool foreground)` | `void` | Uses `kill(pid, SIGCONT)` and, for `fg`, foreground selection plus `waitpid()` |
@@ -2671,11 +2680,11 @@ later resumes the shell.
 
 ## 12.4 Parsing and command execution
 
-The parser validates balanced double quotes, removes a trailing `&`, recognizes
-one final whitespace-preceded `>` or `>>`, splits the command name from its raw
-arguments, expands `$NAME`, `$?`, and `$!`, and removes double-quote
-characters. A command containing `/` is loaded directly; another name is
-searched through colon-separated `PATH` entries.
+The parser validates balanced single and double quotes, removes a trailing `&`,
+recognizes one final whitespace-preceded `>` or `>>`, splits the command name
+from its raw arguments, and expands `$NAME`, `$?`, and `$!`. A command
+containing `/` is loaded directly; another name is searched through
+colon-separated `PATH` entries.
 
 Absolute `PATH` entries are used directly. A relative entry such as the
 configured `./user` is resolved from `initial_shell_working_directory`, not
@@ -2704,7 +2713,7 @@ sequenceDiagram
         K->>H: ESC load absolute-path ESC /
         H-->>K: Program image or failure
         K-->>E: NEW child PID
-        E->>E: Expand variables and remove double quotes
+        E->>E: Expand variables
         E->>K: run(pid, arguments, current environment)
         K->>C: Copy initial stack/descriptors and make READY
         alt foreground
@@ -2720,15 +2729,15 @@ sequenceDiagram
 ```
 
 Argument handling is intentionally small. The kernel splits the final string
-on spaces and tabs; double quotes are removed but do not preserve embedded
-whitespace as one argument, and there is no single-quote or general escape
-grammar. `echo.bin` itself interprets the two characters `\n`.
+on unquoted spaces and tabs and removes matching single or double quotes. There
+is no general escape grammar. `echo.bin` itself interprets the two characters
+`\n`.
 
 ## 12.5 Shell built-ins
 
 Built-ins execute inside the shell process. This is essential for operations
 such as `cd` and `export`, since a separate child could change only its own PCB
-or process-local `environ`.
+or process-local `environ`. The shell has ten built-ins overall.
 
 | Built-in | Behavior | Library functions called |
 | --- | --- | --- |
@@ -2740,7 +2749,6 @@ or process-local `environ`.
 | `load PATH` | Loads a binary but leaves its PCB in `NEW` | `load()` / syscall 3 |
 | `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `>`, and `>>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
 | `unload PID` | Terminates/removes the selected non-current process | `unload()` / syscall 5 |
-| `list` | Prints the kernel process list | `list()` / syscall 4 |
 | `fg` | Sends `SIGCONT` to the most recently tracked PID, makes it foreground, and waits | `kill`, `set_foreground_process`, `waitpid` |
 | `bg` | Sends `SIGCONT` to the most recently tracked PID without waiting | `kill()` |
 
@@ -2810,9 +2818,9 @@ normal interactive facilities.
 
 # 13. User applications
 
-PicoOS builds the shell plus ten standalone commands. An application runs in
-its own process and cannot directly change its parent shell's environment,
-working directory, or descriptor table.
+PicoOS builds 16 userspace programs overall: the shell and 15 standalone user
+applications. An application runs in its own process and cannot directly
+change its parent shell's environment, working directory, or descriptor table.
 
 ## 13.1 Applications and their library use
 
@@ -2822,6 +2830,11 @@ working directory, or descriptor table.
 | `echo.bin` | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
 | `count.bin` | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
 | `cat.bin` | Opens each file read-only, copies it in 64-cell chunks to stdout, continues after per-file errors | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| `touch.bin` | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write` |
+| `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write` |
+| `mv.bin` | Moves or renames one file or directory | `move`, `command_write` |
+| `sed.bin` | Inserts, changes, or appends text at one line number or inserts before matching lines | `open`, `lseek`, `read`, `write`, `close`, `malloc`, `free`, `unsetenv`, `command_write` |
+| `ps.bin` | Prints every process PID and binary path | `list_processes` |
 | `ls.bin` | Lists `.` or one directory and prefixes entries with `d` or `-` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
 | `mkdir.bin` | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
 | `pwd.bin` | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
@@ -2845,7 +2858,21 @@ at most one nonnegative loop-count delay; its delay is not milliseconds, and
 `cat.bin` requires at least one path and does not read stdin when no operand is
 given. It disables `PICOOS_LOADING_BAR` so progress output cannot corrupt file
 contents. It closes each descriptor before opening the next and returns 1 if
-any read/write/open operation failed.
+an open or read operation failed.
+
+`touch.bin` accepts one or more paths. `cp.bin` and `mv.bin` each accept exactly
+one source and destination and have no options. `cp.bin` also disables
+`PICOOS_LOADING_BAR`; `mv.bin` demonstrates a small multi-path syscall and the
+emulator's matching `move` host request. `ps.bin` replaces the former `list`
+shell built-in and calls the existing process-list syscall from its own process.
+
+`sed.bin` has no options and writes its result to stdout. It supports only
+`sed.bin '5iNEW LINE' file.txt`, `sed.bin '5cNEW LINE' file.txt`,
+`sed.bin '5aNEW LINE' file.txt`, and
+`sed.bin '/very simple pattern/iNEW LINE' file.txt`. These respectively insert
+before, change, append after, or insert before every line containing the simple
+pattern. It loads the file into memory and disables `PICOOS_LOADING_BAR` so the
+file output is not mixed with progress text.
 
 `ls.bin` preserves host listing order and includes hidden entries and `.`/`..`.
 There is no sorting, long format, filtering, or recursion. `mkdir.bin` has no

@@ -1,0 +1,32 @@
+process with pid 3 created
+one
+two
+very simple pattern here
+four
+NEW LINE
+five
+six
+process with pid 4 created
+one
+two
+very simple pattern here
+four
+NEW LINE
+six
+process with pid 5 created
+one
+two
+very simple pattern here
+four
+five
+NEW LINE
+six
+process with pid 6 created
+one
+two
+NEW LINE
+very simple pattern here
+four
+five
+six
+process with pid 7 created

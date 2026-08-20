@@ -12,3 +12,5 @@ int make_host_directory(char *path);
 int read_host_directory(struct ReadDirectoryRequest *request);
 int unlink_host_file(char *path);
 int remove_host_directory(char *path);
+int move_host_path(struct MoveRequest *request);
+int touch_host_file(char *path);

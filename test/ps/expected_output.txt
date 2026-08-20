@@ -1,0 +1,6 @@
+process with pid 3 created
+1 system/init.bin
+2 ./user/shell.bin
+3 test/ps/launcher.bin
+4 user/ps.bin
+process with pid 5 created

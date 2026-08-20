@@ -2,15 +2,21 @@
 #include "../../common/syscall.header"
 
 int unlink(char *path) {
-    if (path == NULL) {
-        return -1;
-    }
     return invoke_syscall(SYSCALL_UNLINK, (int)path);
 }
 
 int rmdir(char *path) {
-    if (path == NULL) {
-        return -1;
-    }
     return invoke_syscall(SYSCALL_RMDIR, (int)path);
+}
+
+int move(char *old_path, char *new_path) {
+    struct MoveRequest request;
+
+    request.old_path = old_path;
+    request.new_path = new_path;
+    return invoke_syscall(SYSCALL_MOVE, (int)&request);
+}
+
+int touch(char *path) {
+    return invoke_syscall(SYSCALL_TOUCH, (int)path);
 }

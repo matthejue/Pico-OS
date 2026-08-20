@@ -115,14 +115,11 @@ bool build_process_path(char *path, char *result, int capacity) {
     return true;
 }
 
-bool set_process_working_directory(struct Process *process, char *path) {
+void set_process_working_directory(struct Process *process, char *path) {
     int length = string_length(path);
     int index = 0;
     char *copy = (char *)kmalloc(length + 1);
 
-    if (copy == NULL) {
-        return false;
-    }
     while (index <= length) {
         copy[index] = path[index];
         index = index + 1;
@@ -131,17 +128,16 @@ bool set_process_working_directory(struct Process *process, char *path) {
         kfree(process->working_directory);
     }
     process->working_directory = copy;
-    return true;
 }
 
 int initialize_working_directory(struct Process *process) {
     char path[512];
 
     uart_send_host_request("pwd", "");
-    if (uart_receive_string(path, PATH_MAX) < 0 ||
-        !set_process_working_directory(process, path)) {
+    if (uart_receive_string(path, PATH_MAX) < 0) {
         return -1;
     }
+    set_process_working_directory(process, path);
     return 0;
 }
 
@@ -175,9 +171,7 @@ int change_working_directory(char *path) {
     if (receive_word() < 0) {
         return -1;
     }
-    if (!set_process_working_directory(current_process(), absolute_path)) {
-        return -1;
-    }
+    set_process_working_directory(current_process(), absolute_path);
     return 0;
 }
 
@@ -202,7 +196,7 @@ int read_host_directory(struct ReadDirectoryRequest *request) {
     return uart_receive_string(request->buffer, request->capacity);
 }
 
-int remove_host_path(char *command, char *path) {
+int request_host_path_operation(char *command, char *path) {
     char absolute_path[512];
 
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
@@ -213,9 +207,31 @@ int remove_host_path(char *command, char *path) {
 }
 
 int unlink_host_file(char *path) {
-    return remove_host_path("unlink ", path);
+    return request_host_path_operation("unlink ", path);
 }
 
 int remove_host_directory(char *path) {
-    return remove_host_path("rmdir ", path);
+    return request_host_path_operation("rmdir ", path);
+}
+
+int move_host_path(struct MoveRequest *request) {
+    char old_path[512];
+    char new_path[512];
+
+    if (!build_process_path(request->old_path, old_path, PATH_MAX) ||
+        !build_process_path(request->new_path, new_path, PATH_MAX)) {
+        return -1;
+    }
+    uart_print_character(27);
+    uart_print_string("move ");
+    uart_print_string(old_path);
+    uart_print_character('\n');
+    uart_print_string(new_path);
+    uart_print_character(27);
+    uart_print_character('/');
+    return receive_word();
+}
+
+int touch_host_file(char *path) {
+    return request_host_path_operation("touch ", path);
 }

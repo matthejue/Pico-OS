@@ -1,0 +1,8 @@
+// dependencies: ../library/unistd/libunistd.reti_blocks
+
+#include "../library/unistd/unistd.header"
+
+int main(void) {
+    list_processes();
+    return 0;
+}

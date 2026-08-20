@@ -6,10 +6,10 @@ error: unload requires a process ID
 error: could not unload process
 error: export requires an assignment
 error: run-shell-tests requires a manifest path
-error: list does not accept arguments
 error: fg does not accept arguments
 error: bg does not accept arguments
 error: exit does not accept arguments
-error: unmatched double quote
+error: unmatched quote
+error: unmatched quote
 error: could not load process
 process with pid 3 created

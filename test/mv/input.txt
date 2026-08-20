@@ -1,0 +1,4 @@
+mv.bin test/mv/source.txt test/mv/moved.txt
+cat.bin test/mv/moved.txt
+ls.bin test/mv
+poweroff.bin

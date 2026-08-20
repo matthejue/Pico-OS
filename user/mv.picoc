@@ -1,0 +1,16 @@
+// dependencies: ../common/user_command.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/user_command.header"
+#include "../library/unistd/unistd.header"
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        command_write(STDERR_FILENO, "Usage: mv.bin SOURCE DESTINATION\n");
+        return 1;
+    }
+    if (move(argv[1], argv[2]) < 0) {
+        command_write(STDERR_FILENO, "mv: could not move path\n");
+        return 1;
+    }
+    return 0;
+}
