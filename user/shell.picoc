@@ -196,12 +196,6 @@ int append_shell_line_character(
     return length;
 }
 
-void shell_yield(void) {
-    asm("LOADI IN1 0");
-    asm("LOADI ACC 13"); // SYSCALL_YIELD
-    asm("INT 0");
-}
-
 bool shell_reset(void) {
     int file_descriptor = SHELL_PRIVATE_FILE_DESCRIPTOR_START;
 
@@ -886,7 +880,7 @@ bool run_shell_test(char *test_directory) {
 
     output_file_descriptor = open(
         capture_path,
-        O_WRONLY | O_CREAT | O_TRUNC
+        O_WRONLY | O_CREAT | O_TRUNC | O_APPEND
     );
     if (output_file_descriptor < 0 ||
         dup2(STDOUT_FILENO, SHELL_TEST_SAVED_STDOUT_FILENO) < 0 ||
@@ -910,9 +904,10 @@ bool run_shell_test(char *test_directory) {
         }
         input[index] = 0;
         if (index > line_start) {
-            evaluating = eval(input + line_start);
-            if (evaluating) {
-                shell_yield();
+            if (strcmp(input + line_start, "poweroff.bin") == 0) {
+                evaluating = false;
+            } else {
+                evaluating = eval(input + line_start);
             }
         }
         index = index + 1;

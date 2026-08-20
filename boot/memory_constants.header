@@ -1,3 +1,3 @@
 #define SRAM_MAX_ADDRESS 262143 // 2^18 - 1
-#define EPROM_DS_START_ASM "LOADI32 DS 2697" // datasegment_start
+#define EPROM_DS_START_ASM "LOADI32 DS 2816" // datasegment_start
 #define EPROM_STACK_START_ASM "LOADI32 SP -2147221505" // -2^31 + 2^18 - 1

@@ -8,7 +8,7 @@
 #include "../library/unistd/unistd.header"
 
 #define FAST_TEST_PATH_CAPACITY 160
-#define FAST_TEST_SAVED_STDOUT_FILENO 7
+#define FAST_TEST_SAVED_STDOUT_FILENO 5
 
 void append_path(char *path, int *length, char *suffix) {
     int index = 0;
@@ -41,7 +41,7 @@ bool run_test_launcher(char *test_directory) {
 
     output_file_descriptor = open(
         output_path,
-        O_WRONLY | O_CREAT | O_TRUNC
+        O_WRONLY | O_CREAT | O_TRUNC | O_APPEND
     );
     if (output_file_descriptor >= 0) {
         stdout_saved =
