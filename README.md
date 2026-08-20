@@ -594,7 +594,7 @@ protocol on top of it. Requests start with escape byte 27 and end with
 | `<ESC>read-range <offset> <count> <path><ESC>/` | Returned byte count followed by that file range |
 | `<ESC>file-size <path><ESC>/` | File size as one 32-bit value |
 | `<ESC>write <path><ESC>/` | Create/truncate a file and route following UART bytes to it |
-| `<ESC>append <path><ESC>/` | Route following UART bytes to the end of a file |
+| `<ESC>write-at <offset> <path><ESC>/` | Preserve a file and route following UART bytes to the byte offset |
 | `<ESC>write stdout<ESC>/` / `stderr` | Restore a host standard output stream |
 | `<ESC>pwd<ESC>/` | Host startup directory |
 | `<ESC>is-directory <path><ESC>/` | Directory test |
@@ -611,8 +611,8 @@ For `load`, the host returns the complete file length in words followed by the
 file bytes; `UINT32_MAX` represents failure. `read-range`, `file-size`, `pwd`,
 and `ls` begin their responses with a big-endian length/value. Output-selection
 requests are different: after `<ESC>write path<ESC>/` or
-`<ESC>append path<ESC>/`, ordinary subsequent UART bytes go to that host file
-until PicoOS sends `<ESC>write stdout<ESC>/` or selects stderr.
+`<ESC>write-at offset path<ESC>/`, ordinary subsequent UART bytes go to that
+host file until PicoOS sends `<ESC>write stdout<ESC>/` or selects stderr.
 
 This protocol is the boundary between PicoOS descriptor/path state and host
 files. The compiler creates `.bin` files, the emulator both assembles and
@@ -2069,7 +2069,7 @@ sequenceDiagram
 | `O_RDONLY`, `O_WRONLY`, `O_RDWR` | Two-bit access mode checked by later read/write calls |
 | `O_CREAT` | Allows a missing path to be created |
 | `O_TRUNC` | With writable access, sends `<ESC>write path<ESC>/` during open to create/empty the file |
-| `O_APPEND` | Records append intent; regular PicoOS writes append in all writable file modes |
+| `O_APPEND` | Makes each regular-file write request the current file size and use it as its write offset |
 
 `open_file_descriptor()` normalizes a path against the current PCB’s working
 directory, selects the lowest free descriptor, allocates an absolute path copy,
@@ -2084,13 +2084,18 @@ other file path sends a ranged host request at `descriptor->offset`, copies
 returned bytes, and advances the offset.
 
 `write_file_descriptor()` validates write mode. Stdout sends bytes directly.
-Stderr temporarily selects host stderr. A regular file selects
-`append <path>`, sends the requested bytes, restores stdout, and advances its
-offset. Regular-file writes are append-only: `O_TRUNC` implements shell `>` by
-emptying at open time, while opening without truncation implements `>>`.
-An explicitly opened `/device/terminal` writes directly to terminal stdout.
-Seeking changes the logical read offset but not the append destination and is
+Stderr temporarily selects host stderr. A regular file sends
+`write-at <offset> <path>`, sends the requested bytes, restores stdout, and
+advances its offset. Without `O_APPEND`, the descriptor offset selects where
+bytes overwrite the file, so seeking affects both reads and writes. With
+`O_APPEND`, the kernel requests the current file size immediately before every
+write and uses that as the offset, regardless of an earlier seek. An explicitly
+opened `/device/terminal` writes directly to terminal stdout. Seeking is
 rejected for the terminal device.
+
+The `file-size` and `write-at` requests are separate, so concurrent modification
+of one host file by multiple PicoOS processes or host programs is unsupported:
+another writer could change the size between the two requests.
 
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
@@ -2243,7 +2248,7 @@ because the caller's stack is suspended.
 | Structure and field | Meaning | Consumer and retained state |
 | --- | --- | --- |
 | `OpenRequest.path` | Relative or absolute host-backed path | `open()`/`fopen()` and syscall 15; normalized and copied into the selected descriptor |
-| `OpenRequest.flags` | Access mode plus `O_CREAT`, `O_TRUNC`, or `O_APPEND` | Copied into the descriptor; also decides which host request is sent during open |
+| `OpenRequest.flags` | Access mode plus `O_CREAT`, `O_TRUNC`, or `O_APPEND` | Copied into the descriptor; create/truncate decide open requests and append changes later write positioning |
 | `IoRequest.file_descriptor` | Entry number in the current PCB's six-entry table | `read()`/`write()` and syscalls 16/17 |
 | `IoRequest.buffer` | Userspace destination for read or source for write | Used directly during the call; for a blocked terminal read the terminal temporarily retains the destination pointer |
 | `IoRequest.count` | Maximum cells to read or exact cells to write | Validated before transfer; retained in terminal pending state only while stdin is blocked |
@@ -2785,12 +2790,14 @@ sequenceDiagram
     K->>C: Deep-copy all six descriptor entries
     S->>K: dup2(5, 1), then close(5)
     C->>K: write(1, bytes, count)
-    K->>H: ESC append path ESC /, bytes, ESC write stdout ESC /
+    K->>H: ESC file-size path ESC /
+    H-->>K: Current size
+    K->>H: ESC write-at size path ESC /, bytes, ESC write stdout ESC /
 ```
 
-Regular writes append regardless of the descriptor's logical seek position.
-The distinction between `>` and `>>` is therefore whether open first empties
-the host file. There is no input redirection, pipeline, or `dup()` interface.
+For `>`, opening first empties the host file and ordinary writes begin at offset
+zero. For `>>`, `O_APPEND` makes every write request the current file size and
+write there. There is no input redirection, pipeline, or `dup()` interface.
 
 ## 12.8 Shell-test support
 
@@ -3029,7 +3036,8 @@ The main deliberate limitations are:
 - exact-child `waitpid()` rather than a general wait interface
 - five signals and one foreground/input owner rather than full job control
 - one global terminal with at most one pending input read
-- append-only regular-file writes and a logical seek offset mainly for reads
+- non-atomic `O_APPEND` positioning when another process or host program writes
+  the same host-backed file concurrently
 - fixed/default process heap and stack sizing with no dynamic stack growth
 - small formatting, scanning, shell parsing, and standard-library subsets
 - familiar POSIX-like names without full POSIX semantics
