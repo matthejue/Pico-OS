@@ -1,0 +1,3 @@
+cp.bin test/cp/source.txt test/cp/copy.txt
+cat.bin test/cp/copy.txt
+poweroff.bin

@@ -13,10 +13,6 @@ char *copy_file_path(char *path) {
     }
 
     copy = (char *)kmalloc(length + 1);
-    if (copy == NULL) {
-        return NULL;
-    }
-
     while (index < length) {
         copy[index] = path[index];
         index = index + 1;
@@ -43,17 +39,9 @@ struct FileDescriptorTable *create_file_descriptor_table(void) {
     table = (struct FileDescriptorTable *)kmalloc(
         sizeof(struct FileDescriptorTable)
     );
-    if (table == NULL) {
-        return NULL;
-    }
-
     table->entries = (struct FileDescriptor *)kmalloc(
         sizeof(struct FileDescriptor) * FILE_DESCRIPTOR_COUNT
     );
-    if (table->entries == NULL) {
-        kfree(table);
-        return NULL;
-    }
 
     index = 0;
     while (index < FILE_DESCRIPTOR_COUNT) {
@@ -88,16 +76,10 @@ struct FileDescriptorTable *create_file_descriptor_table(void) {
     table->entries[STDERR_FILENO].path = copy_file_path(
         TERMINAL_DEVICE_PATH
     );
-    if (table->entries[STDIN_FILENO].path == NULL ||
-        table->entries[STDOUT_FILENO].path == NULL ||
-        table->entries[STDERR_FILENO].path == NULL) {
-        destroy_file_descriptor_table(table);
-        return NULL;
-    }
     return table;
 }
 
-bool copy_file_descriptor(
+void copy_file_descriptor(
     struct FileDescriptor *source,
     struct FileDescriptor *target
 ) {
@@ -105,9 +87,6 @@ bool copy_file_descriptor(
 
     if (source->path != NULL) {
         path = copy_file_path(source->path);
-        if (path == NULL) {
-            return false;
-        }
     }
 
     kfree(target->path);
@@ -115,7 +94,6 @@ bool copy_file_descriptor(
     target->flags = source->flags;
     target->offset = source->offset;
     target->path = path;
-    return true;
 }
 
 struct FileDescriptorTable *inherit_file_descriptors(
@@ -124,18 +102,11 @@ struct FileDescriptorTable *inherit_file_descriptors(
     struct FileDescriptorTable *copy = create_file_descriptor_table();
     int index = 0;
 
-    if (copy == NULL) {
-        return NULL;
-    }
-
     while (index < FILE_DESCRIPTOR_COUNT) {
-        if (!copy_file_descriptor(
-                source->entries + index,
-                copy->entries + index
-            )) {
-            destroy_file_descriptor_table(copy);
-            return NULL;
-        }
+        copy_file_descriptor(
+            source->entries + index,
+            copy->entries + index
+        );
         index = index + 1;
     }
     return copy;
@@ -205,8 +176,6 @@ int duplicate_file_descriptor(struct Dup2Request *request) {
     }
 
     target = table->entries + request->new_file_descriptor;
-    if (!copy_file_descriptor(source, target)) {
-        return -1;
-    }
+    copy_file_descriptor(source, target);
     return request->new_file_descriptor;
 }

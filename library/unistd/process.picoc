@@ -40,7 +40,7 @@ bool unload(int pid) {
     return invoke_syscall(SYSCALL_UNLOAD_PROCESS, pid);
 }
 
-void list(void) {
+void list_processes(void) {
     invoke_syscall(SYSCALL_LIST_PROCESSES, 0);
 }
 

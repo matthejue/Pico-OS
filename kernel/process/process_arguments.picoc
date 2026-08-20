@@ -6,12 +6,17 @@ bool process_argument_is_space(int value) {
     return value == ' ' || value == '\t';
 }
 
-// Counts the space- or tab-separated argument tokens in the input string
+bool process_argument_is_quote(int value) {
+    return value == '"' || value == '\'';
+}
+
+// Counts argument tokens while quoted whitespace remains inside a token
 int process_argument_token_count(char *arguments) {
     // Current position in the input argument string
     int index = 0;
-    // Number of whitespace-separated arguments found so far
+    // Number of arguments found so far
     int token_count = 0;
+    char quote;
 
     if (arguments == NULL) {
         return 0;
@@ -27,9 +32,14 @@ int process_argument_token_count(char *arguments) {
             token_count = token_count + 1;
         }
 
+        quote = 0;
         while (arguments[index] != 0 &&
-               !process_argument_is_space(arguments[index])) {
-            // Moves past the current argument before looking for the next one
+               (quote != 0 || !process_argument_is_space(arguments[index]))) {
+            if (quote == 0 && process_argument_is_quote(arguments[index])) {
+                quote = arguments[index];
+            } else if (arguments[index] == quote) {
+                quote = 0;
+            }
             index = index + 1;
         }
     }
@@ -43,6 +53,7 @@ int process_argument_string_cell_count(char *arguments) {
     int index = 0;
     // Number of cells needed for the separated argument strings
     int string_cells = 0;
+    char quote;
 
     if (arguments == NULL) {
         return 0;
@@ -55,13 +66,19 @@ int process_argument_string_cell_count(char *arguments) {
         }
 
         if (arguments[index] != 0) {
-            // Counts the characters copied into this argument
+            quote = 0;
             while (arguments[index] != 0 &&
-                   !process_argument_is_space(arguments[index])) {
-                string_cells = string_cells + 1;
+                   (quote != 0 || !process_argument_is_space(arguments[index]))) {
+                if (quote == 0 && process_argument_is_quote(arguments[index])) {
+                    quote = arguments[index];
+                } else if (arguments[index] == quote) {
+                    quote = 0;
+                } else {
+                    string_cells = string_cells + 1;
+                }
                 index = index + 1;
             }
-            // Each copied argument needs a trailing '\0' character
+            // Each argument needs a trailing '\0' character
             string_cells = string_cells + 1;
         }
     }
@@ -131,6 +148,7 @@ void store_process_arguments(
     int environment_string_cells = 0;
     // Current position in the original argument string
     int source_index = 0;
+    char quote;
 
     // Counts the arguments, environment strings, and cells needed for the
     // initial process argument layout
@@ -182,11 +200,19 @@ void store_process_arguments(
             argv[argument_index] = string_target;
             argument_index = argument_index + 1;
 
-            // Copies one whitespace-separated argument into process memory
+            quote = 0;
             while (arguments[source_index] != 0 &&
-                   !process_argument_is_space(arguments[source_index])) {
-                *string_target = arguments[source_index];
-                string_target = string_target + 1;
+                   (quote != 0 ||
+                    !process_argument_is_space(arguments[source_index]))) {
+                if (quote == 0 &&
+                    process_argument_is_quote(arguments[source_index])) {
+                    quote = arguments[source_index];
+                } else if (arguments[source_index] == quote) {
+                    quote = 0;
+                } else {
+                    *string_target = arguments[source_index];
+                    string_target = string_target + 1;
+                }
                 source_index = source_index + 1;
             }
 
@@ -227,9 +253,6 @@ bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
         file_descriptors = inherit_file_descriptors(
             current_process()->file_descriptors
         );
-        if (file_descriptors == NULL) {
-            return false;
-        }
         destroy_file_descriptor_table(process->file_descriptors);
         process->file_descriptors = file_descriptors;
     }

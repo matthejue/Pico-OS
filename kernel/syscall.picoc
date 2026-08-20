@@ -113,6 +113,10 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
         return unlink_host_file((char *)argument);
     } else if (syscall_number == SYSCALL_RMDIR) {
         return remove_host_directory((char *)argument);
+    } else if (syscall_number == SYSCALL_MOVE) {
+        return move_host_path((struct MoveRequest *)argument);
+    } else if (syscall_number == SYSCALL_TOUCH) {
+        return touch_host_file((char *)argument);
     } else if (syscall_number == SYSCALL_PROCESS_HEAP_FULL) {
         handle_process_heap_full_exception();
         return 1;
