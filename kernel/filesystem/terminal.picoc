@@ -19,7 +19,6 @@ void initialize_terminal(void) {
     terminal.input_waiters.tail = NULL;
     terminal.pending_read_buffer = NULL;
     terminal.pending_read_count = 0;
-    terminal.pending_character_read = false;
 }
 
 struct Terminal *kernel_terminal(void) {
@@ -76,7 +75,6 @@ int begin_terminal_read(
     struct Terminal *terminal,
     char *buffer,
     int count,
-    bool character_read,
     int *caller_context
 ) {
     int uart_interrupt_index;
@@ -96,16 +94,12 @@ int begin_terminal_read(
             uart_interrupt_index,
             uart_interrupt_priority
         );
-        if (character_read) {
-            return pop_terminal_byte(terminal);
-        }
         // Copies directly into the current read request because it did not wait
         return copy_terminal_bytes(terminal, buffer, count);
     }
 
     terminal->pending_read_buffer = buffer;
     terminal->pending_read_count = count;
-    terminal->pending_character_read = character_read;
     enqueue_current_process_on_wait_queue(&(terminal->input_waiters));
     interrupt_controller_assign_device(
         INTERRUPT_DEVICE_UART,
@@ -114,16 +108,6 @@ int begin_terminal_read(
     );
     dispatcher_switch_from_context(caller_context);
     return 1;
-}
-
-int read_stdin_character(int *caller_context) {
-    return begin_terminal_read(
-        kernel_terminal(),
-        NULL,
-        1,
-        true,
-        caller_context
-    );
 }
 
 void complete_pending_terminal_read(
@@ -136,21 +120,16 @@ void complete_pending_terminal_read(
         return;
     }
 
-    if (terminal->pending_character_read) {
-        result = pop_terminal_byte(terminal);
-    } else {
-        // Uses the request buffer saved before the waiting process was suspended
-        result = copy_terminal_bytes(
-            terminal,
-            terminal->pending_read_buffer,
-            terminal->pending_read_count
-        );
-    }
+    // Uses the request buffer saved before the waiting process was suspended
+    result = copy_terminal_bytes(
+        terminal,
+        terminal->pending_read_buffer,
+        terminal->pending_read_count
+    );
 
     process->activation.acc = result;
     terminal->pending_read_buffer = NULL;
     terminal->pending_read_count = 0;
-    terminal->pending_character_read = false;
     wakeup_wait_queue(&(terminal->input_waiters));
 }
 

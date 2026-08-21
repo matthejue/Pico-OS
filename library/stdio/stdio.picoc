@@ -25,7 +25,8 @@ void send_byte_over_uart(int value) {
 int receive_byte_over_uart(void) {
     int value = 0;
 
-    asm("LOADI ACC 1"); // SYSCALL_RECEIVE_BYTE_OVER_UART
+    // Supports PicoC-Compiler tests linked with isrs.reti without PicoOS
+    asm("LOADI ACC 1"); // Legacy isrs.reti receive-byte syscall
     asm("INT 0");
     asm("STOREIN BAF ACC 0");
     return value;
@@ -54,6 +55,8 @@ void prepare_standard_streams(void) {
     standard_input_pointer = &standard_input_stream;
     standard_output_pointer = &standard_output_stream;
     standard_error_pointer = &standard_error_stream;
+    // Detects PicoOS so compiler tests with isrs.reti can use legacy UART I/O
+    // without linking and booting the complete kernel
     standard_streams_use_file_descriptors = invoke_stdio_syscall(
         SYSCALL_FILE_DESCRIPTORS_AVAILABLE,
         0
@@ -64,6 +67,13 @@ void prepare_standard_streams(void) {
         file_stream_used[index] = false;
         index = index + 1;
     }
+}
+
+bool standard_stream_uses_legacy_uart(FILE *stream, int file_descriptor) {
+    // Keeps stdio usable in PicoC-Compiler tests linked with isrs.reti
+    // without linking and booting the complete kernel
+    return !standard_streams_use_file_descriptors &&
+           stream->file_descriptor == file_descriptor;
 }
 
 void initialize_standard_streams(void) {
@@ -170,6 +180,29 @@ int fclose(FILE *stream) {
     return result;
 }
 
+int fgetc(FILE *stream) {
+    struct IoRequest request;
+    char value;
+
+    prepare_standard_streams();
+    if (stream == NULL) {
+        return -1;
+    }
+
+    if (standard_stream_uses_legacy_uart(stream, STDIN_FILENO)) {
+        return receive_byte_over_uart();
+    }
+
+    request.file_descriptor = stream->file_descriptor;
+    request.buffer = &value;
+    request.count = 1;
+    request.show_loading_bar = false;
+    if (invoke_stdio_syscall(SYSCALL_READ, (int)&request) != 1) {
+        return -1;
+    }
+    return value & 255;
+}
+
 int fputc(int character, FILE *stream) {
     struct IoRequest request;
     char value = character;
@@ -179,8 +212,7 @@ int fputc(int character, FILE *stream) {
         return -1;
     }
 
-    if (!standard_streams_use_file_descriptors &&
-        stream->file_descriptor == STDOUT_FILENO) {
+    if (standard_stream_uses_legacy_uart(stream, STDOUT_FILENO)) {
         send_byte_over_uart(character);
         return character & 255;
     }
@@ -200,6 +232,7 @@ int fputs(char *text, FILE *stream) {
     int length = 0;
     int index;
 
+    prepare_standard_streams();
     if (text == NULL || stream == NULL) {
         return -1;
     }
@@ -207,21 +240,20 @@ int fputs(char *text, FILE *stream) {
         length = length + 1;
     }
 
-    if (standard_streams_use_file_descriptors ||
-        stream->file_descriptor != STDOUT_FILENO) {
-        request.file_descriptor = stream->file_descriptor;
-        request.buffer = text;
-        request.count = length;
-        request.show_loading_bar = false;
-        return invoke_stdio_syscall(SYSCALL_WRITE, (int)&request);
+    if (standard_stream_uses_legacy_uart(stream, STDOUT_FILENO)) {
+        index = 0;
+        while (index < length) {
+            send_byte_over_uart(text[index]);
+            index = index + 1;
+        }
+        return length;
     }
 
-    index = 0;
-    while (index < length) {
-        send_byte_over_uart(text[index]);
-        index = index + 1;
-    }
-    return length;
+    request.file_descriptor = stream->file_descriptor;
+    request.buffer = text;
+    request.count = length;
+    request.show_loading_bar = false;
+    return invoke_stdio_syscall(SYSCALL_WRITE, (int)&request);
 }
 
 int write_decimal(FILE *stream, int value) {
