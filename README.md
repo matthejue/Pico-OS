@@ -1983,7 +1983,6 @@ struct Terminal {
     struct wait_queue input_waiters;
     char *pending_read_buffer;
     int pending_read_count;
-    bool pending_character_read;
 };
 ```
 
@@ -1996,7 +1995,6 @@ struct Terminal {
 | `input_waiters` | Embedded FIFO queue of blocked reader PCBs |
 | `pending_read_buffer` | Pointer into blocked input owner’s process memory |
 | `pending_read_count` | Maximum requested byte count |
-| `pending_character_read` | Single-character syscall versus buffered `read()` |
 
 The PicoC compiler does not implement usable `extern` variable declarations,
 so other kernel files cannot declare `terminal` directly. `kernel_terminal()`
@@ -2011,7 +2009,7 @@ release tree also contains `binary/device/terminal.dev` as a visible dummy
 device marker; it stores no terminal data and is not the implementation.
 
 If the ring is empty, `begin_terminal_read()` briefly disables UART delivery
-to prevent a lost wakeup, stores buffer/count/kind in the terminal, enqueues
+to prevent a lost wakeup, stores buffer/count in the terminal, enqueues
 the current PCB on `input_waiters`, restores UART routing, and dispatches. A
 later UART ISR copies bytes, stores the result in `process->activation.acc`,
 clears pending state, and wakes the reader.
@@ -2061,8 +2059,7 @@ sequenceDiagram
 | `pop_terminal_byte(struct Terminal *terminal)` | Byte | Advances head and decrements count |
 | `copy_terminal_bytes(struct Terminal *terminal, char *buffer, int count)` | Count | Pops bytes into process buffer |
 | `enqueue_terminal_byte(struct Terminal *terminal, int value)` | `void` | Inserts at tail; may discard oldest |
-| `begin_terminal_read(struct Terminal *terminal, char *buffer, int count, bool character_read, int *caller_context)` | Immediate or later result | Reads ring or fills pending fields, queues PCB, saves activation, dispatches |
-| `read_stdin_character(int *caller_context)` | Character | Uses singleton terminal in character mode |
+| `begin_terminal_read(struct Terminal *terminal, char *buffer, int count, int *caller_context)` | Immediate or later result | Reads ring or fills pending fields, queues PCB, saves activation, dispatches |
 | `complete_pending_terminal_read(struct Process *process, struct Terminal *terminal)` | `void` | Internal: copies available input, writes saved `activation.acc`, clears pending fields, wakes reader |
 | `handle_uart_interrupt(void)` | `void` | Acknowledges byte, signals target or mutates terminal/reader PCB |
 
@@ -2435,12 +2432,17 @@ one-character pushback slot.
 | `FILE *standard_input/output/error(void)` | Addresses of the three process-global stream objects | Syscall 20 only on lazy first preparation |
 | `FILE *fopen(char *path, char *mode)` | One of five stream slots or `NULL`; supports `r`, `w`, `a`, and `+` | 15, `OpenRequest` after mode-to-flag conversion |
 | `int fclose(FILE *stream)` | Closes descriptor and frees its stream slot | 18, descriptor directly |
+| `int fgetc(FILE *stream)` | Read character or `-1` | 16 with `IoRequest`; standalone stdin may use legacy UART syscall 1 |
 | `int fputc(int character, FILE *stream)` | Written character or `-1` | 17 with `IoRequest`; standalone stdout may use direct UART syscall 0 |
 | `int fputs(char *text, FILE *stream)` | Written count or `-1` | 17 with `IoRequest`, or repeated syscall 0 in fallback mode |
 | `int fprintf(FILE *stream, char *format, ...)` | Written count or `-1` | Formatting is userspace; output reduces to `fputc()`/`fputs()` |
 | `int printf(char *format, ...)` | Written count or `-1` to `stdout` | Same as `fprintf()` |
-| `int scanf(char *format, ...)` | Number of assigned arguments | Input characters use syscall 1 through `receive_byte_over_uart()` |
-| `int receive_byte_over_uart(void)` | One terminal character, blocking if necessary | Syscall 1; kernel uses the global terminal pending-read state |
+| `int scanf(char *format, ...)` | Number of assigned arguments | Input reduces to `fgetc(stdin)` |
+
+The legacy UART fallbacks are only for PicoC-Compiler tests linked with
+`isrs.reti`, allowing those tests to use `printf()` and `scanf()` without
+linking and booting the complete PicoOS kernel. PicoOS detects descriptor
+support through syscall 20, then uses descriptor-backed standard I/O.
 
 Formatting supports `%d`, `%c`, `%s`, and `%%`; scanning supports `%d`, `%c`,
 `%s`, literal characters, and whitespace matching. Variadic values are read

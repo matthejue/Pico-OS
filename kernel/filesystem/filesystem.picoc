@@ -152,7 +152,6 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
             kernel_terminal(),
             request->buffer,
             request->count,
-            false,
             caller_context
         );
     }

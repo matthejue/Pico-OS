@@ -1,0 +1,3 @@
+load test/stdio_scanf/launcher.bin
+run 3
+poweroff.bin
