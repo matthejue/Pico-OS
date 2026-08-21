@@ -14,7 +14,6 @@ struct Terminal {
     struct wait_queue input_waiters;
     char *pending_read_buffer;
     int pending_read_count;
-    bool pending_character_read;
 };
 
 void initialize_terminal(void);
@@ -31,8 +30,6 @@ int begin_terminal_read(
     struct Terminal *terminal,
     char *buffer,
     int count,
-    bool character_read,
     int *caller_context
 );
-int read_stdin_character(int *caller_context);
 void handle_uart_interrupt(void);

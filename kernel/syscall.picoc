@@ -4,7 +4,6 @@
 #include "filesystem/file_descriptor.header"
 #include "filesystem/filesystem.header"
 #include "filesystem/host_filesystem.header"
-#include "filesystem/terminal.header"
 #include "kernel.header"
 #include "process.header"
 #include "process_arguments.header"
@@ -13,14 +12,11 @@
 #include "signal.header"
 
 void send_byte_over_uart(int value);
-int receive_byte_over_uart(void);
 
 int handle_syscall(int syscall_number, int argument, int *caller_context) {
     if (syscall_number == SYSCALL_SEND_BYTE_OVER_UART) {
         send_byte_over_uart(argument);
         return 1;
-    } else if (syscall_number == SYSCALL_RECEIVE_BYTE_OVER_UART) {
-        return read_stdin_character(caller_context);
     } else if (syscall_number == SYSCALL_SHUTDOWN) {
         shutdown();
         return 1;

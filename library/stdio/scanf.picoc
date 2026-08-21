@@ -19,7 +19,7 @@ int read_input(void) {
         return unread_input;
     }
 
-    return receive_byte_over_uart();
+    return fgetc(stdin);
 }
 
 void unread(int value) {
