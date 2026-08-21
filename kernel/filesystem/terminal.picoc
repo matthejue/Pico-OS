@@ -99,6 +99,7 @@ int begin_terminal_read(
         if (character_read) {
             return pop_terminal_byte(terminal);
         }
+        // Copies directly into the current read request because it did not wait
         return copy_terminal_bytes(terminal, buffer, count);
     }
 
@@ -138,6 +139,7 @@ void complete_pending_terminal_read(
     if (terminal->pending_character_read) {
         result = pop_terminal_byte(terminal);
     } else {
+        // Uses the request buffer saved before the waiting process was suspended
         result = copy_terminal_bytes(
             terminal,
             terminal->pending_read_buffer,
