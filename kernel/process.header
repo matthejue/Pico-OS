@@ -59,11 +59,7 @@ struct Process {
     int parent_death_signal;
     int exit_status;
     int stopped_from_state;
-    int pending_signals;
-    int signal_handlers[SIGNAL_COUNT];
-    int signal_restorer;
-    bool handling_signal;
-    struct ActivationRecord signal_saved_activation;
+    bool pending_termination;
 };
 
 void initialize_process_table(void);

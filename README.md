@@ -732,7 +732,7 @@ PCB nodes.
 | Process-list head/tail/current/PID counter | Kernel `.data` globals | Static | `first_process()`, `current_process()`, `find_process_by_pid()` | Whole kernel run |
 | One `struct Process` PCB | Kernel heap | `kmalloc()` | Linked from `process_list_head` | Load until removal/reaping |
 | Process image: code, data, userspace heap, stack | Process-memory arena | `pmalloc()` | PCB `base_address` and absolute pointers | Load until PCB removal |
-| Activation and saved signal activation | Embedded in PCB | Part of PCB | `process->activation` | Same as PCB |
+| Process activation | Embedded in PCB | Part of PCB | `process->activation` | Same as PCB |
 | Binary path and working directory | Kernel heap | `kmalloc()` copies | PCB pointers | Same as PCB, replaceable directory |
 | File-descriptor table and entry array | Kernel heap | `kmalloc()` | `current_process()->file_descriptors` | Same as PCB |
 | Regular-file descriptor path | Kernel heap | `kmalloc()` copy | Descriptor `path` | Close, replacement, or PCB removal |
@@ -872,8 +872,8 @@ int handle_syscall(int number, int argument, int *caller_context) {
 
 Immediate syscalls restore registers, place the C return value in `ACC`,
 restore the process boundary, and execute `RTI`. Blocking, yielding, exiting,
-and signal restoration may save or replace the activation and dispatch another
-process instead.
+and deferred termination may save or replace the activation and dispatch
+another process instead.
 
 | Selectors | Kernel subsystem reached |
 | --- | --- |
@@ -883,13 +883,13 @@ process instead.
 | 15–20 | Open/read/write/close/seek and descriptor availability |
 | 21–23 | Shared-memory open, map, and unlink |
 | 24–25 | Descriptor `dup2` and test-only process reset |
-| 26–30 | Signal install/send/return, parent-death control, and foreground/input owner |
+| 26–30 | Reserved 26/28, signal send at 27, parent-death control, and foreground/input owner |
 | 31 | Userspace heap-exhaustion exception path |
 | 32–39 | Working-directory, directory-list/create, file unlink, directory removal, move, and touch |
 
 Multi-argument calls use stack-local request structures such as
-`LoadProcessRequest`, `RunProcessRequest`, `WaitPidRequest`, `SignalRequest`,
-`KillRequest`, `ShmOpenRequest`, `OpenRequest`, `IoRequest`, and
+`LoadProcessRequest`, `RunProcessRequest`, `WaitPidRequest`, `KillRequest`,
+`ShmOpenRequest`, `OpenRequest`, `IoRequest`, and
 `SeekRequest`. The kernel reads them through the absolute pointer in `IN1`.
 They are not persistent kernel objects unless a subsystem explicitly copies a
 referenced value, such as a path or shared-memory name.
@@ -1072,10 +1072,6 @@ These are the RETI registers required to resume a process.
 registers. It is not a pointer to a stack frame and is not allocated
 separately.
 
-Each PCB also embeds `signal_saved_activation`. A custom signal handler copies
-the normal activation there before changing the normal activation’s `sp`.
-`sigreturn` later copies it back.
-
 ## 5.3 Process control block
 
 The current PCB layout is:
@@ -1103,11 +1099,7 @@ struct Process {
     int parent_death_signal;
     int exit_status;
     int stopped_from_state;
-    int pending_signals;
-    int signal_handlers[SIGNAL_COUNT];
-    int signal_restorer;
-    bool handling_signal;
-    struct ActivationRecord signal_saved_activation;
+    bool pending_termination;
 };
 ```
 
@@ -1132,11 +1124,7 @@ struct Process {
 | `parent_death_signal` | Signal inherited at creation and sent when the parent terminates; zero disables it |
 | `exit_status` | Status retained while the process is a zombie |
 | `stopped_from_state` | Remembers whether `SIGTSTP` interrupted runnable or blocked state |
-| `pending_signals` | Bit set; repeated equal signals collapse into one bit |
-| `signal_handlers[]` | User addresses or default/ignore sentinels, embedded in the PCB |
-| `signal_restorer` | User restorer address used after a custom handler |
-| `handling_signal` | Prevents normal nested custom handlers |
-| `signal_saved_activation` | Embedded pre-handler CPU state |
+| `pending_termination` | Whether termination is deferred until the running process leaves its interrupt-return path |
 
 The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers;
@@ -1212,7 +1200,7 @@ the loader does not allocate code, heap, and stack as separate blocks.
 | State | Meaning | Typical transition |
 | --- | --- | --- |
 | `NEW` | Image and PCB exist but initial run state is incomplete | `load_process()` |
-| `READY` | Eligible for the scheduler | Run setup, queue wakeup, or signal wakeup |
+| `READY` | Eligible for the scheduler | Run setup, queue wakeup, or `SIGCONT` |
 | `RUNNING` | Activation is loaded into the CPU | Dispatcher |
 | `BLOCKED` | PCB is linked into one wait queue | Terminal read, `waitpid()`, or `sleep()` |
 | `STOPPED` | Suspended by `SIGTSTP` | Signal subsystem |
@@ -1225,7 +1213,7 @@ stateDiagram-v2
     READY --> RUNNING: dispatcher
     RUNNING --> READY: timer or yield
     RUNNING --> BLOCKED: waitpid, sleep, or empty stdin
-    BLOCKED --> READY: wakeup, input, or caught signal
+    BLOCKED --> READY: wakeup or input
     READY --> STOPPED: SIGTSTP
     RUNNING --> STOPPED: SIGTSTP
     BLOCKED --> STOPPED: SIGTSTP remembers BLOCKED
@@ -1251,10 +1239,10 @@ table. The parent PID and working directory, in contrast, are established when
 the image is loaded.
 
 Termination first handles children, records status, changes the PCB to
-`ZOMBIE`, wakes waiting parents, and sends `SIGCHLD`. An orphan or a child
-whose parent was already waiting can be removed immediately. Otherwise the
-zombie retains its PCB, image, descriptor table, paths, and attachments until
-the parent collects it with `waitpid()`.
+`ZOMBIE`, and wakes waiting parents. An orphan or a child whose parent was
+already waiting can be removed immediately. Otherwise the zombie retains its
+PCB, image, descriptor table, paths, and attachments until the parent collects
+it with `waitpid()`.
 
 Final removal unlinks the PCB from a wait queue and process list, releases
 shared-memory attachments, calls `pfree(base_address)`, destroys the descriptor
@@ -1274,7 +1262,7 @@ table, and frees PCB-owned strings and the PCB with `kfree()`.
 | `remove_process(struct Process *process)` | `void` | Internal final destructor for queues, list, image, attachments, table, strings, and PCB |
 | `orphan_and_signal_children(struct Process *parent)` | `void` | Clears matching child parent PIDs, removes zombie children, and sends configured parent-death signals |
 | `wake_parent_waiting_for_process(struct Process *process, int status)` | `void` | Writes status to the matching parent waiter, clears its pointer, and drains the process's waiter queue |
-| `terminate_process(struct Process *process, int status)` | `void` | Orphans/signals children, stores status, makes zombie, wakes waiters, sends `SIGCHLD`, may remove |
+| `terminate_process(struct Process *process, int status)` | `void` | Orphans/signals children, stores status, makes zombie, wakes waiters, and may remove the process |
 | `exit_process(int status)` | Does not return normally | Terminates current PCB and dispatches |
 | `unload_process_by_pid(int pid)` | Success | Terminates/removes a non-running target |
 | `wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context)` | Immediate-completion flag | Collects status or stores status pointer and blocks caller on child queue |
@@ -1427,16 +1415,12 @@ a state change in another child must not complete the wrong wait.
 
 ## 6.3 Signals inside the PCB
 
-Signal state is not stored in a global signal table. Almost all of it is
-embedded in each PCB:
+Signals have fixed kernel actions and cannot be caught or ignored. The small
+amount of per-process signal state is embedded in each PCB:
 
 | PCB field | Role |
 | --- | --- |
-| `pending_signals` | Integer bit set; lower-numbered signals are selected first |
-| `signal_handlers[SIGNAL_COUNT]` | Default, ignore, or user function address |
-| `signal_restorer` | Userspace return stub |
-| `handling_signal` | Prevents normal handler nesting |
-| `signal_saved_activation` | Complete pre-handler CPU state |
+| `pending_termination` | Whether termination is deferred while the target is the running process |
 | `stopped_from_state` | State reconsidered on `SIGCONT` |
 | `parent_death_signal` | Signal delivered when the parent terminates |
 
@@ -1444,31 +1428,40 @@ The subsystem also has global `foreground_process_id` and
 `terminal_input_process_id` integers in kernel `.data`. They are not PCB
 pointers; lookup validates that the process still exists.
 
-Five signals are implemented: `SIGKILL`, `SIGTERM`, `SIGCHLD`, `SIGCONT`, and
-`SIGTSTP`. `SIGKILL` cannot be caught or ignored. `SIGCHLD` and `SIGCONT` are
-ignored by default; `SIGTSTP` stops; other default actions terminate.
+Three signals are implemented: `SIGKILL`, `SIGCONT`, and `SIGTSTP`.
+`SIGKILL` terminates, `SIGTSTP` stops, and `SIGCONT` resumes a stopped process.
+Signal 0 remains an existence probe for `kill()` and performs no action.
 
-Sending a custom-handled signal sets one bit and, if necessary, removes a
-blocked process from its queue, sets saved `ACC` to zero, and makes it ready.
-Repeated delivery of the same pending signal does not create multiple records.
-Default termination of the currently `RUNNING` PCB is also first represented
-as a pending bit, because freeing the active interrupt-return context would be
-unsafe; the dispatcher performs the termination before the next restore.
+| Number | Name | Kernel action | Reported status/state |
+| ---: | --- | --- | --- |
+| 0 | Probe | Validates that a non-zombie PID exists | No change |
+| 9 | `SIGKILL` | Terminates the target | Exit status 137 |
+| 18 | `SIGCONT` | Resumes a stopped target | `READY`, or `BLOCKED` if its original wait is still active |
+| 20 | `SIGTSTP` | Stops the target | `STOPPED`; waiters receive `SIGNAL_STOPPED_STATUS` |
 
-Before dispatch, `prepare_process_signal()` inspects pending bits. A default
-action can terminate the PCB. A custom action copies the activation and builds
-this process-stack frame:
+`signal_number_is_valid()` compares against those three named constants
+explicitly. A numeric value in a gap between them is not accepted merely
+because it is below `SIGTSTP`. Signal 0 is handled separately by
+`send_signal_by_pid()` because it performs lookup without delivery.
 
-| Cell relative to new free `SP` | Value |
-| ---: | --- |
-| `+1` | Handler address minus one, consumed by `RTI` |
-| `+2` | Signal restorer address |
-| `+3` | Signal number argument |
+When `SIGTSTP` changes a PCB to `STOPPED`, the prior state is retained in
+`stopped_from_state`. The child-owned waiter queue is drained and each waiting
+process receives the stopped status through its saved `waiting_status_ptr`.
+`SIGCONT` returns an ordinary stopped process to `READY`; a process that was
+blocked and is still linked to its original wait queue returns to `BLOCKED`
+instead, because continuing it does not satisfy that blocking operation.
 
-The next `RTI` enters the user handler. The restorer invokes `sigreturn`; the
-kernel restores `signal_saved_activation`, clears `handling_signal`, and
-redispatches. Normal custom handlers are not nested, although `SIGKILL` is
-still honored.
+Termination of the currently `RUNNING` PCB sets `pending_termination`, because
+freeing the active interrupt-return context would be unsafe. Before a PCB is
+restored, `prepare_process_termination()` clears that flag and terminates the
+process through `kill_process()`, causing the dispatcher to select another
+PCB. `kill_process()` owns the fixed `SIGNAL_KILLED_STATUS`; the more general
+`terminate_process(process, status)` still accepts a status because normal
+exit, exceptions, and unloading use different values. Other targets can be
+terminated immediately; stop and continue actions update their state directly.
+This flag is only a safe-destruction handoff to the dispatcher, not a general
+queue: signal delivery never copies or replaces the process activation and
+never enters userspace code.
 
 ```mermaid
 sequenceDiagram
@@ -1476,26 +1469,20 @@ sequenceDiagram
     participant K as Kernel signal code
     participant P as Target PCB
     participant D as Dispatcher
-    participant H as User handler
-    participant R as signal_restorer
 
     S->>K: kill(pid, signal) or kernel-generated signal
-    K->>P: Apply default action or set pending bit
-    opt caught signal targets a BLOCKED process
-        K->>P: Remove from wait queue, set saved ACC=0, make READY
+    alt target is currently RUNNING and must terminate
+        K->>P: Set pending_termination
+        D->>K: prepare_process_termination(P)
+        K->>P: Terminate safely before restore
+    else other target or stop/continue action
+        K->>P: Terminate or update process state immediately
     end
-    D->>K: prepare_process_signal(P)
-    K->>P: Save activation and build handler stack frame
-    D->>H: Restore P and RTI into handler
-    H->>R: Normal function return
-    R->>K: syscall 28 / sigreturn
-    K->>P: Restore signal_saved_activation
-    K->>D: Redispatch restored process
 ```
 
 Raw-terminal `Ctrl+C` and `Ctrl+Z` arrive as UART bytes 3 and 26. The UART ISR
 consumes them before ring-buffer insertion and resolves
-`foreground_process_id`; byte 3 sends `SIGTERM`, while byte 26 sends
+`foreground_process_id`; byte 3 sends `SIGKILL`, while byte 26 sends
 `SIGTSTP`. The shell changes this global before and after foreground waiting,
 so background work does not receive prompt-time terminal signals.
 
@@ -1503,15 +1490,12 @@ so background work does not receive prompt-time terminal signals.
 
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
-| `install_signal_handler(struct SignalRequest *request)` | Previous handler or `-1` | Changes current PCB handler entry and restorer |
 | `send_signal_by_pid(struct KillRequest *request)` | 0 or `-1` | Finds target; signal 0 only checks existence |
-| `send_signal_to_process(struct Process *process, int signal_number)` | `void` | Continues, stops, terminates, ignores, or sets a pending bit |
-| `queue_signal_handler(struct Process *process, int signal_number)` | `void` | Internal: sets bit and wakes a blocked target |
+| `send_signal_to_process(struct Process *process, int signal_number)` | `void` | Continues, stops, terminates, or defers running-target termination |
+| `kill_process(struct Process *process)` | `void` | Calls the general termination path with the fixed killed status |
 | `stop_process(struct Process *process)` | `void` | Saves prior state, changes to `STOPPED`, reports to waiters |
 | `continue_process(struct Process *process)` | `void` | Restores `BLOCKED` if still queued, otherwise changes to `READY` |
-| `prepare_process_signal(struct Process *process)` | Dispatchable flag | Consumes next bit; may terminate or prepare handler activation |
-| `begin_signal_handler(struct Process *process, int signal_number)` | `void` | Copies activation, writes handler frame, changes activation `sp` |
-| `restore_signal_context(void)` | Does not return normally | Restores activation, clears handling, makes ready, dispatches |
+| `prepare_process_termination(struct Process *process)` | Dispatchable flag | Applies deferred termination and reports whether the PCB remains dispatchable |
 | `set_parent_death_signal(struct PrctlRequest *request)` | 0 or `-1` | Changes current PCB parent-death setting |
 | `set_foreground_process(int pid)` | 0 or `-1` | Changes foreground/input-owner globals after validating a direct child |
 | `terminal_input_process(void)` | PCB pointer | Resolves input owner or falls back to current PCB |
@@ -1519,7 +1503,11 @@ so background work does not receive prompt-time terminal signals.
 
 When a parent terminates, every direct child gets `parent_pid = 0`. Zombie
 children are removed; live children receive their configured parent-death
-signal. This is part of `terminate_process()`, not a background reaper.
+signal. New processes inherit `parent_death_signal` from their parent, while
+`prctl(PR_SET_PDEATHSIG, 0)` disables it before further inheritance. This is
+part of `terminate_process()`, not a background reaper. Child status itself is
+communicated through the exact-child `waitpid()` queue; there is no separate
+child-exit notification signal.
 
 ## 6.5 Mutexes
 
@@ -1612,9 +1600,9 @@ Timer preemption or `yield()` reaches the dispatcher from `RUNNING`, which
 becomes `READY`.
 
 `dispatcher_start_next_process()` schedules and calls
-`prepare_process_signal()` before running a PCB. Signal preparation can remove
-that PCB, requiring another pass. If all existing processes are blocked, the
-loop waits in kernel context until an interrupt makes one ready.
+`prepare_process_termination()` before running a PCB. Deferred termination can
+remove that PCB, requiring another pass. If all existing processes are
+blocked, the loop waits in kernel context until an interrupt makes one ready.
 
 ## 7.3 Restoring
 
@@ -2192,7 +2180,6 @@ execute `INT 0`. The structures are declared in
 struct LoadProcessRequest { char *path; bool show_loading_bar; };
 struct RunProcessRequest { int pid; char *arguments; char **environment; };
 struct WaitPidRequest { int pid; int *status; };
-struct SignalRequest { int signal_number; int handler; int restorer; };
 struct KillRequest { int pid; int signal_number; };
 struct PrctlRequest { int option; int argument; };
 struct ShmOpenRequest { char *name; size_t size; };
@@ -2235,11 +2222,8 @@ because the caller's stack is suspended.
 | `RunProcessRequest.environment` | Null-terminated array of `NAME=value` pointers | Strings and pointer table are copied into the child's initial stack |
 | `WaitPidRequest.pid` | Exact child PID | `waitpid()` / syscall 10; used to find and validate the child |
 | `WaitPidRequest.status` | Address of caller's status cell | Immediate status destination or copied into the waiting parent's `waiting_status_ptr` while blocked |
-| `SignalRequest.signal_number` | Signal whose disposition changes | `signal()` / syscall 26; selects one PCB `signal_handlers[]` entry |
-| `SignalRequest.handler` | `SIG_DFL`, `SIG_IGN`, or user handler address | Copied into the current PCB |
-| `SignalRequest.restorer` | Address of userspace `signal_restorer` | Copied into PCB `signal_restorer` for handler return |
 | `KillRequest.pid` | Target process | `kill()` / syscall 27; lookup only, not retained |
-| `KillRequest.signal_number` | Signal to deliver; 0 probes existence | May change target state/pending bits, but the request is not retained |
+| `KillRequest.signal_number` | Signal to deliver; 0 probes existence | May change target state or defer termination, but the request is not retained |
 | `PrctlRequest.option` | Currently only `PR_SET_PDEATHSIG` | `prctl()` / syscall 29; selects the supported operation |
 | `PrctlRequest.argument` | Signal number, or 0 to disable | Copied into current PCB `parent_death_signal` |
 | `ShmOpenRequest.name` | Name used in the global registry | `shm_open()` / syscall 21; a new entry receives a `kmalloc()` copy |
@@ -2282,7 +2266,7 @@ foreground-process selection pass the value or pointer directly in `IN1`.
 | `library/sys/wait` | Exact-child `waitpid()` and stopped-status test |
 | `library/schedule` | Voluntary `yield()` |
 | `library/mutex` | Atomic test-and-set mutex with wait queue |
-| `library/signal` | Signal installation and delivery |
+| `library/signal` | Signal delivery through `kill()` |
 | `library/sys/prctl` | Parent-death signal |
 | `library/sys/mman` | Named shared memory |
 | `library/dirent` and `sys/stat` | Directory streams and creation |
@@ -2335,7 +2319,6 @@ becomes `IN1`.
 
 | Function | Return and purpose | Syscall and request |
 | --- | --- | --- |
-| `int signal(int signal_number, sighandler_t handler)` | Previous handler or `SIG_ERR`; installs default, ignore, or a user address | 26, `SignalRequest` including `signal_restorer` |
 | `int kill(int pid, int signal_number)` | 0 or `-1`; signal 0 only probes existence | 27, `KillRequest` |
 | `int prctl(int option, int argument)` | 0 or `-1`; supports `PR_SET_PDEATHSIG` | 29, `PrctlRequest` |
 | `int shm_open(const char *name, size_t size)` | Existing/new shared-memory ID or `-1` | 21, `ShmOpenRequest` |
@@ -2346,14 +2329,17 @@ becomes `IN1`.
 | `void mutex_lock(struct mutex *mutex)` | Acquires lock; contenders block instead of spinning | Uses `testset()` and syscall 11 through `sleep()` |
 | `void mutex_unlock(struct mutex *mutex)` | Clears lock and wakes one contender | Uses syscall 12 through `wakeup()` |
 
+`kill()` builds `KillRequest` as a local in the caller's userspace stack and
+passes its address synchronously to syscall 27. The kernel validates the
+signal and PID during that call and does not retain the request pointer. A
+self-directed `SIGKILL` sets `pending_termination` and returns normally from the
+syscall. At the next timer preemption or voluntary yield, the dispatcher
+consumes that value and does not restore the process again.
+
 `struct mutex` contains a one-cell Boolean and a complete `struct wait_queue`.
 It is normal userspace data, not a kernel allocation. Placing it in a shared
 memory region lets all participating processes see both the lock cell and the
 queue object; the queue still links kernel-owned PCBs.
-
-The naked `signal_restorer()` is another internal bridge. A normal return from
-a user handler enters syscall 28, which restores `signal_saved_activation`
-instead of returning through the temporary handler frame.
 
 ### 10.2.3 Directories
 
@@ -2643,7 +2629,7 @@ kernel-heap table.
 ## 12.2 Startup and main loop
 
 At startup the shell calls `set_foreground_process(0)`, configures
-`prctl(PR_SET_PDEATHSIG, SIGTERM)`, clones its environment, and records its
+`prctl(PR_SET_PDEATHSIG, SIGKILL)`, clones its environment, and records its
 working directory with `getcwd()`. It then repeatedly calls `read_line()`,
 stores nonempty commands in history, and sends them to `eval()`. Only the
 `exit` built-in makes `eval()` return false.
@@ -2765,14 +2751,14 @@ though the library provides `unsetenv()`.
 For a foreground child, the shell gives the child's PID to
 `set_foreground_process()`, waits for exactly that PID, restores terminal
 ownership with PID 0, and stores the returned status in `$?`. `Ctrl+C` becomes
-`SIGTERM`; `Ctrl+Z` becomes `SIGTSTP`. A stopped status is recorded as the
+`SIGKILL`; `Ctrl+Z` becomes `SIGTSTP`. A stopped status is recorded as the
 current `$!` target so `fg` or `bg` can continue it.
 
 A trailing `&` starts the child without waiting and stores the PID in `$!`.
 The shell tracks only one background/stopped PID rather than a job table. A
 background start does not replace `$?`. At shell startup,
-`PR_SET_PDEATHSIG=SIGTERM` is installed on the shell and inherited by children,
-so descendants receive `SIGTERM` if their shell terminates.
+`PR_SET_PDEATHSIG=SIGKILL` is installed on the shell and inherited by children,
+so descendants receive `SIGKILL` if their shell terminates.
 
 ## 12.7 Output redirection
 
@@ -2842,7 +2828,7 @@ change its parent shell's environment, working directory, or descriptor table.
 | `pwd.bin` | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
 | `rm.bin` | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
 | `rmdir.bin` | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
-| `kill.bin` | Sends `SIGTERM` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
+| `kill.bin` | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
 | `poweroff.bin` | Halts PicoOS after validating that there are no operands | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
@@ -2881,9 +2867,9 @@ There is no sorting, long format, filtering, or recursion. `mkdir.bin` has no
 `-p`; `rm.bin` has no force/recursive mode; `rmdir.bin` removes only empty
 directories. All continue through later operands after an individual error.
 
-`kill.bin` accepts `SIGKILL`, `SIGTERM`, `SIGCHLD`, `SIGCONT`, `SIGTSTP`, or a
-number. Signal 0 checks existence without delivery. It yields after success so
-the target can be selected promptly. `poweroff.bin` differs from shell `exit`:
+`kill.bin` accepts `SIGKILL`, `SIGCONT`, `SIGTSTP`, or their numbers. Signal 0
+checks existence without delivery. It yields after success so the target can
+be selected promptly. `poweroff.bin` differs from shell `exit`:
 the former invokes syscall 2 and halts the OS, whereas the latter lets init
 start a new shell.
 
@@ -3063,7 +3049,7 @@ The main deliberate limitations are:
 - non-preemptive kernel scheduling and timer-preempted userspace
 - wait-queue `sleep()` rather than timed sleep
 - exact-child `waitpid()` rather than a general wait interface
-- five signals and one foreground/input owner rather than full job control
+- three fixed-action signals and one foreground/input owner rather than full job control
 - one global terminal with at most one pending input read
 - non-atomic `O_APPEND` positioning when another process or host program writes
   the same host-backed file concurrently

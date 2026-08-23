@@ -68,12 +68,9 @@ void report_foreground_process_status(int pid, int status) {
     if (WIFSTOPPED(status)) {
         action = "stopped";
         signal_name = "SIGTSTP";
-    } else if (status == SIGNAL_EXIT_STATUS_BASE + SIGKILL) {
+    } else if (status == SIGNAL_KILLED_STATUS) {
         action = "terminated";
         signal_name = "SIGKILL";
-    } else if (status == SIGNAL_EXIT_STATUS_BASE + SIGTERM) {
-        action = "terminated";
-        signal_name = "SIGTERM";
     }
 
     if (signal_name != NULL) {
@@ -1143,7 +1140,7 @@ int main(int argc, char **argv) {
     int command_length;
 
     set_foreground_process(0);
-    if (prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
         shell_write_string("error: could not configure shell signals\n");
         return 1;
     }

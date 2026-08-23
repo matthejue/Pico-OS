@@ -5,16 +5,16 @@ Print one or more files.
 cat: test/user_program_error_messages/missing.txt: could not open file
 cat: user: could not open file
 Usage: kill.bin [SIGNAL] PID
-SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+SIGNAL may be 0, SIGKILL, SIGCONT, SIGTSTP, or its number.
 kill: process not found
 kill: process not found
 kill: invalid signal
 Usage: kill.bin [SIGNAL] PID
-SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+SIGNAL may be 0, SIGKILL, SIGCONT, SIGTSTP, or its number.
 kill: invalid process ID
 Usage: kill.bin [SIGNAL] PID
-SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+SIGNAL may be 0, SIGKILL, SIGCONT, SIGTSTP, or its number.
 kill: invalid signal
 Usage: kill.bin [SIGNAL] PID
-SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.
+SIGNAL may be 0, SIGKILL, SIGCONT, SIGTSTP, or its number.
 process with pid 13 created
