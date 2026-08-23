@@ -639,30 +639,24 @@ Relevant commits: `c4f7df0b91b3`, `6fe45d4f365c`, `02e2fb84971d`
 ## Signals, parent relationships, and shell job control
 
 ```c
-void cleanup(int signal_number) {
-    printf("cleanup\n");
-}
-
-signal(SIGTERM, cleanup);
-prctl(PR_SET_PDEATHSIG, SIGTERM);
+prctl(PR_SET_PDEATHSIG, SIGKILL);
 ```
 
-| Signal | Default effect |
+| Signal | Effect |
 | --- | --- |
-| `SIGKILL` | Terminate; cannot be caught or ignored |
-| `SIGTERM` | Terminate; may be caught or ignored |
-| `SIGCHLD` | Notify parent; ignored by default |
+| `SIGKILL` | Terminate |
 | `SIGCONT` | Continue a stopped process |
 | `SIGTSTP` | Stop a process |
 
-Ctrl+C sends `SIGTERM` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
+Signals have fixed kernel actions and cannot be caught or ignored. Ctrl+C sends
+`SIGKILL` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
 and `bg` resume the most recently tracked job with `SIGCONT`. In debugger mode,
 these shortcuts require RETI-Emulator's `(V)iew raw terminal`; its normal
 `(v)iew terminal` keeps host control-key handling active. A configured
 parent-death signal is inherited by later children.
 
-PicoOS defines `SIGKILL`, `SIGTERM`, `SIGCHLD`, `SIGCONT`, and `SIGTSTP`.
-`SIGINT` and `SIGSTOP` are not defined; the terminal uses `SIGTERM` and
+PicoOS defines `SIGKILL`, `SIGCONT`, and `SIGTSTP`.
+`SIGINT` and `SIGSTOP` are not defined; the terminal uses `SIGKILL` and
 `SIGTSTP` for the corresponding interactive actions. The shell reports process
 creation and signal-driven foreground stops or termination on separate lines.
 
@@ -672,9 +666,9 @@ Relevant commit: `068f84d75f19`
 
 | Command | Signal sent |
 | --- | --- |
-| `kill.bin 3` | `SIGTERM` |
+| `kill.bin 3` | `SIGKILL` |
 | `kill.bin SIGKILL 3` | `SIGKILL` |
-| `kill.bin SIGTERM 3` | `SIGTERM` |
+| `kill.bin SIGTSTP 3` | `SIGTSTP` |
 | `kill.bin 0 3` | Check existence without sending a signal |
 
 The optional first argument may name an implemented signal or give its number.

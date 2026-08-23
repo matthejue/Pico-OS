@@ -4,14 +4,9 @@
 #include "../common/stddef.header"
 #include "../common/syscall.header"
 
-#define SIGNAL_DEFAULT_HANDLER 0
-#define SIGNAL_IGNORE_HANDLER 1
-
-int install_signal_handler(struct SignalRequest *request);
 int send_signal_by_pid(struct KillRequest *request);
 void send_signal_to_process(struct Process *process, int signal_number);
-bool prepare_process_signal(struct Process *process);
-void restore_signal_context(void);
+bool prepare_process_termination(struct Process *process);
 int set_parent_death_signal(struct PrctlRequest *request);
 int set_foreground_process(int pid);
 struct Process *terminal_input_process(void);

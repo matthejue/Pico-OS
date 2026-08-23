@@ -39,7 +39,7 @@ void dispatcher_start_next_process(void) {
     // interrupt can make one of them runnable without a separate idle process
     while (first_process() != NULL &&
            (next_process == NULL ||
-            !prepare_process_signal(next_process))) {
+            !prepare_process_termination(next_process))) {
         next_process = scheduler_next_process();
     }
 

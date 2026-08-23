@@ -20,10 +20,6 @@ int parse_signal(char *value) {
 
     if (kill_text_matches(value, "SIGKILL")) {
         return SIGKILL;
-    } else if (kill_text_matches(value, "SIGTERM")) {
-        return SIGTERM;
-    } else if (kill_text_matches(value, "SIGCHLD")) {
-        return SIGCHLD;
     } else if (kill_text_matches(value, "SIGCONT")) {
         return SIGCONT;
     } else if (kill_text_matches(value, "SIGTSTP")) {
@@ -60,13 +56,13 @@ void kill_write_usage(int file_descriptor) {
     );
     command_write(
         file_descriptor,
-        "SIGNAL may be 0, SIGKILL, SIGTERM, SIGCHLD, SIGCONT, SIGTSTP, or its number.\n"
+        "SIGNAL may be 0, SIGKILL, SIGCONT, SIGTSTP, or its number.\n"
     );
 }
 
 int main(int argc, char **argv) {
     int process_id;
-    int signal_number = SIGTERM;
+    int signal_number = SIGKILL;
 
     if (argc == 2 && command_is_help(argv[1])) {
         kill_write_usage(STDOUT_FILENO);
@@ -87,7 +83,10 @@ int main(int argc, char **argv) {
         kill_write_usage(STDERR_FILENO);
         return 1;
     }
-    if (signal_number < 0 || signal_number >= SIGNAL_COUNT) {
+    if (signal_number != 0 &&
+        signal_number != SIGKILL &&
+        signal_number != SIGCONT &&
+        signal_number != SIGTSTP) {
         command_write(STDERR_FILENO, "kill: invalid signal\n");
         kill_write_usage(STDERR_FILENO);
         return 1;
