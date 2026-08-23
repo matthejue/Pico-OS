@@ -2,11 +2,8 @@
 
 // Uses the familiar Unix signal numbers
 #define SIGKILL 9
-#define SIGTERM 15
-#define SIGCHLD 17
 #define SIGCONT 18
 #define SIGTSTP 20
-#define SIGNAL_COUNT 21
 
-#define SIGNAL_EXIT_STATUS_BASE 128
-#define SIGNAL_STOPPED_STATUS (SIGNAL_EXIT_STATUS_BASE + SIGTSTP)
+#define SIGNAL_KILLED_STATUS (128 + SIGKILL)
+#define SIGNAL_STOPPED_STATUS (128 + SIGTSTP)

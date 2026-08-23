@@ -77,7 +77,6 @@ struct Process *create_process(
 ) {
     struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
     struct Process *parent = current_process();
-    int signal_number = 0;
     int stack_pointer = base_address + size - 1;
 
     process->pid = next_process_id;
@@ -129,13 +128,7 @@ struct Process *create_process(
     }
     process->exit_status = 0;
     process->stopped_from_state = PROCESS_STATE_READY;
-    process->pending_signals = 0;
-    while (signal_number < SIGNAL_COUNT) {
-        process->signal_handlers[signal_number] = 0;
-        signal_number = signal_number + 1;
-    }
-    process->signal_restorer = 0;
-    process->handling_signal = false;
+    process->pending_termination = false;
     *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
@@ -308,10 +301,6 @@ void terminate_process(struct Process *process, int status) {
     process->exit_status = status;
     process->state = PROCESS_STATE_ZOMBIE;
     wake_parent_waiting_for_process(process, status);
-    if (parent != NULL) {
-        send_signal_to_process(parent, SIGCHLD);
-    }
-
     // A parent that was already waiting has received the status, while an
     // orphan has nobody that could collect it
     if (parent == NULL || parent_is_waiting) {

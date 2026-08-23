@@ -1,25 +1,8 @@
-// dependencies: ../../library/signal/libsignal.reti_blocks ../../library/schedule/libschedule.reti_blocks
+// dependencies: ../../library/schedule/libschedule.reti_blocks
 
-#include "../../library/signal/signal.header"
 #include "../../library/schedule/schedule.header"
-#include "../../common/stddef.header"
-
-bool continued = false;
-
-void handle_sigcont(int signal_number) {
-    if (signal_number == SIGCONT) {
-        continued = true;
-    }
-}
 
 int main(void) {
-    if (signal(SIGCONT, handle_sigcont) == SIG_ERR) {
-        return 1;
-    }
-
     yield();
-    while (!continued) {
-        yield();
-    }
     return 6;
 }

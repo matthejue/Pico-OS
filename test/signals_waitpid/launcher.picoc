@@ -7,14 +7,6 @@
 #include "../../library/schedule/schedule.header"
 #include "../../common/stddef.header"
 
-int sigchld_count = 0;
-
-void child_exited(int signal_number) {
-    if (signal_number == SIGCHLD) {
-        sigchld_count = sigchld_count + 1;
-    }
-}
-
 int run_and_yield(char *path) {
     int pid = load(path);
 
@@ -30,23 +22,10 @@ int main(void) {
     int status;
 
     pid = run_and_yield(
-        "test/signals_waitpid/sigterm_target.bin"
+        "test/signals_waitpid/endless.bin"
     );
-    kill(pid, SIGTERM);
-    status = waitpid(pid);
-    printf("SIGTERM handler status: %d\n", status);
-
-    if (signal(SIGCHLD, child_exited) == SIG_ERR) {
-        return 1;
-    }
-
-    pid = run_and_yield(
-        "test/signals_waitpid/sigkill_target.bin"
-    );
-    kill(pid, SIGTERM);
+    kill(pid, SIGKILL);
     printf("SIGKILL status: %d\n", waitpid(pid));
-    yield();
-    printf("SIGCHLD delivered: %d\n", sigchld_count);
 
     pid = run_and_yield(
         "test/signals_waitpid/stop_target.bin"

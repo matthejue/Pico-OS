@@ -27,9 +27,7 @@
 #define SYSCALL_SHM_UNLINK 23
 #define SYSCALL_DUP2 24
 #define SYSCALL_RESET_PROCESSES 25
-#define SYSCALL_SIGNAL 26
 #define SYSCALL_KILL 27
-#define SYSCALL_SIGRETURN 28
 #define SYSCALL_PRCTL 29
 #define SYSCALL_SET_FOREGROUND_PROCESS 30
 #define SYSCALL_PROCESS_HEAP_FULL 31
@@ -56,12 +54,6 @@ struct RunProcessRequest {
 struct WaitPidRequest {
     int pid;
     int *status;
-};
-
-struct SignalRequest {
-    int signal_number;
-    int handler;
-    int restorer;
 };
 
 struct KillRequest {
