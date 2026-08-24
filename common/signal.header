@@ -1,9 +1,15 @@
 #pragma once
 
 // Uses the familiar Unix signal numbers
+#define SIGINT 2
 #define SIGKILL 9
 #define SIGCONT 18
+#define SIGSTOP 19
 #define SIGTSTP 20
+#define SIGTTIN 21
 
+#define SIGNAL_INTERRUPTED_STATUS (128 + SIGINT)
 #define SIGNAL_KILLED_STATUS (128 + SIGKILL)
+#define SIGNAL_STOP_STATUS (128 + SIGSTOP)
 #define SIGNAL_STOPPED_STATUS (128 + SIGTSTP)
+#define SIGNAL_TERMINAL_INPUT_STATUS (128 + SIGTTIN)

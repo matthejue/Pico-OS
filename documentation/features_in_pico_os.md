@@ -292,7 +292,8 @@ int status = waitpid(child);
 | Parent calls `waitpid()` later | Status returns to the parent and the child is removed |
 
 `waitpid()` accepts one exact child PID, with no options argument. It returns a
-stopped status for `SIGTSTP`; `WIFSTOPPED(status)` identifies that case.
+signal-specific stopped status for `SIGSTOP`, `SIGTSTP`, or `SIGTTIN`;
+`WIFSTOPPED(status)` identifies all three cases.
 
 Relevant commits: `babb464d0b8a`, `e8104b49736a`, `7f0da4af5dfd`,
 `068f84d75f19`
@@ -644,21 +645,33 @@ prctl(PR_SET_PDEATHSIG, SIGKILL);
 
 | Signal | Effect |
 | --- | --- |
+| `SIGINT` | Terminate |
 | `SIGKILL` | Terminate |
 | `SIGCONT` | Continue a stopped process |
+| `SIGSTOP` | Stop a process |
 | `SIGTSTP` | Stop a process |
+| `SIGTTIN` | Stop a process; generated for a background terminal read |
 
 Signals have fixed kernel actions and cannot be caught or ignored. Ctrl+C sends
-`SIGKILL` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
-and `bg` resume the most recently tracked job with `SIGCONT`. In debugger mode,
+`SIGINT` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
+makes the most recently tracked job the terminal input owner before resuming it
+with `SIGCONT`; `bg` resumes ordinary stopped jobs without transferring input.
+A background process that reads terminal stdin receives `SIGTTIN` and cannot
+continue that pending read until it becomes foreground. New input does not
+automatically choose or continue a stopped reader. The shell's `fg` command
+selects its tracked process, gives it terminal ownership, and sends `SIGCONT`.
+The pending userspace buffer/count remains in that process's PCB, while stopped
+readers are not left in the terminal's active wait queue. In debugger mode,
 these shortcuts require RETI-Emulator's `(V)iew raw terminal`; its normal
 `(v)iew terminal` keeps host control-key handling active. A configured
 parent-death signal is inherited by later children.
 
-PicoOS defines `SIGKILL`, `SIGCONT`, and `SIGTSTP`.
-`SIGINT` and `SIGSTOP` are not defined; the terminal uses `SIGKILL` and
-`SIGTSTP` for the corresponding interactive actions. The shell reports process
-creation and signal-driven foreground stops or termination on separate lines.
+Unix/Linux allows `SIGINT` to be caught and handled but never `SIGKILL`; PicoOS
+does not implement handlers, so both have the same termination effect.
+Unix/Linux similarly makes `SIGSTOP` uncatchable while `SIGTSTP` and `SIGTTIN`
+can normally be caught or ignored; PicoOS gives all three the same stop effect.
+The shell reports process creation and signal-driven foreground stops or
+termination on separate lines.
 
 Relevant commit: `068f84d75f19`
 
@@ -667,11 +680,15 @@ Relevant commit: `068f84d75f19`
 | Command | Signal sent |
 | --- | --- |
 | `kill.bin 3` | `SIGKILL` |
+| `kill.bin SIGINT 3` | `SIGINT` |
 | `kill.bin SIGKILL 3` | `SIGKILL` |
+| `kill.bin SIGSTOP 3` | `SIGSTOP` |
 | `kill.bin SIGTSTP 3` | `SIGTSTP` |
+| `kill.bin SIGTTIN 3` | `SIGTTIN` |
 | `kill.bin 0 3` | Check existence without sending a signal |
 
-The optional first argument may name an implemented signal or give its number.
+The optional first argument may name any implemented signal without a leading
+`-`, or give its number.
 Invalid PIDs, invalid signals, unknown processes, and incorrect argument counts
 print an error and short usage help, then return status 1.
 

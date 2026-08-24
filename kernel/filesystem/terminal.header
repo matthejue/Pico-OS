@@ -12,8 +12,6 @@ struct Terminal {
     int input_tail;
     int input_count;
     struct wait_queue input_waiters;
-    char *pending_read_buffer;
-    int pending_read_count;
 };
 
 void initialize_terminal(void);
@@ -26,6 +24,8 @@ int copy_terminal_bytes(
     int count
 );
 void enqueue_terminal_byte(struct Terminal *terminal, int value);
+void suspend_pending_terminal_read(struct Process *process);
+void resume_pending_terminal_read(struct Process *process);
 int begin_terminal_read(
     struct Terminal *terminal,
     char *buffer,

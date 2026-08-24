@@ -1,5 +1,6 @@
 #include "signal.header"
 #include "process.header"
+#include "filesystem/terminal.header"
 #include "../common/prctl.header"
 #include "../common/signal.header"
 
@@ -10,9 +11,12 @@ int foreground_process_id = 0;
 int terminal_input_process_id = 0;
 
 bool signal_number_is_valid(int signal_number) {
-    return signal_number == SIGKILL ||
+    return signal_number == SIGINT ||
+           signal_number == SIGKILL ||
            signal_number == SIGCONT ||
-           signal_number == SIGTSTP;
+           signal_number == SIGSTOP ||
+           signal_number == SIGTSTP ||
+           signal_number == SIGTTIN;
 }
 
 void notify_process_stopped(struct Process *process) {
@@ -22,20 +26,22 @@ void notify_process_stopped(struct Process *process) {
         waiting_process = process->waiters.head;
         if (waiting_process->waiting_status_ptr != NULL) {
             *(waiting_process->waiting_status_ptr) =
-                SIGNAL_STOPPED_STATUS;
+                128 + process->stop_signal;
         }
         waiting_process->waiting_status_ptr = NULL;
         wakeup_wait_queue(&(process->waiters));
     }
 }
 
-void stop_process(struct Process *process) {
+void stop_process(struct Process *process, int signal_number) {
     if (process->state == PROCESS_STATE_STOPPED ||
         process->state == PROCESS_STATE_ZOMBIE) {
         return;
     }
 
+    process->stop_signal = signal_number;
     process->stopped_from_state = process->state;
+    suspend_pending_terminal_read(process);
     process->state = PROCESS_STATE_STOPPED;
     notify_process_stopped(process);
 }
@@ -43,6 +49,14 @@ void stop_process(struct Process *process) {
 void continue_process(struct Process *process) {
     if (process->state != PROCESS_STATE_STOPPED) {
         return;
+    }
+
+    if (process->pending_terminal_read_buffer != NULL) {
+        if (!process_has_terminal_input(process)) {
+            process->stop_signal = SIGTTIN;
+            return;
+        }
+        resume_pending_terminal_read(process);
     }
 
     if (process->stopped_from_state == PROCESS_STATE_BLOCKED &&
@@ -53,8 +67,8 @@ void continue_process(struct Process *process) {
     }
 }
 
-void kill_process(struct Process *process) {
-    terminate_process(process, SIGNAL_KILLED_STATUS);
+void kill_process(struct Process *process, int signal_number) {
+    terminate_process(process, 128 + signal_number);
 }
 
 void send_signal_to_process(
@@ -71,8 +85,10 @@ void send_signal_to_process(
         continue_process(process);
         return;
     }
-    if (signal_number == SIGTSTP) {
-        stop_process(process);
+    if (signal_number == SIGSTOP ||
+        signal_number == SIGTSTP ||
+        signal_number == SIGTTIN) {
+        stop_process(process, signal_number);
         return;
     }
 
@@ -80,11 +96,11 @@ void send_signal_to_process(
     // termination is deferred until the next dispatch
     if (process == current_process() &&
         process->state == PROCESS_STATE_RUNNING) {
-        process->pending_termination = true;
+        process->pending_termination_signal = signal_number;
         return;
     }
 
-    kill_process(process);
+    kill_process(process, signal_number);
 }
 
 int send_signal_by_pid(struct KillRequest *request) {
@@ -106,11 +122,13 @@ int send_signal_by_pid(struct KillRequest *request) {
 }
 
 bool prepare_process_termination(struct Process *process) {
-    if (!process->pending_termination) {
+    int signal_number = process->pending_termination_signal;
+
+    if (signal_number == 0) {
         return true;
     }
-    process->pending_termination = false;
-    kill_process(process);
+    process->pending_termination_signal = 0;
+    kill_process(process, signal_number);
     return false;
 }
 
@@ -145,6 +163,10 @@ int set_foreground_process(int pid) {
     return 0;
 }
 
+bool process_has_terminal_input(struct Process *process) {
+    return process != NULL && process->pid == terminal_input_process_id;
+}
+
 struct Process *terminal_input_process(void) {
     struct Process *process;
 
@@ -163,7 +185,7 @@ bool handle_terminal_signal_character(int value) {
     int signal_number;
 
     if (value == TERMINAL_INTERRUPT_CHARACTER) {
-        signal_number = SIGKILL;
+        signal_number = SIGINT;
     } else if (value == TERMINAL_STOP_CHARACTER) {
         signal_number = SIGTSTP;
     } else {

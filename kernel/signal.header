@@ -9,5 +9,6 @@ void send_signal_to_process(struct Process *process, int signal_number);
 bool prepare_process_termination(struct Process *process);
 int set_parent_death_signal(struct PrctlRequest *request);
 int set_foreground_process(int pid);
+bool process_has_terminal_input(struct Process *process);
 struct Process *terminal_input_process(void);
 bool handle_terminal_signal_character(int value);

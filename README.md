@@ -945,10 +945,11 @@ void handle_uart_interrupt(void) {
 }
 ```
 
-The ISR acknowledges one byte. `Ctrl+C` and `Ctrl+Z` become foreground-process
-signals. Any other byte enters the global terminal ring; if a process is
-waiting, the handler writes the read result into that PCB’s saved
-`activation.acc` and wakes it.
+The ISR acknowledges one byte. `Ctrl+C` becomes `SIGINT` and `Ctrl+Z` becomes
+`SIGTSTP` for the foreground process. Any other byte enters the global terminal
+ring; if the foreground process is waiting, the handler copies into that
+process's pending read buffer, writes the result into its saved
+`activation.acc`, and wakes it.
 
 ## 4.6 CPU exception path
 
@@ -1098,8 +1099,11 @@ struct Process {
     int parent_pid;
     int parent_death_signal;
     int exit_status;
+    int stop_signal;
     int stopped_from_state;
-    bool pending_termination;
+    int pending_termination_signal;
+    char *pending_terminal_read_buffer;
+    int pending_terminal_read_count;
 };
 ```
 
@@ -1123,8 +1127,10 @@ struct Process {
 | `parent_pid` | PID of the process that loaded this image; zero means no parent |
 | `parent_death_signal` | Signal inherited at creation and sent when the parent terminates; zero disables it |
 | `exit_status` | Status retained while the process is a zombie |
-| `stopped_from_state` | Remembers whether `SIGTSTP` interrupted runnable or blocked state |
-| `pending_termination` | Whether termination is deferred until the running process leaves its interrupt-return path |
+| `stop_signal` | Signal that most recently changed the process to `STOPPED` |
+| `stopped_from_state` | Remembers whether a stop interrupted runnable or blocked state |
+| `pending_termination_signal` | `SIGINT`/`SIGKILL` deferred until the running process leaves its interrupt-return path; zero means none |
+| `pending_terminal_read_buffer`, `pending_terminal_read_count` | Userspace request retained while a terminal read is blocked or interrupted by a stop signal |
 
 The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers;
@@ -1203,7 +1209,7 @@ the loader does not allocate code, heap, and stack as separate blocks.
 | `READY` | Eligible for the scheduler | Run setup, queue wakeup, or `SIGCONT` |
 | `RUNNING` | Activation is loaded into the CPU | Dispatcher |
 | `BLOCKED` | PCB is linked into one wait queue | Terminal read, `waitpid()`, or `sleep()` |
-| `STOPPED` | Suspended by `SIGTSTP` | Signal subsystem |
+| `STOPPED` | Suspended by `SIGSTOP`, `SIGTSTP`, or `SIGTTIN` | Signal subsystem |
 | `ZOMBIE` | Terminated status retained for a parent | `terminate_process()` |
 
 ```mermaid
@@ -1214,9 +1220,9 @@ stateDiagram-v2
     RUNNING --> READY: timer or yield
     RUNNING --> BLOCKED: waitpid, sleep, or empty stdin
     BLOCKED --> READY: wakeup or input
-    READY --> STOPPED: SIGTSTP
-    RUNNING --> STOPPED: SIGTSTP
-    BLOCKED --> STOPPED: SIGTSTP remembers BLOCKED
+    READY --> STOPPED: stop signal
+    RUNNING --> STOPPED: stop signal
+    BLOCKED --> STOPPED: stop signal remembers BLOCKED
     STOPPED --> BLOCKED: SIGCONT while still queued
     STOPPED --> READY: SIGCONT otherwise
     NEW --> ZOMBIE: termination
@@ -1420,48 +1426,66 @@ amount of per-process signal state is embedded in each PCB:
 
 | PCB field | Role |
 | --- | --- |
-| `pending_termination` | Whether termination is deferred while the target is the running process |
+| `pending_termination_signal` | `SIGINT`/`SIGKILL` deferred while the target is the running process |
+| `stop_signal` | Identifies the signal reported for the current stopped state |
 | `stopped_from_state` | State reconsidered on `SIGCONT` |
 | `parent_death_signal` | Signal delivered when the parent terminates |
+| `pending_terminal_read_buffer`, `pending_terminal_read_count` | Terminal request retained across any stop while the read is pending |
 
 The subsystem also has global `foreground_process_id` and
 `terminal_input_process_id` integers in kernel `.data`. They are not PCB
 pointers; lookup validates that the process still exists.
 
-Three signals are implemented: `SIGKILL`, `SIGCONT`, and `SIGTSTP`.
-`SIGKILL` terminates, `SIGTSTP` stops, and `SIGCONT` resumes a stopped process.
-Signal 0 remains an existence probe for `kill()` and performs no action.
+Six signals are implemented. `SIGINT` and `SIGKILL` terminate; `SIGSTOP`,
+`SIGTSTP`, and `SIGTTIN` stop; and `SIGCONT` resumes a stopped process. Signal
+0 remains an existence probe for `kill()` and performs no action.
 
 | Number | Name | Kernel action | Reported status/state |
 | ---: | --- | --- | --- |
 | 0 | Probe | Validates that a non-zombie PID exists | No change |
+| 2 | `SIGINT` | Terminates the target | Exit status 130 |
 | 9 | `SIGKILL` | Terminates the target | Exit status 137 |
 | 18 | `SIGCONT` | Resumes a stopped target | `READY`, or `BLOCKED` if its original wait is still active |
-| 20 | `SIGTSTP` | Stops the target | `STOPPED`; waiters receive `SIGNAL_STOPPED_STATUS` |
+| 19 | `SIGSTOP` | Stops the target | `STOPPED`; status 147 |
+| 20 | `SIGTSTP` | Stops the target | `STOPPED`; status 148 |
+| 21 | `SIGTTIN` | Stops the target; generated when a background process reads the terminal | `STOPPED`; status 149 |
 
-`signal_number_is_valid()` compares against those three named constants
+`signal_number_is_valid()` compares against those six named constants
 explicitly. A numeric value in a gap between them is not accepted merely
-because it is below `SIGTSTP`. Signal 0 is handled separately by
+because it lies within the implemented range. Signal 0 is handled separately by
 `send_signal_by_pid()` because it performs lookup without delivery.
 
-When `SIGTSTP` changes a PCB to `STOPPED`, the prior state is retained in
-`stopped_from_state`. The child-owned waiter queue is drained and each waiting
-process receives the stopped status through its saved `waiting_status_ptr`.
+When a stop signal changes a PCB to `STOPPED`, the signal and prior state are
+retained in `stop_signal` and `stopped_from_state`. The child-owned waiter queue
+is drained and each waiting process receives that signal's stopped status
+through its saved `waiting_status_ptr`. `WIFSTOPPED()` recognizes all three
+stopped statuses. If the process was blocked in a terminal read, it is detached
+from `terminal.input_waiters`, but its userspace buffer and requested count stay
+in the PCB. This keeps the inactive reader out of the terminal's active wait
+queue without losing the suspended system call.
 `SIGCONT` returns an ordinary stopped process to `READY`; a process that was
 blocked and is still linked to its original wait queue returns to `BLOCKED`
 instead, because continuing it does not satisfy that blocking operation.
 
-Termination of the currently `RUNNING` PCB sets `pending_termination`, because
-freeing the active interrupt-return context would be unsafe. Before a PCB is
-restored, `prepare_process_termination()` clears that flag and terminates the
-process through `kill_process()`, causing the dispatcher to select another
-PCB. `kill_process()` owns the fixed `SIGNAL_KILLED_STATUS`; the more general
+Termination of the currently `RUNNING` PCB stores its signal in
+`pending_termination_signal`, because freeing the active interrupt-return
+context would be unsafe. Before a PCB is restored,
+`prepare_process_termination()` clears that value and terminates the process
+through `kill_process()`, causing the dispatcher to select another PCB. The
+more general
 `terminate_process(process, status)` still accepts a status because normal
 exit, exceptions, and unloading use different values. Other targets can be
 terminated immediately; stop and continue actions update their state directly.
-This flag is only a safe-destruction handoff to the dispatcher, not a general
+This value is only a safe-destruction handoff to the dispatcher, not a general
 queue: signal delivery never copies or replaces the process activation and
 never enters userspace code.
+
+Unlike Unix/Linux, PicoOS does not support catching or ignoring signals.
+Unix/Linux permits a process to catch and handle `SIGINT`, while `SIGKILL`
+cannot be caught; this educational OS deliberately gives both the same fixed
+termination action. Unix/Linux likewise makes `SIGSTOP` uncatchable while
+`SIGTSTP` and `SIGTTIN` can normally be caught or ignored. PicoOS gives all
+three the same fixed stop action.
 
 ```mermaid
 sequenceDiagram
@@ -1472,7 +1496,7 @@ sequenceDiagram
 
     S->>K: kill(pid, signal) or kernel-generated signal
     alt target is currently RUNNING and must terminate
-        K->>P: Set pending_termination
+        K->>P: Store pending termination signal
         D->>K: prepare_process_termination(P)
         K->>P: Terminate safely before restore
     else other target or stop/continue action
@@ -1482,9 +1506,21 @@ sequenceDiagram
 
 Raw-terminal `Ctrl+C` and `Ctrl+Z` arrive as UART bytes 3 and 26. The UART ISR
 consumes them before ring-buffer insertion and resolves
-`foreground_process_id`; byte 3 sends `SIGKILL`, while byte 26 sends
+`foreground_process_id`; byte 3 sends `SIGINT`, while byte 26 sends
 `SIGTSTP`. The shell changes this global before and after foreground waiting,
 so background work does not receive prompt-time terminal signals.
+
+A terminal `read()` first checks `terminal_input_process_id`. If the caller is
+not the input owner, the kernel retains its buffer/count in the PCB and sends
+it `SIGTTIN` before the read can consume buffered input or claim the terminal
+wait queue. Input arrival does not select or continue any `SIGTTIN`-stopped
+process. The shell explicitly chooses its tracked job with `fg`, assigns
+foreground ownership first, and then sends `SIGCONT`. Only then can the read
+consume buffered input or join the terminal wait queue until a byte arrives.
+A background `SIGCONT` leaves any pending terminal read stopped with
+`SIGTTIN`, including a read that originally stopped through `SIGSTOP` or
+`SIGTSTP`. This resume path briefly masks UART delivery around its ring check
+and queue insertion to prevent a lost wakeup.
 
 ## 6.4 Important signal functions
 
@@ -1492,12 +1528,13 @@ so background work does not receive prompt-time terminal signals.
 | --- | --- | --- |
 | `send_signal_by_pid(struct KillRequest *request)` | 0 or `-1` | Finds target; signal 0 only checks existence |
 | `send_signal_to_process(struct Process *process, int signal_number)` | `void` | Continues, stops, terminates, or defers running-target termination |
-| `kill_process(struct Process *process)` | `void` | Calls the general termination path with the fixed killed status |
-| `stop_process(struct Process *process)` | `void` | Saves prior state, changes to `STOPPED`, reports to waiters |
-| `continue_process(struct Process *process)` | `void` | Restores `BLOCKED` if still queued, otherwise changes to `READY` |
+| `kill_process(struct Process *process, int signal_number)` | `void` | Calls the general termination path with that termination signal's status |
+| `stop_process(struct Process *process, int signal_number)` | `void` | Saves signal/prior state, changes to `STOPPED`, reports to waiters |
+| `continue_process(struct Process *process)` | `void` | Resumes ordinary stops; a pending terminal read additionally requires input ownership |
 | `prepare_process_termination(struct Process *process)` | Dispatchable flag | Applies deferred termination and reports whether the PCB remains dispatchable |
 | `set_parent_death_signal(struct PrctlRequest *request)` | 0 or `-1` | Changes current PCB parent-death setting |
 | `set_foreground_process(int pid)` | 0 or `-1` | Changes foreground/input-owner globals after validating a direct child |
+| `process_has_terminal_input(struct Process *process)` | Ownership flag | Checks whether a PCB owns terminal input |
 | `terminal_input_process(void)` | PCB pointer | Resolves input owner or falls back to current PCB |
 | `handle_terminal_signal_character(int value)` | Consumed flag | Maps `Ctrl+C`/`Ctrl+Z` to foreground signals |
 
@@ -1969,8 +2006,6 @@ struct Terminal {
     int input_tail;
     int input_count;
     struct wait_queue input_waiters;
-    char *pending_read_buffer;
-    int pending_read_count;
 };
 ```
 
@@ -1980,9 +2015,7 @@ struct Terminal {
 | `input_head` | Index of next byte to consume |
 | `input_tail` | Index of next insertion |
 | `input_count` | Distinguishes full from empty when indices match |
-| `input_waiters` | Embedded FIFO queue of blocked reader PCBs |
-| `pending_read_buffer` | Pointer into blocked input owner’s process memory |
-| `pending_read_count` | Maximum requested byte count |
+| `input_waiters` | Generic blocking queue containing the active foreground reader while it waits for input |
 
 The PicoC compiler does not implement usable `extern` variable declarations,
 so other kernel files cannot declare `terminal` directly. `kernel_terminal()`
@@ -1996,15 +2029,20 @@ use the input ring, terminal writes use UART output, and seeking fails. The
 release tree also contains `binary/device/terminal.dev` as a visible dummy
 device marker; it stores no terminal data and is not the implementation.
 
-If the ring is empty, `begin_terminal_read()` briefly disables UART delivery
-to prevent a lost wakeup, stores buffer/count in the terminal, enqueues
-the current PCB on `input_waiters`, restores UART routing, and dispatches. A
-later UART ISR copies bytes, stores the result in `process->activation.acc`,
-clears pending state, and wakes the reader.
+If the input ring is empty during a foreground read, `begin_terminal_read()`
+briefly disables UART delivery to prevent a lost wakeup, stores buffer/count in
+the current PCB, enqueues it on `input_waiters`, restores UART routing, and
+dispatches. A later UART ISR resolves the current input owner, copies bytes into
+that process's request, stores the result in `process->activation.acc`, clears
+its pending state, and wakes it.
 
 The shell transfers `terminal_input_process_id` between itself and one
-foreground child. This makes one pending-reader slot sufficient for the small
-job-control model.
+foreground child. Because there is only one input owner, at most that active
+reader belongs in `input_waiters`; a stop signal detaches it from the queue.
+The queue is still useful for the normal block/wakeup and process-removal
+machinery, but it does not choose among stopped jobs. Per-process pending-read
+fields remain necessary because every stopped reader must retain the userspace
+destination and requested count until the shell later selects it with `fg`.
 
 ```mermaid
 sequenceDiagram
@@ -2041,12 +2079,13 @@ sequenceDiagram
 | `file_descriptor_is_valid(int file_descriptor)` | Boolean | Reads fixed range |
 | `file_descriptor_can_read(struct FileDescriptor *descriptor)` | Boolean | Reads access bits |
 | `file_descriptor_can_write(struct FileDescriptor *descriptor)` | Boolean | Reads access bits |
-| `initialize_terminal(void)` | `void` | Resets global ring, queue, and pending-read fields |
+| `initialize_terminal(void)` | `void` | Resets the global ring and reader queue |
 | `kernel_terminal(void)` | Global pointer | No mutation |
 | `is_terminal_device_path(char *path)` | Boolean | Recognizes `/device/terminal` |
 | `pop_terminal_byte(struct Terminal *terminal)` | Byte | Advances head and decrements count |
 | `copy_terminal_bytes(struct Terminal *terminal, char *buffer, int count)` | Count | Pops bytes into process buffer |
 | `enqueue_terminal_byte(struct Terminal *terminal, int value)` | `void` | Inserts at tail; may discard oldest |
+| `suspend_pending_terminal_read(struct Process *process)` | `void` | Detaches a stopped reader from the active terminal queue while retaining its PCB request |
 | `begin_terminal_read(struct Terminal *terminal, char *buffer, int count, int *caller_context)` | Immediate or later result | Reads ring or fills pending fields, queues PCB, saves activation, dispatches |
 | `complete_pending_terminal_read(struct Process *process, struct Terminal *terminal)` | `void` | Internal: copies available input, writes saved `activation.acc`, clears pending fields, wakes reader |
 | `handle_uart_interrupt(void)` | `void` | Acknowledges byte, signals target or mutates terminal/reader PCB |
@@ -2236,7 +2275,7 @@ because the caller's stack is suspended.
 | `OpenRequest.path` | Relative or absolute host-backed path | `open()`/`fopen()` and syscall 15; normalized and copied into the selected descriptor |
 | `OpenRequest.flags` | Access mode plus `O_CREAT`, `O_TRUNC`, or `O_APPEND` | Copied into the descriptor; create/truncate decide open requests and append changes later write positioning |
 | `IoRequest.file_descriptor` | Entry number in the current PCB's six-entry table | `read()`/`write()` and syscalls 16/17 |
-| `IoRequest.buffer` | Userspace destination for read or source for write | Used directly during the call; for a blocked terminal read the terminal temporarily retains the destination pointer |
+| `IoRequest.buffer` | Userspace destination for read or source for write | Used directly during the call; for a blocked terminal read the caller's PCB temporarily retains the destination pointer |
 | `IoRequest.count` | Maximum cells to read or exact cells to write | Validated before transfer; retained in terminal pending state only while stdin is blocked |
 | `IoRequest.show_loading_bar` | Whether a host-file read shows progress | `read()` derives this from the environment; writes set it false |
 | `SeekRequest.file_descriptor` | Regular-file descriptor to reposition | `lseek()` / syscall 19 |
@@ -2307,7 +2346,7 @@ kernel until it needs I/O or a process service.
 | `int open(char *path, int flags, ...)` | Lowest free descriptor or `-1`; the optional mode is not used | 15, `OpenRequest` |
 | `int creat(char *path, int mode)` | Equivalent to write/create/truncate open; `mode` is ignored | Calls `open()` and therefore syscall 15 |
 | `int waitpid(int pid)` | Exact child's exit/stopped status, or `-1` | 10, `WaitPidRequest`; may suspend its stack frame |
-| `bool WIFSTOPPED(int status)` | Whether status equals PicoOS's `SIGTSTP` stopped value | No syscall |
+| `bool WIFSTOPPED(int status)` | Whether status represents `SIGSTOP`, `SIGTSTP`, or `SIGTTIN` | No syscall |
 | `void yield(void)` | Voluntarily saves the current activation and schedules | 13, no request |
 
 `invoke_syscall(number, argument)` is the common assembly bridge used by most
@@ -2332,9 +2371,10 @@ becomes `IN1`.
 `kill()` builds `KillRequest` as a local in the caller's userspace stack and
 passes its address synchronously to syscall 27. The kernel validates the
 signal and PID during that call and does not retain the request pointer. A
-self-directed `SIGKILL` sets `pending_termination` and returns normally from the
-syscall. At the next timer preemption or voluntary yield, the dispatcher
-consumes that value and does not restore the process again.
+self-directed `SIGINT` or `SIGKILL` stores `pending_termination_signal` and
+returns normally from the syscall. At the next timer preemption or voluntary
+yield, the dispatcher consumes that value and does not restore the process
+again.
 
 `struct mutex` contains a one-cell Boolean and a complete `struct wait_queue`.
 It is normal userspace data, not a kernel allocation. Placing it in a shared
@@ -2641,7 +2681,7 @@ stores nonempty commands in history, and sends them to `eval()`. Only the
 | `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
 | `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
 | `bool run_process(int pid, char *arguments, bool background, char *stdout_path, bool append)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
-| `void continue_background_process(bool foreground)` | `void` | Uses `kill(pid, SIGCONT)` and, for `fg`, foreground selection plus `waitpid()` |
+| `void continue_background_process(bool foreground)` | `void` | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
 | `bool eval(char *command)` | Continue-shell flag | Selects a built-in or external execution path |
 | `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the prompt loop |
 
@@ -2737,7 +2777,7 @@ or process-local `environ`. The shell has ten built-ins overall.
 | `load PATH` | Loads a binary but leaves its PCB in `NEW` | `load()` / syscall 3 |
 | `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `>`, and `>>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
 | `unload PID` | Terminates/removes the selected non-current process | `unload()` / syscall 5 |
-| `fg` | Sends `SIGCONT` to the most recently tracked PID, makes it foreground, and waits | `kill`, `set_foreground_process`, `waitpid` |
+| `fg` | Makes the most recently tracked PID foreground, sends `SIGCONT`, and waits | `set_foreground_process`, `kill`, `waitpid` |
 | `bg` | Sends `SIGCONT` to the most recently tracked PID without waiting | `kill()` |
 
 Every built-in validates the operands it supports. `cd -h`/`--help` prints its
@@ -2751,12 +2791,16 @@ though the library provides `unsetenv()`.
 For a foreground child, the shell gives the child's PID to
 `set_foreground_process()`, waits for exactly that PID, restores terminal
 ownership with PID 0, and stores the returned status in `$?`. `Ctrl+C` becomes
-`SIGKILL`; `Ctrl+Z` becomes `SIGTSTP`. A stopped status is recorded as the
+`SIGINT`; `Ctrl+Z` becomes `SIGTSTP`. A stopped status is recorded as the
 current `$!` target so `fg` or `bg` can continue it.
 
 A trailing `&` starts the child without waiting and stores the PID in `$!`.
 The shell tracks only one background/stopped PID rather than a job table. A
-background start does not replace `$?`. At shell startup,
+background process that reads terminal stdin is stopped with `SIGTTIN`; `fg`
+chooses that tracked process, transfers input ownership, and then continues its
+pending read. New input never wakes or selects a stopped background process on
+its own. `bg` alone cannot continue any stopped process that has a pending
+terminal read. A background start does not replace `$?`. At shell startup,
 `PR_SET_PDEATHSIG=SIGKILL` is installed on the shell and inherited by children,
 so descendants receive `SIGKILL` if their shell terminates.
 
@@ -2867,9 +2911,10 @@ There is no sorting, long format, filtering, or recursion. `mkdir.bin` has no
 `-p`; `rm.bin` has no force/recursive mode; `rmdir.bin` removes only empty
 directories. All continue through later operands after an individual error.
 
-`kill.bin` accepts `SIGKILL`, `SIGCONT`, `SIGTSTP`, or their numbers. Signal 0
-checks existence without delivery. It yields after success so the target can
-be selected promptly. `poweroff.bin` differs from shell `exit`:
+`kill.bin` accepts `SIGINT`, `SIGKILL`, `SIGCONT`, `SIGSTOP`, `SIGTSTP`, and
+`SIGTTIN` by name without a leading `-`, or by number. Signal 0 checks
+existence without delivery. It yields after success so the target can be
+selected promptly. `poweroff.bin` differs from shell `exit`:
 the former invokes syscall 2 and halts the OS, whereas the latter lets init
 start a new shell.
 
@@ -3049,8 +3094,8 @@ The main deliberate limitations are:
 - non-preemptive kernel scheduling and timer-preempted userspace
 - wait-queue `sleep()` rather than timed sleep
 - exact-child `waitpid()` rather than a general wait interface
-- three fixed-action signals and one foreground/input owner rather than full job control
-- one global terminal with at most one pending input read
+- six fixed-action signals and one foreground/input owner rather than full job control
+- one global terminal ring and wait queue with per-process pending input reads
 - non-atomic `O_APPEND` positioning when another process or host program writes
   the same host-backed file concurrently
 - fixed/default process heap and stack sizing with no dynamic stack growth
