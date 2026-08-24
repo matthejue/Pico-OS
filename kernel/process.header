@@ -58,8 +58,12 @@ struct Process {
     // Signal inherited by children and received when their parent terminates
     int parent_death_signal;
     int exit_status;
+    int stop_signal;
     int stopped_from_state;
-    bool pending_termination;
+    int pending_termination_signal;
+    // Userspace buffer retained while a terminal read is blocked or stopped
+    char *pending_terminal_read_buffer;
+    int pending_terminal_read_count;
 };
 
 void initialize_process_table(void);

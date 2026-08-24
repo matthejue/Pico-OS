@@ -1,0 +1,10 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+
+int main(void) {
+    char value;
+
+    read(STDIN_FILENO, &value, 1);
+    return value;
+}

@@ -65,9 +65,18 @@ void report_foreground_process_status(int pid, int status) {
     char *signal_name = NULL;
     char *action = NULL;
 
-    if (WIFSTOPPED(status)) {
+    if (status == SIGNAL_STOP_STATUS) {
+        action = "stopped";
+        signal_name = "SIGSTOP";
+    } else if (status == SIGNAL_STOPPED_STATUS) {
         action = "stopped";
         signal_name = "SIGTSTP";
+    } else if (status == SIGNAL_TERMINAL_INPUT_STATUS) {
+        action = "stopped";
+        signal_name = "SIGTTIN";
+    } else if (status == SIGNAL_INTERRUPTED_STATUS) {
+        action = "terminated";
+        signal_name = "SIGINT";
     } else if (status == SIGNAL_KILLED_STATUS) {
         action = "terminated";
         signal_name = "SIGKILL";
@@ -731,14 +740,18 @@ bool run_process(
 void continue_background_process(bool foreground) {
     int pid = last_background_process_id;
 
-    if (pid == 0 || kill(pid, SIGCONT) == -1) {
+    if (pid == 0 ||
+        (foreground && set_foreground_process(pid) == -1) ||
+        kill(pid, SIGCONT) == -1) {
+        if (foreground) {
+            set_foreground_process(0);
+        }
         last_background_process_id = 0;
         shell_write_string("error: no background process\n");
         return;
     }
 
     if (foreground) {
-        set_foreground_process(pid);
         last_foreground_exit_status = waitpid(pid);
         set_foreground_process(0);
         report_foreground_process_status(
