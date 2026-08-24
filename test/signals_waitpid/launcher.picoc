@@ -28,6 +28,12 @@ int main(void) {
     printf("SIGKILL status: %d\n", waitpid(pid));
 
     pid = run_and_yield(
+        "test/signals_waitpid/endless.bin"
+    );
+    kill(pid, SIGINT);
+    printf("SIGINT status: %d\n", waitpid(pid));
+
+    pid = run_and_yield(
         "test/signals_waitpid/stop_target.bin"
     );
     kill(pid, SIGTSTP);
@@ -35,6 +41,55 @@ int main(void) {
     printf("SIGTSTP stopped: %d\n", WIFSTOPPED(status));
     kill(pid, SIGCONT);
     printf("SIGCONT status: %d\n", waitpid(pid));
+
+    pid = run_and_yield(
+        "test/signals_waitpid/stop_target.bin"
+    );
+    kill(pid, SIGSTOP);
+    status = waitpid(pid);
+    printf("SIGSTOP stopped: %d, status: %d\n",
+           WIFSTOPPED(status), status);
+    kill(pid, SIGCONT);
+    printf("SIGSTOP continued status: %d\n", waitpid(pid));
+
+    pid = run_and_yield(
+        "test/signals_waitpid/background_reader.bin"
+    );
+    status = waitpid(pid);
+    printf("SIGTTIN stopped: %d, status: %d\n",
+           WIFSTOPPED(status), status);
+    kill(pid, SIGCONT);
+    status = waitpid(pid);
+    printf("SIGTTIN background continue stopped: %d\n",
+           status == SIGNAL_TERMINAL_INPUT_STATUS);
+    set_foreground_process(pid);
+    kill(pid, SIGCONT);
+    yield();
+    kill(pid, SIGKILL);
+    set_foreground_process(0);
+    printf("SIGTTIN foreground wait status: %d\n", waitpid(pid));
+
+    pid = load(
+        "test/signals_waitpid/background_reader.bin"
+    );
+    set_foreground_process(pid);
+    run(pid, NULL, NULL);
+    yield();
+    kill(pid, SIGTSTP);
+    status = waitpid(pid);
+    printf("blocked reader SIGTSTP stopped: %d\n",
+           status == SIGNAL_STOPPED_STATUS);
+    set_foreground_process(0);
+    kill(pid, SIGCONT);
+    status = waitpid(pid);
+    printf("blocked reader background continue SIGTTIN: %d\n",
+           status == SIGNAL_TERMINAL_INPUT_STATUS);
+    set_foreground_process(pid);
+    kill(pid, SIGCONT);
+    yield();
+    kill(pid, SIGKILL);
+    set_foreground_process(0);
+    printf("blocked reader foreground wait status: %d\n", waitpid(pid));
 
     parent = load(
         "test/signals_waitpid/grandchild_parent.bin"

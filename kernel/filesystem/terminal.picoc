@@ -17,8 +17,6 @@ void initialize_terminal(void) {
     terminal.input_count = 0;
     terminal.input_waiters.head = NULL;
     terminal.input_waiters.tail = NULL;
-    terminal.pending_read_buffer = NULL;
-    terminal.pending_read_count = 0;
 }
 
 struct Terminal *kernel_terminal(void) {
@@ -71,14 +69,96 @@ void enqueue_terminal_byte(struct Terminal *terminal, int value) {
     terminal->input_count = terminal->input_count + 1;
 }
 
+void enqueue_terminal_reader(
+    struct Terminal *terminal,
+    struct Process *process
+) {
+    process->wait_next = NULL;
+    process->waiting_queue_ptr = &(terminal->input_waiters);
+    if (terminal->input_waiters.tail == NULL) {
+        terminal->input_waiters.head = process;
+    } else {
+        terminal->input_waiters.tail->wait_next = process;
+    }
+    terminal->input_waiters.tail = process;
+}
+
+void suspend_pending_terminal_read(struct Process *process) {
+    struct Terminal *terminal = kernel_terminal();
+
+    if (process->pending_terminal_read_buffer != NULL &&
+        process->waiting_queue_ptr == &(terminal->input_waiters)) {
+        remove_from_wait_queue(process);
+    }
+}
+
+void resume_pending_terminal_read(struct Process *process) {
+    struct Terminal *terminal = kernel_terminal();
+    int uart_interrupt_index;
+    int uart_interrupt_priority;
+    int result;
+
+    if (process->pending_terminal_read_buffer == NULL) {
+        return;
+    }
+
+    uart_interrupt_index = periphery_read_register(
+        INTERRUPT_CONTROLLER_UART_DEVICE_TO_ISR_REGISTER
+    );
+    uart_interrupt_priority = periphery_read_register(
+        INTERRUPT_CONTROLLER_UART_DEVICE_PRIORITY_REGISTER
+    );
+    interrupt_controller_disable_device(INTERRUPT_DEVICE_UART);
+
+    if (terminal->input_count > 0) {
+        result = copy_terminal_bytes(
+            terminal,
+            process->pending_terminal_read_buffer,
+            process->pending_terminal_read_count
+        );
+        process->activation.acc = result;
+        process->pending_terminal_read_buffer = NULL;
+        process->pending_terminal_read_count = 0;
+        if (process->waiting_queue_ptr != NULL) {
+            remove_from_wait_queue(process);
+        }
+        process->stopped_from_state = PROCESS_STATE_READY;
+        interrupt_controller_assign_device(
+            INTERRUPT_DEVICE_UART,
+            uart_interrupt_index,
+            uart_interrupt_priority
+        );
+        return;
+    }
+
+    if (process->waiting_queue_ptr == NULL) {
+        enqueue_terminal_reader(terminal, process);
+    }
+    process->stopped_from_state = PROCESS_STATE_BLOCKED;
+    interrupt_controller_assign_device(
+        INTERRUPT_DEVICE_UART,
+        uart_interrupt_index,
+        uart_interrupt_priority
+    );
+}
+
 int begin_terminal_read(
     struct Terminal *terminal,
     char *buffer,
     int count,
     int *caller_context
 ) {
+    struct Process *process = current_process();
     int uart_interrupt_index;
     int uart_interrupt_priority;
+
+    if (!process_has_terminal_input(process)) {
+        process->pending_terminal_read_buffer = buffer;
+        process->pending_terminal_read_count = count;
+        send_signal_to_process(process, SIGTTIN);
+        dispatcher_switch_from_context(caller_context);
+        return 1;
+    }
 
     uart_interrupt_index = periphery_read_register(
         INTERRUPT_CONTROLLER_UART_DEVICE_TO_ISR_REGISTER
@@ -98,8 +178,8 @@ int begin_terminal_read(
         return copy_terminal_bytes(terminal, buffer, count);
     }
 
-    terminal->pending_read_buffer = buffer;
-    terminal->pending_read_count = count;
+    process->pending_terminal_read_buffer = buffer;
+    process->pending_terminal_read_count = count;
     enqueue_current_process_on_wait_queue(&(terminal->input_waiters));
     interrupt_controller_assign_device(
         INTERRUPT_DEVICE_UART,
@@ -120,17 +200,25 @@ void complete_pending_terminal_read(
         return;
     }
 
+    if (process == NULL ||
+        process->state != PROCESS_STATE_BLOCKED ||
+        process->waiting_queue_ptr != &(terminal->input_waiters) ||
+        process->pending_terminal_read_buffer == NULL) {
+        return;
+    }
+
     // Uses the request buffer saved before the waiting process was suspended
     result = copy_terminal_bytes(
         terminal,
-        terminal->pending_read_buffer,
-        terminal->pending_read_count
+        process->pending_terminal_read_buffer,
+        process->pending_terminal_read_count
     );
 
     process->activation.acc = result;
-    terminal->pending_read_buffer = NULL;
-    terminal->pending_read_count = 0;
-    wakeup_wait_queue(&(terminal->input_waiters));
+    process->pending_terminal_read_buffer = NULL;
+    process->pending_terminal_read_count = 0;
+    remove_from_wait_queue(process);
+    process->state = PROCESS_STATE_READY;
 }
 
 void handle_uart_interrupt(void) {

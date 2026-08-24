@@ -127,8 +127,11 @@ struct Process *create_process(
         return NULL;
     }
     process->exit_status = 0;
+    process->stop_signal = 0;
     process->stopped_from_state = PROCESS_STATE_READY;
-    process->pending_termination = false;
+    process->pending_termination_signal = 0;
+    process->pending_terminal_read_buffer = NULL;
+    process->pending_terminal_read_count = 0;
     *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
@@ -365,7 +368,7 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
         return true;
     }
     if (waited_process->state == PROCESS_STATE_STOPPED) {
-        *(request->status) = SIGNAL_STOPPED_STATUS;
+        *(request->status) = 128 + waited_process->stop_signal;
         return true;
     }
 

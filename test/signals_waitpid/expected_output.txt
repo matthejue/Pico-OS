@@ -1,6 +1,15 @@
 process with pid 3 created
 SIGKILL status: 137
+SIGINT status: 130
 SIGTSTP stopped: 1
 SIGCONT status: 6
+SIGSTOP stopped: 1, status: 147
+SIGSTOP continued status: 6
+SIGTTIN stopped: 1, status: 149
+SIGTTIN background continue stopped: 1
+SIGTTIN foreground wait status: 137
+blocked reader SIGTSTP stopped: 1
+blocked reader background continue SIGTTIN: 1
+blocked reader foreground wait status: 137
 waitpid rejects non-child: 1
-process with pid 8 created
+process with pid 12 created
