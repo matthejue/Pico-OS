@@ -1,5 +1,6 @@
 #include "../process.header"
 #include "../process_arguments.header"
+#include "../process_loader.header"
 #include "../kernel.header"
 #include "../kmalloc.header"
 #include "../pmalloc.header"
@@ -7,7 +8,9 @@
 #include "../signal.header"
 #include "../dispatcher.header"
 #include "../filesystem/file_descriptor.header"
+#include "../filesystem/filesystem.header"
 #include "../filesystem/host_filesystem.header"
+#include "../../common/file.header"
 #include "../../common/uart_protocol.header"
 
 struct Process *process_list_head = NULL;
@@ -28,12 +31,27 @@ struct Process *first_process(void) {
 
 void list_processes(void) {
     struct Process *process = first_process();
+    struct IoRequest request;
+    char line[PATH_MAX + 16];
+    int index;
+    int path_index;
 
     while (process != NULL) {
-        uart_print_integer(process->pid);
-        uart_print_character(' ');
-        uart_print_string(process->binary_path);
-        uart_print_character('\n');
+        index = uart_append_decimal(line, 0, process->pid);
+        line[index] = ' ';
+        index = index + 1;
+        path_index = 0;
+        while (process->binary_path[path_index] != 0) {
+            line[index] = process->binary_path[path_index];
+            index = index + 1;
+            path_index = path_index + 1;
+        }
+        line[index] = '\n';
+        request.file_descriptor = STDOUT_FILENO;
+        request.buffer = line;
+        request.count = index + 1;
+        request.show_loading_bar = false;
+        write_file_descriptor(&request);
         process = process->next;
     }
 }
@@ -132,6 +150,7 @@ struct Process *create_process(
     process->pending_termination_signal = 0;
     process->pending_terminal_read_buffer = NULL;
     process->pending_terminal_read_count = 0;
+    process->pending_load = NULL;
     *((int *)stack_pointer) = process->activation.cs - 1;
 
     process->next = NULL;
@@ -225,6 +244,7 @@ void remove_process(struct Process *process) {
     }
 
     release_process_shared_memory(candidate);
+    cancel_process_load(candidate);
     pfree(candidate->base_address);
     destroy_file_descriptor_table(candidate->file_descriptors);
     kfree(candidate->binary_path);

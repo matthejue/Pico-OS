@@ -4,6 +4,18 @@
 #include "scheduler.header"
 #include "signal.header"
 
+bool reschedule_requested = false;
+
+void dispatcher_request_reschedule(void) {
+    reschedule_requested = true;
+}
+
+void dispatcher_reschedule_if_requested(int *caller_context) {
+    if (reschedule_requested) {
+        dispatcher_switch_from_context(caller_context);
+    }
+}
+
 __attribute__((naked))
 void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN SP BAF 2");
@@ -26,6 +38,7 @@ void dispatcher_switch_to_process(struct Process *process) {
         current_process()->state = PROCESS_STATE_READY;
     }
 
+    reschedule_requested = false;
     set_current_process(process);
     process->state = PROCESS_STATE_RUNNING;
 

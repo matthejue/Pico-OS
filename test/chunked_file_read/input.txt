@@ -1,0 +1,3 @@
+./test/chunked_file_read/chunked_file_read.bin
+exit
+poweroff.bin

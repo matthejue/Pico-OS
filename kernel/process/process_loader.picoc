@@ -1,11 +1,29 @@
 #include "../process_loader.header"
 #include "../process.header"
+#include "../kmalloc.header"
 #include "../pmalloc.header"
 #include "../../common/loading_bar.header"
 #include "../../common/file.header"
 #include "../../common/uart_protocol.header"
 #include "../../common/sram_loader.header"
 #include "../filesystem/host_filesystem.header"
+
+int receive_byte_over_uart(void);
+
+struct ProcessLoad {
+    int base_address;
+    int process_size;
+    int code_start;
+    int data_start;
+    int heap_start;
+    int heap_size;
+    int word_count;
+    int payload_word_count;
+    int loaded_word_count;
+    int loading_bar_update;
+    char *binary_path;
+    char *host_path;
+};
 
 int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
     if (stack_start == -1) {
@@ -39,6 +57,199 @@ void drain_process_words(
             );
         }
     }
+}
+
+void drain_process_bytes(int byte_count) {
+    int index = 0;
+
+    while (index < byte_count) {
+        receive_byte_over_uart();
+        index = index + 1;
+    }
+}
+
+void free_process_load(struct ProcessLoad *load) {
+    kfree(load->binary_path);
+    kfree(load->host_path);
+    kfree(load);
+}
+
+void cancel_process_load(struct Process *process) {
+    struct ProcessLoad *load = process->pending_load;
+
+    if (load == NULL) {
+        return;
+    }
+    process->pending_load = NULL;
+    pfree(load->base_address);
+    free_process_load(load);
+}
+
+int finish_process_load(struct Process *owner) {
+    struct ProcessLoad *load = owner->pending_load;
+    struct Process *process = create_process(
+        load->base_address,
+        load->process_size,
+        load->code_start,
+        load->data_start,
+        load->heap_start,
+        load->heap_size,
+        load->word_count,
+        load->binary_path
+    );
+    int pid;
+
+    if (process == NULL) {
+        cancel_process_load(owner);
+        uart_print_string("error: could not create process\n");
+        return 0;
+    }
+
+    pid = process->pid;
+    owner->pending_load = NULL;
+    free_process_load(load);
+    return pid;
+}
+
+int begin_process_load(char *path, bool show_loading_bar) {
+    char absolute_path[512];
+    char *host_path = path;
+    int file_byte_count;
+    int header_byte_count;
+    int code_start;
+    int data_start;
+    int heap_start;
+    int heap_size;
+    int stack_start;
+    int effective_stack_start;
+    int process_size;
+    int base_address;
+    struct ProcessLoad *load;
+    struct Process *owner = current_process();
+
+    if (!build_process_path(path, absolute_path, PATH_MAX)) {
+        return 0;
+    }
+    host_path = absolute_path;
+
+    uart_send_host_request("file-size ", host_path);
+    file_byte_count = receive_word();
+    if (file_byte_count < 20 || file_byte_count % 4 != 0) {
+        return 0;
+    }
+
+    uart_send_file_range_command(host_path, 0, 20);
+    header_byte_count = receive_word();
+    if (header_byte_count != 20) {
+        if (header_byte_count > 0) {
+            drain_process_bytes(header_byte_count);
+        }
+        return 0;
+    }
+
+    code_start = receive_word();
+    data_start = receive_word();
+    heap_start = receive_word();
+    heap_size = receive_word();
+    stack_start = receive_word();
+    if (heap_size == -1) {
+        heap_size = DEFAULT_PROCESS_HEAP_CELLS;
+    }
+
+    effective_stack_start = loaded_process_stack_start(
+        heap_start,
+        heap_size,
+        stack_start
+    );
+    if (effective_stack_start == PMALLOC_INVALID_START) {
+        uart_print_string("error: invalid process stack start\n");
+        return 0;
+    }
+    process_size = effective_stack_start + 1;
+    base_address = pmalloc(process_size);
+    if (base_address == PMALLOC_INVALID_START) {
+        uart_print_string("error: not enough process memory\n");
+        return 0;
+    }
+
+    load = (struct ProcessLoad *)kmalloc(sizeof(struct ProcessLoad));
+    load->base_address = base_address;
+    load->process_size = process_size;
+    load->code_start = code_start;
+    load->data_start = data_start;
+    load->heap_start = heap_start;
+    load->heap_size = heap_size;
+    load->word_count = file_byte_count / 4;
+    load->payload_word_count = load->word_count - 5;
+    load->loaded_word_count = 0;
+    load->binary_path = copy_process_path(path);
+    load->host_path = copy_process_path(host_path);
+    owner->pending_load = load;
+
+    uart_print_loading_bar_label(show_loading_bar, "load ", host_path);
+    load->loading_bar_update = uart_start_loading_bar(
+        show_loading_bar,
+        load->payload_word_count
+    );
+    if (load->payload_word_count == 0) {
+        return finish_process_load(owner);
+    }
+    return SYSCALL_LOAD_PROCESS_CONTINUE;
+}
+
+int continue_process_load(struct Process *owner) {
+    struct ProcessLoad *load = owner->pending_load;
+    int remaining = load->payload_word_count - load->loaded_word_count;
+    int requested_words = remaining;
+    int requested_bytes;
+    int byte_count;
+    int index = 0;
+    int word;
+
+    if (requested_words > UART_HOST_TRANSFER_CHUNK_WORDS) {
+        requested_words = UART_HOST_TRANSFER_CHUNK_WORDS;
+    }
+    requested_bytes = requested_words * 4;
+    uart_send_file_range_command(
+        load->host_path,
+        (load->loaded_word_count + 5) * 4,
+        requested_bytes
+    );
+    byte_count = receive_word();
+    if (byte_count != requested_bytes) {
+        if (byte_count > 0) {
+            drain_process_bytes(byte_count);
+        }
+        cancel_process_load(owner);
+        return 0;
+    }
+
+    while (index < requested_words) {
+        word = receive_word();
+        *((int *)(load->base_address + load->loaded_word_count)) = word;
+        load->loaded_word_count = load->loaded_word_count + 1;
+        index = index + 1;
+        if (load->loaded_word_count == load->loading_bar_update) {
+            load->loading_bar_update = uart_update_loading_bar(
+                load->loaded_word_count,
+                load->payload_word_count
+            );
+        }
+    }
+
+    if (load->loaded_word_count == load->payload_word_count) {
+        return finish_process_load(owner);
+    }
+    return SYSCALL_LOAD_PROCESS_CONTINUE;
+}
+
+int load_process_chunk(char *path, bool show_loading_bar) {
+    struct Process *owner = current_process();
+
+    if (owner->pending_load == NULL) {
+        return begin_process_load(path, show_loading_bar);
+    }
+    return continue_process_load(owner);
 }
 
 int load_process(char *path, bool show_loading_bar) {

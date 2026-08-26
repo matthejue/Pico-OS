@@ -7,7 +7,7 @@ int invoke_prctl_syscall(int number, int argument) {
     asm("LOADIN BAF ACC 3");
     asm("LOADIN BAF IN1 4");
     asm("INT 0");
-    asm("STOREIN BAF ACC 0");
+    asm("STOREIN BAF IN2 0");
     return result;
 }
 

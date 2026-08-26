@@ -4,3 +4,5 @@ struct Process;
 
 void dispatcher_switch_from_context(int *caller_context);
 void dispatcher_start_next_process(void);
+void dispatcher_request_reschedule(void);
+void dispatcher_reschedule_if_requested(int *caller_context);
