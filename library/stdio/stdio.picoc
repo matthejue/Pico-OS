@@ -28,7 +28,7 @@ int receive_byte_over_uart(void) {
     // Supports PicoC-Compiler tests linked with isrs.reti without PicoOS
     asm("LOADI ACC 1"); // Legacy isrs.reti receive-byte syscall
     asm("INT 0");
-    asm("STOREIN BAF ACC 0");
+    asm("STOREIN BAF IN2 0");
     return value;
 }
 
@@ -38,7 +38,7 @@ int invoke_stdio_syscall(int number, int argument) {
     asm("LOADIN BAF ACC 3");
     asm("LOADIN BAF IN1 4");
     asm("INT 0");
-    asm("STOREIN BAF ACC 0");
+    asm("STOREIN BAF IN2 0");
     return result;
 }
 
@@ -197,6 +197,8 @@ int fgetc(FILE *stream) {
     request.buffer = &value;
     request.count = 1;
     request.show_loading_bar = false;
+    request.transferred = 0;
+    request.complete = false;
     if (invoke_stdio_syscall(SYSCALL_READ, (int)&request) != 1) {
         return -1;
     }

@@ -1,0 +1,46 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
+
+#define SHARED_NAME "chunked-process-load"
+#define WORKER_PATH "test/chunked_process_load/worker.bin"
+#define LOAD_TARGET_PATH "test/chunked_process_load/launcher.bin"
+
+void set_timer_interval(int interval) {
+    asm("STOREIN BAF DS 0"); // Saves DS before switching address spaces
+    asm("LOADI DS 1048576"); // 2^20
+    asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADIN BAF ACC 3");
+    asm("STORE ACC 9"); // Timer interval register
+    asm("LOADIN BAF DS 0"); // Restores DS after periphery access
+}
+
+int main(void) {
+    int shared_id = shm_open(SHARED_NAME, 1);
+    int *worker_ran = (int *)mmap(shared_id);
+    int worker;
+    int loaded_process;
+    bool passed;
+
+    *worker_ran = 0;
+    worker = load(WORKER_PATH);
+    set_timer_interval(100);
+    run(worker, NULL, NULL);
+
+    loaded_process = load(LOAD_TARGET_PATH);
+
+    set_timer_interval(1000);
+    waitpid(worker);
+    passed = *worker_ran == 1 && loaded_process > 0;
+    unload(loaded_process);
+    shm_unlink(SHARED_NAME);
+
+    if (passed) {
+        write(STDOUT_FILENO, "chunked process load passed\n", 28);
+    } else {
+        write(STDOUT_FILENO, "chunked process load failed\n", 28);
+    }
+    return !passed;
+}

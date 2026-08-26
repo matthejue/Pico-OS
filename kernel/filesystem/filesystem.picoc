@@ -88,46 +88,61 @@ int open_file_descriptor(struct OpenRequest *request) {
 
 int read_regular_file(
     struct FileDescriptor *descriptor,
-    char *buffer,
-    int count,
-    bool show_loading_bar
+    struct IoRequest *request
 ) {
     int byte_count;
     int copied = 0;
-    int loading_bar_update;
+    int remaining = request->count - request->transferred;
+    int requested = remaining;
+    int total_copied;
     int value;
 
+    if (requested > UART_HOST_TRANSFER_CHUNK_BYTES) {
+        requested = UART_HOST_TRANSFER_CHUNK_BYTES;
+    }
     uart_send_file_range_command(
         descriptor->path,
         descriptor->offset,
-        count
+        requested
     );
     byte_count = receive_word();
     if (byte_count == -1) {
+        request->complete = true;
         return -1;
     }
-    uart_print_loading_bar_label(
-        show_loading_bar,
-        "read ",
-        descriptor->path
-    );
-    loading_bar_update = uart_start_loading_bar(
-        show_loading_bar,
-        byte_count
-    );
+    if (request->transferred == 0) {
+        uart_print_loading_bar_label(
+            request->show_loading_bar,
+            "read ",
+            descriptor->path
+        );
+        request->loading_bar_update = uart_start_loading_bar(
+            request->show_loading_bar,
+            request->count
+        );
+    }
 
     while (copied < byte_count) {
         value = receive_byte_over_uart();
-        buffer[copied] = value;
+        request->buffer[request->transferred + copied] = value;
         copied = copied + 1;
-        if (copied == loading_bar_update) {
-            loading_bar_update = uart_update_loading_bar(
-                copied,
-                byte_count
+        total_copied = request->transferred + copied;
+        if (total_copied == request->loading_bar_update) {
+            request->loading_bar_update = uart_update_loading_bar(
+                total_copied,
+                request->count
             );
         }
     }
     descriptor->offset = descriptor->offset + copied;
+    total_copied = request->transferred + copied;
+    request->complete = copied < requested ||
+                        total_copied == request->count;
+    if (request->complete &&
+        total_copied < request->count &&
+        request->show_loading_bar) {
+        uart_update_loading_bar(request->count, request->count);
+    }
     return copied;
 }
 
@@ -136,33 +151,39 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
     struct FileDescriptor *descriptor;
 
     if (!file_descriptor_is_valid(request->file_descriptor)) {
+        request->complete = true;
         return -1;
     }
-    if (request->count == 0) {
+    if (request->count < 0 ||
+        request->transferred < 0 ||
+        request->transferred > request->count) {
+        request->complete = true;
+        return -1;
+    }
+    if (request->count == request->transferred) {
+        request->complete = true;
         return 0;
     }
 
     descriptor = table->entries + request->file_descriptor;
     if (descriptor->kind == FILE_DESCRIPTOR_FREE ||
         !file_descriptor_can_read(descriptor)) {
+        request->complete = true;
         return -1;
     }
     if (is_terminal_device_path(descriptor->path)) {
+        request->complete = true;
         return begin_terminal_read(
             kernel_terminal(),
-            request->buffer,
-            request->count,
+            request->buffer + request->transferred,
+            request->count - request->transferred,
             caller_context
         );
     }
     if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
-        return read_regular_file(
-            descriptor,
-            request->buffer,
-            request->count,
-            request->show_loading_bar
-        );
+        return read_regular_file(descriptor, request);
     }
+    request->complete = true;
     return -1;
 }
 

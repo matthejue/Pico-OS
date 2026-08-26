@@ -10,17 +10,22 @@ int invoke_syscall(int number, int argument) {
     asm("LOADIN BAF ACC 3");
     asm("LOADIN BAF IN1 4");
     asm("INT 0");
-    asm("STOREIN BAF ACC 0");
+    asm("STOREIN BAF IN2 0");
     return result;
 }
 
 int load(char *path) {
     struct LoadProcessRequest request;
+    int result;
 
     request.path = path;
     request.show_loading_bar =
         getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
-    return invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
+    result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
+    while (result == SYSCALL_LOAD_PROCESS_CONTINUE) {
+        result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
+    }
+    return result;
 }
 
 bool run(int pid, char *arguments, char **environment) {

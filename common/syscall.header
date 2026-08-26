@@ -40,6 +40,8 @@
 #define SYSCALL_MOVE 38
 #define SYSCALL_TOUCH 39
 
+#define SYSCALL_LOAD_PROCESS_CONTINUE -1
+
 struct LoadProcessRequest {
     char *path;
     bool show_loading_bar;
@@ -62,7 +64,9 @@ struct KillRequest {
 };
 
 struct PrctlRequest {
+    // Selects the operation, currently PR_SET_PDEATHSIG
     int option;
+    // Supplies an implemented signal number or 0
     int argument;
 };
 

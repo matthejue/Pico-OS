@@ -5,13 +5,27 @@
 
 int read(int file_descriptor, void *buffer, int count) {
     struct IoRequest request;
+    int result;
 
     request.file_descriptor = file_descriptor;
     request.buffer = (char *)buffer;
     request.count = count;
     request.show_loading_bar =
         getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
-    return invoke_syscall(SYSCALL_READ, (int)&request);
+    request.transferred = 0;
+    request.complete = false;
+
+    while (!request.complete) {
+        result = invoke_syscall(SYSCALL_READ, (int)&request);
+        if (result <= 0) {
+            if (result < 0 && request.transferred == 0) {
+                return -1;
+            }
+            return request.transferred;
+        }
+        request.transferred = request.transferred + result;
+    }
+    return request.transferred;
 }
 
 int write(int file_descriptor, void *buffer, int count) {

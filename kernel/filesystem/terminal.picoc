@@ -116,7 +116,7 @@ void resume_pending_terminal_read(struct Process *process) {
             process->pending_terminal_read_buffer,
             process->pending_terminal_read_count
         );
-        process->activation.acc = result;
+        process->activation.in2 = result;
         process->pending_terminal_read_buffer = NULL;
         process->pending_terminal_read_count = 0;
         if (process->waiting_queue_ptr != NULL) {
@@ -214,7 +214,7 @@ void complete_pending_terminal_read(
         process->pending_terminal_read_count
     );
 
-    process->activation.acc = result;
+    process->activation.in2 = result;
     process->pending_terminal_read_buffer = NULL;
     process->pending_terminal_read_count = 0;
     remove_from_wait_queue(process);
