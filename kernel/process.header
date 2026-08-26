@@ -6,6 +6,7 @@
 #include "../common/wait_queue.header"
 
 struct FileDescriptorTable;
+struct ProcessLoad;
 struct SharedMemoryAttachment;
 
 #define PROCESS_STATE_NEW 0
@@ -64,6 +65,8 @@ struct Process {
     // Userspace buffer retained while a terminal read is blocked or stopped
     char *pending_terminal_read_buffer;
     int pending_terminal_read_count;
+    // Partially received executable owned by this process while load() yields
+    struct ProcessLoad *pending_load;
 };
 
 void initialize_process_table(void);
@@ -93,3 +96,4 @@ struct Process *first_process(void);
 struct Process *current_process(void);
 struct Process *find_process_by_pid(int pid);
 void set_current_process(struct Process *process);
+char *copy_process_path(char *path);

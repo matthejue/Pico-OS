@@ -33,6 +33,9 @@ struct IoRequest {
     char *buffer;
     int count;
     bool show_loading_bar;
+    int transferred;
+    int loading_bar_update;
+    bool complete;
 };
 
 struct SeekRequest {

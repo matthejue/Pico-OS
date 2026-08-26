@@ -132,11 +132,17 @@ RETI chooses an address space from the two highest address bits:
 
 PicoOS uses `0x80000000` as its SRAM base and configures 2^18 physical SRAM
 words. Kernel code is non-preemptive: a timer interrupt that interrupted
-kernel code returns to that code. User processes are timer-preempted and
-scheduled round-robin. A UART interrupt can briefly run while the kernel is
-waiting, but it returns to the interrupted kernel work. Kernel operations
-therefore do not overlap with another process’s kernel operations, so the
-kernel does not need internal locks.
+kernel code records a pending reschedule and returns to that code. The request
+is consumed when the syscall next leaves the kernel, before its process resumes
+in userspace. A UART interrupt can briefly run while the kernel is waiting, but
+it returns to the interrupted kernel work. Kernel operations therefore do not
+overlap with another process’s kernel operations, so the kernel does not need
+internal locks.
+
+Executable loading and regular-file reads keep that kernel model while
+bounding its latency. Userspace wrappers transfer at most 1 KiB per syscall.
+They can request the next chunk directly because a timer observed during the
+previous chunk is handled at that syscall's return boundary.
 
 ## Contents
 
@@ -413,11 +419,12 @@ bootloader, and process loader. When the emulator assembles a program to
 | 3 | `heap_size` | Configured heap size, or `-1` for the PicoOS default |
 | 4 | `stack_start` | Highest stack cell, or `-1` for the PicoOS default |
 
-The UART `load` response supplies the total word count separately. The
-bootloader and process loader consume the five header words and copy only the
+The UART `load` response supplies the total word count separately to the
+bootloader. The userspace process loader obtains the same count from
+`file-size`. Both loaders consume the five header words and copy only the
 encoded RETI words after the header to SRAM. Consequently the PCB's
-`word_count` records the complete transferred file count, while the allocated
-process image contains only the linked program and its heap/stack room.
+`word_count` records the complete file count, while the allocated process
+image contains only the linked program and its heap/stack room.
 
 ```mermaid
 flowchart LR
@@ -590,7 +597,7 @@ protocol on top of it. Requests start with escape byte 27 and end with
 
 | Request form | Result |
 | --- | --- |
-| `<ESC>load <path><ESC>/` | Big-endian word count followed by binary bytes |
+| `<ESC>load <path><ESC>/` | Big-endian word count followed by binary bytes; used by the bootloader |
 | `<ESC>read-range <offset> <count> <path><ESC>/` | Returned byte count followed by that file range |
 | `<ESC>file-size <path><ESC>/` | File size as one 32-bit value |
 | `<ESC>write <path><ESC>/` | Create/truncate a file and route following UART bytes to it |
@@ -610,16 +617,20 @@ debugger additionally shows RETI registers, EPROM, SRAM, periphery state, PicoC
 source, snapshots, and normal/raw UART terminals.
 
 For `load`, the host returns the complete file length in words followed by the
-file bytes; `UINT32_MAX` represents failure. `read-range`, `file-size`, `pwd`,
-and `ls` begin their responses with a big-endian length/value. Output-selection
-requests are different: after `<ESC>write path<ESC>/` or
+file bytes; `UINT32_MAX` represents failure. The EPROM bootloader consumes this
+stream before scheduling exists. Userspace process loading instead combines
+`file-size` with independent 1 KiB `read-range` responses, so another process
+can safely use the host protocol between chunks. `read-range`, `file-size`,
+`pwd`, and `ls` begin their responses with a big-endian length/value.
+Output-selection requests are different: after `<ESC>write path<ESC>/` or
 `<ESC>write-at offset path<ESC>/`, ordinary subsequent UART bytes go to that
 host file until PicoOS sends `<ESC>write stdout<ESC>/` or selects stderr.
 
 This protocol is the boundary between PicoOS descriptor/path state and host
 files. The compiler creates `.bin` files, the emulator both assembles and
-serves them, the bootloader/process loader request them, and later kernel file
-operations use the same UART transport for bounded host services.
+serves them, the bootloader and process loader request them in their respective
+forms, and later kernel file operations use the same UART transport for
+bounded host services.
 
 # 2. Bootloading and kernel startup
 
@@ -733,6 +744,7 @@ PCB nodes.
 | One `struct Process` PCB | Kernel heap | `kmalloc()` | Linked from `process_list_head` | Load until removal/reaping |
 | Process image: code, data, userspace heap, stack | Process-memory arena | `pmalloc()` | PCB `base_address` and absolute pointers | Load until PCB removal |
 | Process activation | Embedded in PCB | Part of PCB | `process->activation` | Same as PCB |
+| Pending process load | Kernel heap plus reserved process-memory region | `kmalloc()` and `pmalloc()` | Loading PCB `pending_load` | Until completion, failure, or loader removal |
 | Binary path and working directory | Kernel heap | `kmalloc()` copies | PCB pointers | Same as PCB, replaceable directory |
 | File-descriptor table and entry array | Kernel heap | `kmalloc()` | `current_process()->file_descriptors` | Same as PCB |
 | Regular-file descriptor path | Kernel heap | `kmalloc()` copy | Descriptor `path` | Close, replacement, or PCB removal |
@@ -744,7 +756,7 @@ PCB nodes.
 | Per-process shared-memory attachment | Kernel heap | `kmalloc()` | PCB attachment list | Mapping until process removal |
 | Kernel/process-memory heap descriptors | Kernel `.data` globals | Static | `kmalloc()`/`pmalloc()` | Whole kernel run |
 | Heap block headers | Inside managed heap region | Written by allocator | Linked from `struct Heap` | Split/merged dynamically |
-| Syscall request objects | Usually userspace stack | Local struct | Pointer in `IN1` | One syscall |
+| Syscall request objects | Usually userspace stack | Local struct | Pointer in `IN1` | One wrapper call; the kernel never retains the request pointer |
 | Interrupt saved frame | Interrupted process stack | Register pushes and return cell | `caller_context` | Until return/copy |
 | Interrupt vector table | Kernel `.ivt` section | Linked static array | CPU vector lookup | Whole kernel run |
 
@@ -824,9 +836,11 @@ return PC remains at `activation.sp + 1` for the later `RTI`.
 ## 4.3 System-call path
 
 Userspace wrappers place the syscall number in `ACC`, one integer or request
-pointer in `IN1`, and execute `INT 0`. The naked entry saves the process
-registers, disables the process boundary while changing stacks, installs
-kernel segments and the kernel stack, and calls the normal C dispatcher:
+pointer in `IN1`, and execute `INT 0`. After `RTI`, `IN2` contains the syscall
+result, matching the normal PicoC function-return convention. The naked entry
+saves the process registers, disables the process boundary while changing
+stacks, installs kernel segments and the kernel stack, and calls the normal C
+dispatcher:
 
 ```c
 __attribute__((naked))
@@ -850,7 +864,7 @@ It is a dispatch hub rather than the owner of subsystem state:
 ```c
 int handle_syscall(int number, int argument, int *caller_context) {
     if (number == SYSCALL_LOAD_PROCESS) {
-        return load_process(
+        return load_process_chunk(
             ((struct LoadProcessRequest *)argument)->path,
             ((struct LoadProcessRequest *)argument)->show_loading_bar
         );
@@ -870,10 +884,17 @@ int handle_syscall(int number, int argument, int *caller_context) {
 }
 ```
 
-Immediate syscalls restore registers, place the C return value in `ACC`,
-restore the process boundary, and execute `RTI`. Blocking, yielding, exiting,
-and deferred termination may save or replace the activation and dispatch
-another process instead.
+Immediate syscalls replace the saved `IN2` with the C return value. Before
+restoring the other registers, the return stub checks whether a timer requested
+rescheduling while the kernel was running. A pending request dispatches from
+the saved frame; otherwise the stub restores the process boundary and executes
+`RTI`. Saved `ACC` remains the syscall number, while saved `IN2` carries the
+result through either path.
+
+The userspace `load()` and regular-file `read()` wrappers repeat chunk syscalls
+while work remains without explicitly yielding. Blocking, yielding, exiting,
+deferred timer scheduling, and deferred termination may save or replace the
+activation and dispatch another process instead.
 
 | Selectors | Kernel subsystem reached |
 | --- | --- |
@@ -903,6 +924,7 @@ of 1000 instructions after init becomes ready:
 __attribute__((naked))
 void timer_interrupt(void) {
     // Pushes ACC, IN1, IN2, BAF, CS, and DS
+    // Records a pending reschedule request
 
     // If the saved PC belongs to kernel text:
     // Restore the six registers and RTI
@@ -912,9 +934,11 @@ void timer_interrupt(void) {
 }
 ```
 
-Kernel work resumes directly. A process activation is saved and goes through
-the scheduler. This is the implementation of a non-preemptive kernel with
-preemptive userspace.
+If the timer interrupted userspace, its process activation is saved and goes
+through the scheduler immediately. If it interrupted kernel code, that code
+resumes directly and the pending request is consumed by the next syscall-return
+path. This keeps kernel execution non-preemptive without losing a time slice
+that expires inside a syscall.
 
 ## 4.5 UART ISR
 
@@ -949,7 +973,7 @@ The ISR acknowledges one byte. `Ctrl+C` becomes `SIGINT` and `Ctrl+Z` becomes
 `SIGTSTP` for the foreground process. Any other byte enters the global terminal
 ring; if the foreground process is waiting, the handler copies into that
 process's pending read buffer, writes the result into its saved
-`activation.acc`, and wakes it.
+`activation.in2`, and wakes it.
 
 ## 4.6 CPU exception path
 
@@ -1104,6 +1128,7 @@ struct Process {
     int pending_termination_signal;
     char *pending_terminal_read_buffer;
     int pending_terminal_read_count;
+    struct ProcessLoad *pending_load;
 };
 ```
 
@@ -1113,7 +1138,7 @@ struct Process {
 | `state` | `NEW`, `READY`, `RUNNING`, `BLOCKED`, `STOPPED`, or `ZOMBIE`; changed by run, queues, signals, dispatcher, and termination |
 | `base_address`, `size` | Absolute start and total cell count of the `pmalloc()` process image |
 | `heap_start`, `heap_size` | Process-relative userspace heap start and cell count from the binary header/defaults |
-| `word_count` | Loader-reported complete binary word count, including its five header words |
+| `word_count` | Complete binary word count derived from the host file size, including its five header words |
 | `binary_path` | PCB-owned `kmalloc()` copy of the path used to load the binary |
 | `working_directory` | PCB-owned absolute host path, copied from the parent or initialized with host `pwd` for PID 1 |
 | `activation` | Embedded saved CPU context used by dispatcher and blocked syscall returns |
@@ -1131,6 +1156,7 @@ struct Process {
 | `stopped_from_state` | Remembers whether a stop interrupted runnable or blocked state |
 | `pending_termination_signal` | `SIGINT`/`SIGKILL` deferred until the running process leaves its interrupt-return path; zero means none |
 | `pending_terminal_read_buffer`, `pending_terminal_read_count` | Userspace request retained while a terminal read is blocked or interrupted by a stop signal |
+| `pending_load` | Kernel-owned executable metadata, paths, progress, and reserved process-memory region while this process is between load chunks |
 
 The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers;
@@ -1138,8 +1164,8 @@ there is no address translation or protection between processes.
 
 ## 5.4 Process image and initial stack
 
-`load_process()` allocates one contiguous region from the global
-process-memory heap:
+The boot-time `load_process()` and userspace `load_process_chunk()` paths each
+allocate one contiguous region from the global process-memory heap:
 
 ```mermaid
 flowchart LR
@@ -1182,12 +1208,19 @@ sequenceDiagram
     participant PM as Process-memory heap
     participant PT as Process list
 
-    C->>K: load(path)
-    K->>H: ESC load absolute-path ESC /
-    H-->>K: Word count, five header words, encoded program
+    C->>K: load(path), syscall 3
+    K->>H: file-size and read-range for five header words
+    H-->>K: Byte count and header
     K->>K: Resolve default heap and stack boundaries
     K->>PM: pmalloc(complete process region)
-    K->>PM: Copy encoded program at base_address
+    loop At most 1 KiB per syscall
+        C->>K: Continue syscall 3
+        K->>H: read-range next payload chunk
+        H-->>K: Byte count and payload
+        K->>PM: Copy chunk at base_address + progress
+        K-->>C: Internal continue result
+        C->>K: Request the next chunk directly
+    end
     K->>PT: kmalloc PCB/path/descriptors and append NEW process
     K-->>C: PID, or 0 on failure
     C->>K: run(pid, arguments, environment)
@@ -1199,13 +1232,16 @@ If the binary header contains `heap_size == -1`, PicoOS uses its 1000-cell
 default. If `stack_start == -1`, it leaves another 1000 cells above the heap
 for the downward-growing stack. An explicit stack start is rejected if it
 overlaps the heap. These choices determine the size passed to `pmalloc()`;
-the loader does not allocate code, heap, and stack as separate blocks.
+the loader does not allocate code, heap, and stack as separate blocks. The
+partial image belongs to the loading PCB and is released if that process is
+terminated before the transfer completes. A PCB for the new process is only
+created after the last chunk arrives.
 
 ## 5.5 States and lifetime
 
 | State | Meaning | Typical transition |
 | --- | --- | --- |
-| `NEW` | Image and PCB exist but initial run state is incomplete | `load_process()` |
+| `NEW` | Complete image and PCB exist but initial run state is incomplete | Completed process load |
 | `READY` | Eligible for the scheduler | Run setup, queue wakeup, or `SIGCONT` |
 | `RUNNING` | Activation is loaded into the CPU | Dispatcher |
 | `BLOCKED` | PCB is linked into one wait queue | Terminal read, `waitpid()`, or `sleep()` |
@@ -1233,7 +1269,8 @@ stateDiagram-v2
     ZOMBIE --> [*]: waitpid collection or orphan cleanup
 ```
 
-Loading and starting are separate. `load_process()` creates a `NEW` PCB.
+Loading and starting are separate. Completing `load_process()` or
+`load_process_chunk()` creates a `NEW` PCB.
 `mark_process_ready_with_arguments()` inherits descriptor values, writes the
 initial stack, and changes it to `READY`.
 
@@ -1251,8 +1288,9 @@ PCB, image, descriptor table, paths, and attachments until the parent collects
 it with `waitpid()`.
 
 Final removal unlinks the PCB from a wait queue and process list, releases
-shared-memory attachments, calls `pfree(base_address)`, destroys the descriptor
-table, and frees PCB-owned strings and the PCB with `kfree()`.
+shared-memory attachments and any pending process load, calls
+`pfree(base_address)`, destroys the descriptor table, and frees PCB-owned
+strings and the PCB with `kfree()`.
 
 ## 5.6 Important process functions
 
@@ -1284,7 +1322,9 @@ Process-loading functions are kept separately:
 
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
-| [`load_process(char *path, bool show_loading_bar)`](kernel/process/process_loader.picoc) | PID or 0 | Receives header/payload, `pmalloc()`s image, creates and appends `NEW` PCB |
+| [`load_process(char *path, bool show_loading_bar)`](kernel/process/process_loader.picoc) | PID or 0 | Boot-time continuous transfer used before the timer starts |
+| `load_process_chunk(char *path, bool show_loading_bar)` | PID, 0, or internal continue value | Starts or advances the current PCB's bounded ranged transfer and creates a `NEW` PCB only when complete |
+| `cancel_process_load(struct Process *process)` | `void` | Releases a partial image, copied paths, and continuation metadata |
 | [`store_process_arguments(struct Process *process, char *arguments, char **environment)`](kernel/process/process_arguments.picoc) | `void` | Writes initial stack/tables/strings into image and changes activation `sp`/`baf` |
 | [`mark_process_ready_with_arguments(struct RunProcessRequest *request)`](kernel/process/process_arguments.picoc) | Success | Installs inherited descriptor copy, stores startup data, changes `NEW` to `READY` |
 
@@ -1608,8 +1648,8 @@ the only runnable one.
 
 ## 7.2 Saving and selecting
 
-Timer preemption, `yield()`, terminal blocking, queues, and `waitpid()`
-eventually pass a saved frame to:
+Immediate timer preemption, deferred timer requests, `yield()`, terminal
+blocking, queues, and `waitpid()` eventually pass a saved frame to:
 
 ```c
 void dispatcher_switch_from_context(int *caller_context) {
@@ -1634,7 +1674,10 @@ void dispatcher_switch_from_context(int *caller_context) {
 
 Blocking code has already changed the PCB to `BLOCKED`, so that state remains.
 Timer preemption or `yield()` reaches the dispatcher from `RUNNING`, which
-becomes `READY`.
+becomes `READY`. `dispatcher_request_reschedule()` records timer expiry without
+switching inside the kernel, and `dispatcher_reschedule_if_requested()` sends
+the syscall's saved frame through this same path at return. Any actual process
+switch clears the request.
 
 `dispatcher_start_next_process()` schedules and calls
 `prepare_process_termination()` before running a PCB. Deferred termination can
@@ -1672,6 +1715,8 @@ kernel code through `RTI`.
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
 | `scheduler_next_process(void)` | Runnable PCB or `NULL` | Reads list/current globals |
+| `dispatcher_request_reschedule(void)` | `void` | Records that a timer expired while preserving the current kernel execution |
+| `dispatcher_reschedule_if_requested(int *caller_context)` | Returns only when no request is pending | Dispatches from the syscall frame when a timer request is pending |
 | `dispatcher_switch_from_context(int *caller_context)` | Does not return on switch | Copies frame to activation, may change `RUNNING` to `READY` |
 | `dispatcher_start_next_process(void)` | Normally leaves through `RTI` | Schedules, consumes signal actions, waits if all blocked |
 | `dispatcher_switch_to_process(struct Process *process)` | Does not return normally | Updates states and active pointer |
@@ -2023,6 +2068,9 @@ provides the pointer to the single global instance instead. When the ring is
 full, a new byte discards the oldest. A read copies as many available bytes as
 possible and need not fill the requested count.
 
+Callers retrieve this pointer once and pass it to terminal helpers. This avoids
+extra `kernel_terminal()` calls when one helper invokes another.
+
 The descriptor layer reaches this object through the hardcoded virtual path
 `/device/terminal`. Opening that path skips host-file requests, terminal reads
 use the input ring, terminal writes use UART output, and seeking fails. The
@@ -2033,7 +2081,7 @@ If the input ring is empty during a foreground read, `begin_terminal_read()`
 briefly disables UART delivery to prevent a lost wakeup, stores buffer/count in
 the current PCB, enqueues it on `input_waiters`, restores UART routing, and
 dispatches. A later UART ISR resolves the current input owner, copies bytes into
-that process's request, stores the result in `process->activation.acc`, clears
+that process's request, stores the result in `process->activation.in2`, clears
 its pending state, and wakes it.
 
 The shell transfers `terminal_input_process_id` between itself and one
@@ -2061,7 +2109,7 @@ sequenceDiagram
         K->>P: Save activation and change to BLOCKED
         K->>D: Select another process
         U->>T: Enqueue received byte
-        U->>P: Copy bytes and store result in activation.acc
+        U->>P: Copy bytes and store result in activation.in2
         U->>T: Clear pending fields and wake queue head
         D-->>P: Restore later and return the saved result
     end
@@ -2087,7 +2135,7 @@ sequenceDiagram
 | `enqueue_terminal_byte(struct Terminal *terminal, int value)` | `void` | Inserts at tail; may discard oldest |
 | `suspend_pending_terminal_read(struct Process *process)` | `void` | Detaches a stopped reader from the active terminal queue while retaining its PCB request |
 | `begin_terminal_read(struct Terminal *terminal, char *buffer, int count, int *caller_context)` | Immediate or later result | Reads ring or fills pending fields, queues PCB, saves activation, dispatches |
-| `complete_pending_terminal_read(struct Process *process, struct Terminal *terminal)` | `void` | Internal: copies available input, writes saved `activation.acc`, clears pending fields, wakes reader |
+| `complete_pending_terminal_read(struct Process *process, struct Terminal *terminal)` | `void` | Internal: copies available input, writes saved `activation.in2`, clears pending fields, wakes reader |
 | `handle_uart_interrupt(void)` | `void` | Acknowledges byte, signals target or mutates terminal/reader PCB |
 
 ## 9.4 Opening, reading, writing, and seeking
@@ -2108,8 +2156,11 @@ operations and opens the kernel terminal directly.
 
 `read_file_descriptor()` validates the entry and read mode. A descriptor whose
 path is `/device/terminal` reads from the kernel terminal and may block. Any
-other file path sends a ranged host request at `descriptor->offset`, copies
-returned bytes, and advances the offset.
+other file path sends independent ranged host requests of at most 1 KiB at
+`descriptor->offset`, copies returned bytes, and advances the offset. The
+userspace `read()` wrapper repeats syscall 16 until the requested count, EOF,
+or an error. It does not need to yield between chunks because deferred timer
+requests are consumed when each syscall returns.
 
 `write_file_descriptor()` validates write mode. Stdout sends bytes directly.
 Stderr temporarily selects host stderr. A regular file sends
@@ -2140,15 +2191,19 @@ sequenceDiagram
     participant E as RETI-Emulator
     participant H as Host filesystem
 
-    A->>K: read(fd, buffer, count), syscall 16 with IoRequest
-    K->>K: Validate descriptor, access mode, buffer, and count
-    K->>U: Send ranged request at descriptor.offset
-    U->>E: ESC read-range offset count absolute-path ESC /
-    E->>H: Open, seek, and read at most count bytes
-    H-->>E: Returned data
-    E-->>U: Big-endian returned count and bytes
-    U->>K: Copy into userspace buffer
-    K->>K: Advance descriptor.offset by returned count
+    loop Until count, EOF, or error
+        A->>K: read chunk, syscall 16 with IoRequest
+        K->>K: Validate descriptor and remaining count
+        K->>U: Request at most 1 KiB at descriptor.offset
+        U->>E: ESC read-range offset chunk-count absolute-path ESC /
+        E->>H: Open, seek, and read the bounded range
+        H-->>E: Returned data
+        E-->>U: Big-endian returned count and bytes
+        U->>K: Copy at buffer + transferred
+        K->>K: Advance descriptor offset and request progress
+        K-->>A: Chunk count and completion flag
+        A->>K: Request the next chunk directly
+    end
     K-->>A: Return count
 ```
 
@@ -2232,6 +2287,9 @@ struct IoRequest {
     char *buffer;
     int count;
     bool show_loading_bar;
+    int transferred;
+    int loading_bar_update;
+    bool complete;
 };
 struct SeekRequest {
     int file_descriptor;
@@ -2244,8 +2302,10 @@ struct Dup2Request { int old_file_descriptor; int new_file_descriptor; };
 
 These request objects are not allocated with `malloc()`, `kmalloc()`, or
 `pmalloc()`: they are ordinary locals in the caller's process stack. The
-kernel reads them synchronously through the absolute pointer. It does not keep
-the request pointer after the syscall. The important exception is the value of
+kernel reads them synchronously through the absolute pointer. `load()` and
+regular-file `read()` keep their local request alive while their wrappers make
+repeated syscalls, but the kernel does not retain its pointer between calls.
+The important exception is the value of
 `WaitPidRequest.status`: when waiting blocks, the kernel copies that separate
 pointer into `PCB.waiting_status_ptr`; the pointed-to status cell remains safe
 because the caller's stack is suspended.
@@ -2278,6 +2338,9 @@ because the caller's stack is suspended.
 | `IoRequest.buffer` | Userspace destination for read or source for write | Used directly during the call; for a blocked terminal read the caller's PCB temporarily retains the destination pointer |
 | `IoRequest.count` | Maximum cells to read or exact cells to write | Validated before transfer; retained in terminal pending state only while stdin is blocked |
 | `IoRequest.show_loading_bar` | Whether a host-file read shows progress | `read()` derives this from the environment; writes set it false |
+| `IoRequest.transferred` | Bytes already copied by earlier chunks of the same `read()` | Updated by the userspace wrapper and used as the next buffer position |
+| `IoRequest.loading_bar_update` | Next total byte count that redraws read progress | Initialized by the first regular-file chunk and carried in the wrapper's local request |
+| `IoRequest.complete` | Whether `read()` should return instead of invoking another chunk | Set immediately for terminal reads and on count, EOF, or error for regular files |
 | `SeekRequest.file_descriptor` | Regular-file descriptor to reposition | `lseek()` / syscall 19 |
 | `SeekRequest.offset` | Signed displacement | Combined with `SEEK_SET`, current descriptor offset, or host file size |
 | `SeekRequest.origin` | `SEEK_SET`, `SEEK_CUR`, or `SEEK_END` | Selects the base for the new descriptor offset |
@@ -2322,14 +2385,14 @@ kernel until it needs I/O or a process service.
 
 | Function | Return and purpose | Syscall and request |
 | --- | --- | --- |
-| `int load(char *path)` | PID, or 0; creates a `NEW` process | 3, `LoadProcessRequest` |
+| `int load(char *path)` | PID, or 0; repeats bounded syscall 3 transfers and creates a `NEW` process | 3, `LoadProcessRequest` |
 | `bool run(int pid, char *arguments, char **environment)` | Whether a `NEW` process was initialized and made `READY`; `NULL` environment means current `environ` | 8, `RunProcessRequest` |
 | `bool unload(int pid)` | Whether a non-current target was terminated/removed | 5, PID directly |
 | `void list_processes(void)` | Prints all known PIDs and binary paths | 4, no request |
 | `int getpid(void)` | Current PCB's PID | 14, no request |
 | `void reset_processes(void)` | Test hook that removes non-system processes and resets related state | 25, no request |
 | `int set_foreground_process(int pid)` | 0 or `-1`; gives terminal input/signals to a direct child, or back to the shell for PID 0 | 30, PID directly |
-| `int read(int fd, void *buffer, int count)` | Number read or `-1`; may block on stdin | 16, `IoRequest` |
+| `int read(int fd, void *buffer, int count)` | Number read or `-1`; repeats bounded regular-file chunks and may block on stdin | 16, `IoRequest` |
 | `int write(int fd, void *buffer, int count)` | Number written or `-1` | 17, `IoRequest` |
 | `int close(int fd)` | 0 or `-1`; releases the descriptor entry's path/state | 18, descriptor directly |
 | `int dup2(int old_fd, int new_fd)` | New descriptor or `-1`; independently copies the entry | 24, `Dup2Request` |
@@ -2433,7 +2496,6 @@ process heap.
 | `void destroy_environment(char **environment)` | Frees a cloned array and its strings | No syscall |
 | `int restore_environment(char **environment)` | Clears and recreates current `environ` from a clone | No syscall |
 | `void exit(int status)` | Terminates current process and does not normally return | Syscall 9, status directly |
-| `memcpy`, `memset` | Cell-wise copying/filling | No syscall |
 | `strcpy`, `strcat` | Copy/append terminated strings | No syscall |
 | `strcmp`, `strncmp`, `strlen` | Compare strings or count cells before `NUL` | No syscall |
 

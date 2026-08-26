@@ -1,0 +1,24 @@
+// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks
+
+#include "../../library/fcntl/fcntl.header"
+#include "../../library/unistd/unistd.header"
+
+#define READ_COUNT 1100
+
+char contents[READ_COUNT];
+
+int main(void) {
+    int file_descriptor = open("README.md", O_RDONLY);
+    int count;
+
+    if (file_descriptor < 0) {
+        return 1;
+    }
+    count = read(file_descriptor, contents, READ_COUNT);
+    close(file_descriptor);
+    if (count != READ_COUNT || contents[0] != '#') {
+        return 2;
+    }
+    write(STDOUT_FILENO, "chunked file read passed\n", 25);
+    return 0;
+}

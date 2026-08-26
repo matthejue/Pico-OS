@@ -1,0 +1,13 @@
+// dependencies: ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/sys/mman/mman.header"
+
+#define SHARED_NAME "chunked-process-load"
+
+int main(void) {
+    int shared_id = shm_open(SHARED_NAME, 1);
+    int *worker_ran = (int *)mmap(shared_id);
+
+    *worker_ran = 1;
+    return 0;
+}

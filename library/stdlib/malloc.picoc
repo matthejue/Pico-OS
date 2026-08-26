@@ -22,12 +22,12 @@ void init_process_heap(void) {
     // SYSCALL_PROCESS_HEAP_START
     asm("LOADI ACC 6");
     asm("INT 0");
-    asm("STOREIN BAF ACC 0");
+    asm("STOREIN BAF IN2 0");
 
     // SYSCALL_PROCESS_HEAP_SIZE
     asm("LOADI ACC 7");
     asm("INT 0");
-    asm("STOREIN BAF ACC -1");
+    asm("STOREIN BAF IN2 -1");
 
     heap_init_region(&process_heap, (void *)heap_start, heap_size);
 }

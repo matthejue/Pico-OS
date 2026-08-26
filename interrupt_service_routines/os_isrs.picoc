@@ -9,7 +9,9 @@
 #define OS_INTERRUPT_VECTOR_COUNT 4
 
 void timer_interrupt(void);
+void timer_interrupt_after_reschedule_request(void);
 void syscall_interrupt(void);
+void syscall_interrupt_restore(void);
 void uart_interrupt(void);
 void cpu_exception_interrupt(void);
 
@@ -23,7 +25,7 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
 
 __attribute__((naked))
 void timer_interrupt(void) {
-    // Saves the interrupted context before deciding whether to enter the scheduler
+    // Saves the interrupted context before requesting a process switch
     asm("PUSH ACC");
     asm("PUSH IN1");
     asm("PUSH IN2");
@@ -32,13 +34,26 @@ void timer_interrupt(void) {
     asm("PUSH DS");
     // SP is saved later. From then on, its value is called old_sp
 
+    // Uses kernel segments because an interrupt can arrive during entry or return
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+
+    asm("LOADI32 ACC timer_interrupt_after_reschedule_request");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC dispatcher_request_reschedule");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void timer_interrupt_after_reschedule_request(void) {
     /*
      * Restores kernel regs when the interrupted instruction belongs to the
-     * kernel code segment. CS cannot identify this reliably because process
-     * entry and syscall return update it shortly before leaving kernel code
+     * kernel code segment. The pending request is consumed when that kernel
+     * work next returns to a process
      */
     asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
-    asm(KERNEL_DS_START_ASM); // Kernel code ends before its data segment
     asm("SUB ACC DS");
     asm("JUMP>= 14"); // Only process code executes at or above this boundary
     asm("POP DS");
@@ -99,10 +114,9 @@ void syscall_interrupt(void) {
     asm("LOADIN BAF IN2 6");
     asm("PUSH IN2"); // Syscall number
 
-    // A syscall that switches processes resumes with a successful result
+    // A syscall that switches processes resumes with a successful IN2 result
     asm("LOADI IN2 1");
     asm("STOREIN BAF IN2 4");
-    asm("STOREIN BAF IN2 6");
 
     // Calls handle_syscall and returns through syscall_interrupt_return
     asm("LOADI32 ACC syscall_interrupt_return");
@@ -116,8 +130,20 @@ void syscall_interrupt(void) {
 __attribute__((naked))
 void syscall_interrupt_return(void) {
     // Handle_syscall restores BAF to the saved caller context before returning
-    // Saves the syscall result before switching back to the process stack
+    // Saves the IN2 result before a pending timer request can dispatch the caller
     asm("STOREIN BAF IN2 4");
+
+    asm("PUSH BAF"); // Caller context
+    asm("LOADI32 ACC syscall_interrupt_restore");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC dispatcher_reschedule_if_requested");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void syscall_interrupt_restore(void) {
     asm("MOVE BAF SP");
     activate_current_process_stack_boundary();
     asm("POP DS");
@@ -125,8 +151,7 @@ void syscall_interrupt_return(void) {
     asm("POP BAF");
     asm("POP IN2");
     asm("POP IN1");
-    asm("ADDI SP 1"); // Skip saved ACC
-    asm("MOVE IN2 ACC");
+    asm("POP ACC");
     asm("RTI");
 }
 
