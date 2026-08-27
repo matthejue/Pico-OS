@@ -9,6 +9,7 @@
 #include "pmalloc.header"
 #include "shared_memory.header"
 #include "filesystem/terminal.header"
+#include "../config/config.header"
 
 void shutdown(void) {
     asm("JUMP 0");
@@ -26,7 +27,7 @@ int main(void) {
     init_process_memory_heap();
     initialize_shared_memory();
     interrupt_controller_initialize();
-    init_pid = load_process("system/init.bin", false);
+    init_pid = load_process("system/init.bin", loading_bar_enabled);
     init_request.pid = init_pid;
     init_request.arguments = NULL;
     init_request.environment = NULL;

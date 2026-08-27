@@ -659,6 +659,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/syscall.picoc
 
 KERNEL_HEADERS := \
+	config/config.header \
 	$(filter-out kernel/memory_constants.header,$(wildcard kernel/*.header)) \
 	$(wildcard kernel/filesystem/*.header) \
 	$(wildcard common/*.header)
