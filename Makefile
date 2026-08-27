@@ -113,7 +113,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -165,6 +165,7 @@ help:
 	@echo "  make poweroff.bin               Build the poweroff user program binary"
 	@echo "  make ps.bin                     Build the ps user program binary"
 	@echo "  make pwd.bin                    Build the pwd user program binary"
+	@echo "  make reboot.bin                 Build the reboot user program binary"
 	@echo "  make rm.bin                     Build the rm user program binary"
 	@echo "  make rmdir.bin                  Build the rmdir user program binary"
 	@echo "  make sed.bin                    Build the sed user program binary"
@@ -519,6 +520,10 @@ ps.bin: binary/user/ps.bin
 pwd.reti: user/pwd.reti
 
 pwd.bin: binary/user/pwd.bin
+
+reboot.reti: user/reboot.reti
+
+reboot.bin: binary/user/reboot.bin
 
 rm.reti: user/rm.reti
 
