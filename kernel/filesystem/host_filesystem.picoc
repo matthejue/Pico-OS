@@ -13,7 +13,7 @@ int uart_receive_string(char *buffer, int capacity) {
     int value;
 
     if (byte_count < 0) {
-        buffer[0] = 0;
+        buffer[0] = '\0';
         return -1;
     }
     while (index < byte_count) {
@@ -24,9 +24,9 @@ int uart_receive_string(char *buffer, int capacity) {
         index = index + 1;
     }
     if (byte_count < capacity) {
-        buffer[byte_count] = 0;
+        buffer[byte_count] = '\0';
     } else {
-        buffer[capacity - 1] = 0;
+        buffer[capacity - 1] = '\0';
     }
     if (byte_count >= capacity) {
         return -1;
@@ -45,12 +45,12 @@ bool append_path_segments(
     int segment_length;
     int copy_index;
 
-    while (path[index] != 0) {
+    while (path[index] != '\0') {
         while (path[index] == '/') {
             index = index + 1;
         }
         segment_start = index;
-        while (path[index] != 0 && path[index] != '/') {
+        while (path[index] != '\0' && path[index] != '/') {
             index = index + 1;
         }
         segment_length = index - segment_start;
@@ -111,7 +111,7 @@ bool build_process_path(char *path, char *result, int capacity) {
         )) {
         return false;
     }
-    result[result_length] = 0;
+    result[result_length] = '\0';
     return true;
 }
 

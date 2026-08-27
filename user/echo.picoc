@@ -5,7 +5,7 @@
 void print_argument(char *argument) {
     int index = 0;
 
-    while (argument[index] != 0) {
+    while (argument[index] != '\0') {
         if (argument[index] == '\\' &&
             argument[index + 1] == 'n') {
             printf("%c", '\n');

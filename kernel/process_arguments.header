@@ -1,6 +1,7 @@
 #pragma once
 
 #include "process.header"
+#include "../common/stddef.header"
 #include "../common/syscall.header"
 
 void store_process_arguments(

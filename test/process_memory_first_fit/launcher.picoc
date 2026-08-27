@@ -18,11 +18,11 @@ int main(void) {
     int address_6;
     int address_7;
     int address_8;
-    int first_fit_1;
-    int first_fit_2;
-    int first_fit_3;
-    int first_fit_4;
-    int first_fit_5;
+    bool first_fit_1;
+    bool first_fit_2;
+    bool first_fit_3;
+    bool first_fit_4;
+    bool first_fit_5;
     char result[10];
 
     worker_1 = load("test/process_memory_first_fit/worker.bin");

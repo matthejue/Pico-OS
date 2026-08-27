@@ -2,6 +2,7 @@
 
 #include "../../library/sys/prctl/prctl.header"
 #include "../../library/schedule/schedule.header"
+#include "../../common/stddef.header"
 
 int main(void) {
     if (prctl(PR_SET_PDEATHSIG, 0) == -1) {
@@ -9,7 +10,7 @@ int main(void) {
     }
 
     yield();
-    while (1) {
+    while (true) {
         yield();
     }
 }

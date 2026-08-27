@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../common/stddef.header"
 #include "../../common/syscall.header"
 
 struct Process;
