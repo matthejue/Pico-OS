@@ -1,0 +1,27 @@
+process with pid 3 created
+Usage: cp.bin SOURCE DESTINATION
+Copy a file.
+process with pid 4 created
+Usage: mv.bin SOURCE DESTINATION
+Move or rename a path.
+process with pid 5 created
+Usage: poweroff.bin
+Shut down PicoOS.
+process with pid 6 created
+Usage: ps.bin
+List running processes.
+process with pid 7 created
+Usage: reboot.bin
+Restart PicoOS.
+process with pid 8 created
+Usage: sed.bin EXPRESSION FILE
+Edit selected lines from a file.
+process with pid 9 created
+Usage: shell.bin
+Start the PicoOS command shell.
+process with pid 10 created
+Usage: touch.bin FILE...
+Create files or update their timestamps.
+process with pid 11 created
+--help
+process with pid 12 created

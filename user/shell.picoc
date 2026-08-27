@@ -1,3 +1,5 @@
+// dependencies: ../common/user_command.reti_blocks
+
 #include "../library/unistd/unistd.header"
 #include "../library/fcntl/fcntl.header"
 #include "../library/sys/wait/wait.header"
@@ -7,6 +9,7 @@
 #include "../library/string/string.header"
 #include "../common/decimal.header"
 #include "../common/loading_bar.header"
+#include "../common/user_command.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
 #define SHELL_COMMAND_HISTORY_CAPACITY 8
@@ -46,6 +49,11 @@ void shell_write_string(char *text) {
         length = length + 1;
     }
     write(STDOUT_FILENO, text, length);
+}
+
+void shell_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: shell.bin\n");
+    command_write(file_descriptor, "Start the PicoOS command shell.\n");
 }
 
 void shell_write_decimal(int value) {
@@ -1037,8 +1045,7 @@ bool eval(char *command) {
             shell_write_string(
                 "Change the shell's working directory.\n"
             );
-        } else if (strcmp(raw_arguments, "--help") == 0 ||
-                   strcmp(raw_arguments, "-h") == 0) {
+        } else if (command_is_help(raw_arguments)) {
             shell_write_string("Usage: cd DIRECTORY\n");
             shell_write_string(
                 "Change the shell's working directory.\n"
@@ -1152,6 +1159,14 @@ int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
     int command_length;
 
+    if (argc == 2 && command_is_help(argv[1])) {
+        shell_usage(STDOUT_FILENO);
+        return 0;
+    }
+    if (argc != 1) {
+        shell_usage(STDERR_FILENO);
+        return 1;
+    }
     set_foreground_process(0);
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
         shell_write_string("error: could not configure shell signals\n");

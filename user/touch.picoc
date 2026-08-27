@@ -3,11 +3,20 @@
 #include "../common/user_command.header"
 #include "../library/unistd/unistd.header"
 
+void touch_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: touch.bin FILE...\n");
+    command_write(file_descriptor, "Create files or update their timestamps.\n");
+}
+
 int main(int argc, char **argv) {
     int index = 1;
 
+    if (argc == 2 && command_is_help(argv[1])) {
+        touch_usage(STDOUT_FILENO);
+        return 0;
+    }
     if (argc < 2) {
-        command_write(STDERR_FILENO, "Usage: touch.bin FILE...\n");
+        touch_usage(STDERR_FILENO);
         return 1;
     }
     while (index < argc) {

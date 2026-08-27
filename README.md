@@ -2916,29 +2916,32 @@ change its parent shell's environment, working directory, or descriptor table.
 
 | Binary | Behavior | Principal library functions called |
 | --- | --- | --- |
-| `shell.bin` | Interactive command interpreter described above | `read`, `write`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `chdir`, `getcwd` |
+| `shell.bin` | Interactive command interpreter described above | `read`, `write`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `chdir`, `getcwd`, `command_is_help` |
 | `echo.bin` | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
 | `count.bin` | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
 | `cat.bin` | Opens each file read-only, copies it in 64-cell chunks to stdout, continues after per-file errors | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
-| `touch.bin` | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write` |
-| `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write` |
-| `mv.bin` | Moves or renames one file or directory | `move`, `command_write` |
-| `sed.bin` | Inserts, changes, or appends text at one line number or inserts before matching lines | `open`, `lseek`, `read`, `write`, `close`, `malloc`, `free`, `unsetenv`, `command_write` |
-| `ps.bin` | Prints every process PID and binary path | `list_processes` |
-| `ls.bin` | Lists `.` or one directory and prefixes entries with `d` or `-` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
+| `touch.bin` | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
+| `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| `mv.bin` | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
+| `sed.bin` | Inserts, changes, or appends text at one line number or inserts before matching lines | `open`, `lseek`, `read`, `write`, `close`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
+| `ps.bin` | Prints every process PID and binary path | `list_processes`, `command_write`, `command_is_help` |
+| `ls.bin` | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
 | `mkdir.bin` | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
 | `pwd.bin` | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
 | `rm.bin` | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
 | `rmdir.bin` | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
 | `kill.bin` | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
-| `poweroff.bin` | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)` |
-| `reboot.bin` | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)` |
+| `poweroff.bin` | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
+| `reboot.bin` | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
 application helpers. `command_write(fd, text)` counts the string and calls
 `write()`. `command_is_help(argument)` recognizes `-h` and `--help`. These
 helpers allocate no state and use no request structure beyond the `IoRequest`
 created inside `write()`.
+
+Every user program except `echo.bin` uses `command_is_help()` for a sole help
+argument. `echo.bin` keeps `-h` and `--help` as ordinary text to print.
 
 ## 13.2 Command behavior and limitations
 
@@ -2965,8 +2968,8 @@ before, change, append after, or insert before every line containing the simple
 pattern. It loads the file into memory and disables `PICOOS_LOADING_BAR` so the
 file output is not mixed with progress text.
 
-`ls.bin` preserves host listing order and includes hidden entries and `.`/`..`.
-There is no sorting, long format, filtering, or recursion. `mkdir.bin` has no
+`ls.bin` preserves host listing order and hides names beginning with `.` unless
+`-a` is given. There is no sorting, long format, or recursion. `mkdir.bin` has no
 `-p`; `rm.bin` has no force/recursive mode; `rmdir.bin` removes only empty
 directories. All continue through later operands after an individual error.
 

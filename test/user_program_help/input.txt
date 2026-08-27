@@ -1,0 +1,10 @@
+cp.bin --help
+mv.bin --help
+poweroff.bin --help
+ps.bin --help
+reboot.bin --help
+sed.bin --help
+shell.bin --help
+touch.bin --help
+echo.bin --help
+poweroff.bin

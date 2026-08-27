@@ -5,25 +5,42 @@
 #include "../library/unistd/unistd.header"
 
 void ls_usage(int file_descriptor) {
-    command_write(file_descriptor, "Usage: ls.bin [DIRECTORY]\n");
-    command_write(file_descriptor, "List every entry in a directory.\n");
+    command_write(file_descriptor, "Usage: ls.bin [-a] [DIRECTORY]\n");
+    command_write(file_descriptor, "List directory entries.\n");
+    command_write(file_descriptor, "  -a  Include hidden entries.\n");
 }
 
 int main(int argc, char **argv) {
     char *path = ".";
     DIR *directory;
     struct dirent *entry;
+    bool show_hidden = false;
 
     if (argc == 2 && command_is_help(argv[1])) {
         ls_usage(STDOUT_FILENO);
         return 0;
     }
-    if (argc > 2) {
+    if (argc > 3) {
         ls_usage(STDERR_FILENO);
         return 1;
     }
-    if (argc == 2) {
+    if (argc >= 2 &&
+        argv[1][0] == '-' &&
+        argv[1][1] == 'a' &&
+        argv[1][2] == '\0') {
+        show_hidden = true;
+        if (argc == 3) {
+            if (argv[2][0] == '-') {
+                ls_usage(STDERR_FILENO);
+                return 1;
+            }
+            path = argv[2];
+        }
+    } else if (argc == 2 && argv[1][0] != '-') {
         path = argv[1];
+    } else if (argc >= 2) {
+        ls_usage(STDERR_FILENO);
+        return 1;
     }
     directory = opendir(path);
     if (directory == NULL) {
@@ -32,13 +49,15 @@ int main(int argc, char **argv) {
     }
     entry = readdir(directory);
     while (entry != NULL) {
-        if (entry->d_type == DT_DIR) {
-            command_write(STDOUT_FILENO, "d ");
-        } else {
-            command_write(STDOUT_FILENO, "- ");
+        if (show_hidden || entry->d_name[0] != '.') {
+            if (entry->d_type == DT_DIR) {
+                command_write(STDOUT_FILENO, "d ");
+            } else {
+                command_write(STDOUT_FILENO, "- ");
+            }
+            command_write(STDOUT_FILENO, entry->d_name);
+            command_write(STDOUT_FILENO, "\n");
         }
-        command_write(STDOUT_FILENO, entry->d_name);
-        command_write(STDOUT_FILENO, "\n");
         entry = readdir(directory);
     }
     closedir(directory);
