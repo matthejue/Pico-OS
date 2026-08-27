@@ -120,7 +120,6 @@ int open_shared_memory(struct ShmOpenRequest *request) {
     entry->id = next_shared_memory_id;
     next_shared_memory_id = next_shared_memory_id + 1;
     entry->address = (void *)address;
-    entry->size = request->size;
     entry->reference_count = 0;
     entry->unlink_requested = false;
     entry->next = shared_memory_list_head;

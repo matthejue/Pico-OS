@@ -27,6 +27,7 @@ int pmalloc(int size) {
     return (int)memory;
 }
 
+// Resizes process-memory allocations; currently unused
 int prealloc(int start, int size) {
     void *memory;
 

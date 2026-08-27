@@ -108,26 +108,3 @@ void uart_send_file_write_command(char *path, int offset) {
     uart_print_character(27);
     uart_print_character('/');
 }
-
-int uart_read_file(char *path, char *buffer, int capacity) {
-    int byte_count;
-    int buffer_index = 0;
-    int value;
-
-    uart_send_file_range_command(path, 0, capacity - 1);
-    byte_count = receive_word();
-
-    if (byte_count == -1) {
-        buffer[0] = '\0';
-        return -1;
-    }
-
-    while (buffer_index < byte_count) {
-        value = receive_byte_over_uart();
-        buffer[buffer_index] = value;
-        buffer_index++;
-    }
-
-    buffer[buffer_index] = '\0';
-    return buffer_index;
-}
