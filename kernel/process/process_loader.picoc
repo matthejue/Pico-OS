@@ -17,7 +17,6 @@ struct ProcessLoad {
     int data_start;
     int heap_start;
     int heap_size;
-    int word_count;
     int payload_word_count;
     int loaded_word_count;
     int loading_bar_update;
@@ -94,7 +93,6 @@ int finish_process_load(struct Process *owner) {
         load->data_start,
         load->heap_start,
         load->heap_size,
-        load->word_count,
         load->binary_path
     );
     int pid;
@@ -179,8 +177,7 @@ int begin_process_load(char *path, bool show_loading_bar) {
     load->data_start = data_start;
     load->heap_start = heap_start;
     load->heap_size = heap_size;
-    load->word_count = file_byte_count / 4;
-    load->payload_word_count = load->word_count - 5;
+    load->payload_word_count = file_byte_count / 4 - 5;
     load->loaded_word_count = 0;
     load->binary_path = copy_process_path(path);
     load->host_path = copy_process_path(host_path);
@@ -326,7 +323,6 @@ int load_process(char *path, bool show_loading_bar) {
         data_start,
         heap_start,
         heap_size,
-        word_count,
         path
     );
 

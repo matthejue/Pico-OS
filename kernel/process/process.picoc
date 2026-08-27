@@ -90,7 +90,6 @@ struct Process *create_process(
     int data_start,
     int heap_start,
     int heap_size,
-    int word_count,
     char *binary_path
 ) {
     struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
@@ -104,7 +103,6 @@ struct Process *create_process(
     process->size = size;
     process->heap_start = heap_start;
     process->heap_size = heap_size;
-    process->word_count = word_count;
     process->binary_path = copy_process_path(binary_path);
     process->file_descriptors = create_file_descriptor_table();
 

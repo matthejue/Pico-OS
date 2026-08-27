@@ -27,6 +27,7 @@ void *kmalloc(int size) {
     );
 }
 
+// Resizes kernel heap allocations; currently unused
 void *krealloc(void *ptr, int size) {
     return require_kernel_heap_allocation(
         heap_realloc_from(&kernel_heap, ptr, size),

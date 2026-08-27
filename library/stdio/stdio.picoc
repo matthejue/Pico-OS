@@ -76,11 +76,6 @@ bool standard_stream_uses_legacy_uart(FILE *stream, int file_descriptor) {
            stream->file_descriptor == file_descriptor;
 }
 
-void initialize_standard_streams(void) {
-    prepare_standard_streams();
-    standard_streams_use_file_descriptors = true;
-}
-
 FILE *standard_input(void) {
     prepare_standard_streams();
     return standard_input_pointer;

@@ -422,9 +422,8 @@ bootloader, and process loader. When the emulator assembles a program to
 The UART `load` response supplies the total word count separately to the
 bootloader. The userspace process loader obtains the same count from
 `file-size`. Both loaders consume the five header words and copy only the
-encoded RETI words after the header to SRAM. Consequently the PCB's
-`word_count` records the complete file count, while the allocated process
-image contains only the linked program and its heap/stack room.
+encoded RETI words after the header to SRAM. The allocated process image
+therefore contains only the linked program and its heap/stack room.
 
 ```mermaid
 flowchart LR
@@ -1109,7 +1108,6 @@ struct Process {
     int size;
     int heap_start;
     int heap_size;
-    int word_count;
     char *binary_path;
     char *working_directory;
     struct ActivationRecord activation;
@@ -1138,7 +1136,6 @@ struct Process {
 | `state` | `NEW`, `READY`, `RUNNING`, `BLOCKED`, `STOPPED`, or `ZOMBIE`; changed by run, queues, signals, dispatcher, and termination |
 | `base_address`, `size` | Absolute start and total cell count of the `pmalloc()` process image |
 | `heap_start`, `heap_size` | Process-relative userspace heap start and cell count from the binary header/defaults |
-| `word_count` | Complete binary word count derived from the host file size, including its five header words |
 | `binary_path` | PCB-owned `kmalloc()` copy of the path used to load the binary |
 | `working_directory` | PCB-owned absolute host path, copied from the parent or initialized with host `pwd` for PID 1 |
 | `activation` | Embedded saved CPU context used by dispatcher and blocked syscall returns |
@@ -1297,7 +1294,7 @@ strings and the PCB with `kfree()`.
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
 | `initialize_process_table(void)` | `void` | Resets head, tail, active pointer, and next PID globals |
-| `create_process(int base_address, int size, int code_start, int data_start, int heap_start, int heap_size, int word_count, char *binary_path)` | PCB pointer or `NULL` | Allocates PCB/path/table metadata, initializes embedded state, inherits parent fields, appends PCB |
+| `create_process(int base_address, int size, int code_start, int data_start, int heap_start, int heap_size, char *binary_path)` | PCB pointer or `NULL` | Allocates PCB/path/table metadata, initializes embedded state, inherits parent fields, appends PCB |
 | `first_process(void)` | Head PCB | Reads global head |
 | `current_process(void)` | Active PCB | Reads global active pointer |
 | `set_current_process(struct Process *process)` | `void` | Replaces global active pointer |
@@ -1863,7 +1860,6 @@ struct SharedMemoryEntry {
     char *name;
     int id;
     void *address;
-    size_t size;
     int reference_count;
     bool unlink_requested;
     struct SharedMemoryEntry *next;
@@ -2295,7 +2291,6 @@ struct SeekRequest {
     int file_descriptor;
     int offset;
     int origin;
-    bool show_loading_bar;
 };
 struct Dup2Request { int old_file_descriptor; int new_file_descriptor; };
 ```

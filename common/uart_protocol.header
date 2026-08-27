@@ -11,4 +11,3 @@ void uart_print_string(char *value);
 void uart_send_host_request(char *command, char *path);
 void uart_send_file_range_command(char *path, int offset, int count);
 void uart_send_file_write_command(char *path, int offset);
-int uart_read_file(char *path, char *buffer, int capacity);
