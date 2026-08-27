@@ -1,31 +1,6 @@
 #include "string.header"
 #include "../../common/string.header"
 
-void *memcpy(void *destination, void *source, int count) {
-    char *destination_bytes = (char *)destination;
-    char *source_bytes = (char *)source;
-    int index = 0;
-
-    while (index < count) {
-        destination_bytes[index] = source_bytes[index];
-        index = index + 1;
-    }
-
-    return destination;
-}
-
-void *memset(void *buffer, int value, int count) {
-    char *bytes = (char *)buffer;
-    int index = 0;
-
-    while (index < count) {
-        bytes[index] = value;
-        index = index + 1;
-    }
-
-    return buffer;
-}
-
 char *strcpy(char *destination, char *source) {
     int index = 0;
 

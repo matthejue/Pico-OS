@@ -56,7 +56,5 @@ int lseek(int file_descriptor, int offset, int origin) {
     request.file_descriptor = file_descriptor;
     request.offset = offset;
     request.origin = origin;
-    request.show_loading_bar =
-        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
     return invoke_syscall(SYSCALL_LSEEK, (int)&request);
 }

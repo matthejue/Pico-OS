@@ -112,14 +112,6 @@ def print_process_output(result):
         print(result.stderr, end="", file=sys.stderr)
 
 
-def process_text(value):
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return value
-
-
 def is_os_feature_test(test_dir):
     launcher_file = test_dir / "launcher.picoc"
     input_file = test_dir / "input.txt"

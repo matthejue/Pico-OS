@@ -2,5 +2,5 @@
 
 #include "../../common/file.header"
 
-int open(char *path, int flags, ...);
-int creat(char *path, int mode);
+int open(char *path, int flags);
+int creat(char *path);

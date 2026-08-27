@@ -120,12 +120,12 @@ strcpy(path, "./user/");
 strcat(path, "echo.bin");
 
 if (strcmp(path, "./user/echo.bin") == 0) {
-    memset(buffer, 0, sizeof(buffer));
+    strcat(path, ".backup");
 }
 ```
 
-The current API contains `memcpy()`, `memset()`, `strcpy()`, `strcat()`,
-`strcmp()`, `strncmp()`, and `strlen()`.
+The current API contains `strcpy()`, `strcat()`, `strcmp()`, `strncmp()`, and
+`strlen()`.
 
 Relevant commits: `1fde82e40b74`, `838a7e718898`, `ffa167713d30`
 

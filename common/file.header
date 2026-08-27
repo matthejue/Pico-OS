@@ -42,7 +42,6 @@ struct SeekRequest {
     int file_descriptor;
     int offset;
     int origin;
-    bool show_loading_bar;
 };
 
 struct Dup2Request {

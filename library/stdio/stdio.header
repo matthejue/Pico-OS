@@ -10,7 +10,6 @@ typedef struct PicoFile FILE;
 #define stdout standard_output()
 #define stderr standard_error()
 
-void initialize_standard_streams(void);
 FILE *standard_input(void);
 FILE *standard_output(void);
 FILE *standard_error(void);

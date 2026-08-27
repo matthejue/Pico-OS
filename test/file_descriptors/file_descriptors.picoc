@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    file_descriptor = creat(TEST_PATH, 0);
+    file_descriptor = creat(TEST_PATH);
     if (file_descriptor != 3) {
         return 1;
     }
