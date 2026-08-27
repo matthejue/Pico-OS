@@ -4,6 +4,6 @@
 #include "../library/unistd/unistd.header"
 
 int main(void) {
-    invoke_syscall(SYSCALL_SHUTDOWN, 0);
+    invoke_syscall(SYSCALL_REBOOT, 0);
     return 0;
 }

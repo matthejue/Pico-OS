@@ -727,6 +727,7 @@ dispatcher waits in kernel context until an interrupt makes one runnable.
 | --- | --- |
 | `int main(void)` | Initializes every global subsystem, creates PID 1, activates the timer, and enters the dispatcher |
 | `void shutdown(void)` | Halts by jumping to the current instruction; it does not free structures because execution ends |
+| `void reboot(void)` | Disables hardware interrupts and stack protection, then jumps to the EPROM bootloader |
 
 # 3. Kernel storage and ownership
 
@@ -857,7 +858,7 @@ void syscall_interrupt(void) {
 }
 ```
 
-[`handle_syscall()`](kernel/syscall.picoc) has 40 selectors, numbered 0–39.
+[`handle_syscall()`](kernel/syscall.picoc) has selectors numbered 0–40.
 It is a dispatch hub rather than the owner of subsystem state:
 
 ```c
@@ -2339,7 +2340,6 @@ because the caller's stack is suspended.
 | `SeekRequest.file_descriptor` | Regular-file descriptor to reposition | `lseek()` / syscall 19 |
 | `SeekRequest.offset` | Signed displacement | Combined with `SEEK_SET`, current descriptor offset, or host file size |
 | `SeekRequest.origin` | `SEEK_SET`, `SEEK_CUR`, or `SEEK_END` | Selects the base for the new descriptor offset |
-| `SeekRequest.show_loading_bar` | Whether the `SEEK_END` file-size request shows progress | Read during the syscall only |
 | `Dup2Request.old_file_descriptor` | Descriptor to copy | `dup2()` / syscall 24; source entry remains unchanged |
 | `Dup2Request.new_file_descriptor` | Entry to replace | Target path is freed, then fields/path are independently copied |
 | `GetCwdRequest.buffer` | Userspace destination | `getcwd()` / syscall 33; receives a copy of PCB `working_directory` |
@@ -2401,8 +2401,8 @@ kernel until it needs I/O or a process service.
 | `void wait_queue_init(struct wait_queue *queue)` | Initializes embedded `head`/`tail` locally | No syscall |
 | `void sleep(struct wait_queue *queue)` | Blocks caller on the intrusive queue | 11, queue pointer directly |
 | `void wakeup(struct wait_queue *queue)` | Wakes at most the FIFO head | 12, queue pointer directly |
-| `int open(char *path, int flags, ...)` | Lowest free descriptor or `-1`; the optional mode is not used | 15, `OpenRequest` |
-| `int creat(char *path, int mode)` | Equivalent to write/create/truncate open; `mode` is ignored | Calls `open()` and therefore syscall 15 |
+| `int open(char *path, int flags)` | Lowest free descriptor or `-1` | 15, `OpenRequest` |
+| `int creat(char *path)` | Equivalent to write/create/truncate open | Calls `open()` and therefore syscall 15 |
 | `int waitpid(int pid)` | Exact child's exit/stopped status, or `-1` | 10, `WaitPidRequest`; may suspend its stack frame |
 | `bool WIFSTOPPED(int status)` | Whether status represents `SIGSTOP`, `SIGTSTP`, or `SIGTTIN` | No syscall |
 | `void yield(void)` | Voluntarily saves the current activation and schedules | 13, no request |
@@ -2511,7 +2511,6 @@ one-character pushback slot.
 
 | Function | Return and purpose | Syscall and request |
 | --- | --- | --- |
-| `void initialize_standard_streams(void)` | Initializes stream globals and requires descriptor-backed operation | Syscall 20 checks descriptor availability |
 | `FILE *standard_input/output/error(void)` | Addresses of the three process-global stream objects | Syscall 20 only on lazy first preparation |
 | `FILE *fopen(char *path, char *mode)` | One of five stream slots or `NULL`; supports `r`, `w`, `a`, and `+` | 15, `OpenRequest` after mode-to-flag conversion |
 | `int fclose(FILE *stream)` | Closes descriptor and frees its stream slot | 18, descriptor directly |
@@ -2691,10 +2690,12 @@ and descriptor values into the child.
 
 Init blocks on `waitpid(shell_pid)`, not on an arbitrary child notification.
 Entering the shell built-in `exit` therefore ends one shell process; init
-collects it and loads a new shell. `poweroff.bin` is different: it invokes the
-kernel shutdown syscall and halts PicoOS. Since `waitpid()` also reports a
-stopped child, explicitly stopping the shell itself can make init begin a new
-session; normal foreground job control targets the shell's children instead.
+collects it and loads a new shell. `poweroff.bin` invokes the kernel shutdown
+syscall and halts PicoOS, while `reboot.bin` asks the kernel to disable active
+hardware state and jump back to the EPROM bootloader. Since `waitpid()` also
+reports a stopped child, explicitly stopping the shell itself can make init
+begin a new session; normal foreground job control targets the shell's
+children instead.
 
 Init and `fast_os_test_launcher` live under `system` because they implement
 system policy. They are not exposed through the normal `PATH=./user` command
@@ -2907,7 +2908,7 @@ normal interactive facilities.
 
 # 13. User applications
 
-PicoOS builds 16 userspace programs overall: the shell and 15 standalone user
+PicoOS builds 17 userspace programs overall: the shell and 16 standalone user
 applications. An application runs in its own process and cannot directly
 change its parent shell's environment, working directory, or descriptor table.
 
@@ -2930,7 +2931,8 @@ change its parent shell's environment, working directory, or descriptor table.
 | `rm.bin` | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
 | `rmdir.bin` | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
 | `kill.bin` | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
-| `poweroff.bin` | Halts PicoOS after validating that there are no operands | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
+| `poweroff.bin` | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)` |
+| `reboot.bin` | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
 application helpers. `command_write(fd, text)` counts the string and calls
@@ -2971,9 +2973,10 @@ directories. All continue through later operands after an individual error.
 `kill.bin` accepts `SIGINT`, `SIGKILL`, `SIGCONT`, `SIGSTOP`, `SIGTSTP`, and
 `SIGTTIN` by name without a leading `-`, or by number. Signal 0 checks
 existence without delivery. It yields after success so the target can be
-selected promptly. `poweroff.bin` differs from shell `exit`:
-the former invokes syscall 2 and halts the OS, whereas the latter lets init
-start a new shell.
+selected promptly. `poweroff.bin` differs from shell `exit`: the former
+invokes syscall 2 and halts the OS, whereas the latter lets init start a new
+shell. `reboot.bin` invokes syscall 40, which performs a full bootloader and
+kernel startup without ending the emulator process.
 
 ## 13.3 Errors and exit status
 
