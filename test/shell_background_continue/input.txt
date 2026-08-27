@@ -1,0 +1,5 @@
+test/shell_background_continue/self_stopping.bin
+fg
+bg
+kill.bin SIGKILL 3
+poweroff.bin
