@@ -15,6 +15,18 @@ void shutdown(void) {
     asm("JUMP 0");
 }
 
+void reboot(void) {
+    int device = 0;
+
+    while (device < INTERRUPT_DEVICE_COUNT) {
+        interrupt_controller_disable_device(device);
+        device = device + 1;
+    }
+    periphery_write_register(INTERRUPT_CONTROLLER_TIMER_INTERVAL_REGISTER, 0);
+    periphery_write_register(STACK_HEAP_BOUNDARY_REGISTER, 0);
+    asm("LOADI PC 0");
+}
+
 int main(void) {
     int init_pid;
     struct RunProcessRequest init_request;
