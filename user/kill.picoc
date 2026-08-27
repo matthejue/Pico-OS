@@ -9,7 +9,7 @@
 bool kill_text_matches(char *left, char *right) {
     int index = 0;
 
-    while (left[index] != 0 && left[index] == right[index]) {
+    while (left[index] != '\0' && left[index] == right[index]) {
         index = index + 1;
     }
     return left[index] == right[index];
@@ -31,13 +31,13 @@ int parse_signal(char *value) {
     } else if (kill_text_matches(value, "SIGTTIN")) {
         return SIGTTIN;
     }
-    if (value[0] == 0) {
+    if (value[0] == '\0') {
         return -1;
     }
     while (value[index] >= '0' && value[index] <= '9') {
         index = index + 1;
     }
-    if (value[index] != 0) {
+    if (value[index] != '\0') {
         return -1;
     }
     return atoi(value);
@@ -49,7 +49,7 @@ int parse_process_id(char *value) {
     while (value[index] >= '0' && value[index] <= '9') {
         index = index + 1;
     }
-    if (index == 0 || value[index] != 0) {
+    if (index == 0 || value[index] != '\0') {
         return -1;
     }
     return atoi(value);

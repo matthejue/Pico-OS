@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
     contents = (char *)malloc(file_size + 1);
     file_size = read(file_descriptor, contents, file_size);
     close(file_descriptor);
-    contents[file_size] = 0;
+    contents[file_size] = '\0';
 
     while (start < file_size) {
         end = start;

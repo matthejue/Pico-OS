@@ -18,7 +18,7 @@ bool shared_memory_names_equal(char *left, char *right) {
         return false;
     }
 
-    while (left[index] != 0 && left[index] == right[index]) {
+    while (left[index] != '\0' && left[index] == right[index]) {
         index = index + 1;
     }
     return left[index] == right[index];
@@ -29,7 +29,7 @@ char *copy_shared_memory_name(char *name) {
     int index = 0;
     char *copy;
 
-    while (name[length] != 0) {
+    while (name[length] != '\0') {
         length = length + 1;
     }
 
@@ -38,7 +38,7 @@ char *copy_shared_memory_name(char *name) {
         copy[index] = name[index];
         index = index + 1;
     }
-    copy[index] = 0;
+    copy[index] = '\0';
     return copy;
 }
 

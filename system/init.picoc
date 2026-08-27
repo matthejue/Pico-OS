@@ -10,7 +10,7 @@
 void init_write_error(char *text) {
     int length = 0;
 
-    while (text[length] != 0) {
+    while (text[length] != '\0') {
         length = length + 1;
     }
     write(STDERR_FILENO, text, length);
@@ -52,7 +52,7 @@ bool read_environment(void) {
         init_write_error("init: environment file is too long\n");
         return false;
     }
-    contents[length] = 0;
+    contents[length] = '\0';
 
     while (index < length) {
         name = contents + index;
@@ -67,7 +67,7 @@ bool read_environment(void) {
             init_write_error("init: invalid environment entry\n");
             return false;
         }
-        contents[index] = 0;
+        contents[index] = '\0';
         index = index + 1;
 
         value = contents + index;
@@ -76,7 +76,7 @@ bool read_environment(void) {
                contents[index] != '\r') {
             index = index + 1;
         }
-        contents[index] = 0;
+        contents[index] = '\0';
 
         if (setenv(name, value, true) != 0) {
             free(contents);
@@ -114,7 +114,7 @@ int main(void) {
         }
     }
 
-    while (1) {
+    while (true) {
         shell_pid = load("./user/shell.bin");
         if (shell_pid == 0) {
             init_write_error("init: could not load shell\n");

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "file.header"
+#include "stddef.header"
 
 void command_write(int file_descriptor, char *text);
 bool command_is_help(char *argument);

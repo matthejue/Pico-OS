@@ -22,23 +22,23 @@ int process_argument_token_count(char *arguments) {
         return 0;
     }
 
-    while (arguments[index] != 0) {
+    while (arguments[index] != '\0') {
         // Ignores separators before the next argument
         while (process_argument_is_space(arguments[index])) {
             index = index + 1;
         }
 
-        if (arguments[index] != 0) {
+        if (arguments[index] != '\0') {
             token_count = token_count + 1;
         }
 
-        quote = 0;
-        while (arguments[index] != 0 &&
-               (quote != 0 || !process_argument_is_space(arguments[index]))) {
-            if (quote == 0 && process_argument_is_quote(arguments[index])) {
+        quote = '\0';
+        while (arguments[index] != '\0' &&
+               (quote != '\0' || !process_argument_is_space(arguments[index]))) {
+            if (quote == '\0' && process_argument_is_quote(arguments[index])) {
                 quote = arguments[index];
             } else if (arguments[index] == quote) {
-                quote = 0;
+                quote = '\0';
             }
             index = index + 1;
         }
@@ -59,20 +59,20 @@ int process_argument_string_cell_count(char *arguments) {
         return 0;
     }
 
-    while (arguments[index] != 0) {
+    while (arguments[index] != '\0') {
         // Ignores separators before the next argument
         while (process_argument_is_space(arguments[index])) {
             index = index + 1;
         }
 
-        if (arguments[index] != 0) {
-            quote = 0;
-            while (arguments[index] != 0 &&
-                   (quote != 0 || !process_argument_is_space(arguments[index]))) {
-                if (quote == 0 && process_argument_is_quote(arguments[index])) {
+        if (arguments[index] != '\0') {
+            quote = '\0';
+            while (arguments[index] != '\0' &&
+                   (quote != '\0' || !process_argument_is_space(arguments[index]))) {
+                if (quote == '\0' && process_argument_is_quote(arguments[index])) {
                     quote = arguments[index];
                 } else if (arguments[index] == quote) {
-                    quote = 0;
+                    quote = '\0';
                 } else {
                     string_cells = string_cells + 1;
                 }
@@ -103,7 +103,7 @@ int process_environment_count(char **environment) {
 int process_string_cell_count(char *value) {
     int count = 1;
 
-    while (value[count - 1] != 0) {
+    while (value[count - 1] != '\0') {
         count = count + 1;
     }
 
@@ -113,12 +113,12 @@ int process_string_cell_count(char *value) {
 char *copy_process_string(char *target, char *source) {
     int index = 0;
 
-    while (source[index] != 0) {
+    while (source[index] != '\0') {
         target[index] = source[index];
         index = index + 1;
     }
 
-    target[index] = 0;
+    target[index] = '\0';
     return target + index + 1;
 }
 
@@ -189,26 +189,26 @@ void store_process_arguments(
 
     // Parses each whitespace-separated argument and copies it into process
     // memory while adding a pointer to it in the argv table
-    while (arguments != NULL && arguments[source_index] != 0) {
+    while (arguments != NULL && arguments[source_index] != '\0') {
         // Skips separators before the next argument
         while (process_argument_is_space(arguments[source_index])) {
             source_index = source_index + 1;
         }
 
-        if (arguments[source_index] != 0) {
+        if (arguments[source_index] != '\0') {
             // Stores a pointer to the separately stored copy of this argument
             argv[argument_index] = string_target;
             argument_index = argument_index + 1;
 
-            quote = 0;
-            while (arguments[source_index] != 0 &&
-                   (quote != 0 ||
+            quote = '\0';
+            while (arguments[source_index] != '\0' &&
+                   (quote != '\0' ||
                     !process_argument_is_space(arguments[source_index]))) {
-                if (quote == 0 &&
+                if (quote == '\0' &&
                     process_argument_is_quote(arguments[source_index])) {
                     quote = arguments[source_index];
                 } else if (arguments[source_index] == quote) {
-                    quote = 0;
+                    quote = '\0';
                 } else {
                     *string_target = arguments[source_index];
                     string_target = string_target + 1;
@@ -217,7 +217,7 @@ void store_process_arguments(
             }
 
             // Terminates the copied argument as a C string
-            *string_target = 0;
+            *string_target = '\0';
             string_target = string_target + 1;
         }
     }

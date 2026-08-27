@@ -1,6 +1,7 @@
 #pragma once
 
 #include "process.header"
+#include "../common/stddef.header"
 
 #define DEFAULT_PROCESS_HEAP_CELLS 1000
 #define DEFAULT_PROCESS_STACK_CELLS 1000

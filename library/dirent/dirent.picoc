@@ -58,7 +58,7 @@ struct dirent *readdir(DIR *directory) {
         }
         directory->offset = directory->offset + 1;
     }
-    directory->entry.d_name[name_index] = 0;
+    directory->entry.d_name[name_index] = '\0';
     directory->offset = directory->offset + 1;
     return &directory->entry;
 }
