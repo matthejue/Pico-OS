@@ -3,9 +3,18 @@
 #include "../common/user_command.header"
 #include "../library/unistd/unistd.header"
 
+void mv_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: mv.bin SOURCE DESTINATION\n");
+    command_write(file_descriptor, "Move or rename a path.\n");
+}
+
 int main(int argc, char **argv) {
+    if (argc == 2 && command_is_help(argv[1])) {
+        mv_usage(STDOUT_FILENO);
+        return 0;
+    }
     if (argc != 3) {
-        command_write(STDERR_FILENO, "Usage: mv.bin SOURCE DESTINATION\n");
+        mv_usage(STDERR_FILENO);
         return 1;
     }
     if (move(argv[1], argv[2]) < 0) {

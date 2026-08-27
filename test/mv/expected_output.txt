@@ -2,9 +2,7 @@ process with pid 3 created
 process with pid 4 created
 moved text
 process with pid 5 created
-d .
-d ..
-- input.txt
 - expected_output.txt
+- input.txt
 - moved.txt
 process with pid 6 created

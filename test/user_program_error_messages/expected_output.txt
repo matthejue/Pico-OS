@@ -17,4 +17,10 @@ SIGNAL may be 0, SIGINT, SIGKILL, SIGCONT, SIGSTOP, SIGTSTP, SIGTTIN, or its num
 kill: invalid signal
 Usage: kill.bin [SIGNAL] PID
 SIGNAL may be 0, SIGINT, SIGKILL, SIGCONT, SIGSTOP, SIGTSTP, SIGTTIN, or its number.
-process with pid 13 created
+Usage: ls.bin [-a] [DIRECTORY]
+List directory entries.
+  -a  Include hidden entries.
+Usage: ls.bin [-a] [DIRECTORY]
+List directory entries.
+  -a  Include hidden entries.
+process with pid 15 created

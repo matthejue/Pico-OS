@@ -594,7 +594,8 @@ SYSTEM_LIBRARY_SOURCES := \
 	library/string/libstring.picoc
 SHELL_LIBRARY_SOURCES := \
 	$(SYSTEM_LIBRARY_SOURCES) \
-	common/decimal.picoc
+	common/decimal.picoc \
+	common/user_command.picoc
 SYSTEM_INIT_SOURCES := system/init.picoc $(SYSTEM_LIBRARY_SOURCES)
 SHELL_SOURCES := user/shell.picoc $(SHELL_LIBRARY_SOURCES)
 
