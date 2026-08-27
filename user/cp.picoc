@@ -8,14 +8,23 @@
 
 #define COPY_BUFFER_SIZE 64
 
+void cp_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: cp.bin SOURCE DESTINATION\n");
+    command_write(file_descriptor, "Copy a file.\n");
+}
+
 int main(int argc, char **argv) {
     char buffer[COPY_BUFFER_SIZE];
     int source;
     int destination;
     int count;
 
+    if (argc == 2 && command_is_help(argv[1])) {
+        cp_usage(STDOUT_FILENO);
+        return 0;
+    }
     if (argc != 3) {
-        command_write(STDERR_FILENO, "Usage: cp.bin SOURCE DESTINATION\n");
+        cp_usage(STDERR_FILENO);
         return 1;
     }
     unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);

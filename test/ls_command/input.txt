@@ -1,0 +1,6 @@
+mkdir.bin test/ls_command/work
+touch.bin test/ls_command/work/visible.txt test/ls_command/work/.hidden.txt
+ls.bin test/ls_command/work
+ls.bin -a test/ls_command/work
+ls.bin --help
+poweroff.bin

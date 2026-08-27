@@ -1,3 +1,2 @@
-load test/ps/launcher.bin
-run 3
+ps.bin
 poweroff.bin

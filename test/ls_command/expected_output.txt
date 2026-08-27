@@ -1,0 +1,14 @@
+process with pid 3 created
+process with pid 4 created
+process with pid 5 created
+- visible.txt
+process with pid 6 created
+d .
+d ..
+- visible.txt
+- .hidden.txt
+process with pid 7 created
+Usage: ls.bin [-a] [DIRECTORY]
+List directory entries.
+  -a  Include hidden entries.
+process with pid 8 created

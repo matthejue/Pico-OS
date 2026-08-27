@@ -29,6 +29,11 @@ void write_replacement(char *text) {
     command_write(STDOUT_FILENO, "\n");
 }
 
+void sed_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: sed.bin EXPRESSION FILE\n");
+    command_write(file_descriptor, "Edit selected lines from a file.\n");
+}
+
 int main(int argc, char **argv) {
     char *expression;
     char *contents;
@@ -46,8 +51,12 @@ int main(int argc, char **argv) {
     bool selected;
     char command;
 
+    if (argc == 2 && command_is_help(argv[1])) {
+        sed_usage(STDOUT_FILENO);
+        return 0;
+    }
     if (argc != 3) {
-        command_write(STDERR_FILENO, "Usage: sed.bin EXPRESSION FILE\n");
+        sed_usage(STDERR_FILENO);
         return 1;
     }
     unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);

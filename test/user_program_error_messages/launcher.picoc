@@ -27,5 +27,7 @@ int main(void) {
     run_program("./user/kill.bin", "99 999");
     run_program("./user/kill.bin", "SIGKILL");
     run_program("./user/kill.bin", "SIGBOGUS 3");
+    run_program("./user/ls.bin", "-x");
+    run_program("./user/ls.bin", ". extra");
     return 0;
 }

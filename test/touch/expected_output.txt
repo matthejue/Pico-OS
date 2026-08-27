@@ -2,10 +2,8 @@ process with pid 3 created
 process with pid 4 created
 keep me
 process with pid 5 created
-d .
-d ..
-- input.txt
 - expected_output.txt
+- input.txt
 - kept.txt
 - created.txt
 process with pid 6 created

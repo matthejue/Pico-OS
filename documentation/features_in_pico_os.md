@@ -372,6 +372,7 @@ continues it, and Ctrl+C terminates it.
 ```text
 PicoOS> pwd.bin
 PicoOS> ls.bin
+PicoOS> ls.bin -a
 PicoOS> cd /tmp
 PicoOS> ls.bin > files.txt
 PicoOS> mkdir.bin new-directory
@@ -388,8 +389,8 @@ other relative load and file paths.
 
 `ls.bin`, `mkdir.bin`, `pwd.bin`, `rm.bin`, and `rmdir.bin` call PicoOS library
 functions. `ls.bin` uses the `opendir()`, `readdir()`, and
-`closedir()` functions from `library/dirent`; it always includes hidden entries
-and prints only `d name` or `- name`. The syscalls use bounded `is-directory`,
+`closedir()` functions from `library/dirent`; it hides names beginning with `.`
+unless `-a` is given and prints only `d name` or `- name`. The syscalls use bounded `is-directory`,
 `ls`, `mkdir`, `pwd`, `unlink`, and `rmdir` UART frames. For `chdir()`, the
 kernel combines the argument with the calling process's PCB directory and
 removes `.` and `..` components. It sends the resulting absolute path through
@@ -691,6 +692,10 @@ The optional first argument may name any implemented signal without a leading
 `-`, or give its number.
 Invalid PIDs, invalid signals, unknown processes, and incorrect argument counts
 print an error and short usage help, then return status 1.
+
+User programs accept `-h` and `--help` through the shared
+`command_is_help()` helper. `echo.bin` is the exception because it prints all
+arguments as text, including strings such as `--help`.
 
 Relevant commits: `432568fd9a97`, `fbe915710f14`
 
