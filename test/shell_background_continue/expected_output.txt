@@ -1,0 +1,5 @@
+process with pid 3 created
+process with pid 3 stopped by signal SIGTSTP
+process with pid 3 stopped by signal SIGTSTP
+process with pid 4 created
+process with pid 5 created

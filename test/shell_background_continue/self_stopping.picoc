@@ -1,0 +1,20 @@
+// dependencies: ../../library/schedule/libschedule.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/signal/libsignal.reti_blocks ../../library/stdlib/libstdlib.reti_blocks
+
+#include "../../library/schedule/schedule.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/signal/signal.header"
+#include "../../common/stddef.header"
+
+void stop_self(void) {
+    kill(getpid(), SIGTSTP);
+    yield();
+}
+
+int main(void) {
+    stop_self();
+    stop_self();
+
+    while (true) {
+        yield();
+    }
+}
