@@ -1,6 +1,7 @@
 // dependencies: ../common/user_command.reti_blocks ../library/stdio/libstdio.reti_blocks ../library/schedule/libschedule.reti_blocks ../library/unistd/libunistd.reti_blocks
 
 #include "../common/user_command.header"
+#include "../common/stddef.header"
 #include "../library/stdio/stdio.header"
 #include "../library/schedule/schedule.header"
 #include "../library/stdlib/stdlib.header"
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    while (1) {
+    while (true) {
         printf("\r%d", count);
 
         delay = count_delay;

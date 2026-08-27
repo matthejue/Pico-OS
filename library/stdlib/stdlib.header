@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../common/heap.header"
+#include "../../common/stddef.header"
 
 void init_process_heap(void);
 void *malloc(int size);

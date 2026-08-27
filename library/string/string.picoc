@@ -29,12 +29,12 @@ void *memset(void *buffer, int value, int count) {
 char *strcpy(char *destination, char *source) {
     int index = 0;
 
-    while (source[index] != 0) {
+    while (source[index] != '\0') {
         destination[index] = source[index];
         index = index + 1;
     }
 
-    destination[index] = 0;
+    destination[index] = '\0';
     return destination;
 }
 
@@ -42,24 +42,24 @@ char *strcat(char *destination, char *source) {
     int destination_index = 0;
     int source_index = 0;
 
-    while (destination[destination_index] != 0) {
+    while (destination[destination_index] != '\0') {
         destination_index = destination_index + 1;
     }
 
-    while (source[source_index] != 0) {
+    while (source[source_index] != '\0') {
         destination[destination_index] = source[source_index];
         destination_index = destination_index + 1;
         source_index = source_index + 1;
     }
 
-    destination[destination_index] = 0;
+    destination[destination_index] = '\0';
     return destination;
 }
 
 int strcmp(char *left, char *right) {
     int index = 0;
 
-    while (left[index] != 0 && left[index] == right[index]) {
+    while (left[index] != '\0' && left[index] == right[index]) {
         index = index + 1;
     }
 
@@ -70,7 +70,7 @@ int strncmp(char *left, char *right, int count) {
     int index = 0;
 
     while (index < count &&
-           left[index] != 0 &&
+           left[index] != '\0' &&
            left[index] == right[index]) {
         index = index + 1;
     }

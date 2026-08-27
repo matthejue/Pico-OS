@@ -38,11 +38,14 @@ bool run(int pid, char *arguments, char **environment) {
     } else {
         request.environment = environment;
     }
-    return invoke_syscall(SYSCALL_RUN_PROCESS_WITH_ARGUMENTS, (int)&request);
+    return (bool)invoke_syscall(
+        SYSCALL_RUN_PROCESS_WITH_ARGUMENTS,
+        (int)&request
+    );
 }
 
 bool unload(int pid) {
-    return invoke_syscall(SYSCALL_UNLOAD_PROCESS, pid);
+    return (bool)invoke_syscall(SYSCALL_UNLOAD_PROCESS, pid);
 }
 
 void list_processes(void) {

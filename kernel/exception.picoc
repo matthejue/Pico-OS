@@ -30,7 +30,7 @@ void write_process_exception_message(char *message) {
     struct IoRequest request;
     int length = 0;
 
-    while (message[length] != 0) {
+    while (message[length] != '\0') {
         length = length + 1;
     }
     request.file_descriptor = STDOUT_FILENO;

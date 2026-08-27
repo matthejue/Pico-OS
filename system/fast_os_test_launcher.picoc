@@ -13,12 +13,12 @@
 void append_path(char *path, int *length, char *suffix) {
     int index = 0;
 
-    while (suffix[index] != 0) {
+    while (suffix[index] != '\0') {
         path[*length] = suffix[index];
         *length = *length + 1;
         index = index + 1;
     }
-    path[*length] = 0;
+    path[*length] = '\0';
 }
 
 void build_test_path(char *directory, char *suffix, char *path) {
@@ -92,7 +92,7 @@ char *read_manifest(char *path, int *size) {
         return NULL;
     }
     close(file_descriptor);
-    contents[*size] = 0;
+    contents[*size] = '\0';
     return contents;
 }
 
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
         while (index < manifest_size && manifest[index] != '\n') {
             index = index + 1;
         }
-        manifest[index] = 0;
+        manifest[index] = '\0';
         if (index > test_start &&
             !run_test_launcher(manifest + test_start)) {
             passed = false;

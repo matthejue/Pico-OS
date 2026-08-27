@@ -9,7 +9,7 @@
 void write_text(char *text) {
     int length = 0;
 
-    while (text[length] != 0) {
+    while (text[length] != '\0') {
         length = length + 1;
     }
     write(STDOUT_FILENO, text, length);
@@ -38,7 +38,7 @@ void build_worker_arguments(
         arguments + length,
         shared_memory_id
     );
-    arguments[length] = 0;
+    arguments[length] = '\0';
 }
 
 int main(void) {

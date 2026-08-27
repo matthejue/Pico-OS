@@ -41,7 +41,7 @@ void list_processes(void) {
         line[index] = ' ';
         index = index + 1;
         path_index = 0;
-        while (process->binary_path[path_index] != 0) {
+        while (process->binary_path[path_index] != '\0') {
             line[index] = process->binary_path[path_index];
             index = index + 1;
             path_index = path_index + 1;
@@ -69,7 +69,7 @@ char *copy_process_path(char *path) {
     int index = 0;
     char *copy;
 
-    while (path[length] != 0) {
+    while (path[length] != '\0') {
         length = length + 1;
     }
 
@@ -79,7 +79,7 @@ char *copy_process_path(char *path) {
         copy[index] = path[index];
         index = index + 1;
     }
-    copy[index] = 0;
+    copy[index] = '\0';
     return copy;
 }
 
@@ -285,7 +285,7 @@ void wake_parent_waiting_for_process(
 void orphan_and_signal_children(struct Process *parent) {
     struct Process *child;
 
-    while (1) {
+    while (true) {
         child = process_list_head;
         while (child != NULL &&
                child->parent_pid != parent->pid) {

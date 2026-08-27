@@ -89,18 +89,18 @@ bool read_string(char *target) {
 
     if (is_whitespace(current)) {
         unread(current);
-        target[0] = 0;
+        target[0] = '\0';
         return false;
     }
 
-    while (current != 0 && !is_whitespace(current)) {
+    while (current != '\0' && !is_whitespace(current)) {
         target[index] = current;
         index = index + 1;
         current = read_input();
     }
 
     unread(current);
-    target[index] = 0;
+    target[index] = '\0';
     return index != 0;
 }
 
@@ -121,7 +121,7 @@ int scanf(char *format, ...) {
     asm("MOVE BAF IN1");
     asm("STOREIN BAF IN1 0");
 
-    while (format[index] != 0) {
+    while (format[index] != '\0') {
         current = format[index];
 
         if (current == '%') {

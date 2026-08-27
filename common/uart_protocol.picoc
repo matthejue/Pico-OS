@@ -66,14 +66,14 @@ void uart_print_integer(int value) {
     char buffer[12];
     int index = uart_append_decimal(buffer, 0, value);
 
-    buffer[index] = 0;
+    buffer[index] = '\0';
     uart_print_string(buffer);
 }
 
 void uart_print_string(char *value) {
     int index = 0;
 
-    while (value[index] != 0) {
+    while (value[index] != '\0') {
         uart_print_character(value[index]);
         index = index + 1;
     }
