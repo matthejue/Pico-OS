@@ -5,8 +5,8 @@ process with pid 5 created
 process with pid 6 created
 d .
 d ..
-- visible.txt
 - .hidden.txt
+- visible.txt
 process with pid 7 created
 Usage: ls.bin [-a] [DIRECTORY]
 List directory entries.
