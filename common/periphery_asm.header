@@ -1,0 +1,6 @@
+// Writes the boundary in IN1 without creating a call frame
+static inline void write_stack_heap_boundary_from_in1(void) {
+    asm("LOADI ACC 1048576");
+    asm("MULTI ACC 1024");
+    asm("STOREIN ACC IN1 10");
+}

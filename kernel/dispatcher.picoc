@@ -3,6 +3,7 @@
 #include "process.header"
 #include "scheduler.header"
 #include "signal.header"
+#include "../common/periphery_asm.header"
 
 bool reschedule_requested = false;
 
@@ -18,11 +19,14 @@ void dispatcher_reschedule_if_requested(int *caller_context) {
 
 __attribute__((naked))
 void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
+    // Reads the process pointer and its precomputed stack boundary from the call frame
     asm("LOADIN SP BAF 2");
     asm("LOADIN SP IN1 3");
-    asm("LOADI ACC 1048576");
-    asm("MULTI ACC 1024");
-    asm("STOREIN ACC IN1 10");
+
+    // Installs the process boundary without creating a call frame
+    write_stack_heap_boundary_from_in1();
+
+    // Restores the saved activation record while BAF still points to the process
     asm("LOADIN BAF SP 11");
     asm("LOADIN BAF CS 13");
     asm("LOADIN BAF DS 14");
@@ -30,6 +34,8 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN BAF IN2 9");
     asm("LOADIN BAF ACC 10");
     asm("LOADIN BAF BAF 12");
+
+    // Returns to the restored process context
     asm("RTI");
 }
 
