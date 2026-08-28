@@ -29,10 +29,32 @@ struct Process *first_process(void) {
     return process_list_head;
 }
 
+char *process_display_path(struct Process *process) {
+    char *path = process->binary_path;
+    char *root = process_list_head->working_directory;
+    int index = 0;
+
+    if (path[0] != '/') {
+        return path;
+    }
+    while (root[index] != '\0' && root[index] == path[index]) {
+        index = index + 1;
+    }
+    if (root[index] != '\0' || path[index] != '/') {
+        return path;
+    }
+    index = index + 1;
+    if (path[index] == '.' && path[index + 1] == '/') {
+        index = index + 2;
+    }
+    return path + index;
+}
+
 void list_processes(void) {
     struct Process *process = first_process();
     struct IoRequest request;
     char line[PATH_MAX + 16];
+    char *path;
     int index;
     int path_index;
 
@@ -40,9 +62,10 @@ void list_processes(void) {
         index = uart_append_decimal(line, 0, process->pid);
         line[index] = ' ';
         index = index + 1;
+        path = process_display_path(process);
         path_index = 0;
-        while (process->binary_path[path_index] != '\0') {
-            line[index] = process->binary_path[path_index];
+        while (path[path_index] != '\0') {
+            line[index] = path[path_index];
             index = index + 1;
             path_index = path_index + 1;
         }
