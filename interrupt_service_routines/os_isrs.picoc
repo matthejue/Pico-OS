@@ -1,4 +1,5 @@
 #include "../common/stddef.header"
+#include "../common/periphery_asm.header"
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
 #include "../kernel/exception.header"
@@ -66,10 +67,8 @@ void timer_interrupt_after_reschedule_request(void) {
 
     // BAF keeps old_sp while loading kernel CS, DS and SP
     asm("MOVE SP BAF");
-    asm("LOADI ACC 1048576"); // 2^20
-    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
     asm("LOADI IN1 0");
-    asm("STOREIN ACC IN1 10");
+    write_stack_heap_boundary_from_in1();
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
     asm(KERNEL_SP_START_ASM);
@@ -98,10 +97,8 @@ void syscall_interrupt(void) {
 
     // BAF keeps old_sp while loading kernel CS, DS and SP
     asm("MOVE SP BAF");
-    asm("LOADI ACC 1048576"); // 2^20
-    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
     asm("LOADI IN1 0");
-    asm("STOREIN ACC IN1 10");
+    write_stack_heap_boundary_from_in1();
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
     asm(KERNEL_SP_START_ASM);
@@ -159,10 +156,8 @@ __attribute__((naked))
 void cpu_exception_interrupt(void) {
     // BAF preserves the interrupted CS while the handler resets kernel context
     asm("MOVE CS BAF");
-    asm("LOADI ACC 1048576"); // 2^20
-    asm("MULTI ACC 1024"); // 2^20 * 2^10 = 2^30, periphery base
     asm("LOADI IN1 0");
-    asm("STOREIN ACC IN1 10");
+    write_stack_heap_boundary_from_in1();
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
     asm(KERNEL_SP_START_ASM);
