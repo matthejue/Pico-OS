@@ -8,10 +8,11 @@ if [[ -f "$script_dir/binary/boot/bootloader.reti" ]]; then
   runtime_dir="$script_dir/binary"
 fi
 emulator_path=""
+dma_option=()
 
 usage() {
   cat <<'EOF'
-Usage: ./start-picoos.sh [--reti-emulator PATH] [-- EMULATOR_ARGS...]
+Usage: ./start-picoos.sh [--reti-emulator PATH] [--dma] [-- EMULATOR_ARGS...]
 EOF
 }
 
@@ -21,6 +22,10 @@ while (($#)); do
       [[ $# -ge 2 ]] || { echo "--reti-emulator requires a path" >&2; exit 2; }
       emulator_path=$2
       shift 2
+      ;;
+    --dma)
+      dma_option=(--dma)
+      shift
       ;;
     --help|-h)
       usage
@@ -65,4 +70,5 @@ exec "$emulator_path" \
   -r 262144 \
   -S kernel/kernel.sections \
   -D kernel/kernel.debuginfo \
+  "${dma_option[@]}" \
   "$@"
