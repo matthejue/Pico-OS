@@ -115,7 +115,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -149,6 +149,8 @@ help:
 	@echo "  make ci-build                   Build the complete release tree in binary"
 	@echo "  make ci-artifacts               Alias for make release-tree"
 	@echo "  make bootload                   Build the release tree and boot through binary/boot/bootloader.reti"
+	@echo "  make bootload-dma               Boot through binary/boot/bootloader.reti with DMA enabled"
+	@echo "  make bootload-notui             Boot through binary/boot/bootloader.reti without the debug TUI"
 	@echo "  make bootload-debug             Rebuild PicoC files with -g and bootload"
 	@echo "  make run-kernel                 Build and run kernel/kernel.reti directly"
 	@echo "  make eprom                      Build boot/bootloader.reti"
@@ -704,6 +706,12 @@ run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin bi
 
 bootload: firmware binary/device/terminal.dev
 	cd binary && ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo $(DMA_EMU_OPTION)
+
+bootload-dma:
+	$(MAKE) bootload DMA=1
+
+bootload-notui: firmware binary/device/terminal.dev
+	cd binary && ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo $(DMA_EMU_OPTION)
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header

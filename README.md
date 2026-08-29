@@ -271,6 +271,8 @@ layout/debug information to the emulator. `-O` supplies the initial modeled OS
 context from which the first dispatcher `RTI` can leave. `-n 5` tells the
 emulator that five IVT entries will later be loaded into SRAM by the
 bootloader; they are not present in the initially parsed EPROM image.
+`make bootload-dma` adds DMA loading, while `make bootload-notui` omits `-d`
+and runs PicoOS directly in the terminal. The latter also accepts `DMA=1`.
 
 Capital `V` opens the raw UART terminal and `Ctrl+]` returns to the debug view.
 This single command therefore connects the generated bootloader, kernel
@@ -282,6 +284,9 @@ Useful narrower commands are:
 | Command | Purpose |
 | --- | --- |
 | `make firmware` | Build the complete firmware/release tree |
+| `make bootload-dma` | Boot through the debug TUI with DMA enabled |
+| `make bootload-notui` | Boot directly in the terminal without the debug TUI |
+| `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
 | `make run-os OS_RUN_PATH=test/hello_world` | Run one configured OS scenario |
 | `make test-lib` | Run the standalone library tests |
 | `make test-os` | Run the OS feature tests |

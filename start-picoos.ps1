@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RetiEmulator,
+    [switch]$Dma,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$EmulatorArguments
 )
@@ -47,6 +48,7 @@ $Emulator = Resolve-Tool `
     -LocalNames @("reti_emulator.exe", "reti_emulator") `
     -CommandName "reti_emulator"
 
+$DmaArguments = if ($Dma) { @("--dma") } else { @() }
 $Arguments = @(
     "-n", "5",
     "-e", "./boot/bootloader.reti",
@@ -54,7 +56,7 @@ $Arguments = @(
     "-r", "262144",
     "-S", "kernel/kernel.sections",
     "-D", "kernel/kernel.debuginfo"
-) + $EmulatorArguments
+) + $DmaArguments + $EmulatorArguments
 
 Push-Location $RuntimeRoot
 try {
