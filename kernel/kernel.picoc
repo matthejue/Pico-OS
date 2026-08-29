@@ -1,10 +1,11 @@
 #include "kernel.header"
 #include "dispatcher.header"
+#include "dma.header"
 #include "exception.header"
 #include "interrupt_controller.header"
-#include "process.header"
-#include "process_arguments.header"
-#include "process_loader.header"
+#include "process/process.header"
+#include "process/process_arguments.header"
+#include "process/process_loader.header"
 #include "kmalloc.header"
 #include "pmalloc.header"
 #include "shared_memory.header"
@@ -32,12 +33,14 @@ int main(void) {
     struct RunProcessRequest init_request;
 
     activate_kernel_stack_boundary();
-    debug;
     init_kernel_heap();
     initialize_terminal();
     initialize_process_table();
     init_process_memory_heap();
     initialize_shared_memory();
+    if (dma_is_active()) {
+        initialize_dma();
+    }
     interrupt_controller_initialize();
     init_pid = load_process("system/init.bin", loading_bar_enabled);
     init_request.pid = init_pid;

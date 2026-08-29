@@ -47,7 +47,7 @@ implemented across the following translation units:
 | Boot and binary input | [`bootloader.picoc`](../boot/bootloader.picoc), [`process_loader.picoc`](../kernel/process/process_loader.picoc) | [binary sections](../../RETI-Emulator/documentation/section_file_entries.md) |
 | UART | [`uart_hardware.picoc`](../kernel/uart_hardware.picoc), [`uart_protocol.picoc`](../common/uart_protocol.picoc) | [emulator UART](../../RETI-Emulator/documentation/uart_protocol.md) |
 | IVT/ISRs | [`os_isrs.picoc`](../interrupt_service_routines/os_isrs.picoc) | [compiler low-level attributes](../../PicoC-Compiler/documentation/reti_sections_low_level_picoc.md) |
-| Processes/waits | [`process.header`](../kernel/process.header), [`process.picoc`](../kernel/process/process.picoc) | [PicoC calls/frames](../../PicoC-Compiler/README.md#function-calls-and-stack-frames) |
+| Processes/waits | [`process.header`](../kernel/process/process.header), [`process.picoc`](../kernel/process/process.picoc) | [PicoC calls/frames](../../PicoC-Compiler/README.md#function-calls-and-stack-frames) |
 | Scheduling/dispatch | [`scheduler.picoc`](../kernel/scheduler.picoc), [`dispatcher.picoc`](../kernel/dispatcher.picoc) | [`INT`/`RTI` interpreter](../../RETI-Emulator/source/interpr.c) |
 | Exceptions | [`exception.picoc`](../kernel/exception.picoc) | [CPU exceptions](../../RETI-Emulator/documentation/cpu_exceptions.md) |
 | Memory | [`heap.picoc`](../common/heap.picoc), [`kmalloc.picoc`](../kernel/kmalloc.picoc), [`pmalloc.picoc`](../kernel/pmalloc.picoc) | [generated kernel constants](../../PicoC-Compiler/documentation/kernel_header_option.md) |

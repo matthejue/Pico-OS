@@ -1,7 +1,7 @@
 #include "file_descriptor.header"
 #include "terminal.header"
 #include "../kmalloc.header"
-#include "../process.header"
+#include "../process/process.header"
 
 char *copy_file_path(char *path) {
     int length = 0;

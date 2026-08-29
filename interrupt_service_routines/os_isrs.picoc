@@ -2,12 +2,13 @@
 #include "../common/periphery_asm.header"
 #include "../kernel/memory_constants.header"
 #include "../kernel/dispatcher.header"
+#include "../kernel/dma.header"
 #include "../kernel/exception.header"
 #include "../kernel/interrupt_controller.header"
 #include "../kernel/filesystem/terminal.header"
 #include "../kernel/syscall.header"
 
-#define OS_INTERRUPT_VECTOR_COUNT 4
+#define OS_INTERRUPT_VECTOR_COUNT 5
 
 void timer_interrupt(void);
 void timer_interrupt_after_reschedule_request(void);
@@ -15,13 +16,15 @@ void syscall_interrupt(void);
 void syscall_interrupt_restore(void);
 void uart_interrupt(void);
 void cpu_exception_interrupt(void);
+void dma_interrupt(void);
 
 __attribute__((section("ivt")))
 void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
     syscall_interrupt,
     timer_interrupt,
     uart_interrupt,
-    cpu_exception_interrupt
+    cpu_exception_interrupt,
+    dma_interrupt
 };
 
 __attribute__((naked))
@@ -204,6 +207,42 @@ void uart_interrupt(void) {
 __attribute__((naked))
 void uart_interrupt_return(void) {
     // Restores the context that was active before the UART interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+
+__attribute__((naked))
+void dma_interrupt(void) {
+    // Saves the interrupted context while the kernel completes the DMA wait
+    asm("PUSH ACC");
+    asm("PUSH IN1");
+    asm("PUSH IN2");
+    asm("PUSH BAF");
+    asm("PUSH CS");
+    asm("PUSH DS");
+
+    // BAF keeps the interrupted stack while the handler uses kernel segments
+    asm("MOVE SP BAF");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+
+    asm("LOADI32 ACC dma_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC handle_dma_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void dma_interrupt_return(void) {
+    // Restores the context that was active before the DMA interrupt
     asm("MOVE BAF SP");
     asm("POP DS");
     asm("POP CS");

@@ -1,0 +1,77 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
+#include "../../common/stddef.header"
+
+#define DMA_ACTIVE_REGISTER 12
+#define DMA_STATUS_REGISTER 16
+#define DMA_STATUS_COMPLETE 2
+#define SHARED_NAME "dma-process-load"
+#define WORKER_PATH "test/dma_process_load/worker.bin"
+#define LOAD_TARGET_PATH "test/dma_process_load/launcher.bin"
+
+void write_periphery_register(int register_index, int value) {
+    asm("STOREIN BAF DS 0"); // Saves DS before switching address spaces
+    asm("LOADI DS 1048576"); // 2^20
+    asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("ADD ACC DS");
+    asm("STOREIN ACC IN1 0");
+    asm("LOADIN BAF DS 0"); // Restores DS after periphery access
+}
+
+int read_periphery_register(int register_index) {
+    int value;
+
+    asm("STOREIN BAF DS 0"); // Saves DS before switching address spaces
+    asm("LOADI DS 1048576"); // 2^20
+    asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
+    asm("LOADIN BAF ACC 3");
+    asm("ADD ACC DS");
+    asm("LOADIN ACC ACC 0");
+    asm("LOADIN BAF DS 0"); // Restores DS after periphery access
+    asm("STOREIN BAF ACC 0");
+    return value;
+}
+
+void set_timer_interval(int interval) {
+    write_periphery_register(9, interval);
+}
+
+int main(void) {
+    int shared_id;
+    bool *worker_ran;
+    int worker;
+    int loaded_process;
+    bool passed;
+
+    write_periphery_register(DMA_ACTIVE_REGISTER, 1);
+    shared_id = shm_open(SHARED_NAME, 1);
+    worker_ran = (bool *)mmap(shared_id);
+    *worker_ran = false;
+
+    worker = load(WORKER_PATH);
+    set_timer_interval(100);
+    run(worker, NULL, NULL);
+    loaded_process = load(LOAD_TARGET_PATH);
+
+    set_timer_interval(1000);
+    waitpid(worker);
+    passed = read_periphery_register(DMA_ACTIVE_REGISTER) == 1 &&
+             read_periphery_register(DMA_STATUS_REGISTER) ==
+                 DMA_STATUS_COMPLETE &&
+             *worker_ran &&
+             loaded_process > 0;
+    unload(loaded_process);
+    shm_unlink(SHARED_NAME);
+
+    if (passed) {
+        write(STDOUT_FILENO, "DMA process load passed\n", 24);
+    } else {
+        write(STDOUT_FILENO, "DMA process load failed\n", 24);
+    }
+    return !passed;
+}

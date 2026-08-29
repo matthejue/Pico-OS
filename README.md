@@ -127,7 +127,7 @@ RETI chooses an address space from the two highest address bits:
 | High bits | Address space | PicoOS use |
 | --- | --- | --- |
 | `00` | EPROM | Bootloader |
-| `01` | Memory-mapped periphery | UART, interrupt controller, timer, stack boundary, exception cause |
+| `01` | Memory-mapped periphery | UART, interrupt controller, timer, stack boundary, exception cause, DMA |
 | `10` or `11` | SRAM | Interrupt table, kernel, process images, heaps, and stacks |
 
 PicoOS uses `0x80000000` as its SRAM base and configures 2^18 physical SRAM
@@ -260,7 +260,7 @@ programs, then starts the RETI debugger with the EPROM bootloader. The command
 corresponds to:
 
 ```console
-$ ./run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti \
+$ ./run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti \
     -d -c -O -r 262144 \
     -S kernel/kernel.sections -D kernel/kernel.debuginfo
 ```
@@ -268,8 +268,8 @@ $ ./run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti \
 `-e` selects the EPROM image, `-r` selects the 2^18-cell SRAM, `-d -c` opens
 the commented debug TUI, and `-S`/`-D` connect the compiler-generated kernel
 layout/debug information to the emulator. `-O` supplies the initial modeled OS
-context from which the first dispatcher `RTI` can leave. `-n 4` tells the
-emulator that four IVT entries will later be loaded into SRAM by the
+context from which the first dispatcher `RTI` can leave. `-n 5` tells the
+emulator that five IVT entries will later be loaded into SRAM by the
 bootloader; they are not present in the initially parsed EPROM image.
 
 Capital `V` opens the raw UART terminal and `Ctrl+]` returns to the debug view.
@@ -286,6 +286,8 @@ Useful narrower commands are:
 | `make test-lib` | Run the standalone library tests |
 | `make test-os` | Run the OS feature tests |
 | `make test-shell` | Run the shell tests |
+| `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
+| `make test-fast DMA=1` | Run the fast workflow with emulator DMA enabled |
 
 # 1. Toolchain work required by PicoOS
 
@@ -507,8 +509,9 @@ interrupt frame, and the dispatcher restores the same layout.
 | Binary assembly | `--assemble program.reti` combines RETI words with the five layout header words in `program.bin` |
 | EPROM-only boot | `-e boot/bootloader.reti` starts reset execution without preloading a program into SRAM |
 | Configurable SRAM | PicoOS selects 262,144 physical 32-bit cells while retaining the RETI tagged address space |
-| Memory-mapped periphery | UART, device mappings, priorities, timer interval, stack boundary, and exception cause occupy offsets 0–11 |
-| Interrupt controller | Timer, custom device, and UART have configurable vector mappings, priorities, pending state, and nesting behavior |
+| Memory-mapped periphery | UART, device mappings, priorities, timer interval, stack boundary, exception cause, and optional DMA occupy offsets 0–16 |
+| Interrupt controller | Timer, DMA through the custom device line, and UART have configurable vector mappings, priorities, pending state, and nesting behavior |
+| Direct memory access | Optional DMA drains complete UART words into SRAM while the loading process sleeps and signals completion through a hardware interrupt |
 | Manual interrupts | The TUI can select and trigger an interrupt vector for inspection |
 | Runtime timer | An instruction-count interval produces repeatable userspace preemption and exposes the live counter in the TUI |
 | Raw-byte UART | Receive/send registers and status bits model byte delivery rather than line-oriented console input |
@@ -522,7 +525,7 @@ interrupt frame, and the dispatcher restores the same layout.
 | Snapshots and restart | Complete CPU, memory, interrupt, UART, and peripheral state can be saved, restored repeatedly, or restarted |
 | Live inspection/editing | Windows can be selected, scrolled, centered, and edited while inspecting registers or memory |
 | Synthetic OS context | The initial debugger state can model the kernel/interrupt context needed before PicoOS's first `RTI` |
-| Explicit vector count | The emulator can reserve the four-entry IVT before the bootloader populates SRAM |
+| Explicit vector count | The emulator can reserve the five-entry IVT before the bootloader populates SRAM |
 | Isolated assembly runs | The repository wrapper keeps assembler processes from overwriting peripheral files belonging to an active OS instance |
 
 ### 1.2.1 Machine model and peripherals
@@ -543,9 +546,14 @@ at `0x80000000`.
 | 9 | Timer interval | Instruction-count period; zero disables and a write restarts the counter |
 | 10 | Stack/heap boundary | Inclusive active lower stack limit; dispatcher rewrites it on every context switch |
 | 11 | CPU exception cause | Read-only: none, divide by zero, stack overflow, or illegal instruction |
+| 12 | DMA active | Always present; `1` enables DMA and exposes offsets 13–16 |
+| 13 | DMA source | Absolute UART receive address used by PicoOS |
+| 14 | DMA destination | Absolute SRAM destination address |
+| 15 | DMA word count | Number of complete 32-bit words to copy |
+| 16 | DMA status/control | `0` idle, write/read `1` for start/busy, `2` complete, `3` error |
 
 CPU exception vector 3 is fixed rather than configured through cells 3–8.
-The kernel initializes timer/UART mappings from its global arrays; the
+The kernel initializes timer/DMA/UART mappings from its global arrays; the
 dispatcher connects each PCB's `base_address`, `heap_start`, and `heap_size` to
 cell 10. This is a concrete example of a kernel data structure controlling an
 emulated hardware protection register.
@@ -785,7 +793,7 @@ flowchart TD
 
 ## 4.1 Interrupt vector table
 
-The linked kernel has four vector cells at the beginning of SRAM:
+The linked kernel has five vector cells at the beginning of SRAM:
 
 ```c
 __attribute__((section("ivt")))
@@ -793,7 +801,8 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
     syscall_interrupt,
     timer_interrupt,
     uart_interrupt,
-    cpu_exception_interrupt
+    cpu_exception_interrupt,
+    dma_interrupt
 };
 ```
 
@@ -803,14 +812,15 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
 | 1 | `timer_interrupt` | Timer device |
 | 2 | `uart_interrupt` | UART receive device |
 | 3 | `cpu_exception_interrupt` | Fixed synchronous CPU exception vector |
+| 4 | `dma_interrupt` | DMA completion on the hardware custom-device line |
 
 An `INT` automatically saves only the interrupted return PC. Each ISR
 explicitly saves any general registers it needs. `RTI` reloads the PC from
 `SP + 1`, increments `SP`, and advances execution.
 
 The interrupt controller has two static global arrays in kernel `.data`.
-`interrupt_device_isrs[]` maps timer/custom/UART to `1/disabled/2`, and
-`interrupt_device_priorities[]` assigns `1/0/2`. Initialization reads these
+`interrupt_device_isrs[]` maps timer/DMA/UART to `1/4/2`, and
+`interrupt_device_priorities[]` assigns `1/1/2`. Initialization reads these
 arrays and writes periphery registers 3–8; neither array uses `kmalloc()`.
 
 ## 4.2 Saved interrupt frame
