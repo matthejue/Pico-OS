@@ -1,4 +1,5 @@
 #include "sram_loader.header"
+#include "dma.header"
 #include "loading_bar.header"
 #include "uart_protocol.header"
 
@@ -13,6 +14,17 @@ void receive_words_to_sram(
         word_count
     );
     int word;
+
+    if (dma_is_active()) {
+        start_dma_uart_transfer(base_address, word_count);
+        while (dma_transfer_status() == DMA_STATUS_BUSY) {
+        }
+        if (loading_bar_update >= 0 &&
+            dma_transfer_status() == DMA_STATUS_COMPLETE) {
+            uart_update_loading_bar(word_count, word_count);
+        }
+        return;
+    }
 
     while (index < word_count) {
         word = receive_word();

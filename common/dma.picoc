@@ -1,0 +1,34 @@
+#include "dma.header"
+
+#define PERIPHERY_BASE 1073741824
+
+int read_dma_register(int register_index) {
+    int *dma_register = (int *)(PERIPHERY_BASE + register_index);
+
+    return *dma_register;
+}
+
+void write_dma_register(int register_index, int value) {
+    int *dma_register = (int *)(PERIPHERY_BASE + register_index);
+
+    *dma_register = value;
+}
+
+bool dma_is_active(void) {
+    return read_dma_register(DMA_ACTIVE_REGISTER) == 1;
+}
+
+int dma_transfer_status(void) {
+    return read_dma_register(DMA_STATUS_REGISTER);
+}
+
+void start_dma_uart_transfer(int destination, int word_count) {
+    write_dma_register(DMA_SOURCE_REGISTER, DMA_UART_RECEIVE_ADDRESS);
+    write_dma_register(DMA_DESTINATION_REGISTER, destination);
+    write_dma_register(DMA_WORD_COUNT_REGISTER, word_count);
+    write_dma_register(DMA_STATUS_REGISTER, DMA_STATUS_BUSY);
+}
+
+void cancel_dma_transfer(void) {
+    write_dma_register(DMA_STATUS_REGISTER, DMA_STATUS_IDLE);
+}

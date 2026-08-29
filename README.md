@@ -511,7 +511,7 @@ interrupt frame, and the dispatcher restores the same layout.
 | Configurable SRAM | PicoOS selects 262,144 physical 32-bit cells while retaining the RETI tagged address space |
 | Memory-mapped periphery | UART, device mappings, priorities, timer interval, stack boundary, exception cause, and optional DMA occupy offsets 0–16 |
 | Interrupt controller | Timer, DMA through the custom device line, and UART have configurable vector mappings, priorities, pending state, and nesting behavior |
-| Direct memory access | Optional DMA drains complete UART words into SRAM while the loading process sleeps and signals completion through a hardware interrupt |
+| Direct memory access | Optional DMA copies UART words into SRAM for kernel, init, and later program loading; scheduled loads receive a completion interrupt |
 | Manual interrupts | The TUI can select and trigger an interrupt vector for inspection |
 | Runtime timer | An instruction-count interval produces repeatable userspace preemption and exposes the live counter in the TUI |
 | Raw-byte UART | Receive/send registers and status bits model byte delivery rather than line-oriented console input |
@@ -624,11 +624,14 @@ debugger additionally shows RETI registers, EPROM, SRAM, periphery state, PicoC
 source, snapshots, and normal/raw UART terminals.
 
 For `load`, the host returns the complete file length in words followed by the
-file bytes; `UINT32_MAX` represents failure. The EPROM bootloader consumes this
-stream before scheduling exists. Userspace process loading instead combines
-`file-size` with independent 1 KiB `read-range` responses, so another process
-can safely use the host protocol between chunks. `read-range`, `file-size`,
-`pwd`, and `ls` begin their responses with a big-endian length/value.
+file bytes; `UINT32_MAX` represents failure. The EPROM bootloader and the
+kernel's initial `init` load consume this stream before scheduling exists. They
+copy it with DMA when register 12 reports DMA active and otherwise receive one
+word at a time. Later process loading combines `file-size` with `read-range`:
+the DMA path requests the complete payload, while the fallback uses independent
+1 KiB responses so another process can safely use the host protocol between
+chunks. `read-range`, `file-size`, `pwd`, and `ls` begin their responses with a
+big-endian length/value.
 Output-selection requests are different: after `<ESC>write path<ESC>/` or
 `<ESC>write-at offset path<ESC>/`, ordinary subsequent UART bytes go to that
 host file until PicoOS sends `<ESC>write stdout<ESC>/` or selects stderr.
@@ -650,7 +653,7 @@ functions:
 | Function | Purpose and state change |
 | --- | --- |
 | `void _start(void)` | Establishes EPROM `CS`/`DS` and a temporary stack at the top of SRAM, then jumps to `boot_main()` |
-| `void boot_main(void)` | Requests `kernel/kernel.bin`, validates and consumes its header, and copies the payload into SRAM |
+| `void boot_main(void)` | Requests `kernel/kernel.bin`, validates and consumes its header, and copies the payload into SRAM through DMA or the polling fallback |
 | `void start_loaded_kernel(void)` | Converts relative code/data/stack values to SRAM addresses, replaces the boot stack with the kernel stack, and jumps to the kernel entry |
 
 The bootloader has no dynamic memory and no process structures. Its locals and
@@ -670,7 +673,8 @@ sequenceDiagram
     EPROM->>EPROM: Set EPROM segments and temporary SRAM stack
     EPROM->>UART: Request kernel/kernel.bin
     Host-->>EPROM: Count, five header words, payload
-    EPROM->>SRAM: Copy payload from SRAM base
+    EPROM->>EPROM: Check the DMA active register
+    EPROM->>SRAM: Copy payload through DMA or one word at a time
     EPROM->>CPU: Install kernel CS, DS, SP, and BAF
     CPU->>Kernel: Jump to generated kernel _start
 ```
@@ -691,12 +695,14 @@ int main(void) {
     struct RunProcessRequest init_request;
 
     activate_kernel_stack_boundary();
-    debug;
     init_kernel_heap();
     initialize_terminal();
     initialize_process_table();
     init_process_memory_heap();
     initialize_shared_memory();
+    if (dma_is_active()) {
+        initialize_dma();
+    }
     interrupt_controller_initialize();
     init_pid = load_process("system/init.bin", loading_bar_enabled);
     init_request.pid = init_pid;
@@ -720,10 +726,11 @@ stack and change its PCB from `NEW` to `READY`.
 4. Reset the process-list globals
 5. Initialize the process-memory heap
 6. Reset the named shared-memory registry
-7. Configure interrupt-vector mappings and priorities
-8. Load `system/init.bin` as a `NEW` process
-9. Build init’s initial stack and change it to `READY`
-10. Activate the timer and dispatch init
+7. Initialize DMA state when the activation register is set
+8. Configure interrupt-vector mappings and priorities
+9. Load `system/init.bin` through DMA or the polling fallback as a `NEW` process
+10. Build init’s initial stack and change it to `READY`
+11. Activate the timer and dispatch init
 
 ## 2.3 Entering normal execution
 
