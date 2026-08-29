@@ -10,7 +10,8 @@ this directory. Run the download script again at any time to update both tools.
 
 The launchers look for `reti_emulator` in this directory and then in `PATH`.
 Use `--reti-emulator PATH` with the shell script or `-RetiEmulator PATH` with
-the PowerShell script to select a custom emulator executable.
+the PowerShell script to select a custom emulator executable. Add `--dma` to
+the shell command or `-Dma` to the PowerShell command to enable DMA loading.
 
 PicoOS exposes the host filesystem through RETI-Emulator UART services,
 including per-process working directories, directory listing, creation, and

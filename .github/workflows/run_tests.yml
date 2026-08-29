@@ -73,7 +73,7 @@ jobs:
             test/host_commands/expected_output.txt
 
       - name: Run tests
-        run: make test TEST_BUILD_MODE=direct TEST_JOBS="$(nproc)"
+        run: make test TEST_BUILD_MODE=direct TEST_JOBS="$(nproc)" DMA=1
 
       - name: Publish test status
         if: always()
