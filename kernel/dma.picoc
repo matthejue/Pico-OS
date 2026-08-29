@@ -1,6 +1,5 @@
 #include "dma.header"
 #include "dispatcher.header"
-#include "periphery.header"
 #include "process/process.header"
 #include "../common/syscall.header"
 
@@ -14,14 +13,6 @@ void initialize_dma(void) {
     dma_waiters.head = NULL;
     dma_waiters.tail = NULL;
     dma_initialized = true;
-}
-
-bool dma_is_active(void) {
-    return periphery_read_register(DMA_ACTIVE_REGISTER) == 1;
-}
-
-int dma_transfer_status(void) {
-    return periphery_read_register(DMA_STATUS_REGISTER);
 }
 
 bool start_dma_uart_receive(
@@ -41,16 +32,9 @@ bool start_dma_uart_receive(
 
     caller_context[4] = SYSCALL_LOAD_PROCESS_CONTINUE;
     enqueue_current_process_on_wait_queue(&dma_waiters);
-    periphery_write_register(DMA_SOURCE_REGISTER, DMA_UART_RECEIVE_ADDRESS);
-    periphery_write_register(DMA_DESTINATION_REGISTER, destination);
-    periphery_write_register(DMA_WORD_COUNT_REGISTER, word_count);
-    periphery_write_register(DMA_STATUS_REGISTER, DMA_STATUS_BUSY);
+    start_dma_uart_transfer(destination, word_count);
     dispatcher_switch_from_context(caller_context);
     return true;
-}
-
-void cancel_dma_transfer(void) {
-    periphery_write_register(DMA_STATUS_REGISTER, DMA_STATUS_IDLE);
 }
 
 void handle_dma_interrupt(void) {

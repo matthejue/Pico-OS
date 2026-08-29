@@ -560,6 +560,7 @@ config/isrs.reti: $(ISRS_PICOC_SOURCES)
 
 EPROM_PICOC_SOURCES := \
 	boot/bootloader.picoc \
+	common/dma.picoc \
 	common/loading_bar.picoc \
 	common/sram_loader.picoc \
 	kernel/uart_hardware.picoc \
@@ -567,6 +568,7 @@ EPROM_PICOC_SOURCES := \
 
 EPROM_HEADERS := \
 	config/config.header \
+	common/dma.header \
 	common/loading_bar.header
 
 boot/memory_constants.header: $(EPROM_PICOC_SOURCES) $(EPROM_HEADERS) kernel/memory_constants.header
@@ -642,6 +644,7 @@ binary/user/%.bin: user/%.reti | binary/user
 
 KERNEL_PICOC_SOURCES := \
 	interrupt_service_routines/os_isrs.picoc \
+	common/dma.picoc \
 	common/loading_bar.picoc \
 	common/sram_loader.picoc \
 	common/string.picoc \
