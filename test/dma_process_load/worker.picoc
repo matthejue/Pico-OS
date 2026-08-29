@@ -1,0 +1,14 @@
+// dependencies: ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/sys/mman/mman.header"
+#include "../../common/stddef.header"
+
+#define SHARED_NAME "dma-process-load"
+
+int main(void) {
+    int shared_id = shm_open(SHARED_NAME, 1);
+    bool *worker_ran = (bool *)mmap(shared_id);
+
+    *worker_ran = true;
+    return 0;
+}

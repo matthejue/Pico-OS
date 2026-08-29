@@ -25,7 +25,7 @@ TEMPORARY_ROOT = Path("/tmp")
 BINARY_TEST_ROOT = Path("binary/test")
 RUNTIME_BOOT_ARGUMENTS = (
     "-n",
-    "4",
+    "5",
     "-e",
     "./boot/bootloader.reti",
     "-S",

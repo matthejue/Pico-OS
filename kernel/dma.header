@@ -1,0 +1,27 @@
+#pragma once
+
+#include "../common/stddef.header"
+
+#define DMA_ACTIVE_REGISTER 12
+#define DMA_SOURCE_REGISTER 13
+#define DMA_DESTINATION_REGISTER 14
+#define DMA_WORD_COUNT_REGISTER 15
+#define DMA_STATUS_REGISTER 16
+
+#define DMA_UART_RECEIVE_ADDRESS 1073741825 // Periphery base + UART receive register
+
+#define DMA_STATUS_IDLE 0
+#define DMA_STATUS_BUSY 1
+#define DMA_STATUS_COMPLETE 2
+#define DMA_STATUS_ERROR 3
+
+void initialize_dma(void);
+bool dma_is_active(void);
+int dma_transfer_status(void);
+bool start_dma_uart_receive(
+    int destination,
+    int word_count,
+    int *caller_context
+);
+void cancel_dma_transfer(void);
+void handle_dma_interrupt(void);
