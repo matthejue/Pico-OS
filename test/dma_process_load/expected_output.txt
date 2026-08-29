@@ -1,0 +1,3 @@
+process with pid 3 created
+DMA process load passed
+process with pid 6 created

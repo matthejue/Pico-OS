@@ -1,7 +1,7 @@
 #include "shared_memory.header"
 #include "kmalloc.header"
 #include "pmalloc.header"
-#include "process.header"
+#include "process/process.header"
 
 struct SharedMemoryEntry *shared_memory_list_head = NULL;
 int next_shared_memory_id = 1;

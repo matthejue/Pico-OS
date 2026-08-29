@@ -1,5 +1,6 @@
-#include "../process_loader.header"
-#include "../process.header"
+#include "process_loader.header"
+#include "../dma.header"
+#include "process.header"
 #include "../kmalloc.header"
 #include "../pmalloc.header"
 #include "../../common/loading_bar.header"
@@ -20,6 +21,7 @@ struct ProcessLoad {
     int payload_word_count;
     int loaded_word_count;
     int loading_bar_update;
+    bool uses_dma;
     char *binary_path;
     char *host_path;
 };
@@ -79,6 +81,9 @@ void cancel_process_load(struct Process *process) {
     if (load == NULL) {
         return;
     }
+    if (load->uses_dma && dma_transfer_status() == DMA_STATUS_BUSY) {
+        cancel_dma_transfer();
+    }
     process->pending_load = NULL;
     pfree(load->base_address);
     free_process_load(load);
@@ -109,7 +114,11 @@ int finish_process_load(struct Process *owner) {
     return pid;
 }
 
-int begin_process_load(char *path, bool show_loading_bar) {
+int begin_process_load(
+    char *path,
+    bool show_loading_bar,
+    int *caller_context
+) {
     char absolute_path[512];
     char *host_path = path;
     int file_byte_count;
@@ -122,6 +131,7 @@ int begin_process_load(char *path, bool show_loading_bar) {
     int effective_stack_start;
     int process_size;
     int base_address;
+    int byte_count;
     struct ProcessLoad *load;
     struct Process *owner = current_process();
 
@@ -179,6 +189,7 @@ int begin_process_load(char *path, bool show_loading_bar) {
     load->heap_size = heap_size;
     load->payload_word_count = file_byte_count / 4 - 5;
     load->loaded_word_count = 0;
+    load->uses_dma = false;
     load->binary_path = copy_process_path(path);
     load->host_path = copy_process_path(host_path);
     owner->pending_load = load;
@@ -191,17 +202,62 @@ int begin_process_load(char *path, bool show_loading_bar) {
     if (load->payload_word_count == 0) {
         return finish_process_load(owner);
     }
+
+    if (dma_is_active()) {
+        uart_send_file_range_command(
+            load->host_path,
+            20,
+            load->payload_word_count * 4
+        );
+        byte_count = receive_word();
+        if (byte_count != load->payload_word_count * 4) {
+            if (byte_count > 0) {
+                drain_process_bytes(byte_count);
+            }
+            cancel_process_load(owner);
+            return 0;
+        }
+
+        load->uses_dma = true;
+        if (!start_dma_uart_receive(
+            load->base_address,
+            load->payload_word_count,
+            caller_context
+        )) {
+            cancel_process_load(owner);
+            return 0;
+        }
+    }
     return SYSCALL_LOAD_PROCESS_CONTINUE;
 }
 
 int continue_process_load(struct Process *owner) {
     struct ProcessLoad *load = owner->pending_load;
+    int status;
     int remaining = load->payload_word_count - load->loaded_word_count;
     int requested_words = remaining;
     int requested_bytes;
     int byte_count;
     int index = 0;
     int word;
+
+    if (load->uses_dma) {
+        status = dma_transfer_status();
+        if (status == DMA_STATUS_BUSY) {
+            return SYSCALL_LOAD_PROCESS_CONTINUE;
+        }
+        if (status != DMA_STATUS_COMPLETE) {
+            cancel_process_load(owner);
+            return 0;
+        }
+        if (load->loading_bar_update >= 0) {
+            uart_update_loading_bar(
+                load->payload_word_count,
+                load->payload_word_count
+            );
+        }
+        return finish_process_load(owner);
+    }
 
     if (requested_words > UART_HOST_TRANSFER_CHUNK_WORDS) {
         requested_words = UART_HOST_TRANSFER_CHUNK_WORDS;
@@ -240,11 +296,15 @@ int continue_process_load(struct Process *owner) {
     return SYSCALL_LOAD_PROCESS_CONTINUE;
 }
 
-int load_process_chunk(char *path, bool show_loading_bar) {
+int load_process_chunk(
+    char *path,
+    bool show_loading_bar,
+    int *caller_context
+) {
     struct Process *owner = current_process();
 
     if (owner->pending_load == NULL) {
-        return begin_process_load(path, show_loading_bar);
+        return begin_process_load(path, show_loading_bar, caller_context);
     }
     return continue_process_load(owner);
 }

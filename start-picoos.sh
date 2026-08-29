@@ -59,7 +59,7 @@ resolve_emulator() {
 resolve_emulator
 cd "$runtime_dir"
 exec "$emulator_path" \
-  -n 4 \
+  -n 5 \
   -e ./boot/bootloader.reti \
   -d -c -O \
   -r 262144 \

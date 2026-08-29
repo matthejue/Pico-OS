@@ -48,7 +48,7 @@ $Emulator = Resolve-Tool `
     -CommandName "reti_emulator"
 
 $Arguments = @(
-    "-n", "4",
+    "-n", "5",
     "-e", "./boot/bootloader.reti",
     "-d", "-c", "-O",
     "-r", "262144",

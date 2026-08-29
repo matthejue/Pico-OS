@@ -1,0 +1,3 @@
+load test/dma_process_load/launcher.bin
+run 3
+poweroff.bin

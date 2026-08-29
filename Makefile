@@ -26,6 +26,8 @@ README_PDF_MERMAID ?= $(README_PDF_TOOL_DIR)/node_modules/.bin/mmdc
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
+DMA ?= 0
+DMA_EMU_OPTION := $(if $(filter 1 true yes on,$(DMA)),--dma,)
 TEST_BUILD_MODE ?= staged
 
 VALID_TEST_BUILD_MODES := staged direct
@@ -187,6 +189,7 @@ help:
 	@echo "  OS_RUN_EMU_OPTS='<arguments>'   Override ./config/os_run_emu_opts.txt"
 	@echo "  EXTRA_CPL_ARGS='<arguments>'    Additional compiler arguments for normal runs/tests"
 	@echo "  EXTRA_EMU_ARGS='<arguments>'    Additional emulator arguments for normal runs/tests"
+	@echo "  DMA=1                           Enable DMA program loading in the emulator"
 	@echo "  TEST_BUILD_MODE=staged|direct   Select staged or direct test compilation (default: staged)"
 	@echo "  TEST_JOBS=<count>               Set parallel normal-test jobs without prompting"
 	@echo ""
@@ -235,11 +238,11 @@ readme-pdf:
 # ----------------------------------------------------------------------
 
 run:
-	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	./run.sh "$(RUN_PATH)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"
 
 run-os: test-runtime-tree
 	./export_environment_vars_for_makefile.sh;\
-	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	./run_os_tests.py --run "$(OS_RUN_PATH)" "$${COLUMNS:-120}" "" "$(OS_RUN_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_RUN_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; rm -rf binary/test; exit "$$status"
 
 run_send_keypresses:
@@ -250,7 +253,7 @@ run_send_keypresses:
 		$(PICOC_BUILD) $$(cat ./config/run_cpl_opts.txt) $(EXTRA_CPL_ARGS) "$$run_path" -o "$$compiled_path"; \
 		run_path="$$compiled_path"; \
 	fi; \
-	./send_keypresses.py --input ./config/input.txt ./run_reti_emulator_isolated.sh $$(cat ./config/run_emu_opts.txt) $(EXTRA_EMU_ARGS) "$$run_path"
+	./send_keypresses.py --input ./config/input.txt ./run_reti_emulator_isolated.sh $$(cat ./config/run_emu_opts.txt) $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION) "$$run_path"
 
 
 # ----------------------------------------------------------------------
@@ -297,13 +300,13 @@ test-fast: release-tree
 
 test-lib: config/isrs.reti
 	./export_environment_vars_for_makefile.sh;\
-	TEST_JOBS="$(TEST_JOBS)" ./run_sys_tests.sh $(TEST_BUILD_OPTION) "$${COLUMNS:-120}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	TEST_JOBS="$(TEST_JOBS)" ./run_sys_tests.sh $(TEST_BUILD_OPTION) "$${COLUMNS:-120}" "$(TEST_PATTERN)" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"
 
 test-all: test
 
 test_not_passed:
 	./export_environment_vars_for_makefile.sh;\
-	TEST_JOBS="$(TEST_JOBS)" ./run_sys_tests.sh --not-passed $(TEST_BUILD_OPTION) "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS)"
+	TEST_JOBS="$(TEST_JOBS)" ./run_sys_tests.sh --not-passed $(TEST_BUILD_OPTION) "$${COLUMNS:-120}" "" "$(EXTRA_CPL_ARGS)" "$(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"
 
 test-sys:
 	@test_jobs="$$(./select_test_jobs.sh)" || exit $$?; \
@@ -320,7 +323,7 @@ test-sys:
 test-os: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
-	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-os completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
@@ -330,7 +333,7 @@ test-os: test-runtime-tree
 test-shell: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
-	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	./run_os_tests.py $(TEST_BUILD_OPTION) $(TEST_JOB_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-shell completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
@@ -353,7 +356,7 @@ test-os-fast: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
 	$(MAKE) binary/system/fast_os_test_launcher.bin; \
-	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-os-fast completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
@@ -364,7 +367,7 @@ test-shell-fast: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
 	$(MAKE) binary/system/fast_os_test_launcher.bin; \
-	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS)"; \
+	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
 	printf 'make test-shell-fast completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
@@ -643,6 +646,7 @@ KERNEL_PICOC_SOURCES := \
 	common/sram_loader.picoc \
 	common/string.picoc \
 	kernel/uart_hardware.picoc \
+	kernel/dma.picoc \
 	common/uart_protocol.picoc \
 	kernel/kernel.picoc \
 	kernel/exception.picoc \
@@ -693,10 +697,10 @@ binary/kernel/kernel.bin: kernel/kernel.reti | binary/kernel
 # ----------------------------------------------------------------------
 
 run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt binary/device/terminal.dev
-	cd binary && ../run_reti_emulator_isolated.sh ../kernel/kernel.reti -d -c -O -r $(SRAM_SIZE)
+	cd binary && ../run_reti_emulator_isolated.sh ../kernel/kernel.reti -d -c -O -r $(SRAM_SIZE) $(DMA_EMU_OPTION)
 
 bootload: firmware binary/device/terminal.dev
-	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
+	cd binary && ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo $(DMA_EMU_OPTION)
 
 bootload-debug:
 	$(MAKE) kernel/memory_constants.header
@@ -711,7 +715,7 @@ bootload-debug:
 		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel/kernel.reti
 	$(MAKE) release-tree
-	cd binary && ../run_reti_emulator_isolated.sh -n 4 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo
+	cd binary && ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo $(DMA_EMU_OPTION)
 
 
 # ----------------------------------------------------------------------

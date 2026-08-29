@@ -4,7 +4,7 @@
 #include "kmalloc.header"
 #include "memory_constants.header"
 #include "periphery.header"
-#include "process.header"
+#include "process/process.header"
 #include "../common/file.header"
 #include "../common/uart_protocol.header"
 
