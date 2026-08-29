@@ -1,5 +1,6 @@
 process with pid 3 created
 process with pid 4 created
-3
 3 0
-process with pid 6 created
+process with pid 5 created
+3
+process with pid 7 created
