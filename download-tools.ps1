@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("reti_emulator", "picoc_compiler")]
+    [string[]]$Tool
+)
 
 $ErrorActionPreference = "Stop"
 $RuntimeRoot = $PSScriptRoot
@@ -51,16 +54,20 @@ function Install-Package {
 }
 
 try {
-    Install-Package `
-        -Repository "RETI-Emulator" `
-        -Asset "reti-emulator-windows-x86_64.zip" `
-        -ExecutableName "reti_emulator.exe"
-    Install-Package `
-        -Repository "PicoC-Compiler" `
-        -Asset "picoc-compiler-windows-x86_64.zip" `
-        -ExecutableName "picoc_compiler.exe"
+    if (-not $Tool -or $Tool -contains "reti_emulator") {
+        Install-Package `
+            -Repository "RETI-Emulator" `
+            -Asset "reti-emulator-windows-x86_64.zip" `
+            -ExecutableName "reti_emulator.exe"
+    }
+    if (-not $Tool -or $Tool -contains "picoc_compiler") {
+        Install-Package `
+            -Repository "PicoC-Compiler" `
+            -Asset "picoc-compiler-windows-x86_64.zip" `
+            -ExecutableName "picoc_compiler.exe"
+    }
 } finally {
     Remove-Item -LiteralPath $TemporaryRoot -Recurse -Force
 }
 
-Write-Host "Installed the latest RETI Emulator and PicoC Compiler in $RuntimeRoot"
+Write-Host "Installed the selected PicoOS tools in $RuntimeRoot"

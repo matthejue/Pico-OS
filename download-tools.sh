@@ -2,6 +2,35 @@
 
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: ./download-tools.sh [reti_emulator] [picoc_compiler]
+EOF
+}
+
+download_emulator=false
+download_compiler=false
+if (($# == 0)); then
+  download_emulator=true
+  download_compiler=true
+else
+  for tool in "$@"; do
+    case "$tool" in
+      reti_emulator) download_emulator=true ;;
+      picoc_compiler) download_compiler=true ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        echo "Unknown tool: $tool" >&2
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+fi
+
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 runtime_dir=$script_dir
 if [[ -f "$script_dir/binary/boot/bootloader.reti" ]]; then
@@ -94,14 +123,20 @@ install_package() {
   done < <(find "$package_root" \( -type f -o -type l \) -print0)
 }
 
-install_package \
-  RETI-Emulator \
-  "reti-emulator-$platform-$architecture.tar.gz" \
-  reti_emulator
-install_package \
-  PicoC-Compiler \
-  "picoc-compiler-$platform-$architecture.tar.gz" \
-  picoc_compiler
+if "$download_emulator"; then
+  install_package \
+    RETI-Emulator \
+    "reti-emulator-$platform-$architecture.tar.gz" \
+    reti_emulator
+  chmod 755 "$runtime_dir/reti_emulator"
+fi
 
-chmod 755 "$runtime_dir/reti_emulator" "$runtime_dir/picoc_compiler"
-echo "Installed the latest RETI Emulator and PicoC Compiler in $runtime_dir"
+if "$download_compiler"; then
+  install_package \
+    PicoC-Compiler \
+    "picoc-compiler-$platform-$architecture.tar.gz" \
+    picoc_compiler
+  chmod 755 "$runtime_dir/picoc_compiler"
+fi
+
+echo "Installed the selected PicoOS tools in $runtime_dir"
