@@ -1,12 +1,34 @@
 [CmdletBinding()]
 param(
     [string]$RetiEmulator,
+    [Alias("M")]
     [switch]$Dma,
+    [Alias("N", "notui")]
+    [switch]$NoTui,
+    [Alias("h")]
+    [switch]$Help,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$EmulatorArguments
 )
 
 $ErrorActionPreference = "Stop"
+if ($Help) {
+    $Usage = @(
+        "Usage: .\start-picoos.ps1 [OPTIONS] [-- EMULATOR_ARGS...]",
+        "",
+        "Options:",
+        "  -RetiEmulator PATH  Use a custom RETI Emulator executable",
+        "  -Dma, -M            Enable DMA loading",
+        "  -NoTui, -N          Start without the Debug TUI",
+        "  -Help, -h           Show this help page",
+        "  --                  Pass all following arguments to RETI Emulator"
+    ) -join [Environment]::NewLine
+    Write-Host $Usage
+    exit 0
+}
+
+$NoTui = $NoTui -or ($EmulatorArguments -contains "--notui")
+$EmulatorArguments = @($EmulatorArguments | Where-Object { $_ -ne "--notui" })
 $RuntimeRoot = $PSScriptRoot
 $RepositoryRuntime = Join-Path $PSScriptRoot "binary\boot\bootloader.reti"
 if (Test-Path -LiteralPath $RepositoryRuntime -PathType Leaf) {
@@ -43,11 +65,16 @@ function Resolve-Tool {
     return $null
 }
 
-function Install-PicoOsTools {
+function Install-PicoOsTool {
+    param(
+        [string]$Tool,
+        [string]$ToolName
+    )
+
     $DownloadScript = Join-Path $PSScriptRoot "download-tools.ps1"
-    $Answer = Read-Host "RETI Emulator was not found. Download the latest RETI Emulator and PicoC Compiler? [y/N]"
+    $Answer = Read-Host "$ToolName was not found. Download the latest version? [y/N]"
     if ($Answer -notmatch "^(y|yes)$") {
-        Write-Host "PicoOS tools were not downloaded"
+        Write-Host "$ToolName was not downloaded"
         return $false
     }
 
@@ -65,7 +92,7 @@ function Install-PicoOsTools {
         }
     }
 
-    & $DownloadScript
+    & $DownloadScript -Tool $Tool
     return $true
 }
 
@@ -75,26 +102,48 @@ $Emulator = Resolve-Tool `
     -CommandName "reti_emulator"
 
 if (-not $Emulator) {
-    if (-not (Install-PicoOsTools)) {
-        exit 1
+    if (Install-PicoOsTool -Tool "reti_emulator" -ToolName "RETI Emulator") {
+        $Emulator = Resolve-Tool `
+            -LocalNames @("reti_emulator.exe", "reti_emulator") `
+            -CommandName "reti_emulator"
     }
-    $Emulator = Resolve-Tool `
-        -LocalNames @("reti_emulator.exe", "reti_emulator") `
-        -CommandName "reti_emulator"
-    if (-not $Emulator) {
-        throw "The downloaded RETI Emulator was not found"
+}
+
+$Compiler = Resolve-Tool `
+    -LocalNames @("picoc_compiler.exe", "picoc_compiler") `
+    -CommandName "picoc_compiler"
+if (-not $Compiler) {
+    if (Install-PicoOsTool -Tool "picoc_compiler" -ToolName "PicoC Compiler") {
+        $Compiler = Resolve-Tool `
+            -LocalNames @("picoc_compiler.exe", "picoc_compiler") `
+            -CommandName "picoc_compiler"
+    }
+}
+
+if (-not $Emulator) {
+    throw "RETI Emulator was not found"
+}
+if (-not $Compiler) {
+    Write-Host "PicoC Compiler was not found"
+}
+
+if (-not $PSBoundParameters.ContainsKey("Dma")) {
+    $Answer = Read-Host "Enable DMA? [y/N]"
+    if ($Answer -match "^(y|yes)$") {
+        $Dma = $true
     }
 }
 
 $DmaArguments = if ($Dma) { @("--dma") } else { @() }
-$Arguments = @(
-    "-n", "5",
-    "-e", "./boot/bootloader.reti",
-    "-d", "-c", "-O",
-    "-r", "262144",
-    "-S", "kernel/kernel.sections",
-    "-D", "kernel/kernel.debuginfo"
-) + $DmaArguments + $EmulatorArguments
+$OptionsFile = Join-Path $RuntimeRoot "config\emulator_options.txt"
+if (-not (Test-Path -LiteralPath $OptionsFile -PathType Leaf)) {
+    throw "Emulator options file not found: $OptionsFile"
+}
+$DefaultArguments = (Get-Content -LiteralPath $OptionsFile -Raw).Trim() -split "\s+"
+if ($NoTui) {
+    $DefaultArguments = @($DefaultArguments | Where-Object { $_ -ne "-d" })
+}
+$Arguments = $DefaultArguments + $DmaArguments + $EmulatorArguments
 
 Push-Location $RuntimeRoot
 try {
