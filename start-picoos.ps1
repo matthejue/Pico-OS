@@ -40,13 +40,51 @@ function Resolve-Tool {
     if ($Command) {
         return $Command.Source
     }
-    throw "$CommandName was not found in the release directory or PATH. Run .\download-tools.ps1 to download the latest release"
+    return $null
+}
+
+function Install-PicoOsTools {
+    $DownloadScript = Join-Path $PSScriptRoot "download-tools.ps1"
+    $Answer = Read-Host "RETI Emulator was not found. Download the latest RETI Emulator and PicoC Compiler? [y/N]"
+    if ($Answer -notmatch "^(y|yes)$") {
+        Write-Host "PicoOS tools were not downloaded"
+        return $false
+    }
+
+    if (-not (Test-Path -LiteralPath $DownloadScript -PathType Leaf)) {
+        throw "Download script not found: $DownloadScript"
+    }
+
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Unix) {
+        & test -x $DownloadScript
+        if ($LASTEXITCODE -ne 0) {
+            & chmod +x $DownloadScript
+            if ($LASTEXITCODE -ne 0) {
+                throw "Could not make the download script executable: $DownloadScript"
+            }
+        }
+    }
+
+    & $DownloadScript
+    return $true
 }
 
 $Emulator = Resolve-Tool `
     -ExplicitPath $RetiEmulator `
     -LocalNames @("reti_emulator.exe", "reti_emulator") `
     -CommandName "reti_emulator"
+
+if (-not $Emulator) {
+    if (-not (Install-PicoOsTools)) {
+        exit 1
+    }
+    $Emulator = Resolve-Tool `
+        -LocalNames @("reti_emulator.exe", "reti_emulator") `
+        -CommandName "reti_emulator"
+    if (-not $Emulator) {
+        throw "The downloaded RETI Emulator was not found"
+    }
+}
 
 $DmaArguments = if ($Dma) { @("--dma") } else { @() }
 $Arguments = @(
