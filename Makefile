@@ -402,6 +402,7 @@ system user: release-tree
 
 RUNTIME_FILES := \
 	$(BINARY_DIR)/config/environment.txt \
+	$(BINARY_DIR)/config/emulator_options.txt \
 	$(BINARY_DIR)/device/terminal.dev \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
@@ -453,6 +454,9 @@ $(BINARY_DIR) $(BINARY_DIR)/boot $(BINARY_DIR)/config $(BINARY_DIR)/device $(BIN
 	mkdir -p $@
 
 binary/config/environment.txt: config/environment.txt | binary/config
+	cp $< $@
+
+binary/config/emulator_options.txt: config/emulator_options.txt | binary/config
 	cp $< $@
 
 binary/device/terminal.dev: | binary/device

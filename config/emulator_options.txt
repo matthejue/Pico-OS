@@ -1,0 +1,1 @@
+-n 5 -e ./boot/bootloader.reti -d -c -O -r 262144 -S kernel/kernel.sections -D kernel/kernel.debuginfo

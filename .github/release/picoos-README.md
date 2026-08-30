@@ -12,6 +12,12 @@ The launchers look for `reti_emulator` in this directory and then in `PATH`.
 Use `--reti-emulator PATH` with the shell script or `-RetiEmulator PATH` with
 the PowerShell script to select a custom emulator executable. Add `--dma` to
 the shell command or `-Dma` to the PowerShell command to enable DMA loading.
+Add `--notui` to the shell command or `-NoTui` to the PowerShell command to
+start directly in the terminal without the Debug TUI.
+
+To reach the terminal through the Debug TUI, use `(c)ontinue` by pressing `c`
+to run the bootloader, kernel, and init process startup. Then select `(V)iew
+raw terminal`. Press `Ctrl+]` to return to the Debug TUI.
 
 PicoOS exposes the host filesystem through RETI-Emulator UART services,
 including per-process working directories, directory listing, creation, and

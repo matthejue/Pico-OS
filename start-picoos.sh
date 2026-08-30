@@ -9,29 +9,46 @@ if [[ -f "$script_dir/binary/boot/bootloader.reti" ]]; then
 fi
 emulator_path=""
 dma_option=()
+dma_specified=false
+notui=false
+emulator_options_file="$runtime_dir/config/emulator_options.txt"
+emulator_options=()
 
 usage() {
   cat <<'EOF'
-Usage: ./start-picoos.sh [--reti-emulator PATH] [--dma] [-- EMULATOR_ARGS...]
+Usage: ./start-picoos.sh [OPTIONS] [-- EMULATOR_ARGS...]
+
+Options:
+  --reti-emulator PATH  Use a custom RETI Emulator executable
+  --dma, -M             Enable DMA loading
+  --notui, -N           Start without the Debug TUI
+  --help, -h            Show this help page
+  --                    Pass all following arguments to RETI Emulator
 EOF
 }
 
 download_tools() {
   local download_script="$script_dir/download-tools.sh"
-  local answer
-
-  printf 'RETI Emulator was not found. Download the latest RETI Emulator and PicoC Compiler? [y/N] ' >&2
-  IFS= read -r answer || answer=""
-  if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-    echo "PicoOS tools were not downloaded" >&2
-    exit 1
-  fi
 
   [[ -f "$download_script" ]] || { echo "Download script not found: $download_script" >&2; exit 1; }
   if [[ ! -x "$download_script" ]]; then
     chmod +x "$download_script"
   fi
-  "$download_script"
+  "$download_script" "$@"
+}
+
+prompt_download() {
+  local tool=$1
+  local tool_name=$2
+  local answer
+
+  printf '%s was not found. Download the latest version? [y/N] ' "$tool_name" >&2
+  IFS= read -r answer || answer=""
+  if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    echo "$tool_name was not downloaded" >&2
+    return 1
+  fi
+  download_tools "$tool"
 }
 
 while (($#)); do
@@ -41,8 +58,13 @@ while (($#)); do
       emulator_path=$2
       shift 2
       ;;
-    --dma)
+    --dma|-M)
       dma_option=(--dma)
+      dma_specified=true
+      shift
+      ;;
+    --notui|-N)
+      notui=true
       shift
       ;;
     --help|-h)
@@ -72,26 +94,50 @@ resolve_emulator() {
   elif command -v reti_emulator >/dev/null 2>&1; then
     emulator_path=$(command -v reti_emulator)
   else
-    download_tools
-    if [[ -x "$runtime_dir/reti_emulator" ]]; then
-      emulator_path="$runtime_dir/reti_emulator"
-    elif [[ -x "$script_dir/reti_emulator" ]]; then
-      emulator_path="$script_dir/reti_emulator"
-    else
-      echo "The downloaded RETI Emulator was not found" >&2
-      exit 1
-    fi
+    return 1
   fi
 }
 
-resolve_emulator
+compiler_available() {
+  [[ -x "$runtime_dir/picoc_compiler" ]] ||
+    [[ -x "$script_dir/picoc_compiler" ]] ||
+    command -v picoc_compiler >/dev/null 2>&1
+}
+
+if ! resolve_emulator; then
+  prompt_download reti_emulator "RETI Emulator" || true
+  resolve_emulator || { echo "RETI Emulator was not found" >&2; emulator_missing=true; }
+fi
+
+if ! compiler_available; then
+  prompt_download picoc_compiler "PicoC Compiler" || true
+  compiler_available || echo "PicoC Compiler was not found" >&2
+fi
+
+if [[ "${emulator_missing:-false}" == true ]]; then
+  exit 1
+fi
+
+if ! "$dma_specified"; then
+  printf 'Enable DMA? [y/N] ' >&2
+  IFS= read -r dma_answer || dma_answer=""
+  if [[ "$dma_answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    dma_option=(--dma)
+  fi
+fi
+
+[[ -f "$emulator_options_file" ]] || { echo "Emulator options file not found: $emulator_options_file" >&2; exit 1; }
+IFS=' ' read -r -a emulator_options < "$emulator_options_file"
+if "$notui"; then
+  filtered_emulator_options=()
+  for option in "${emulator_options[@]}"; do
+    [[ "$option" == -d ]] || filtered_emulator_options+=("$option")
+  done
+  emulator_options=("${filtered_emulator_options[@]}")
+fi
+
 cd "$runtime_dir"
 exec "$emulator_path" \
-  -n 5 \
-  -e ./boot/bootloader.reti \
-  -d -c -O \
-  -r 262144 \
-  -S kernel/kernel.sections \
-  -D kernel/kernel.debuginfo \
+  "${emulator_options[@]}" \
   "${dma_option[@]}" \
   "$@"
