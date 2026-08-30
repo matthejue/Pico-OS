@@ -13,6 +13,11 @@ dma_specified=false
 notui=false
 emulator_options_file="$runtime_dir/config/emulator_options.txt"
 emulator_options=()
+archive_readme="$runtime_dir/README.md"
+cheatsheet_name=picoos-cheatsheet.pdf
+cheatsheet_url="https://github.com/matthejue/Pico-OS_Cheatsheet/releases/latest/download/$cheatsheet_name"
+cheatsheet_file_line="More information can be found in \`$cheatsheet_name\` in this archive directory."
+cheatsheet_link_line="More information can be found under the following link: $cheatsheet_url"
 
 usage() {
   cat <<'EOF'
@@ -49,6 +54,35 @@ prompt_download() {
     return 1
   fi
   download_tools "$tool"
+}
+
+offer_cheatsheet() {
+  local last_line
+  local answer
+  local cheatsheet_line
+
+  [[ -f "$archive_readme" ]] || { echo "Archive README not found: $archive_readme" >&2; exit 1; }
+  last_line=$(tail -n 1 "$archive_readme")
+  if [[ "$last_line" == "$cheatsheet_file_line" || "$last_line" == "$cheatsheet_link_line" ]]; then
+    return
+  fi
+
+  printf 'Download the latest PicoOS cheatsheet? [y/N] ' >&2
+  IFS= read -r answer || answer=""
+  if [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    if command -v curl >/dev/null 2>&1; then
+      curl --fail --location --retry 3 --output "$runtime_dir/$cheatsheet_name" "$cheatsheet_url"
+    elif command -v wget >/dev/null 2>&1; then
+      wget --output-document="$runtime_dir/$cheatsheet_name" "$cheatsheet_url"
+    else
+      echo "Downloading the PicoOS cheatsheet requires curl or wget" >&2
+      exit 1
+    fi
+    cheatsheet_line=$cheatsheet_file_line
+  else
+    cheatsheet_line=$cheatsheet_link_line
+  fi
+  printf '\n%s\n' "$cheatsheet_line" >> "$archive_readme"
 }
 
 while (($#)); do
@@ -117,6 +151,8 @@ fi
 if [[ "${emulator_missing:-false}" == true ]]; then
   exit 1
 fi
+
+offer_cheatsheet
 
 if ! "$dma_specified"; then
   printf 'Enable DMA? [y/N] ' >&2

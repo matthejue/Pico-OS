@@ -96,6 +96,35 @@ function Install-PicoOsTool {
     return $true
 }
 
+function Offer-PicoOsCheatsheet {
+    $ArchiveReadme = Join-Path $RuntimeRoot "README.md"
+    $CheatsheetName = "picoos-cheatsheet.pdf"
+    $CheatsheetUrl = "https://github.com/matthejue/Pico-OS_Cheatsheet/releases/latest/download/$CheatsheetName"
+    $CheatsheetFileLine = "More information can be found in ``$CheatsheetName`` in this archive directory."
+    $CheatsheetLinkLine = "More information can be found under the following link: $CheatsheetUrl"
+
+    if (-not (Test-Path -LiteralPath $ArchiveReadme -PathType Leaf)) {
+        throw "Archive README not found: $ArchiveReadme"
+    }
+    $LastLine = Get-Content -LiteralPath $ArchiveReadme -Tail 1
+    if ($LastLine -eq $CheatsheetFileLine -or $LastLine -eq $CheatsheetLinkLine) {
+        return
+    }
+
+    $Answer = Read-Host "Download the latest PicoOS cheatsheet? [y/N]"
+    if ($Answer -match "^(y|yes)$") {
+        Invoke-WebRequest `
+            -Uri $CheatsheetUrl `
+            -OutFile (Join-Path $RuntimeRoot $CheatsheetName) `
+            -UseBasicParsing
+        $CheatsheetLine = $CheatsheetFileLine
+    } else {
+        $CheatsheetLine = $CheatsheetLinkLine
+    }
+    Add-Content -LiteralPath $ArchiveReadme -Value ""
+    Add-Content -LiteralPath $ArchiveReadme -Value $CheatsheetLine
+}
+
 $Emulator = Resolve-Tool `
     -ExplicitPath $RetiEmulator `
     -LocalNames @("reti_emulator.exe", "reti_emulator") `
@@ -126,6 +155,8 @@ if (-not $Emulator) {
 if (-not $Compiler) {
     Write-Host "PicoC Compiler was not found"
 }
+
+Offer-PicoOsCheatsheet
 
 if (-not $PSBoundParameters.ContainsKey("Dma")) {
     $Answer = Read-Host "Enable DMA? [y/N]"
