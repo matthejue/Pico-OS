@@ -1,4 +1,6 @@
 static inline void switch_to_periphery_address_space(void) {
+    // Reserves the saved DS word against hardware interrupt pushes
+    asm("SUBI SP 1");
     asm("STOREIN BAF DS 0"); // save DS before switching address spaces
     asm("LOADI DS 1048576"); // 2^20
     asm("MULTI DS 1024"); // 2^20 * 2^10 = 2^30, periphery base
