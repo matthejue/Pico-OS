@@ -16,6 +16,24 @@ Usage: ./start-picoos.sh [--reti-emulator PATH] [--dma] [-- EMULATOR_ARGS...]
 EOF
 }
 
+download_tools() {
+  local download_script="$script_dir/download-tools.sh"
+  local answer
+
+  printf 'RETI Emulator was not found. Download the latest RETI Emulator and PicoC Compiler? [y/N] ' >&2
+  IFS= read -r answer || answer=""
+  if [[ ! "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    echo "PicoOS tools were not downloaded" >&2
+    exit 1
+  fi
+
+  [[ -f "$download_script" ]] || { echo "Download script not found: $download_script" >&2; exit 1; }
+  if [[ ! -x "$download_script" ]]; then
+    chmod +x "$download_script"
+  fi
+  "$download_script"
+}
+
 while (($#)); do
   case "$1" in
     --reti-emulator)
@@ -54,10 +72,15 @@ resolve_emulator() {
   elif command -v reti_emulator >/dev/null 2>&1; then
     emulator_path=$(command -v reti_emulator)
   else
-    echo "RETI Emulator not found in the release directory or PATH" >&2
-    echo "Run ./download-tools.sh to download the latest release" >&2
-    echo "Use --reti-emulator PATH to select it explicitly" >&2
-    exit 1
+    download_tools
+    if [[ -x "$runtime_dir/reti_emulator" ]]; then
+      emulator_path="$runtime_dir/reti_emulator"
+    elif [[ -x "$script_dir/reti_emulator" ]]; then
+      emulator_path="$script_dir/reti_emulator"
+    else
+      echo "The downloaded RETI Emulator was not found" >&2
+      exit 1
+    fi
   fi
 }
 

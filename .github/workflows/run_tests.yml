@@ -32,8 +32,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: matthejue/RETI-Emulator
-          ref: statemachine
           path: RETI-Emulator
+          fetch-depth: 0
+
+      - name: Checkout latest RETI-Emulator version
+        run: |
+          latest_tag="$(git -C ../RETI-Emulator tag --list 'v*' --sort=-version:refname | head -n 1)"
+          git -C ../RETI-Emulator checkout "$latest_tag"
 
       - uses: actions/setup-python@v6
         with:
