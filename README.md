@@ -2779,7 +2779,8 @@ them as editing operations:
 | Up arrow | Move toward older entries in the eight-command history ring |
 | Down arrow | Move toward newer entries and finally restore the draft |
 | Left/right arrows | Consume the escape sequence but do not move the cursor |
-| Tab or printable byte | Append it if space remains in the 80-cell buffer |
+| Tab | Append one space if room remains in the 80-cell buffer |
+| Printable byte | Append it if space remains in the 80-cell buffer |
 
 `read(0, ..., 1)` blocks when the global terminal ring is empty. The command
 buffer and its stack frame remain intact while the PCB waits on
