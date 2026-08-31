@@ -2738,7 +2738,7 @@ that shell image's `.data`, not in a kernel shell object:
 
 | Global | Meaning and storage |
 | --- | --- |
-| `last_foreground_exit_status` | One integer used for `$?` |
+| `last_command_exit_status` | One integer used for `$?` |
 | `last_background_process_id` | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
 | `initial_shell_environment` | Process-heap deep copy used to reset isolated shell tests |
 | `initial_shell_working_directory[PATH_MAX]` | Embedded shell startup-directory copy used for test reset |
@@ -2768,7 +2768,7 @@ them to `eval()`. Only the `exit` built-in makes `eval()` return false.
 | `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
 | `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
 | `bool run_process(int pid, char *arguments, bool background, char *stdout_path, bool append)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
-| `void continue_background_process(bool foreground)` | `void` | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
+| `bool continue_background_process(bool foreground)` | Whether a process was continued | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
 | `bool eval(char *command)` | Continue-shell flag | Selects a built-in or external execution path |
 | `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the prompt loop |
 
@@ -3020,8 +3020,9 @@ stderr, so shell redirection of descriptor 1 does not hide errors. `cat`,
 later operands. `kill` distinguishes an invalid PID, invalid signal, and a PID
 that does not exist. The shell similarly diagnoses unmatched quotes, malformed
 redirection, missing built-in operands, failed process operations, and unknown
-commands. Foreground return values become `$?`; signal termination/stopping is
-reported with the PID and signal name.
+commands. Successful built-ins set `$?` to 0, built-in errors set it to 1, and
+foreground process return values replace it with their exit status. Signal
+termination/stopping is reported with the PID and signal name.
 
 # 14. Use in operating-systems and real-time operating-systems lectures
 

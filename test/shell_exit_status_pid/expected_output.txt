@@ -3,4 +3,8 @@ process with pid 4 created
 3 0
 process with pid 5 created
 3
+process with pid 6 created
+6
 process with pid 7 created
+0
+process with pid 9 created
