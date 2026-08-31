@@ -69,7 +69,7 @@ kernel-wide terminal object:
 | Expose the userspace syscall wrappers | [`library/unistd`](../library/unistd) |
 
 `FileDescriptorTable` contains only descriptor entries. Standard descriptors
-store `/device/terminal` in the same path field used by regular files; the
+store `/device/terminal.dev` in the same path field used by regular files; the
 filesystem recognizes that path and enters the shared `Terminal`, which is
 initialized once by the kernel. The UART ISR enters `handle_uart_interrupt()`
 in `terminal.picoc`; descriptor-based terminal reads and the single-character

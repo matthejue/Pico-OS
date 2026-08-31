@@ -2040,7 +2040,7 @@ struct FileDescriptorTable {
 
 Valid descriptor numbers are 0–5. A new table initializes 0 as read-only
 stdin, 1 as write-only stdout, and 2 as write-only stderr. All three store the
-special path `/device/terminal`. Entries 3–5 begin free, although closing a
+special path `/device/terminal.dev`. Entries 3–5 begin free, although closing a
 standard descriptor allows a later open to reuse its number.
 
 | Descriptor field | Meaning and ownership |
@@ -2048,7 +2048,7 @@ standard descriptor allows a later open to reuse its number.
 | `kind` | Free, stdin, stdout, stderr, or regular host file |
 | `flags` | Access mode plus create/truncate/append flags |
 | `offset` | Per-descriptor logical position; reads and successful writes advance it |
-| `path` | Kernel-owned absolute path; `/device/terminal` selects the kernel terminal |
+| `path` | Kernel-owned absolute path; `/device/terminal.dev` selects the kernel terminal |
 
 Descriptor inheritance deep-copies the table, entries, and paths.
 Offsets are copied by value and later diverge; PicoOS has no Unix-style shared
@@ -2093,7 +2093,7 @@ Callers retrieve this pointer once and pass it to terminal helpers. This avoids
 extra `kernel_terminal()` calls when one helper invokes another.
 
 The descriptor layer reaches this object through the hardcoded virtual path
-`/device/terminal`. Opening that path skips host-file requests, terminal reads
+`/device/terminal.dev`. Opening that path skips host-file requests, terminal reads
 use the input ring, terminal writes use UART output, and seeking fails. The
 release tree also contains `binary/device/terminal.dev` as a visible dummy
 device marker; it stores no terminal data and is not the implementation.
@@ -2150,7 +2150,7 @@ sequenceDiagram
 | `file_descriptor_can_write(struct FileDescriptor *descriptor)` | Boolean | Reads access bits |
 | `initialize_terminal(void)` | `void` | Resets the global ring and reader queue |
 | `kernel_terminal(void)` | Global pointer | No mutation |
-| `is_terminal_device_path(char *path)` | Boolean | Recognizes `/device/terminal` |
+| `is_terminal_device_path(char *path)` | Boolean | Recognizes `/device/terminal.dev` |
 | `pop_terminal_byte(struct Terminal *terminal)` | Byte | Advances head and decrements count |
 | `copy_terminal_bytes(struct Terminal *terminal, char *buffer, int count)` | Count | Pops bytes into process buffer |
 | `enqueue_terminal_byte(struct Terminal *terminal, int value)` | `void` | Inserts at tail; may discard oldest |
@@ -2172,11 +2172,11 @@ sequenceDiagram
 directory, selects the lowest free descriptor, allocates an absolute path copy,
 and fills that entry. `O_TRUNC` with a writable mode asks the host to
 create/truncate immediately. Without `O_TRUNC`, a missing file is created only
-with `O_CREAT`. The special `/device/terminal` path bypasses these host-file
+with `O_CREAT`. The special `/device/terminal.dev` path bypasses these host-file
 operations and opens the kernel terminal directly.
 
 `read_file_descriptor()` validates the entry and read mode. A descriptor whose
-path is `/device/terminal` reads from the kernel terminal and may block. Any
+path is `/device/terminal.dev` reads from the kernel terminal and may block. Any
 other file path sends independent ranged host requests of at most 1 KiB at
 `descriptor->offset`, copies returned bytes, and advances the offset. The
 userspace `read()` wrapper repeats syscall 16 until the requested count, EOF,
@@ -2190,7 +2190,7 @@ advances its offset. Without `O_APPEND`, the descriptor offset selects where
 bytes overwrite the file, so seeking affects both reads and writes. With
 `O_APPEND`, the kernel requests the current file size immediately before every
 write and uses that as the offset, regardless of an earlier seek. An explicitly
-opened `/device/terminal` writes directly to terminal stdout. Seeking is
+opened `/device/terminal.dev` writes directly to terminal stdout. Seeking is
 rejected for the terminal device.
 
 The `file-size` and `write-at` requests are separate, so concurrent modification
@@ -2901,6 +2901,12 @@ For `COMMAND > PATH`, the shell opens with
 copies the opened file onto descriptor 1, starts the child, and restores its
 own stdout. Since `run()` deep-copies the descriptor table, the child's
 descriptor 1 retains the file path after the shell restores itself.
+
+`/device/terminal.dev` is the special exception to ordinary file redirection.
+After path normalization, both `> ./device/terminal.dev` and
+`>> ./device/terminal.dev` connect the child's stdout to the terminal. The
+kernel writes those bytes directly to UART, so it neither truncates the dummy
+marker file nor looks up a file size for append mode.
 
 ```mermaid
 sequenceDiagram

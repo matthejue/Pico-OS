@@ -4,7 +4,7 @@
 #include "../../common/wait_queue.header"
 
 #define TERMINAL_INPUT_BUFFER_CAPACITY 128
-#define TERMINAL_DEVICE_PATH "/device/terminal"
+#define TERMINAL_DEVICE_PATH "/device/terminal.dev"
 
 struct Terminal {
     char input_buffer[TERMINAL_INPUT_BUFFER_CAPACITY];
