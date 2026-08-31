@@ -319,6 +319,9 @@ int read_line(char *buffer, int capacity) {
                     character == '\t' ||
                     character >= ' '
                 ) {
+                    if (character == '\t') {
+                        character = ' ';
+                    }
                     length = append_shell_line_character(
                         buffer,
                         length,

@@ -491,6 +491,7 @@ The shell adds line editing on top:
 | Input | Visible behavior |
 | --- | --- |
 | Printable character | Store and echo it |
+| Tab | Store and echo one space |
 | Enter or carriage return | Finish the line |
 | Backspace or Delete | Remove and erase the previous character |
 | Ctrl+U | Remove and erase the complete current line |
