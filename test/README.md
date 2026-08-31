@@ -258,7 +258,9 @@ At startup, init reads `config/environment.txt` into its environment. Child
 processes inherit a copy of that environment through their initial stack.
 The shell reads `PATH` with `getenv()` and searches its colon-separated
 directories when a command does not begin with `./`. For example, the default
-`PATH=./user` entry allows `echo.bin hello` to execute `./user/echo.bin`.
+`PATH=./user` entry allows `echo.bin hello` to execute `user/echo.bin`.
+Relative entries use the immutable emulator startup directory, so they keep
+working after `cd` and when one shell starts another shell.
 `export NAME="value"` updates the shell environment, and `$NAME` in command
 arguments expands to its value.
 

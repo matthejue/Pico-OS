@@ -96,6 +96,10 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
         return change_working_directory((char *)argument);
     } else if (syscall_number == SYSCALL_GETCWD) {
         return get_working_directory((struct GetCwdRequest *)argument);
+    } else if (syscall_number == SYSCALL_GET_SYSTEM_WORKING_DIRECTORY) {
+        return get_system_working_directory(
+            (struct GetCwdRequest *)argument
+        );
     } else if (syscall_number == SYSCALL_MKDIR) {
         return make_host_directory((char *)argument);
     } else if (syscall_number == SYSCALL_READ_DIRECTORY) {

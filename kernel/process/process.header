@@ -95,3 +95,4 @@ struct Process *current_process(void);
 struct Process *find_process_by_pid(int pid);
 void set_current_process(struct Process *process);
 char *copy_process_path(char *path);
+char *system_working_directory(void);

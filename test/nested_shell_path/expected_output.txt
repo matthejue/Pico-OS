@@ -1,0 +1,10 @@
+process with pid 3 created
+process with pid 4 created
+nested
+test
+process with pid 5 created
+1 system/init.bin
+2 user/shell.bin
+3 user/shell.bin
+5 user/ps.bin
+process with pid 6 created
