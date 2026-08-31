@@ -5,12 +5,16 @@
 #include "../library/stdio/stdio.header"
 #include "../library/schedule/schedule.header"
 #include "../library/stdlib/stdlib.header"
+#include "../library/unistd/unistd.header"
 
 #define DEFAULT_COUNT_DELAY 25000
 
-void count_usage(void) {
-    printf("Usage: count.bin [DELAY]\n");
-    printf("Count upward with an optional busy-loop delay.\n");
+void count_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: count.bin [DELAY]\n");
+    command_write(
+        file_descriptor,
+        "Count upward with an optional busy-loop delay.\n"
+    );
 }
 
 int main(int argc, char **argv) {
@@ -19,18 +23,21 @@ int main(int argc, char **argv) {
     int delay;
 
     if (argc == 2 && command_is_help(argv[1])) {
-        count_usage();
+        count_usage(STDOUT_FILENO);
         return 0;
     }
     if (argc > 2) {
-        count_usage();
+        count_usage(STDERR_FILENO);
         return 1;
     }
     if (argc == 2) {
         count_delay = atoi(argv[1]);
         if (count_delay < 0) {
-            printf("count: delay must not be negative\n");
-            count_usage();
+            command_write(
+                STDERR_FILENO,
+                "count: delay must not be negative\n"
+            );
+            count_usage(STDERR_FILENO);
             return 1;
         }
     }

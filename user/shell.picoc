@@ -12,14 +12,17 @@
 #include "../common/user_command.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
+#define SHELL_PIPE_COMMAND_CAPACITY 160
 #define SHELL_COMMAND_HISTORY_CAPACITY 8
 #define SHELL_CTRL_U 21
 #define SHELL_CTRL_W 23
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
+#define SHELL_SAVED_STDIN_FILENO 3
 #define SHELL_SAVED_STDOUT_FILENO 5
+#define SHELL_SAVED_STDERR_FILENO 6
 #define SHELL_TEST_SAVED_STDOUT_FILENO 4
 #define SHELL_PRIVATE_FILE_DESCRIPTOR_START 3
-#define SHELL_FILE_DESCRIPTOR_COUNT 6
+#define SHELL_FILE_DESCRIPTOR_COUNT 7
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
 #define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
@@ -29,6 +32,9 @@ char **initial_shell_environment = NULL;
 char initial_shell_working_directory[PATH_MAX];
 char shell_system_working_directory[PATH_MAX];
 char shell_executable_path[PATH_MAX];
+char shell_pipe_left_command[SHELL_PIPE_COMMAND_CAPACITY];
+char shell_pipe_right_command[SHELL_PIPE_COMMAND_CAPACITY];
+char shell_pipe_path[SHELL_COMMAND_BUFFER_CAPACITY];
 // Keeps bounded command storage outside the process stack
 char command_history[
     SHELL_COMMAND_HISTORY_CAPACITY
@@ -43,18 +49,29 @@ void shell_write_character(char character) {
     write(STDOUT_FILENO, &character, 1);
 }
 
-void shell_write_string(char *text) {
+void shell_write(int file_descriptor, char *text) {
     int length = 0;
 
     while (text[length] != '\0') {
         length = length + 1;
     }
-    write(STDOUT_FILENO, text, length);
+    write(file_descriptor, text, length);
+}
+
+void shell_write_string(char *text) {
+    shell_write(STDOUT_FILENO, text);
+}
+
+void shell_write_error_string(char *text) {
+    shell_write(STDERR_FILENO, text);
 }
 
 void shell_usage(int file_descriptor) {
     command_write(file_descriptor, "Usage: shell.bin\n");
-    command_write(file_descriptor, "Start the PicoOS command shell.\n");
+    command_write(
+        file_descriptor,
+        "Execute commands interactively or from redirected stdin.\n"
+    );
 }
 
 void shell_write_decimal(int value) {
@@ -236,13 +253,15 @@ int read_line(char *buffer, int capacity) {
     int history_position = 0;
     int escape_sequence_state = 0;
     char character;
+    int read_result;
     int retained_length;
     bool complete = false;
     bool process_character;
 
     shell_write_string("PicoOS> ");
     while (!complete) {
-        if (read(STDIN_FILENO, &character, 1) == 1) {
+        read_result = read(STDIN_FILENO, &character, 1);
+        if (read_result == 1) {
             process_character = true;
             if (escape_sequence_state == 1) {
                 if (character == '[' || character == 'O') {
@@ -331,6 +350,10 @@ int read_line(char *buffer, int capacity) {
                     );
                 }
             }
+        } else if (length == 0) {
+            return -1;
+        } else {
+            complete = true;
         }
     }
 
@@ -581,6 +604,156 @@ bool quotes_are_balanced(char *command) {
     return quote == '\0';
 }
 
+int find_pipeline_operator(char *command) {
+    int index = 0;
+    int pipeline = -1;
+    char quote = '\0';
+
+    while (command[index] != '\0') {
+        if (quote == '\0' &&
+            (command[index] == '"' || command[index] == '\'')) {
+            quote = command[index];
+        } else if (command[index] == quote) {
+            quote = '\0';
+        } else if (quote == '\0' && command[index] == '|') {
+            if (pipeline != -1) {
+                return -2;
+            }
+            pipeline = index;
+        }
+        index = index + 1;
+    }
+    return pipeline;
+}
+
+int find_output_redirection(char *command) {
+    int index = 0;
+    char quote = '\0';
+
+    while (command[index] != '\0') {
+        if (quote == '\0' &&
+            (command[index] == '"' || command[index] == '\'')) {
+            quote = command[index];
+        } else if (command[index] == quote) {
+            quote = '\0';
+        } else if (quote == '\0' && command[index] == '>' &&
+                   index > 0 &&
+                   (is_line_whitespace(command[index - 1]) ||
+                    command[index - 1] == '2')) {
+            if (command[index - 1] == '2') {
+                return index - 1;
+            }
+            return index;
+        }
+        index = index + 1;
+    }
+    return index;
+}
+
+bool insert_redirection(
+    char *command,
+    char *redirection,
+    char *path,
+    int position,
+    char *result
+) {
+    int command_length = strlen(command);
+    int redirection_length = strlen(redirection);
+    int path_length = strlen(path);
+    int suffix_length = command_length - position;
+    int index = 0;
+    int result_index = 0;
+
+    if (command_length + redirection_length + path_length + 2 >=
+        SHELL_PIPE_COMMAND_CAPACITY) {
+        return false;
+    }
+    while (index < position) {
+        result[result_index] = command[index];
+        index = index + 1;
+        result_index = result_index + 1;
+    }
+    result[result_index] = ' ';
+    result_index = result_index + 1;
+    index = 0;
+    while (index < redirection_length) {
+        result[result_index] = redirection[index];
+        index = index + 1;
+        result_index = result_index + 1;
+    }
+    result[result_index] = ' ';
+    result_index = result_index + 1;
+    index = 0;
+    while (index < path_length) {
+        result[result_index] = path[index];
+        index = index + 1;
+        result_index = result_index + 1;
+    }
+    if (suffix_length > 0) {
+        result[result_index] = ' ';
+        result_index = result_index + 1;
+        index = position;
+        while (index < command_length) {
+            result[result_index] = command[index];
+            index = index + 1;
+            result_index = result_index + 1;
+        }
+    }
+    result[result_index] = '\0';
+    return true;
+}
+
+void build_shell_pipe_path(void) {
+    int length;
+
+    strcpy(shell_pipe_path, ".picoos-pipe-");
+    length = strlen(shell_pipe_path);
+    length = length + append_decimal(shell_pipe_path + length, getpid());
+    strcpy(shell_pipe_path + length, ".tmp");
+}
+
+bool run_pipeline(char *command, int pipeline) {
+    char *right_command;
+    int left_end = pipeline;
+    bool evaluating;
+
+    while (left_end > 0 &&
+           is_line_whitespace(command[left_end - 1])) {
+        left_end = left_end - 1;
+    }
+    command[left_end] = '\0';
+    right_command = skip_line_whitespace(command + pipeline + 1);
+    if (left_end == 0 || *right_command == '\0') {
+        shell_write_error_string("error: invalid pipeline\n");
+        last_command_exit_status = 1;
+        return true;
+    }
+
+    build_shell_pipe_path();
+    if (!insert_redirection(
+            command,
+            ">",
+            shell_pipe_path,
+            strlen(command),
+            shell_pipe_left_command
+        ) || !insert_redirection(
+            right_command,
+            "<",
+            shell_pipe_path,
+            find_output_redirection(right_command),
+            shell_pipe_right_command
+        )) {
+        shell_write_error_string("error: pipeline is too long\n");
+        last_command_exit_status = 1;
+        return true;
+    }
+
+    eval(shell_pipe_left_command);
+    evaluating = eval(shell_pipe_right_command);
+    unlink(shell_pipe_path);
+    return evaluating;
+}
+
 bool strip_background_operator(char *command) {
     int end = strlen(command);
 
@@ -609,10 +782,27 @@ bool strip_background_operator(char *command) {
     return true;
 }
 
-int strip_stdout_redirection(
+bool redirection_starts_at(
     char *command,
-    char **path,
-    bool *append
+    int index,
+    int file_descriptor
+) {
+    if (index == 0 || !is_line_whitespace(command[index - 1])) {
+        return false;
+    }
+    if (file_descriptor == STDIN_FILENO) {
+        return command[index] == '<';
+    }
+    if (file_descriptor == STDOUT_FILENO) {
+        return command[index] == '>';
+    }
+    return command[index] == '2' && command[index + 1] == '>';
+}
+
+int strip_redirection(
+    char *command,
+    int file_descriptor,
+    char **path
 ) {
     int command_end;
     int index = 0;
@@ -621,9 +811,7 @@ int strip_stdout_redirection(
     int redirect = -1;
 
     while (command[index] != '\0' && redirect == -1) {
-        if (command[index] == '>' &&
-            index > 0 &&
-            is_line_whitespace(command[index - 1])) {
+        if (redirection_starts_at(command, index, file_descriptor)) {
             redirect = index;
         } else {
             index = index + 1;
@@ -631,13 +819,16 @@ int strip_stdout_redirection(
     }
     if (redirect == -1) {
         *path = NULL;
-        *append = false;
         return 0;
     }
 
-    path_start = redirect + 1;
-    *append = command[path_start] == '>';
-    if (*append) {
+    if (file_descriptor == STDERR_FILENO) {
+        path_start = redirect + 2;
+    } else {
+        path_start = redirect + 1;
+    }
+    if (file_descriptor == STDOUT_FILENO &&
+        command[path_start] == '>') {
         path_start = path_start + 1;
     }
     while (is_line_whitespace(command[path_start])) {
@@ -650,7 +841,7 @@ int strip_stdout_redirection(
     path_end = path_start;
     while (command[path_end] != '\0' &&
            !is_line_whitespace(command[path_end])) {
-        if (command[path_end] == '>') {
+        if (command[path_end] == '<' || command[path_end] == '>') {
             return -1;
         }
         path_end = path_end + 1;
@@ -674,47 +865,176 @@ int strip_stdout_redirection(
     }
     command[command_end] = '\0';
     *path = command + path_start;
+    if (file_descriptor == STDOUT_FILENO &&
+        command[redirect + 1] == '>') {
+        return 2;
+    }
     return 1;
+}
+
+int strip_command_redirections(
+    char *command,
+    char **stdin_path,
+    char **stdout_path,
+    bool *append_stdout,
+    char **stderr_path
+) {
+    int status = strip_redirection(
+        command,
+        STDERR_FILENO,
+        stderr_path
+    );
+
+    if (status < 0) {
+        return STDERR_FILENO;
+    }
+    status = strip_redirection(command, STDOUT_FILENO, stdout_path);
+    if (status < 0) {
+        return STDOUT_FILENO;
+    }
+    *append_stdout = status == 2;
+    status = strip_redirection(command, STDIN_FILENO, stdin_path);
+    if (status < 0) {
+        return STDIN_FILENO;
+    }
+    return -1;
+}
+
+void report_invalid_redirection(int file_descriptor) {
+    if (file_descriptor == STDIN_FILENO) {
+        shell_write_error_string("error: invalid stdin redirection\n");
+    } else if (file_descriptor == STDOUT_FILENO) {
+        shell_write_error_string("error: invalid stdout redirection\n");
+    } else {
+        shell_write_error_string("error: invalid stderr redirection\n");
+    }
+}
+
+void restore_standard_descriptors(
+    bool stdin_redirected,
+    bool stdout_redirected,
+    bool stderr_redirected
+) {
+    if (stdin_redirected) {
+        dup2(SHELL_SAVED_STDIN_FILENO, STDIN_FILENO);
+        close(SHELL_SAVED_STDIN_FILENO);
+    }
+    if (stdout_redirected) {
+        dup2(SHELL_SAVED_STDOUT_FILENO, STDOUT_FILENO);
+        close(SHELL_SAVED_STDOUT_FILENO);
+    }
+    if (stderr_redirected) {
+        dup2(SHELL_SAVED_STDERR_FILENO, STDERR_FILENO);
+        close(SHELL_SAVED_STDERR_FILENO);
+    }
+}
+
+bool redirect_standard_input(char *path) {
+    int file_descriptor;
+
+    if (dup2(STDIN_FILENO, SHELL_SAVED_STDIN_FILENO) < 0) {
+        return false;
+    }
+    close(STDIN_FILENO);
+    file_descriptor = open(path, O_RDONLY);
+    if (file_descriptor != STDIN_FILENO) {
+        if (file_descriptor >= 0) {
+            close(file_descriptor);
+        }
+        restore_standard_descriptors(true, false, false);
+        return false;
+    }
+    return true;
+}
+
+bool redirect_output(
+    int target_file_descriptor,
+    int saved_file_descriptor,
+    char *path,
+    bool append
+) {
+    int opened_file_descriptor;
+    int flags = O_WRONLY | O_CREAT;
+
+    if (append) {
+        flags = flags | O_APPEND;
+    } else {
+        flags = flags | O_TRUNC;
+    }
+    opened_file_descriptor = open(path, flags);
+    if (opened_file_descriptor < 0) {
+        return false;
+    }
+    if (dup2(target_file_descriptor, saved_file_descriptor) < 0) {
+        close(opened_file_descriptor);
+        return false;
+    }
+    if (dup2(opened_file_descriptor, target_file_descriptor) < 0) {
+        close(opened_file_descriptor);
+        close(saved_file_descriptor);
+        return false;
+    }
+    close(opened_file_descriptor);
+    return true;
 }
 
 bool run_process(
     int pid,
     char *arguments,
     bool background,
+    char *stdin_path,
     char *stdout_path,
-    bool append_stdout
+    bool append_stdout,
+    char *stderr_path
 ) {
     char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
-    bool redirected = false;
+    bool stdin_redirected = false;
+    bool stdout_redirected = false;
+    bool stderr_redirected = false;
     bool started;
-    int output_file_descriptor;
-    int output_flags;
 
     if (stdout_path != NULL) {
-        output_flags = O_WRONLY | O_CREAT;
-        if (append_stdout) {
-            output_flags = output_flags | O_APPEND;
-        } else {
-            output_flags = output_flags | O_TRUNC;
-        }
-        output_file_descriptor = open(stdout_path, output_flags);
-        if (output_file_descriptor < 0) {
-            shell_write_string("error: could not redirect stdout\n");
+        if (!redirect_output(
+                STDOUT_FILENO,
+                SHELL_SAVED_STDOUT_FILENO,
+                stdout_path,
+                append_stdout
+            )) {
+            shell_write_error_string("error: could not redirect stdout\n");
             return false;
         }
-        if (dup2(STDOUT_FILENO, SHELL_SAVED_STDOUT_FILENO) < 0) {
-            close(output_file_descriptor);
-            shell_write_string("error: could not redirect stdout\n");
+        stdout_redirected = true;
+    }
+
+    if (stderr_path != NULL) {
+        if (!redirect_output(
+                STDERR_FILENO,
+                SHELL_SAVED_STDERR_FILENO,
+                stderr_path,
+                false
+            )) {
+            restore_standard_descriptors(
+                false,
+                stdout_redirected,
+                false
+            );
+            shell_write_error_string("error: could not redirect stderr\n");
             return false;
         }
-        if (dup2(output_file_descriptor, STDOUT_FILENO) < 0) {
-            close(output_file_descriptor);
-            close(SHELL_SAVED_STDOUT_FILENO);
-            shell_write_string("error: could not redirect stdout\n");
+        stderr_redirected = true;
+    }
+
+    if (stdin_path != NULL) {
+        if (!redirect_standard_input(stdin_path)) {
+            restore_standard_descriptors(
+                false,
+                stdout_redirected,
+                stderr_redirected
+            );
+            shell_write_error_string("error: could not redirect stdin\n");
             return false;
         }
-        close(output_file_descriptor);
-        redirected = true;
+        stdin_redirected = true;
     }
 
     started = run(pid, expand_variables(
@@ -723,13 +1043,14 @@ bool run_process(
                            SHELL_COMMAND_BUFFER_CAPACITY),
                   NULL);
 
-    if (redirected) {
-        dup2(SHELL_SAVED_STDOUT_FILENO, STDOUT_FILENO);
-        close(SHELL_SAVED_STDOUT_FILENO);
-    }
+    restore_standard_descriptors(
+        stdin_redirected,
+        stdout_redirected,
+        stderr_redirected
+    );
 
     if (!started) {
-        shell_write_string("error: could not start process\n");
+        shell_write_error_string("error: could not start process\n");
     } else if (background) {
         last_background_process_id = pid;
     } else {
@@ -754,13 +1075,13 @@ bool continue_background_process(bool foreground) {
 
     if (pid == 0) {
         last_background_process_id = 0;
-        shell_write_string("error: no background process\n");
+        shell_write_error_string("error: no background process\n");
         return false;
     }
     if (foreground) {
         if (set_foreground_process(pid) == -1) {
             last_background_process_id = 0;
-            shell_write_string("error: no background process\n");
+            shell_write_error_string("error: no background process\n");
             return false;
         }
     }
@@ -769,7 +1090,7 @@ bool continue_background_process(bool foreground) {
             set_foreground_process(0);
         }
         last_background_process_id = 0;
-        shell_write_string("error: no background process\n");
+        shell_write_error_string("error: no background process\n");
         return false;
     }
 
@@ -997,8 +1318,11 @@ bool run_shell_test_manifest(char *path) {
 
 bool eval(char *command) {
     char *raw_arguments;
+    char *stderr_path;
+    char *stdin_path;
     char *stdout_path;
     int export_status;
+    int pipeline;
     int pid;
     int redirection_status;
     int operand_status;
@@ -1010,14 +1334,23 @@ bool eval(char *command) {
         return true;
     }
     if (!quotes_are_balanced(command)) {
-        shell_write_string("error: unmatched quote\n");
+        shell_write_error_string("error: unmatched quote\n");
         last_command_exit_status = 1;
         return true;
+    }
+    pipeline = find_pipeline_operator(command);
+    if (pipeline == -2) {
+        shell_write_error_string("error: only one pipeline is supported\n");
+        last_command_exit_status = 1;
+        return true;
+    }
+    if (pipeline >= 0) {
+        return run_pipeline(command, pipeline);
     }
 
     if (command_matches(command, "exit")) {
         if (command_operand(command, "exit") != NULL) {
-            shell_write_string("error: exit does not accept arguments\n");
+            shell_write_error_string("error: exit does not accept arguments\n");
             last_command_exit_status = 1;
             return true;
         }
@@ -1032,12 +1365,12 @@ bool eval(char *command) {
     } else if (command_matches(command, "run-shell-tests")) {
         raw_arguments = command_operand(command, "run-shell-tests");
         if (raw_arguments == NULL) {
-            shell_write_string(
+            shell_write_error_string(
                 "error: run-shell-tests requires a manifest path\n"
             );
             last_command_exit_status = 1;
         } else if (!run_shell_test_manifest(raw_arguments)) {
-            shell_write_string("error: shell tests failed\n");
+            shell_write_error_string("error: shell tests failed\n");
             last_command_exit_status = 1;
         } else {
             last_command_exit_status = 0;
@@ -1045,15 +1378,15 @@ bool eval(char *command) {
     } else if (command_matches(command, "export")) {
         raw_arguments = command_operand(command, "export");
         if (raw_arguments == NULL) {
-            shell_write_string("error: export requires an assignment\n");
+            shell_write_error_string("error: export requires an assignment\n");
             last_command_exit_status = 1;
         } else {
             export_status = export_environment_variable(raw_arguments);
             if (export_status > 0) {
-                shell_write_string("error: invalid export\n");
+                shell_write_error_string("error: invalid export\n");
                 last_command_exit_status = 1;
             } else if (export_status < 0) {
-                shell_write_string(
+                shell_write_error_string(
                     "error: could not store environment variable\n"
                 );
                 last_command_exit_status = 1;
@@ -1068,8 +1401,8 @@ bool eval(char *command) {
             &raw_arguments
         );
         if (operand_status != 1) {
-            shell_write_string("Usage: cd DIRECTORY\n");
-            shell_write_string(
+            shell_write_error_string("Usage: cd DIRECTORY\n");
+            shell_write_error_string(
                 "Change the shell's working directory.\n"
             );
             last_command_exit_status = 1;
@@ -1080,7 +1413,7 @@ bool eval(char *command) {
             );
             last_command_exit_status = 0;
         } else if (chdir(raw_arguments) < 0) {
-            shell_write_string("cd: could not change directory\n");
+            shell_write_error_string("cd: could not change directory\n");
             last_command_exit_status = 1;
         } else {
             last_command_exit_status = 0;
@@ -1088,12 +1421,12 @@ bool eval(char *command) {
     } else if (command_matches(command, "load")) {
         raw_arguments = command_operand(command, "load");
         if (raw_arguments == NULL) {
-            shell_write_string("error: load requires a path\n");
+            shell_write_error_string("error: load requires a path\n");
             last_command_exit_status = 1;
         } else {
             pid = load(raw_arguments);
             if (pid == 0) {
-                shell_write_string("error: could not load process\n");
+                shell_write_error_string("error: could not load process\n");
                 last_command_exit_status = 1;
             } else {
                 report_process_created(pid);
@@ -1103,24 +1436,24 @@ bool eval(char *command) {
     } else if (command_matches(command, "run")) {
         raw_arguments = command_operand(command, "run");
         if (raw_arguments == NULL) {
-            shell_write_string("error: run requires a process ID\n");
+            shell_write_error_string("error: run requires a process ID\n");
             last_command_exit_status = 1;
         } else {
             background = strip_background_operator(command);
-            redirection_status = strip_stdout_redirection(
+            redirection_status = strip_command_redirections(
                 command,
+                &stdin_path,
                 &stdout_path,
-                &append_stdout
+                &append_stdout,
+                &stderr_path
             );
-            if (redirection_status < 0) {
-                shell_write_string(
-                    "error: invalid stdout redirection\n"
-                );
+            if (redirection_status >= 0) {
+                report_invalid_redirection(redirection_status);
                 last_command_exit_status = 1;
             } else {
                 raw_arguments = command_operand(command, "run");
                 if (raw_arguments == NULL) {
-                    shell_write_string(
+                    shell_write_error_string(
                         "error: run requires a process ID\n"
                     );
                     last_command_exit_status = 1;
@@ -1130,8 +1463,10 @@ bool eval(char *command) {
                             pid,
                             command_arguments(raw_arguments),
                             background,
+                            stdin_path,
                             stdout_path,
-                            append_stdout
+                            append_stdout,
+                            stderr_path
                         )) {
                         last_command_exit_status = 1;
                     } else if (background) {
@@ -1143,12 +1478,12 @@ bool eval(char *command) {
     } else if (command_matches(command, "unload")) {
         raw_arguments = command_operand(command, "unload");
         if (raw_arguments == NULL) {
-            shell_write_string("error: unload requires a process ID\n");
+            shell_write_error_string("error: unload requires a process ID\n");
             last_command_exit_status = 1;
         } else {
             pid = parse_process_id(raw_arguments);
             if (!unload(pid)) {
-                shell_write_string("error: could not unload process\n");
+                shell_write_error_string("error: could not unload process\n");
                 last_command_exit_status = 1;
             } else {
                 last_command_exit_status = 0;
@@ -1156,14 +1491,14 @@ bool eval(char *command) {
         }
     } else if (command_matches(command, "fg")) {
         if (command_operand(command, "fg") != NULL) {
-            shell_write_string("error: fg does not accept arguments\n");
+            shell_write_error_string("error: fg does not accept arguments\n");
             last_command_exit_status = 1;
         } else if (!continue_background_process(true)) {
             last_command_exit_status = 1;
         }
     } else if (command_matches(command, "bg")) {
         if (command_operand(command, "bg") != NULL) {
-            shell_write_string("error: bg does not accept arguments\n");
+            shell_write_error_string("error: bg does not accept arguments\n");
             last_command_exit_status = 1;
         } else if (continue_background_process(false)) {
             last_command_exit_status = 0;
@@ -1172,13 +1507,16 @@ bool eval(char *command) {
         }
     } else {
         background = strip_background_operator(command);
-        redirection_status = strip_stdout_redirection(
+        redirection_status = strip_command_redirections(
             command,
+            &stdin_path,
             &stdout_path,
-            &append_stdout
+            &append_stdout,
+            &stderr_path
         );
-        if (redirection_status < 0) {
-            shell_write_string("error: invalid stdout redirection\n");
+        if (redirection_status >= 0) {
+            report_invalid_redirection(redirection_status);
+            last_command_exit_status = 1;
         } else {
             raw_arguments = command_arguments(command);
 
@@ -1189,16 +1527,21 @@ bool eval(char *command) {
             }
 
             if (pid == 0) {
-                shell_write_string("error: unknown command\n");
+                shell_write_error_string("error: unknown command\n");
+                last_command_exit_status = 1;
             } else {
                 report_process_created(pid);
-                run_process(
-                    pid,
-                    raw_arguments,
-                    background,
-                    stdout_path,
-                    append_stdout
-                );
+                if (!run_process(
+                        pid,
+                        raw_arguments,
+                        background,
+                        stdin_path,
+                        stdout_path,
+                        append_stdout,
+                        stderr_path
+                    )) {
+                    last_command_exit_status = 1;
+                }
             }
         }
     }
@@ -1217,25 +1560,28 @@ int main(int argc, char **argv) {
         shell_usage(STDERR_FILENO);
         return 1;
     }
+    if (lseek(STDIN_FILENO, 0, SEEK_CUR) >= 0) {
+        unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
+    }
     set_foreground_process(0);
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
-        shell_write_string("error: could not configure shell signals\n");
+        shell_write_error_string("error: could not configure shell signals\n");
         return 1;
     }
     initial_shell_environment = clone_environment();
     if (initial_shell_environment == NULL) {
-        shell_write_string("error: could not save shell environment\n");
+        shell_write_error_string("error: could not save shell environment\n");
         return 1;
     }
     if (getcwd(initial_shell_working_directory, PATH_MAX) == NULL) {
-        shell_write_string("error: could not save working directory\n");
+        shell_write_error_string("error: could not save working directory\n");
         return 1;
     }
     if (get_system_working_directory(
             shell_system_working_directory,
             PATH_MAX
         ) == NULL) {
-        shell_write_string("error: could not find system directory\n");
+        shell_write_error_string("error: could not find system directory\n");
         return 1;
     }
     while (true) {
@@ -1243,6 +1589,9 @@ int main(int argc, char **argv) {
             command,
             SHELL_COMMAND_BUFFER_CAPACITY
         );
+        if (command_length < 0) {
+            return 0;
+        }
         if (command_length > 0) {
             remember_shell_command(command);
             if (!eval(command)) {

@@ -1,8 +1,7 @@
-// dependencies: ../common/user_command.reti_blocks ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks
+// dependencies: ../common/user_command.reti_blocks ../library/unistd/libunistd.reti_blocks
 
 #include "../common/loading_bar.header"
 #include "../common/user_command.header"
-#include "../library/fcntl/fcntl.header"
 #include "../library/stdlib/stdlib.header"
 #include "../library/unistd/unistd.header"
 
@@ -30,8 +29,8 @@ void write_replacement(char *text) {
 }
 
 void sed_usage(int file_descriptor) {
-    command_write(file_descriptor, "Usage: sed.bin EXPRESSION FILE\n");
-    command_write(file_descriptor, "Edit selected lines from a file.\n");
+    command_write(file_descriptor, "Usage: sed.bin EXPRESSION\n");
+    command_write(file_descriptor, "Edit selected lines from stdin.\n");
 }
 
 int main(int argc, char **argv) {
@@ -42,7 +41,6 @@ int main(int argc, char **argv) {
     int pattern_length = 0;
     int addressed_line = 0;
     int command_index = 0;
-    int file_descriptor;
     int file_size;
     int start = 0;
     int end;
@@ -55,7 +53,7 @@ int main(int argc, char **argv) {
         sed_usage(STDOUT_FILENO);
         return 0;
     }
-    if (argc != 3) {
+    if (argc != 2) {
         sed_usage(STDERR_FILENO);
         return 1;
     }
@@ -80,16 +78,19 @@ int main(int argc, char **argv) {
     command = expression[command_index];
     replacement = expression + command_index + 1;
 
-    file_descriptor = open(argv[2], O_RDONLY);
-    if (file_descriptor < 0) {
-        command_write(STDERR_FILENO, "sed: could not open file\n");
+    file_size = lseek(STDIN_FILENO, 0, SEEK_END);
+    if (file_size < 0 || lseek(STDIN_FILENO, 0, SEEK_SET) < 0) {
+        command_write(STDERR_FILENO, "sed: could not read stdin\n");
         return 1;
     }
-    file_size = lseek(file_descriptor, 0, SEEK_END);
-    lseek(file_descriptor, 0, SEEK_SET);
     contents = (char *)malloc(file_size + 1);
-    file_size = read(file_descriptor, contents, file_size);
-    close(file_descriptor);
+    if (contents == NULL ||
+        (file_size > 0 &&
+         read(STDIN_FILENO, contents, file_size) != file_size)) {
+        free(contents);
+        command_write(STDERR_FILENO, "sed: could not read stdin\n");
+        return 1;
+    }
     contents[file_size] = '\0';
 
     while (start < file_size) {

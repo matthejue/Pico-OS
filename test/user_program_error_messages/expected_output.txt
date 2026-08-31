@@ -1,7 +1,4 @@
 process with pid 3 created
-cat: missing file operand
-Usage: cat.bin FILE...
-Print one or more files.
 cat: test/user_program_error_messages/missing.txt: could not open file
 cat: user: could not open file
 Usage: kill.bin [SIGNAL] PID
@@ -23,4 +20,4 @@ List directory entries.
 Usage: ls.bin [-a] [DIRECTORY]
 List directory entries.
   -a  Include hidden entries.
-process with pid 15 created
+process with pid 14 created

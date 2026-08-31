@@ -523,9 +523,11 @@ cat: missing.txt: could not open file
 ```
 
 `cat.bin` reads each named file in 64-cell chunks and handles partial writes to
-stdout. It continues with later files where possible and returns status 1 if an
-operand is missing or an open, read, or write fails. Stdin concatenation and
-options are not implemented.
+stdout. With no path it reads stdin; redirected files are copied byte-for-byte,
+while terminal input supports Backspace/Delete, Enter, and Ctrl+D. Editing
+feedback stays on stderr when stdout is redirected, so `cat.bin > file.txt`
+can be used interactively. It continues with later named files where possible
+and returns status 1 if an open, read, or write fails.
 
 Relevant commits: `422e25b3ecf0`, `6b5fd18bfac6`, `fbe915710f14`
 
@@ -579,22 +581,32 @@ it would mix with program output.
 
 Relevant commit: `d7cfac2eeafe`
 
-## Standard-output redirection and appending
+## Standard-stream redirection and pipelines
 
 ```text
+PicoOS> shell.bin < commands.txt
 PicoOS> echo.bin first > result.txt
 PicoOS> echo.bin second >> result.txt
+PicoOS> cat.bin missing.txt 2> ./device/null.dev
 PicoOS> cat.bin result.txt
 first
 second
 ```
 
-The shell opens the target, saves its own stdout with `dup2()`, replaces
-descriptor 1, and starts the child. The child inherits the redirected
-descriptor while the shell restores its terminal stdout.
+The shell opens each target, saves its own standard descriptor with `dup2()`,
+replaces descriptor 0, 1, or 2, and starts the child. The child inherits the
+redirected descriptor while the shell restores its terminal descriptor.
 
-`>` truncates and `>>` appends. Input redirection, pipelines, stderr
-redirection, and arbitrary descriptor syntax are not implemented.
+A shell with redirected stdin uses its ordinary line reader, executes each
+newline-separated command from the input file, and exits at EOF. Commands from
+a file are therefore run with `shell.bin < FILE`; the shell does not accept a
+file path argument.
+
+`<` redirects input, `>` truncates output, `>>` appends output, and `2>`
+truncates and redirects stderr. `/device/null.dev` accepts and discards output.
+One two-command `|` is implemented sequentially through a temporary file;
+arbitrary descriptor syntax and streaming or longer pipelines are not
+implemented.
 
 Relevant commits: `04588d05f985`, `36979558d57e`
 
@@ -714,7 +726,7 @@ error: unmatched quote
 ```
 
 Init likewise distinguishes a missing, unreadable, oversized, or malformed
-environment file. `cat.bin` reports missing operands and I/O failures;
+environment file. `cat.bin` reports path and I/O failures;
 `kill.bin` reports usage, PID, signal, and process lookup errors. The commands
 return failure where appropriate, so `$?` exposes the result.
 

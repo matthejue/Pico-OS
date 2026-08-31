@@ -14,11 +14,11 @@ process with pid 7 created
 Usage: reboot.bin
 Restart PicoOS.
 process with pid 8 created
-Usage: sed.bin EXPRESSION FILE
-Edit selected lines from a file.
+Usage: sed.bin EXPRESSION
+Edit selected lines from stdin.
 process with pid 9 created
 Usage: shell.bin
-Start the PicoOS command shell.
+Execute commands interactively or from redirected stdin.
 process with pid 10 created
 Usage: touch.bin FILE...
 Create files or update their timestamps.

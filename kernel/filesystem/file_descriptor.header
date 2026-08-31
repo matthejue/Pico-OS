@@ -3,7 +3,7 @@
 #include "../../common/file.header"
 #include "../../common/stddef.header"
 
-#define FILE_DESCRIPTOR_COUNT 6
+#define FILE_DESCRIPTOR_COUNT 7
 
 #define FILE_DESCRIPTOR_FREE 0
 #define FILE_DESCRIPTOR_STDIN 1
