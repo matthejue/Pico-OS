@@ -12,6 +12,7 @@ int dup2(int old_file_descriptor, int new_file_descriptor);
 int lseek(int file_descriptor, int offset, int origin);
 int chdir(char *path);
 char *getcwd(char *buffer, int size);
+char *get_system_working_directory(char *buffer, int size);
 int unlink(char *path);
 int rmdir(char *path);
 int move(char *old_path, char *new_path);

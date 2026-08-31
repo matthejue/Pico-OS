@@ -115,6 +115,32 @@ bool build_process_path(char *path, char *result, int capacity) {
     return true;
 }
 
+char *system_relative_path(char *path) {
+    char *directory = system_working_directory();
+    int index = 0;
+
+    if (directory == NULL || path[0] != '/') {
+        return path;
+    }
+    while (directory[index] != '\0' &&
+           directory[index] == path[index]) {
+        index = index + 1;
+    }
+    if (directory[index] != '\0') {
+        return path;
+    }
+    if (path[index] == '\0') {
+        return ".";
+    }
+    if (index == 1 && directory[0] == '/') {
+        return path + 1;
+    }
+    if (path[index] != '/') {
+        return path;
+    }
+    return path + index + 1;
+}
+
 void set_process_working_directory(struct Process *process, char *path) {
     int length = string_length(path);
     int index = 0;
@@ -141,15 +167,16 @@ int initialize_working_directory(struct Process *process) {
     return 0;
 }
 
-int get_working_directory(struct GetCwdRequest *request) {
-    char *working_directory;
+int copy_working_directory(
+    char *working_directory,
+    struct GetCwdRequest *request
+) {
     int length;
     int index = 0;
 
-    if (request->size <= 0) {
+    if (working_directory == NULL || request->size <= 0) {
         return -1;
     }
-    working_directory = current_process()->working_directory;
     length = string_length(working_directory);
     if (length >= request->size) {
         return -1;
@@ -159,6 +186,17 @@ int get_working_directory(struct GetCwdRequest *request) {
         index = index + 1;
     }
     return 0;
+}
+
+int get_working_directory(struct GetCwdRequest *request) {
+    return copy_working_directory(
+        current_process()->working_directory,
+        request
+    );
+}
+
+int get_system_working_directory(struct GetCwdRequest *request) {
+    return copy_working_directory(system_working_directory(), request);
 }
 
 int change_working_directory(char *path) {

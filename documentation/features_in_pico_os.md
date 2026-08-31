@@ -381,11 +381,12 @@ PicoOS> rmdir.bin new-directory
 ```
 
 Every PCB owns an inherited absolute working-directory string. The kernel gives
-PID 1 the emulator startup directory while creating it, and the shell records
-that inherited directory when it starts. Relative `PATH` entries are looked up from this shell
-startup directory, so commands such as `echo.bin` remain available after
-`cd /tmp`. The kernel prefixes the calling process's current directory to
-other relative load and file paths.
+PID 1 the emulator startup directory while creating it and keeps an immutable
+copy as the system working directory. Relative `PATH` entries are looked up
+from this system directory, so commands such as `echo.bin` remain available
+after `cd /tmp` and from a nested shell. The kernel prefixes the calling
+process's current directory to other relative load and file paths. Loader
+labels and `ps.bin` paths are canonicalized relative to the system directory.
 
 `ls.bin`, `mkdir.bin`, `pwd.bin`, `rm.bin`, and `rmdir.bin` call PicoOS library
 functions. `ls.bin` uses the `opendir()`, `readdir()`, and

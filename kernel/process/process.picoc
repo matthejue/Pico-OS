@@ -17,37 +17,22 @@ struct Process *process_list_head = NULL;
 struct Process *process_list_tail = NULL;
 struct Process *active_process = NULL;
 int next_process_id = 1;
+char *initial_working_directory = NULL;
 
 void initialize_process_table(void) {
     process_list_head = NULL;
     process_list_tail = NULL;
     active_process = NULL;
     next_process_id = 1;
+    initial_working_directory = NULL;
 }
 
 struct Process *first_process(void) {
     return process_list_head;
 }
 
-char *process_display_path(struct Process *process) {
-    char *path = process->binary_path;
-    char *root = process_list_head->working_directory;
-    int index = 0;
-
-    if (path[0] != '/') {
-        return path;
-    }
-    while (root[index] != '\0' && root[index] == path[index]) {
-        index = index + 1;
-    }
-    if (root[index] != '\0' || path[index] != '/') {
-        return path;
-    }
-    index = index + 1;
-    if (path[index] == '.' && path[index + 1] == '/') {
-        index = index + 2;
-    }
-    return path + index;
+char *system_working_directory(void) {
+    return initial_working_directory;
 }
 
 void list_processes(void) {
@@ -62,7 +47,7 @@ void list_processes(void) {
         index = uart_append_decimal(line, 0, process->pid);
         line[index] = ' ';
         index = index + 1;
-        path = process_display_path(process);
+        path = system_relative_path(process->binary_path);
         path_index = 0;
         while (path[path_index] != '\0') {
             line[index] = path[path_index];
@@ -164,6 +149,11 @@ struct Process *create_process(
         kfree(process->binary_path);
         kfree(process);
         return NULL;
+    }
+    if (initial_working_directory == NULL) {
+        initial_working_directory = copy_process_path(
+            process->working_directory
+        );
     }
     process->exit_status = 0;
     process->stop_signal = 0;

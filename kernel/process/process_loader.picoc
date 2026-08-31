@@ -22,7 +22,6 @@ struct ProcessLoad {
     int loaded_word_count;
     int loading_bar_update;
     bool uses_dma;
-    char *binary_path;
     char *host_path;
 };
 
@@ -70,7 +69,6 @@ void drain_process_bytes(int byte_count) {
 }
 
 void free_process_load(struct ProcessLoad *load) {
-    kfree(load->binary_path);
     kfree(load->host_path);
     kfree(load);
 }
@@ -98,7 +96,7 @@ int finish_process_load(struct Process *owner) {
         load->data_start,
         load->heap_start,
         load->heap_size,
-        load->binary_path
+        system_relative_path(load->host_path)
     );
     int pid;
 
@@ -190,11 +188,14 @@ int begin_process_load(
     load->payload_word_count = file_byte_count / 4 - 5;
     load->loaded_word_count = 0;
     load->uses_dma = false;
-    load->binary_path = copy_process_path(path);
     load->host_path = copy_process_path(host_path);
     owner->pending_load = load;
 
-    uart_print_loading_bar_label(show_loading_bar, "load ", host_path);
+    uart_print_loading_bar_label(
+        show_loading_bar,
+        "load ",
+        system_relative_path(host_path)
+    );
     load->loading_bar_update = uart_start_loading_bar(
         show_loading_bar,
         load->payload_word_count
@@ -351,7 +352,11 @@ int load_process(char *path, bool show_loading_bar) {
     }
 
     payload_word_count = word_count - 5;
-    uart_print_loading_bar_label(show_loading_bar, "load ", host_path);
+    uart_print_loading_bar_label(
+        show_loading_bar,
+        "load ",
+        system_relative_path(host_path)
+    );
     effective_stack_start = loaded_process_stack_start(
         heap_start,
         heap_size,
@@ -383,7 +388,7 @@ int load_process(char *path, bool show_loading_bar) {
         data_start,
         heap_start,
         heap_size,
-        path
+        system_relative_path(host_path)
     );
 
     if (process == NULL) {

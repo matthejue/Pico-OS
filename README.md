@@ -761,6 +761,7 @@ PCB nodes.
 | Object | Where it lives | Allocation | Main access path | Lifetime |
 | --- | --- | --- | --- | --- |
 | Process-list head/tail/current/PID counter | Kernel `.data` globals | Static | `first_process()`, `current_process()`, `find_process_by_pid()` | Whole kernel run |
+| System working directory | Kernel heap | First PCB's startup-directory copy | `system_working_directory()` | Whole kernel run |
 | One `struct Process` PCB | Kernel heap | `kmalloc()` | Linked from `process_list_head` | Load until removal/reaping |
 | Process image: code, data, userspace heap, stack | Process-memory arena | `pmalloc()` | PCB `base_address` and absolute pointers | Load until PCB removal |
 | Process activation | Embedded in PCB | Part of PCB | `process->activation` | Same as PCB |
@@ -1159,7 +1160,7 @@ struct Process {
 | `state` | `NEW`, `READY`, `RUNNING`, `BLOCKED`, `STOPPED`, or `ZOMBIE`; changed by run, queues, signals, dispatcher, and termination |
 | `base_address`, `size` | Absolute start and total cell count of the `pmalloc()` process image |
 | `heap_start`, `heap_size` | Process-relative userspace heap start and cell count from the binary header/defaults |
-| `binary_path` | PCB-owned `kmalloc()` copy of the path used to load the binary |
+| `binary_path` | PCB-owned canonical path relative to the system working directory, or absolute when the executable is outside it; also copied to `argv[0]` |
 | `working_directory` | PCB-owned absolute host path, copied from the parent or initialized with host `pwd` for PID 1 |
 | `activation` | Embedded saved CPU context used by dispatcher and blocked syscall returns |
 | `file_descriptors` | Pointer to a kernel-heap table and entry array owned by this PCB |
@@ -1316,13 +1317,14 @@ strings and the PCB with `kfree()`.
 
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
-| `initialize_process_table(void)` | `void` | Resets head, tail, active pointer, and next PID globals |
+| `initialize_process_table(void)` | `void` | Resets head, tail, active pointer, next PID, and system-directory globals |
 | `create_process(int base_address, int size, int code_start, int data_start, int heap_start, int heap_size, char *binary_path)` | PCB pointer or `NULL` | Allocates PCB/path/table metadata, initializes embedded state, inherits parent fields, appends PCB |
 | `first_process(void)` | Head PCB | Reads global head |
 | `current_process(void)` | Active PCB | Reads global active pointer |
 | `set_current_process(struct Process *process)` | `void` | Replaces global active pointer |
+| `system_working_directory(void)` | Immutable path pointer | Reads the emulator startup-directory copy captured from the first PCB |
 | `find_process_by_pid(int pid)` | PCB or `NULL` | Scans list without mutation |
-| `list_processes(void)` | `void` | Scans list and prints PID/path |
+| `list_processes(void)` | `void` | Scans the list and prints canonical system-relative PID/path entries |
 | `remove_process(struct Process *process)` | `void` | Internal final destructor for queues, list, image, attachments, table, strings, and PCB |
 | `orphan_and_signal_children(struct Process *parent)` | `void` | Clears matching child parent PIDs, removes zombie children, and sends configured parent-death signals |
 | `wake_parent_waiting_for_process(struct Process *process, int status)` | `void` | Writes status to the matching parent waiter, clears its pointer, and drains the process's waiter queue |
@@ -2230,10 +2232,11 @@ sequenceDiagram
 
 Every PCB owns a kernel-heap absolute working-directory string. PID 1 has no
 parent, so creation sends `pwd` to the emulator and stores the host startup
-directory. A child receives its own copy of the parent’s string. Changing
-directory validates a normalized path with the host before freeing the old
-copy and installing the new one. It never changes the emulator process’s
-actual working directory.
+directory. The kernel also keeps an immutable copy of this initial directory
+as the system working directory. A child receives its own copy of the
+parent’s current string. Changing directory validates a normalized path with
+the host before freeing the old copy and installing the new one. It never
+changes the emulator process’s actual working directory.
 
 Path normalization starts at `/`, prepends the PCB directory for a relative
 path, removes repeated separators and `.`, resolves `..` without moving above
@@ -2242,9 +2245,11 @@ root, and enforces `PATH_MAX`.
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
 | `build_process_path(char *path, char *result, int capacity)` | Success | Reads PCB directory and writes normalized local result |
+| `system_relative_path(char *path)` | Path pointer | Removes the immutable system-directory prefix from an absolute path inside it |
 | `set_process_working_directory(struct Process *process, char *path)` | `void` | Allocates new kernel copy, frees old string, replaces PCB pointer |
 | `initialize_working_directory(struct Process *process)` | 0 or `-1` | Receives host `pwd` and sets first PCB directory |
 | `get_working_directory(struct GetCwdRequest *request)` | 0 or `-1` | Copies PCB string into caller buffer |
+| `get_system_working_directory(struct GetCwdRequest *request)` | 0 or `-1` | Copies the immutable initial directory into a caller buffer |
 | `change_working_directory(char *path)` | 0 or `-1` | Validates host directory and replaces current PCB string |
 | `make_host_directory(char *path)` | Host status | Normalizes and sends `mkdir`; no kernel table mutation |
 | `read_host_directory(struct ReadDirectoryRequest *request)` | Count or `-1` | Writes host listing into caller buffer |
@@ -2364,7 +2369,7 @@ because the caller's stack is suspended.
 | `SeekRequest.origin` | `SEEK_SET`, `SEEK_CUR`, or `SEEK_END` | Selects the base for the new descriptor offset |
 | `Dup2Request.old_file_descriptor` | Descriptor to copy | `dup2()` / syscall 24; source entry remains unchanged |
 | `Dup2Request.new_file_descriptor` | Entry to replace | Target path is freed, then fields/path are independently copied |
-| `GetCwdRequest.buffer` | Userspace destination | `getcwd()` / syscall 33; receives a copy of PCB `working_directory` |
+| `GetCwdRequest.buffer` | Userspace destination | `getcwd()` / syscall 33 or `get_system_working_directory()` / syscall 41; receives the selected directory copy |
 | `GetCwdRequest.size` | Destination capacity | Prevents copying a path that does not fit |
 | `ReadDirectoryRequest.path` | Directory to list | `opendir()` / syscall 35; normalized for the host request |
 | `ReadDirectoryRequest.buffer` | Userspace listing buffer | Receives `d name\n` / `- name\n` records from the host |
@@ -2416,6 +2421,7 @@ kernel until it needs I/O or a process service.
 | `int lseek(int fd, int offset, int origin)` | New logical offset or `-1` | 19, `SeekRequest` |
 | `int chdir(char *path)` | 0 or `-1`; replaces current PCB working-directory string | 32, path pointer directly |
 | `char *getcwd(char *buffer, int size)` | Buffer or `NULL` | 33, `GetCwdRequest` |
+| `char *get_system_working_directory(char *buffer, int size)` | Buffer or `NULL`; copies the emulator startup directory | 41, `GetCwdRequest` |
 | `int unlink(char *path)` | Host status for removing a file | 36, path pointer directly |
 | `int rmdir(char *path)` | Host status for removing an empty directory | 37, path pointer directly |
 | `int move(char *old_path, char *new_path)` | Host status for moving or renaming a file or directory | 38, `MoveRequest` |
@@ -2735,7 +2741,8 @@ that shell image's `.data`, not in a kernel shell object:
 | `last_foreground_exit_status` | One integer used for `$?` |
 | `last_background_process_id` | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
 | `initial_shell_environment` | Process-heap deep copy used to reset isolated shell tests |
-| `initial_shell_working_directory[PATH_MAX]` | Embedded startup-directory copy used for reset and relative `PATH` entries |
+| `initial_shell_working_directory[PATH_MAX]` | Embedded shell startup-directory copy used for test reset |
+| `shell_system_working_directory[PATH_MAX]` | Embedded immutable system-directory copy used for relative `PATH` entries |
 | `shell_executable_path[PATH_MAX]` | Embedded scratch buffer for one `PATH` candidate |
 | `command_history[8][80]` | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
 | `command_history_draft[80]` | Current unfinished line preserved while navigating history |
@@ -2749,10 +2756,10 @@ kernel-heap table.
 ## 12.2 Startup and main loop
 
 At startup the shell calls `set_foreground_process(0)`, configures
-`prctl(PR_SET_PDEATHSIG, SIGKILL)`, clones its environment, and records its
-working directory with `getcwd()`. It then repeatedly calls `read_line()`,
-stores nonempty commands in history, and sends them to `eval()`. Only the
-`exit` built-in makes `eval()` return false.
+`prctl(PR_SET_PDEATHSIG, SIGKILL)`, clones its environment, and records both
+its current directory and the immutable system working directory. It then
+repeatedly calls `read_line()`, stores nonempty commands in history, and sends
+them to `eval()`. Only the `exit` built-in makes `eval()` return false.
 
 | Important function | Return | Main effect and library calls |
 | --- | --- | --- |
@@ -2796,10 +2803,11 @@ containing `/` is loaded directly; another name is searched through
 colon-separated `PATH` entries.
 
 Absolute `PATH` entries are used directly. A relative entry such as the
-configured `./user` is resolved from `initial_shell_working_directory`, not
-from the shell's later current directory. Programs therefore remain
-discoverable after `cd`, while ordinary relative operands still use the PCB's
-current `working_directory` in kernel path normalization.
+configured `./user` is resolved from `shell_system_working_directory`, not
+from the shell instance's inherited or later current directory. Programs
+therefore remain discoverable after `cd` and from nested shells, while
+ordinary relative operands still use the PCB's current `working_directory`
+in kernel path normalization.
 
 ```mermaid
 sequenceDiagram
@@ -2947,7 +2955,7 @@ change its parent shell's environment, working directory, or descriptor table.
 | `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
 | `mv.bin` | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
 | `sed.bin` | Inserts, changes, or appends text at one line number or inserts before matching lines | `open`, `lseek`, `read`, `write`, `close`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
-| `ps.bin` | Prints every process PID and binary path | `list_processes`, `command_write`, `command_is_help` |
+| `ps.bin` | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
 | `ls.bin` | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
 | `mkdir.bin` | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
 | `pwd.bin` | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |

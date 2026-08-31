@@ -18,3 +18,17 @@ char *getcwd(char *buffer, int size) {
     }
     return buffer;
 }
+
+char *get_system_working_directory(char *buffer, int size) {
+    struct GetCwdRequest request;
+
+    request.buffer = buffer;
+    request.size = size;
+    if (invoke_syscall(
+            SYSCALL_GET_SYSTEM_WORKING_DIRECTORY,
+            (int)&request
+        ) < 0) {
+        return NULL;
+    }
+    return buffer;
+}
