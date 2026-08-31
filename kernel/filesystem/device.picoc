@@ -1,0 +1,22 @@
+#include "device.header"
+
+bool device_paths_match(char *left, char *right) {
+    int index = 0;
+
+    while (left[index] == right[index] && left[index] != '\0') {
+        index = index + 1;
+    }
+    return left[index] == right[index];
+}
+
+bool is_null_device_path(char *path) {
+    return device_paths_match(path, NULL_DEVICE_PATH);
+}
+
+bool is_terminal_device_path(char *path) {
+    return device_paths_match(path, TERMINAL_DEVICE_PATH);
+}
+
+bool is_device_path(char *path) {
+    return is_null_device_path(path) || is_terminal_device_path(path);
+}

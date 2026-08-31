@@ -101,19 +101,29 @@ hello world
 `make test-os` and `make test-shell` compare `output.txt` against this file.
 Trailing whitespace is ignored for the comparison.
 
-The shell redirects a started process's standard output with a trailing
-`> path`, or appends it with `>> path`:
+The shell redirects a started process's standard input with `< path`, its
+standard output with `> path`, appends output with `>> path`, or redirects
+stderr with `2> path`:
 
 ```text
+shell.bin < ./test/example/commands.txt
 echo.bin hello > ./test/example/output.txt
 echo.bin again >> ./test/example/output.txt
+cat.bin missing.txt 2> ./device/null.dev
+cat.bin input.txt | sed.bin "5aNEW" > output.txt
 ```
 
-It opens the target in the requested mode, uses `dup2()` for standard output,
-and passes the resulting standard descriptors to the process when it is
-started. Processes subsequently started by that process inherit the same
+It opens each target in the requested mode, uses `dup2()` for the corresponding
+standard descriptor, and passes the resulting descriptors to the process when
+it is started. Processes subsequently started by that process inherit the same
 redirection. The shell passes `\n` through unchanged, and `echo.bin` expands it
 to a newline character while printing its arguments.
+
+A shell whose stdin is redirected executes newline-separated commands with its
+ordinary line reader and exits successfully at EOF. Use `shell.bin < FILE` to
+run commands from a file; the shell does not accept a file path argument. The
+one supported `|` is sequential and uses a temporary file, not a streaming
+kernel pipe.
 
 ## Running OS Tests
 

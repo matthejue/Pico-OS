@@ -115,7 +115,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user device shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -158,6 +158,7 @@ help:
 	@echo "  make isrs                       Build the UART-only test ISR table"
 	@echo "  make system                     Build system programs"
 	@echo "  make user                       Build user programs"
+	@echo "  make device                     Add device marker files to binary/device"
 	@echo "  make shell.bin                  Build the shell user program binary"
 	@echo "  make cat.bin                    Build the cat user program binary"
 	@echo "  make cp.bin                     Build the cp user program binary"
@@ -401,11 +402,17 @@ user-binaries: $(USER_PROGRAM_BINARIES)
 
 system user: release-tree
 
+DEVICE_FILES := \
+	$(BINARY_DIR)/device/null.dev \
+	$(BINARY_DIR)/device/terminal.dev
+
+device: $(DEVICE_FILES)
+
 RUNTIME_FILES := \
 	$(BINARY_DIR)/config/environment.txt \
 	$(BINARY_DIR)/config/emulator_options.txt \
 	$(BINARY_DIR)/config/os-release.txt \
-	$(BINARY_DIR)/device/terminal.dev \
+	$(DEVICE_FILES) \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
 	$(BINARY_DIR)/kernel/kernel.debuginfo \
@@ -466,6 +473,9 @@ binary/config/os-release.txt: config/os-release.txt | binary/config
 
 binary/device/terminal.dev: | binary/device
 	printf 'PicoOS kernel terminal device\n' > $@
+
+binary/device/null.dev: | binary/device
+	printf 'PicoOS kernel null device\n' > $@
 
 binary/boot/bootloader.reti: boot/bootloader.reti | binary/boot
 	cp $< $@
@@ -677,6 +687,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/process/process.picoc \
 	kernel/signal.picoc \
 	kernel/filesystem/file_descriptor.picoc \
+	kernel/filesystem/device.picoc \
 	kernel/filesystem/filesystem.picoc \
 	kernel/filesystem/host_filesystem.picoc \
 	kernel/filesystem/terminal.picoc \

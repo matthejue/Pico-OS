@@ -23,16 +23,6 @@ struct Terminal *kernel_terminal(void) {
     return &terminal;
 }
 
-bool is_terminal_device_path(char *path) {
-    int index = 0;
-
-    while (path[index] == TERMINAL_DEVICE_PATH[index] &&
-           path[index] != '\0') {
-        index = index + 1;
-    }
-    return path[index] == TERMINAL_DEVICE_PATH[index];
-}
-
 int pop_terminal_byte(struct Terminal *terminal) {
     int value = terminal->input_buffer[terminal->input_head];
 

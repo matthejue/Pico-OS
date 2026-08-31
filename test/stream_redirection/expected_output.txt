@@ -1,0 +1,33 @@
+process with pid 3 created
+process with pid 4 created
+process with pid 5 created
+one
+two
+three
+four
+NEW
+five
+six
+process with pid 6 created
+one
+two
+three
+four
+five
+six
+process with pid 7 created
+process with pid 8 created
+process with pid 9 created
+one
+two
+three
+four
+five
+AFTER
+six
+process with pid 10 created
+process with pid 11 created
+cat: missing.txt: could not open file
+process with pid 12 created
+still-running
+process with pid 13 created

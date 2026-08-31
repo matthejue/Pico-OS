@@ -1,0 +1,10 @@
+#pragma once
+
+#include "../../common/stddef.header"
+
+#define NULL_DEVICE_PATH "/device/null.dev"
+#define TERMINAL_DEVICE_PATH "/device/terminal.dev"
+
+bool is_null_device_path(char *path);
+bool is_terminal_device_path(char *path);
+bool is_device_path(char *path);
