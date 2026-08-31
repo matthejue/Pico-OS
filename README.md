@@ -2945,7 +2945,7 @@ normal interactive facilities.
 
 # 13. User applications
 
-PicoOS builds 17 userspace programs overall: the shell and 16 standalone user
+PicoOS builds 18 userspace programs overall: the shell and 17 standalone user
 applications. An application runs in its own process and cannot directly
 change its parent shell's environment, working directory, or descriptor table.
 
@@ -2970,6 +2970,7 @@ change its parent shell's environment, working directory, or descriptor table.
 | `kill.bin` | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
 | `poweroff.bin` | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
 | `reboot.bin` | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
+| `uname.bin` | Prints the PicoOS version stored in `config/os-release.txt` | `open`, `read`, `write`, `close`, `command_write`, `command_is_help` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
 application helpers. `command_write(fd, text)` counts the string and calls
@@ -3017,6 +3018,7 @@ selected promptly. `poweroff.bin` differs from shell `exit`: the former
 invokes syscall 2 and halts the OS, whereas the latter lets init start a new
 shell. `reboot.bin` invokes syscall 40, which performs a full bootloader and
 kernel startup without ending the emulator process.
+`uname.bin` reads the release version installed in the runtime tree.
 
 ## 13.3 Errors and exit status
 
