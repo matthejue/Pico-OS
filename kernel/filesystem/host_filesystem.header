@@ -6,9 +6,11 @@
 struct Process;
 
 bool build_process_path(char *path, char *result, int capacity);
+char *system_relative_path(char *path);
 int initialize_working_directory(struct Process *process);
 int change_working_directory(char *path);
 int get_working_directory(struct GetCwdRequest *request);
+int get_system_working_directory(struct GetCwdRequest *request);
 int make_host_directory(char *path);
 int read_host_directory(struct ReadDirectoryRequest *request);
 int unlink_host_file(char *path);

@@ -1,0 +1,5 @@
+cd user
+shell.bin
+echo.bin nested\ntest
+./ps.bin
+poweroff.bin
