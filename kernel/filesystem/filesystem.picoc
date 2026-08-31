@@ -210,12 +210,12 @@ int write_file_descriptor(struct IoRequest *request) {
         return -1;
     }
 
+    write_offset = descriptor->offset;
     if (is_terminal_device_path(descriptor->path)) {
         if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
             uart_send_host_request("write ", "stderr");
         }
     } else if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
-        write_offset = descriptor->offset;
         if ((descriptor->flags & O_APPEND) != 0) {
             write_offset = receive_file_size(descriptor->path);
             if (write_offset < 0) {

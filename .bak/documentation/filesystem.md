@@ -419,7 +419,7 @@ UART -> o
 It does not itself decide *where* those bytes go. `write_file_descriptor()` first tells the host whether the following bytes belong to a file, stdout, or stderr.
 
 Foreground process selection is not part of this path. A background process
-with stdout still pointing to `/device/terminal` can write to the terminal;
+with stdout still pointing to `/device/terminal.dev` can write to the terminal;
 foreground ownership is used only for terminal input and terminal-generated
 signals.
 

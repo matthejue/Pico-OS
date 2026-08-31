@@ -1,0 +1,5 @@
+cd /
+echo.bin terminal overwrite > ./device/terminal.dev
+echo.bin terminal append >> ./device/terminal.dev
+exit
+poweroff.bin
