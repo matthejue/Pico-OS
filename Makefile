@@ -115,7 +115,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -174,6 +174,7 @@ help:
 	@echo "  make rmdir.bin                  Build the rmdir user program binary"
 	@echo "  make sed.bin                    Build the sed user program binary"
 	@echo "  make touch.bin                  Build the touch user program binary"
+	@echo "  make uname.bin                  Build the uname user program binary"
 	@echo "  make rebuild-firmware           Remove and rebuild firmware files"
 	@echo "  make clean-firmware             Remove generated firmware files only"
 	@echo "  make clean                      Remove generated test and firmware files"
@@ -403,6 +404,7 @@ system user: release-tree
 RUNTIME_FILES := \
 	$(BINARY_DIR)/config/environment.txt \
 	$(BINARY_DIR)/config/emulator_options.txt \
+	$(BINARY_DIR)/config/os-release.txt \
 	$(BINARY_DIR)/device/terminal.dev \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
@@ -457,6 +459,9 @@ binary/config/environment.txt: config/environment.txt | binary/config
 	cp $< $@
 
 binary/config/emulator_options.txt: config/emulator_options.txt | binary/config
+	cp $< $@
+
+binary/config/os-release.txt: config/os-release.txt | binary/config
 	cp $< $@
 
 binary/device/terminal.dev: | binary/device
@@ -549,6 +554,10 @@ sed.bin: binary/user/sed.bin
 touch.reti: user/touch.reti
 
 touch.bin: binary/user/touch.bin
+
+uname.reti: user/uname.reti
+
+uname.bin: binary/user/uname.bin
 
 shell.reti: user/shell.reti
 

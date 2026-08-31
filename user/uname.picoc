@@ -1,0 +1,44 @@
+// dependencies: ../common/user_command.reti_blocks ../library/fcntl/libfcntl.reti_blocks ../library/unistd/libunistd.reti_blocks
+
+#include "../common/user_command.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/unistd/unistd.header"
+
+#define UNAME_VERSION_PATH "config/os-release.txt"
+#define UNAME_VERSION_SIZE 32
+
+void uname_usage(int file_descriptor) {
+    command_write(file_descriptor, "Usage: uname.bin\n");
+    command_write(file_descriptor, "Print the PicoOS version.\n");
+}
+
+int main(int argc, char **argv) {
+    char version[UNAME_VERSION_SIZE];
+    int file_descriptor;
+    int count;
+
+    if (argc == 2 && command_is_help(argv[1])) {
+        uname_usage(STDOUT_FILENO);
+        return 0;
+    }
+    if (argc != 1) {
+        uname_usage(STDERR_FILENO);
+        return 1;
+    }
+
+    file_descriptor = open(UNAME_VERSION_PATH, O_RDONLY);
+    if (file_descriptor < 0) {
+        command_write(STDERR_FILENO, "uname: could not read version\n");
+        return 1;
+    }
+    count = read(file_descriptor, version, UNAME_VERSION_SIZE);
+    close(file_descriptor);
+    if (count <= 0) {
+        command_write(STDERR_FILENO, "uname: could not read version\n");
+        return 1;
+    }
+
+    command_write(STDOUT_FILENO, "PicoOS-");
+    write(STDOUT_FILENO, version, count);
+    return 0;
+}
