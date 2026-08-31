@@ -1,4 +1,5 @@
 #include "filesystem.header"
+#include "device.header"
 #include "file_descriptor.header"
 #include "terminal.header"
 #include "host_filesystem.header"
@@ -60,7 +61,7 @@ int open_file_descriptor(struct OpenRequest *request) {
     }
     path = copy_file_path(absolute_path);
 
-    if (!is_terminal_device_path(path)) {
+    if (!is_device_path(path)) {
         if ((request->flags & O_TRUNC) != 0) {
             if (access_mode == O_RDONLY) {
                 kfree(path);
@@ -180,6 +181,10 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
             caller_context
         );
     }
+    if (is_null_device_path(descriptor->path)) {
+        request->complete = true;
+        return 0;
+    }
     if (descriptor->kind == FILE_DESCRIPTOR_FILE) {
         return read_regular_file(descriptor, request);
     }
@@ -211,7 +216,10 @@ int write_file_descriptor(struct IoRequest *request) {
     }
 
     write_offset = descriptor->offset;
-    if (is_terminal_device_path(descriptor->path)) {
+    if (is_null_device_path(descriptor->path)) {
+        descriptor->offset = descriptor->offset + request->count;
+        return request->count;
+    } else if (is_terminal_device_path(descriptor->path)) {
         if (descriptor->kind == FILE_DESCRIPTOR_STDERR) {
             uart_send_host_request("write ", "stderr");
         }
@@ -251,7 +259,7 @@ int seek_file_descriptor(struct SeekRequest *request) {
 
     descriptor = table->entries + request->file_descriptor;
     if (descriptor->kind != FILE_DESCRIPTOR_FILE ||
-        is_terminal_device_path(descriptor->path)) {
+        is_device_path(descriptor->path)) {
         return -1;
     }
 

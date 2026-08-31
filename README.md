@@ -228,7 +228,7 @@ previous chunk is handled at that syscall's return boundary.
     - [12.4 Parsing and command execution](#124-parsing-and-command-execution)
     - [12.5 Shell built-ins](#125-shell-built-ins)
     - [12.6 Foreground, background, and signals](#126-foreground-background-and-signals)
-    - [12.7 Output redirection](#127-output-redirection)
+    - [12.7 Redirection and pipelines](#127-redirection-and-pipelines)
     - [12.8 Shell-test support](#128-shell-test-support)
 13. [User applications](#13-user-applications)
     - [13.1 Applications and their library use](#131-applications-and-their-library-use)
@@ -284,6 +284,7 @@ Useful narrower commands are:
 | Command | Purpose |
 | --- | --- |
 | `make firmware` | Build the complete firmware/release tree |
+| `make device` | Add the terminal and null device markers under `binary/device` |
 | `make bootload-dma` | Boot through the debug TUI with DMA enabled |
 | `make bootload-notui` | Boot directly in the terminal without the debug TUI |
 | `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
@@ -2022,7 +2023,7 @@ the emulator performs the actual host file operations.
 
 ## 9.1 Per-process descriptor table
 
-Each PCB owns one table object and one six-entry array, both allocated with
+Each PCB owns one table object and one seven-entry array, both allocated with
 `kmalloc()`:
 
 ```c
@@ -2038,9 +2039,9 @@ struct FileDescriptorTable {
 };
 ```
 
-Valid descriptor numbers are 0–5. A new table initializes 0 as read-only
+Valid descriptor numbers are 0–6. A new table initializes 0 as read-only
 stdin, 1 as write-only stdout, and 2 as write-only stderr. All three store the
-special path `/device/terminal.dev`. Entries 3–5 begin free, although closing a
+special path `/device/terminal.dev`. Entries 3–6 begin free, although closing a
 standard descriptor allows a later open to reuse its number.
 
 | Descriptor field | Meaning and ownership |
@@ -2048,7 +2049,7 @@ standard descriptor allows a later open to reuse its number.
 | `kind` | Free, stdin, stdout, stderr, or regular host file |
 | `flags` | Access mode plus create/truncate/append flags |
 | `offset` | Per-descriptor logical position; reads and successful writes advance it |
-| `path` | Kernel-owned absolute path; `/device/terminal.dev` selects the kernel terminal |
+| `path` | Kernel-owned absolute path; paths under `/device` can select a kernel device |
 
 Descriptor inheritance deep-copies the table, entries, and paths.
 Offsets are copied by value and later diverge; PicoOS has no Unix-style shared
@@ -2092,11 +2093,13 @@ possible and need not fill the requested count.
 Callers retrieve this pointer once and pass it to terminal helpers. This avoids
 extra `kernel_terminal()` calls when one helper invokes another.
 
-The descriptor layer reaches this object through the hardcoded virtual path
-`/device/terminal.dev`. Opening that path skips host-file requests, terminal reads
-use the input ring, terminal writes use UART output, and seeking fails. The
-release tree also contains `binary/device/terminal.dev` as a visible dummy
-device marker; it stores no terminal data and is not the implementation.
+The descriptor layer reaches this object through the virtual path
+`/device/terminal.dev`. Opening that path skips host-file requests, terminal
+reads use the input ring, terminal writes use UART output, and seeking fails.
+`/device/null.dev` is the second virtual device: reads immediately return EOF
+and writes succeed while discarding their bytes. The release tree contains
+visible marker files for both devices under `binary/device`; those files store
+no device data and are not their implementations.
 
 If the input ring is empty during a foreground read, `begin_terminal_read()`
 briefly disables UART delivery to prevent a lost wakeup, stores buffer/count in
@@ -2151,6 +2154,8 @@ sequenceDiagram
 | `initialize_terminal(void)` | `void` | Resets the global ring and reader queue |
 | `kernel_terminal(void)` | Global pointer | No mutation |
 | `is_terminal_device_path(char *path)` | Boolean | Recognizes `/device/terminal.dev` |
+| `is_null_device_path(char *path)` | Boolean | Recognizes `/device/null.dev` |
+| `is_device_path(char *path)` | Boolean | Recognizes either kernel device path |
 | `pop_terminal_byte(struct Terminal *terminal)` | Byte | Advances head and decrements count |
 | `copy_terminal_bytes(struct Terminal *terminal, char *buffer, int count)` | Count | Pops bytes into process buffer |
 | `enqueue_terminal_byte(struct Terminal *terminal, int value)` | `void` | Inserts at tail; may discard oldest |
@@ -2172,12 +2177,13 @@ sequenceDiagram
 directory, selects the lowest free descriptor, allocates an absolute path copy,
 and fills that entry. `O_TRUNC` with a writable mode asks the host to
 create/truncate immediately. Without `O_TRUNC`, a missing file is created only
-with `O_CREAT`. The special `/device/terminal.dev` path bypasses these host-file
-operations and opens the kernel terminal directly.
+with `O_CREAT`. The `/device/terminal.dev` and `/device/null.dev` paths bypass
+these host-file operations and open their kernel devices directly.
 
 `read_file_descriptor()` validates the entry and read mode. A descriptor whose
-path is `/device/terminal.dev` reads from the kernel terminal and may block. Any
-other file path sends independent ranged host requests of at most 1 KiB at
+path is `/device/terminal.dev` reads from the kernel terminal and may block. A
+read from `/device/null.dev` returns EOF. Any other file path sends independent
+ranged host requests of at most 1 KiB at
 `descriptor->offset`, copies returned bytes, and advances the offset. The
 userspace `read()` wrapper repeats syscall 16 until the requested count, EOF,
 or an error. It does not need to yield between chunks because deferred timer
@@ -2190,8 +2196,9 @@ advances its offset. Without `O_APPEND`, the descriptor offset selects where
 bytes overwrite the file, so seeking affects both reads and writes. With
 `O_APPEND`, the kernel requests the current file size immediately before every
 write and uses that as the offset, regardless of an earlier seek. An explicitly
-opened `/device/terminal.dev` writes directly to terminal stdout. Seeking is
-rejected for the terminal device.
+opened `/device/terminal.dev` writes directly to terminal stdout. Writes to
+`/device/null.dev` report success without sending their bytes anywhere. Seeking
+is rejected for both devices.
 
 The `file-size` and `write-at` requests are separate, so concurrent modification
 of one host file by multiple PicoOS processes or host programs is unsupported:
@@ -2744,14 +2751,15 @@ that shell image's `.data`, not in a kernel shell object:
 | `initial_shell_working_directory[PATH_MAX]` | Embedded shell startup-directory copy used for test reset |
 | `shell_system_working_directory[PATH_MAX]` | Embedded immutable system-directory copy used for relative `PATH` entries |
 | `shell_executable_path[PATH_MAX]` | Embedded scratch buffer for one `PATH` candidate |
+| `shell_pipe_*` buffers | Embedded command and temporary-path storage for one two-command pipeline |
 | `command_history[8][80]` | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
 | `command_history_draft[80]` | Current unfinished line preserved while navigating history |
 | `command_history_start`, `command_history_count` | Ring indices/count |
 
 The active command buffer is an 80-cell local array in `main()`'s userspace
-stack. Redirection temporarily reserves descriptors 4 and 5 for shell tests
-and saved stdout; all descriptor state itself remains in the shell PCB's
-kernel-heap table.
+stack. Redirection temporarily reserves descriptors 3–6 for saved stdin, shell
+tests, saved stdout, and saved stderr; all descriptor state itself remains in
+the shell PCB's kernel-heap table.
 
 ## 12.2 Startup and main loop
 
@@ -2759,18 +2767,21 @@ At startup the shell calls `set_foreground_process(0)`, configures
 `prctl(PR_SET_PDEATHSIG, SIGKILL)`, clones its environment, and records both
 its current directory and the immutable system working directory. It then
 repeatedly calls `read_line()`, stores nonempty commands in history, and sends
-them to `eval()`. Only the `exit` built-in makes `eval()` return false.
+them to `eval()`. `read_line()` returns `-1` at EOF, so redirected stdin ends
+the shell normally. Therefore, `shell.bin < commands.txt` reads and executes
+the newline-separated commands in `commands.txt` without requiring typed
+terminal input.
 
 | Important function | Return | Main effect and library calls |
 | --- | --- | --- |
-| `int read_line(char *buffer, int capacity)` | Command length | Repeatedly calls `read(0, ..., 1)`, edits the stack buffer, and updates history-navigation state |
+| `int read_line(char *buffer, int capacity)` | Command length or `-1` at EOF | Repeatedly calls `read(0, ..., 1)`, edits the stack buffer, and updates history-navigation state |
 | `void remember_shell_command(char *command)` | `void` | Mutates the global eight-entry history ring; skips consecutive duplicates |
 | `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
 | `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
-| `bool run_process(int pid, char *arguments, bool background, char *stdout_path, bool append)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
+| `bool run_process(int pid, char *arguments, bool background, char *stdin_path, char *stdout_path, bool append, char *stderr_path)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
 | `bool continue_background_process(bool foreground)` | Whether a process was continued | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
 | `bool eval(char *command)` | Continue-shell flag | Selects a built-in or external execution path |
-| `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the prompt loop |
+| `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the interactive or redirected-input execution path |
 
 ## 12.3 Line editing and history
 
@@ -2796,10 +2807,11 @@ later resumes the shell.
 
 ## 12.4 Parsing and command execution
 
-The parser validates balanced single and double quotes, removes a trailing `&`,
-recognizes one final whitespace-preceded `>` or `>>`, splits the command name
-from its raw arguments, and expands `$NAME`, `$?`, and `$!`. A command
-containing `/` is loaded directly; another name is searched through
+The parser validates balanced single and double quotes, recognizes one
+unquoted `|`, removes a trailing `&`, handles final whitespace-preceded `<`,
+`>`, `>>`, and `2>` operators, splits the command name from its raw arguments,
+and expands `$NAME`, `$?`, and `$!`. A command containing `/` is loaded
+directly; another name is searched through
 colon-separated `PATH` entries.
 
 Absolute `PATH` entries are used directly. A relative entry such as the
@@ -2864,7 +2876,7 @@ or process-local `environ`. The shell has ten built-ins overall.
 | `export NAME=value` | Expands the complete assignment and stores/replaces the variable | `getenv` during expansion and `setenv(..., true)` |
 | `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | `chdir()` / syscall 32 |
 | `load PATH` | Loads a binary but leaves its PCB in `NEW` | `load()` / syscall 3 |
-| `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `>`, and `>>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
+| `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `<`, `>`, `>>`, and `2>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
 | `unload PID` | Terminates/removes the selected non-current process | `unload()` / syscall 5 |
 | `fg` | Makes the most recently tracked PID foreground, sends `SIGCONT`, and waits | `set_foreground_process`, `kill`, `waitpid` |
 | `bg` | Sends `SIGCONT` to the most recently tracked PID without waiting | `kill()` |
@@ -2893,7 +2905,14 @@ terminal read. A background start does not replace `$?`. At shell startup,
 `PR_SET_PDEATHSIG=SIGKILL` is installed on the shell and inherited by children,
 so descendants receive `SIGKILL` if their shell terminates.
 
-## 12.7 Output redirection
+## 12.7 Redirection and pipelines
+
+For `COMMAND < PATH`, the shell saves stdin in private descriptor 3, closes
+descriptor 0, and opens the path read-only into that lowest free slot. It starts
+the child with the resulting descriptor table and then restores its own stdin.
+For example, `cat.bin < input.txt` uses cat's ordinary no-argument stdin path;
+cat contains no redirection parser. `shell.bin < commands.txt` likewise uses
+its normal line reader and exits when that input reaches EOF.
 
 For `COMMAND > PATH`, the shell opens with
 `O_WRONLY | O_CREAT | O_TRUNC`; for `>>`, it uses
@@ -2902,11 +2921,15 @@ copies the opened file onto descriptor 1, starts the child, and restores its
 own stdout. Since `run()` deep-copies the descriptor table, the child's
 descriptor 1 retains the file path after the shell restores itself.
 
-`/device/terminal.dev` is the special exception to ordinary file redirection.
-After path normalization, both `> ./device/terminal.dev` and
-`>> ./device/terminal.dev` connect the child's stdout to the terminal. The
-kernel writes those bytes directly to UART, so it neither truncates the dummy
-marker file nor looks up a file size for append mode.
+For `COMMAND 2> PATH`, the shell performs the same operation for stderr with
+private descriptor 6 and opens the destination with truncation. Thus normal
+stdout stays visible while diagnostics can be inspected separately or sent to
+`./device/null.dev`.
+
+The two paths under `/device` are exceptions to ordinary host-file
+redirection. `/device/terminal.dev` connects output to UART, while
+`/device/null.dev` accepts and discards it. The kernel does not truncate or
+write either marker file.
 
 ```mermaid
 sequenceDiagram
@@ -2922,7 +2945,7 @@ sequenceDiagram
     K-->>S: Temporary descriptor
     S->>K: dup2(1, 5), then dup2(temporary, 1)
     S->>K: run(child)
-    K->>C: Deep-copy all six descriptor entries
+    K->>C: Deep-copy all seven descriptor entries
     S->>K: dup2(5, 1), then close(5)
     C->>K: write(1, bytes, count)
     K->>H: ESC file-size path ESC /
@@ -2932,7 +2955,16 @@ sequenceDiagram
 
 For `>`, opening first empties the host file and ordinary writes begin at offset
 zero. For `>>`, `O_APPEND` makes every write request the current file size and
-write there. There is no input redirection, pipeline, or `dup()` interface.
+write there. Redirections can be combined, including
+`sed.bin "5iNEW" < input.txt > output.txt`.
+
+One `LEFT | RIGHT` operator is supported. Because PicoOS has no kernel pipe
+object, the shell runs `LEFT` to completion with stdout redirected to a hidden
+`.picoos-pipe-PID.tmp` file, then runs `RIGHT` with that file as stdin and
+removes it. This supports finite commands such as
+`cat.bin file.txt | sed.bin "5aNEW" > file2.txt`, but it is sequential rather
+than streaming and does not support longer pipelines. Arbitrary descriptor
+syntax, stderr appending, and a general `dup()` interface are not implemented.
 
 ## 12.8 Shell-test support
 
@@ -2953,14 +2985,14 @@ change its parent shell's environment, working directory, or descriptor table.
 
 | Binary | Behavior | Principal library functions called |
 | --- | --- | --- |
-| `shell.bin` | Interactive command interpreter described above | `read`, `write`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `chdir`, `getcwd`, `command_is_help` |
+| `shell.bin` | Interactive command interpreter that can read newline-separated commands from redirected stdin | `read`, `write`, `lseek`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `unlink`, `chdir`, `getcwd`, `command_is_help` |
 | `echo.bin` | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
 | `count.bin` | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
-| `cat.bin` | Opens each file read-only, copies it in 64-cell chunks to stdout, continues after per-file errors | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| `cat.bin` | Copies named files or stdin to stdout; terminal stdin supports line editing | `open`, `read`, `write`, `lseek`, `close`, `unsetenv`, `command_write`, `command_is_help` |
 | `touch.bin` | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
 | `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
 | `mv.bin` | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
-| `sed.bin` | Inserts, changes, or appends text at one line number or inserts before matching lines | `open`, `lseek`, `read`, `write`, `close`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
+| `sed.bin` | Reads stdin and inserts, changes, or appends text at selected lines | `lseek`, `read`, `write`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
 | `ps.bin` | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
 | `ls.bin` | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
 | `mkdir.bin` | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
@@ -2987,10 +3019,12 @@ argument. `echo.bin` keeps `-h` and `--help` as ordinary text to print.
 at most one nonnegative loop-count delay; its delay is not milliseconds, and
 `yield()` makes its infinite loop a visible scheduler example.
 
-`cat.bin` requires at least one path and does not read stdin when no operand is
-given. It disables `PICOOS_LOADING_BAR` so progress output cannot corrupt file
-contents. It closes each descriptor before opening the next and returns 1 if
-an open or read operation failed.
+`cat.bin` copies each named path in 64-cell chunks. With no operands, seekable
+stdin is copied byte-for-byte, so `cat.bin < input.txt` needs no special cat
+logic. Terminal stdin is line-buffered: Backspace/Delete edits the current
+line, Enter writes it to stdout, and Ctrl+D finishes. When stdout is redirected
+to a file, editing feedback goes to stderr so `cat.bin > output.txt` remains
+usable. It returns 1 after an open, read, or write failure.
 
 `touch.bin` accepts one or more paths. `cp.bin` and `mv.bin` each accept exactly
 one source and destination and have no options. `cp.bin` also disables
@@ -2998,13 +3032,12 @@ one source and destination and have no options. `cp.bin` also disables
 emulator's matching `move` host request. `ps.bin` replaces the former `list`
 shell built-in and calls the existing process-list syscall from its own process.
 
-`sed.bin` has no options and writes its result to stdout. It supports only
-`sed.bin '5iNEW LINE' file.txt`, `sed.bin '5cNEW LINE' file.txt`,
-`sed.bin '5aNEW LINE' file.txt`, and
-`sed.bin '/very simple pattern/iNEW LINE' file.txt`. These respectively insert
-before, change, append after, or insert before every line containing the simple
-pattern. It loads the file into memory and disables `PICOOS_LOADING_BAR` so the
-file output is not mixed with progress text.
+`sed.bin` has no path operand: `sed.bin EXPRESSION` reads seekable stdin and
+writes its result to stdout. Input can come from `< input.txt` or from the
+shell's file-backed pipeline. Expressions such as `5iNEW LINE`, `5cNEW LINE`,
+`5aNEW LINE`, and `/pattern/iNEW LINE` respectively insert before, change,
+append after, or insert before every matching line. Sed loads stdin into memory
+and disables `PICOOS_LOADING_BAR` so output is not mixed with progress text.
 
 `ls.bin` preserves host listing order and hides names beginning with `.` unless
 `-a` is given. There is no sorting, long format, or recursion. `mkdir.bin` has no
@@ -3191,7 +3224,7 @@ The main deliberate limitations are:
 
 - one physical address space with no MMU, isolation, or virtual memory
 - host-backed UART files rather than a resident filesystem
-- six descriptors per process and copied state rather than shared open-file
+- seven descriptors per process and copied state rather than shared open-file
   descriptions
 - linked-list round-robin scanning rather than a separate ready queue
 - non-preemptive kernel scheduling and timer-preempted userspace
