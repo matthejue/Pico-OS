@@ -23,7 +23,7 @@
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
 #define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
-int last_foreground_exit_status = 0;
+int last_command_exit_status = 0;
 int last_background_process_id = 0;
 char **initial_shell_environment = NULL;
 char initial_shell_working_directory[PATH_MAX];
@@ -220,7 +220,7 @@ bool shell_reset(void) {
         close(file_descriptor);
         file_descriptor = file_descriptor + 1;
     }
-    last_foreground_exit_status = 0;
+    last_command_exit_status = 0;
     last_background_process_id = 0;
     return initial_shell_environment != NULL &&
         restore_environment(initial_shell_environment) == 0 &&
@@ -419,7 +419,7 @@ char *expand_variables(char *arguments, char *result, int capacity) {
         if (strncmp(arguments + argument_index, "$?", 2) == 0 ||
             strncmp(arguments + argument_index, "$!", 2) == 0) {
             if (arguments[argument_index + 1] == '?') {
-                special_parameter_value = last_foreground_exit_status;
+                special_parameter_value = last_command_exit_status;
             } else {
                 special_parameter_value = last_background_process_id;
             }
@@ -734,13 +734,13 @@ bool run_process(
         last_background_process_id = pid;
     } else {
         set_foreground_process(pid);
-        last_foreground_exit_status = waitpid(pid);
+        last_command_exit_status = waitpid(pid);
         set_foreground_process(0);
         report_foreground_process_status(
             pid,
-            last_foreground_exit_status
+            last_command_exit_status
         );
-        if (WIFSTOPPED(last_foreground_exit_status)) {
+        if (WIFSTOPPED(last_command_exit_status)) {
             last_background_process_id = pid;
         } else if (last_background_process_id == pid) {
             last_background_process_id = 0;
@@ -749,19 +749,19 @@ bool run_process(
     return started;
 }
 
-void continue_background_process(bool foreground) {
+bool continue_background_process(bool foreground) {
     int pid = last_background_process_id;
 
     if (pid == 0) {
         last_background_process_id = 0;
         shell_write_string("error: no background process\n");
-        return;
+        return false;
     }
     if (foreground) {
         if (set_foreground_process(pid) == -1) {
             last_background_process_id = 0;
             shell_write_string("error: no background process\n");
-            return;
+            return false;
         }
     }
     if (kill(pid, SIGCONT) == -1) {
@@ -770,20 +770,21 @@ void continue_background_process(bool foreground) {
         }
         last_background_process_id = 0;
         shell_write_string("error: no background process\n");
-        return;
+        return false;
     }
 
     if (foreground) {
-        last_foreground_exit_status = waitpid(pid);
+        last_command_exit_status = waitpid(pid);
         set_foreground_process(0);
         report_foreground_process_status(
             pid,
-            last_foreground_exit_status
+            last_command_exit_status
         );
-        if (!WIFSTOPPED(last_foreground_exit_status)) {
+        if (!WIFSTOPPED(last_command_exit_status)) {
             last_background_process_id = 0;
         }
     }
+    return true;
 }
 
 void build_executable_path(char *directory, char *name, char *result) {
@@ -1010,18 +1011,21 @@ bool eval(char *command) {
     }
     if (!quotes_are_balanced(command)) {
         shell_write_string("error: unmatched quote\n");
+        last_command_exit_status = 1;
         return true;
     }
 
     if (command_matches(command, "exit")) {
         if (command_operand(command, "exit") != NULL) {
             shell_write_string("error: exit does not accept arguments\n");
+            last_command_exit_status = 1;
             return true;
         }
         return false;
     } else if (command_matches(command, "eval")) {
         raw_arguments = command_operand(command, "eval");
         if (raw_arguments == NULL) {
+            last_command_exit_status = 0;
             return true;
         }
         return eval(raw_arguments);
@@ -1031,21 +1035,30 @@ bool eval(char *command) {
             shell_write_string(
                 "error: run-shell-tests requires a manifest path\n"
             );
+            last_command_exit_status = 1;
         } else if (!run_shell_test_manifest(raw_arguments)) {
             shell_write_string("error: shell tests failed\n");
+            last_command_exit_status = 1;
+        } else {
+            last_command_exit_status = 0;
         }
     } else if (command_matches(command, "export")) {
         raw_arguments = command_operand(command, "export");
         if (raw_arguments == NULL) {
             shell_write_string("error: export requires an assignment\n");
+            last_command_exit_status = 1;
         } else {
             export_status = export_environment_variable(raw_arguments);
             if (export_status > 0) {
                 shell_write_string("error: invalid export\n");
+                last_command_exit_status = 1;
             } else if (export_status < 0) {
                 shell_write_string(
                     "error: could not store environment variable\n"
                 );
+                last_command_exit_status = 1;
+            } else {
+                last_command_exit_status = 0;
             }
         }
     } else if (command_matches(command, "cd")) {
@@ -1059,30 +1072,39 @@ bool eval(char *command) {
             shell_write_string(
                 "Change the shell's working directory.\n"
             );
+            last_command_exit_status = 1;
         } else if (command_is_help(raw_arguments)) {
             shell_write_string("Usage: cd DIRECTORY\n");
             shell_write_string(
                 "Change the shell's working directory.\n"
             );
+            last_command_exit_status = 0;
         } else if (chdir(raw_arguments) < 0) {
             shell_write_string("cd: could not change directory\n");
+            last_command_exit_status = 1;
+        } else {
+            last_command_exit_status = 0;
         }
     } else if (command_matches(command, "load")) {
         raw_arguments = command_operand(command, "load");
         if (raw_arguments == NULL) {
             shell_write_string("error: load requires a path\n");
+            last_command_exit_status = 1;
         } else {
             pid = load(raw_arguments);
             if (pid == 0) {
                 shell_write_string("error: could not load process\n");
+                last_command_exit_status = 1;
             } else {
                 report_process_created(pid);
+                last_command_exit_status = 0;
             }
         }
     } else if (command_matches(command, "run")) {
         raw_arguments = command_operand(command, "run");
         if (raw_arguments == NULL) {
             shell_write_string("error: run requires a process ID\n");
+            last_command_exit_status = 1;
         } else {
             background = strip_background_operator(command);
             redirection_status = strip_stdout_redirection(
@@ -1094,21 +1116,27 @@ bool eval(char *command) {
                 shell_write_string(
                     "error: invalid stdout redirection\n"
                 );
+                last_command_exit_status = 1;
             } else {
                 raw_arguments = command_operand(command, "run");
                 if (raw_arguments == NULL) {
                     shell_write_string(
                         "error: run requires a process ID\n"
                     );
+                    last_command_exit_status = 1;
                 } else {
                     pid = parse_process_id(raw_arguments);
-                    run_process(
-                        pid,
-                        command_arguments(raw_arguments),
-                        background,
-                        stdout_path,
-                        append_stdout
-                    );
+                    if (!run_process(
+                            pid,
+                            command_arguments(raw_arguments),
+                            background,
+                            stdout_path,
+                            append_stdout
+                        )) {
+                        last_command_exit_status = 1;
+                    } else if (background) {
+                        last_command_exit_status = 0;
+                    }
                 }
             }
         }
@@ -1116,23 +1144,31 @@ bool eval(char *command) {
         raw_arguments = command_operand(command, "unload");
         if (raw_arguments == NULL) {
             shell_write_string("error: unload requires a process ID\n");
+            last_command_exit_status = 1;
         } else {
             pid = parse_process_id(raw_arguments);
             if (!unload(pid)) {
                 shell_write_string("error: could not unload process\n");
+                last_command_exit_status = 1;
+            } else {
+                last_command_exit_status = 0;
             }
         }
     } else if (command_matches(command, "fg")) {
         if (command_operand(command, "fg") != NULL) {
             shell_write_string("error: fg does not accept arguments\n");
-        } else {
-            continue_background_process(true);
+            last_command_exit_status = 1;
+        } else if (!continue_background_process(true)) {
+            last_command_exit_status = 1;
         }
     } else if (command_matches(command, "bg")) {
         if (command_operand(command, "bg") != NULL) {
             shell_write_string("error: bg does not accept arguments\n");
+            last_command_exit_status = 1;
+        } else if (continue_background_process(false)) {
+            last_command_exit_status = 0;
         } else {
-            continue_background_process(false);
+            last_command_exit_status = 1;
         }
     } else {
         background = strip_background_operator(command);
