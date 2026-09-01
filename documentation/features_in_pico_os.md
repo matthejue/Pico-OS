@@ -588,6 +588,7 @@ PicoOS> shell.bin < commands.txt
 PicoOS> echo.bin first > result.txt
 PicoOS> echo.bin second >> result.txt
 PicoOS> cat.bin missing.txt 2> ./device/null.dev
+PicoOS> cat.bin missing-again.txt 2>> errors.txt
 PicoOS> cat.bin result.txt
 first
 second
@@ -602,11 +603,11 @@ newline-separated command from the input file, and exits at EOF. Commands from
 a file are therefore run with `shell.bin < FILE`; the shell does not accept a
 file path argument.
 
-`<` redirects input, `>` truncates output, `>>` appends output, and `2>`
-truncates and redirects stderr. `/device/null.dev` accepts and discards output.
-One two-command `|` is implemented sequentially through a temporary file;
-arbitrary descriptor syntax and streaming or longer pipelines are not
-implemented.
+`<` redirects input, `>` truncates output, `>>` appends output, `2>` truncates
+and redirects stderr, and `2>>` appends stderr. `/device/null.dev` accepts and
+discards output. One two-command `|` is implemented sequentially through a
+temporary file; arbitrary descriptor syntax and streaming or longer pipelines
+are not implemented.
 
 Relevant commits: `04588d05f985`, `36979558d57e`
 

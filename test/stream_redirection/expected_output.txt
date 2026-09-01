@@ -27,7 +27,9 @@ AFTER
 six
 process with pid 10 created
 process with pid 11 created
-cat: missing.txt: could not open file
 process with pid 12 created
-still-running
+cat: missing.txt: could not open file
+cat: missing-again.txt: could not open file
 process with pid 13 created
+still-running
+process with pid 14 created

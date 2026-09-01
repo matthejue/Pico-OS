@@ -21,8 +21,9 @@
 #define SHELL_SAVED_STDOUT_FILENO 5
 #define SHELL_SAVED_STDERR_FILENO 6
 #define SHELL_TEST_SAVED_STDOUT_FILENO 4
+#define SHELL_TEST_SAVED_STDERR_FILENO 7
 #define SHELL_PRIVATE_FILE_DESCRIPTOR_START 3
-#define SHELL_FILE_DESCRIPTOR_COUNT 7
+#define SHELL_FILE_DESCRIPTOR_COUNT 8
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
 #define SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY 11
 
@@ -804,8 +805,10 @@ int strip_redirection(
     int file_descriptor,
     char **path
 ) {
+    bool append;
     int command_end;
     int index = 0;
+    int operator_end;
     int path_end;
     int path_start;
     int redirect = -1;
@@ -823,12 +826,14 @@ int strip_redirection(
     }
 
     if (file_descriptor == STDERR_FILENO) {
-        path_start = redirect + 2;
+        operator_end = redirect + 2;
     } else {
-        path_start = redirect + 1;
+        operator_end = redirect + 1;
     }
-    if (file_descriptor == STDOUT_FILENO &&
-        command[path_start] == '>') {
+    append = file_descriptor != STDIN_FILENO &&
+        command[operator_end] == '>';
+    path_start = operator_end;
+    if (append) {
         path_start = path_start + 1;
     }
     while (is_line_whitespace(command[path_start])) {
@@ -865,8 +870,7 @@ int strip_redirection(
     }
     command[command_end] = '\0';
     *path = command + path_start;
-    if (file_descriptor == STDOUT_FILENO &&
-        command[redirect + 1] == '>') {
+    if (append) {
         return 2;
     }
     return 1;
@@ -877,7 +881,8 @@ int strip_command_redirections(
     char **stdin_path,
     char **stdout_path,
     bool *append_stdout,
-    char **stderr_path
+    char **stderr_path,
+    bool *append_stderr
 ) {
     int status = strip_redirection(
         command,
@@ -888,6 +893,7 @@ int strip_command_redirections(
     if (status < 0) {
         return STDERR_FILENO;
     }
+    *append_stderr = status == 2;
     status = strip_redirection(command, STDOUT_FILENO, stdout_path);
     if (status < 0) {
         return STDOUT_FILENO;
@@ -985,7 +991,8 @@ bool run_process(
     char *stdin_path,
     char *stdout_path,
     bool append_stdout,
-    char *stderr_path
+    char *stderr_path,
+    bool append_stderr
 ) {
     char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
     bool stdin_redirected = false;
@@ -1011,7 +1018,7 @@ bool run_process(
                 STDERR_FILENO,
                 SHELL_SAVED_STDERR_FILENO,
                 stderr_path,
-                false
+                append_stderr
             )) {
             restore_standard_descriptors(
                 false,
@@ -1238,11 +1245,23 @@ bool run_shell_test(char *test_directory) {
     );
     if (output_file_descriptor < 0 ||
         dup2(STDOUT_FILENO, SHELL_TEST_SAVED_STDOUT_FILENO) < 0 ||
-        dup2(output_file_descriptor, STDOUT_FILENO) < 0) {
+        dup2(STDERR_FILENO, SHELL_TEST_SAVED_STDERR_FILENO) < 0) {
         if (output_file_descriptor >= 0) {
             close(output_file_descriptor);
         }
         close(SHELL_TEST_SAVED_STDOUT_FILENO);
+        close(SHELL_TEST_SAVED_STDERR_FILENO);
+        free(input);
+        shell_reset();
+        return false;
+    }
+    if (dup2(output_file_descriptor, STDOUT_FILENO) < 0 ||
+        dup2(output_file_descriptor, STDERR_FILENO) < 0) {
+        dup2(SHELL_TEST_SAVED_STDOUT_FILENO, STDOUT_FILENO);
+        dup2(SHELL_TEST_SAVED_STDERR_FILENO, STDERR_FILENO);
+        close(output_file_descriptor);
+        close(SHELL_TEST_SAVED_STDOUT_FILENO);
+        close(SHELL_TEST_SAVED_STDERR_FILENO);
         free(input);
         shell_reset();
         return false;
@@ -1274,7 +1293,11 @@ bool run_shell_test(char *test_directory) {
     if (dup2(SHELL_TEST_SAVED_STDOUT_FILENO, STDOUT_FILENO) < 0) {
         passed = false;
     }
+    if (dup2(SHELL_TEST_SAVED_STDERR_FILENO, STDERR_FILENO) < 0) {
+        passed = false;
+    }
     close(SHELL_TEST_SAVED_STDOUT_FILENO);
+    close(SHELL_TEST_SAVED_STDERR_FILENO);
     free(input);
     if (!shell_reset()) {
         passed = false;
@@ -1327,6 +1350,7 @@ bool eval(char *command) {
     int redirection_status;
     int operand_status;
     bool append_stdout;
+    bool append_stderr;
     bool background;
 
     command = skip_line_whitespace(command);
@@ -1445,7 +1469,8 @@ bool eval(char *command) {
                 &stdin_path,
                 &stdout_path,
                 &append_stdout,
-                &stderr_path
+                &stderr_path,
+                &append_stderr
             );
             if (redirection_status >= 0) {
                 report_invalid_redirection(redirection_status);
@@ -1466,7 +1491,8 @@ bool eval(char *command) {
                             stdin_path,
                             stdout_path,
                             append_stdout,
-                            stderr_path
+                            stderr_path,
+                            append_stderr
                         )) {
                         last_command_exit_status = 1;
                     } else if (background) {
@@ -1512,7 +1538,8 @@ bool eval(char *command) {
             &stdin_path,
             &stdout_path,
             &append_stdout,
-            &stderr_path
+            &stderr_path,
+            &append_stderr
         );
         if (redirection_status >= 0) {
             report_invalid_redirection(redirection_status);
@@ -1538,7 +1565,8 @@ bool eval(char *command) {
                         stdin_path,
                         stdout_path,
                         append_stdout,
-                        stderr_path
+                        stderr_path,
+                        append_stderr
                     )) {
                     last_command_exit_status = 1;
                 }
