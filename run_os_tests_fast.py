@@ -31,7 +31,7 @@ SHELL_TEST_CAPTURE_FILENAME = ".fast_shell_output.txt"
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Run Pico-OS integration tests with one shared OS boot."
+        description="Run Pico-OS integration tests with shared OS boots."
     )
     parser.add_argument(
         "--kind",
@@ -70,6 +70,19 @@ def is_uart_shell_test(test_dir):
             "\\ctrlL",
         )
     )
+
+
+def requires_independent_shell_session(test_dir):
+    input_lines = (test_dir / "input.txt").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    for line in input_lines:
+        command = line.strip()
+        if (command == "shell.bin" or
+                command.endswith("/shell.bin") or
+                "/device/terminal.dev" in command):
+            return True
+    return False
 
 
 def write_manifest(path, test_dirs):
@@ -201,21 +214,36 @@ def main():
         for path in paths
         if is_os_feature_test(path)
     ]
+    independent_shell_paths = [
+        path
+        for path in paths
+        if path not in os_feature_paths and
+        requires_independent_shell_session(path)
+    ]
     uart_shell_paths = [
         path
         for path in paths
-        if is_uart_shell_test(path)
+        if path not in os_feature_paths and
+        path not in independent_shell_paths and
+        is_uart_shell_test(path)
     ]
     eval_shell_paths = [
         path
         for path in paths
-        if path not in os_feature_paths and path not in uart_shell_paths
+        if path not in os_feature_paths and
+        path not in independent_shell_paths and
+        path not in uart_shell_paths
     ]
-    shell_paths = eval_shell_paths + uart_shell_paths
+    shell_paths = (
+        eval_shell_paths +
+        uart_shell_paths +
+        independent_shell_paths
+    )
     statuses = {}
     ready_os_feature_paths = []
     ready_eval_shell_paths = []
     ready_uart_shell_paths = []
+    ready_independent_shell_paths = []
 
     stage_test_directories(paths)
     for test_dir in paths:
@@ -226,6 +254,8 @@ def main():
         if build_test_programs(test_dir, extra_cpl_args, args.direct):
             if test_dir in os_feature_paths:
                 ready_os_feature_paths.append(test_dir)
+            elif test_dir in independent_shell_paths:
+                ready_independent_shell_paths.append(test_dir)
             elif test_dir in uart_shell_paths:
                 ready_uart_shell_paths.append(test_dir)
             else:
@@ -294,6 +324,17 @@ def main():
                     )
                     else "not-passed"
                 )
+
+    for test_dir in ready_independent_shell_paths:
+        print(f"Running {test_dir} in an independent OS session", flush=True)
+        status = run_os_test(
+            test_dir,
+            extra_emu_args,
+            FAST_TEST_TIMEOUT_SECONDS,
+        )
+        if status == "passed" and not outputs_match(test_dir):
+            status = "not-passed"
+        statuses[test_dir] = status
 
     failing, not_passed, timed_out = collect_results(paths, statuses)
     write_not_passed_tests(not_passed)
