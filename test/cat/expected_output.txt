@@ -2,4 +2,5 @@ process with pid 3 created
 first file
 second file
 process with pid 4 created
+cat: test/cat/missing.txt: could not open file
 process with pid 6 created

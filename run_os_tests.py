@@ -537,28 +537,20 @@ def run_os_test_with_peripherals(
         command,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         cwd="binary",
     )
     stdout = bytearray()
-    stderr = bytearray()
     prompt_search_start = 0
 
     def read_available(wait_seconds):
-        streams = [
-            stream
-            for stream in (process.stdout, process.stderr)
-            if stream is not None
-        ]
-        if not streams:
+        stream = process.stdout
+        if stream is None:
             return
-        readable, _, _ = select.select(streams, [], [], wait_seconds)
-        for stream in readable:
+        readable, _, _ = select.select([stream], [], [], wait_seconds)
+        if readable:
             chunk = os.read(stream.fileno(), 4096)
-            if stream is process.stdout:
-                stdout.extend(chunk)
-            else:
-                stderr.extend(chunk)
+            stdout.extend(chunk)
 
     def wait_for_prompt():
         nonlocal prompt_search_start
@@ -600,11 +592,8 @@ def run_os_test_with_peripherals(
     process.wait()
     if process.stdout is not None:
         stdout.extend(process.stdout.read())
-    if process.stderr is not None:
-        stderr.extend(process.stderr.read())
 
     stdout_text = stdout.decode("utf-8", errors="replace")
-    stderr_text = stderr.decode("utf-8", errors="replace")
     raw_output_file.write_text(stdout_text, encoding="utf-8")
     output_file.write_text(normalize_os_output(stdout_text), encoding="utf-8")
 
@@ -612,8 +601,6 @@ def run_os_test_with_peripherals(
         with PRINT_LOCK:
             if stdout_text:
                 print(stdout_text, end="")
-            if stderr_text:
-                print(stderr_text, end="", file=sys.stderr)
             print(
                 "Emulator timed out after "
                 f"{max_duration_seconds}s for {test_dir}"
@@ -623,8 +610,6 @@ def run_os_test_with_peripherals(
         with PRINT_LOCK:
             if stdout_text:
                 print(stdout_text, end="")
-            if stderr_text:
-                print(stderr_text, end="", file=sys.stderr)
             print(
                 f"Emulator failed with exit status {process.returncode} "
                 f"for {test_dir}"
