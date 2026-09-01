@@ -41,6 +41,8 @@ char command_history[
     SHELL_COMMAND_HISTORY_CAPACITY
 ][SHELL_COMMAND_BUFFER_CAPACITY];
 char command_history_draft[SHELL_COMMAND_BUFFER_CAPACITY];
+// Keeps the complete erase sequence outside the process stack
+char shell_line_erase_sequence[(SHELL_COMMAND_BUFFER_CAPACITY - 1) * 3];
 int command_history_start = 0;
 int command_history_count = 0;
 
@@ -122,13 +124,19 @@ void report_foreground_process_status(int pid, int status) {
 }
 
 int erase_shell_line_suffix(int length, int retained_length) {
-    while (length > retained_length) {
-        shell_write_character('\b');
-        shell_write_character(' ');
-        shell_write_character('\b');
-        length = length - 1;
+    int erased_length = length - retained_length;
+    int index = 0;
+
+    while (index < erased_length) {
+        shell_line_erase_sequence[index] = '\b';
+        shell_line_erase_sequence[erased_length + index] = ' ';
+        shell_line_erase_sequence[erased_length * 2 + index] = '\b';
+        index = index + 1;
     }
-    return length;
+    if (erased_length > 0) {
+        write(STDOUT_FILENO, shell_line_erase_sequence, erased_length * 3);
+    }
+    return retained_length;
 }
 
 int command_history_index(int position) {
@@ -175,10 +183,12 @@ int replace_shell_line(
         replacement_length < capacity - 1
     ) {
         buffer[replacement_length] = replacement[replacement_length];
-        shell_write_character(replacement[replacement_length]);
         replacement_length = replacement_length + 1;
     }
     buffer[replacement_length] = '\0';
+    if (replacement_length > 0) {
+        write(STDOUT_FILENO, buffer, replacement_length);
+    }
     return replacement_length;
 }
 
