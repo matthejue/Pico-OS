@@ -5,22 +5,52 @@
 #include "../library/stdlib/stdlib.header"
 #include "../library/unistd/unistd.header"
 
-bool line_contains(char *line, int line_length, char *pattern, int pattern_length) {
-    int line_index = 0;
+bool text_starts_with(char *text, char *pattern, int pattern_length) {
     int pattern_index;
 
+    pattern_index = 0;
+    while (pattern_index < pattern_length &&
+           text[pattern_index] == pattern[pattern_index]) {
+        pattern_index = pattern_index + 1;
+    }
+    return pattern_index == pattern_length;
+}
+
+bool line_contains(char *line, int line_length, char *pattern, int pattern_length) {
+    int line_index = 0;
+
     while (line_index + pattern_length <= line_length) {
-        pattern_index = 0;
-        while (pattern_index < pattern_length &&
-               line[line_index + pattern_index] == pattern[pattern_index]) {
-            pattern_index = pattern_index + 1;
-        }
-        if (pattern_index == pattern_length) {
+        if (text_starts_with(line + line_index, pattern, pattern_length)) {
             return true;
         }
         line_index = line_index + 1;
     }
     return false;
+}
+
+void write_substituted_line(
+    char *line,
+    int line_length,
+    char *pattern,
+    int pattern_length,
+    char *replacement,
+    int replacement_length
+) {
+    int line_index = 0;
+    bool replaced = false;
+
+    while (line_index < line_length) {
+        if (!replaced &&
+            line_index + pattern_length <= line_length &&
+            text_starts_with(line + line_index, pattern, pattern_length)) {
+            write(STDOUT_FILENO, replacement, replacement_length);
+            line_index = line_index + pattern_length;
+            replaced = true;
+        } else {
+            write(STDOUT_FILENO, line + line_index, 1);
+            line_index = line_index + 1;
+        }
+    }
 }
 
 void write_replacement(char *text) {
@@ -39,6 +69,8 @@ int main(int argc, char **argv) {
     char *replacement;
     char *pattern = NULL;
     int pattern_length = 0;
+    int replacement_length;
+    int replacement_start;
     int addressed_line = 0;
     int command_index = 0;
     int file_size;
@@ -47,6 +79,7 @@ int main(int argc, char **argv) {
     int line_number = 1;
     int line_length;
     bool selected;
+    bool substitution = false;
     char command;
 
     if (argc == 2 && command_is_help(argv[1])) {
@@ -59,7 +92,23 @@ int main(int argc, char **argv) {
     }
     unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
     expression = argv[1];
-    if (expression[0] == '/') {
+    if (expression[0] == 's' && expression[1] == '/') {
+        substitution = true;
+        pattern = expression + 2;
+        command_index = 2;
+        while (expression[command_index] != '/') {
+            command_index = command_index + 1;
+        }
+        pattern_length = command_index - 2;
+        command_index = command_index + 1;
+        replacement_start = command_index;
+        replacement = expression + replacement_start;
+        while (expression[command_index] != '\0' &&
+               expression[command_index] != '/') {
+            command_index = command_index + 1;
+        }
+        replacement_length = command_index - replacement_start;
+    } else if (expression[0] == '/') {
         pattern = expression + 1;
         command_index = 1;
         while (expression[command_index] != '/') {
@@ -75,8 +124,10 @@ int main(int argc, char **argv) {
             command_index = command_index + 1;
         }
     }
-    command = expression[command_index];
-    replacement = expression + command_index + 1;
+    if (!substitution) {
+        command = expression[command_index];
+        replacement = expression + command_index + 1;
+    }
 
     file_size = lseek(STDIN_FILENO, 0, SEEK_END);
     if (file_size < 0 || lseek(STDIN_FILENO, 0, SEEK_SET) < 0) {
@@ -103,16 +154,28 @@ int main(int argc, char **argv) {
             end = end + 1;
         }
         selected = addressed_line == line_number ||
-            (pattern != NULL && line_contains(
+            (pattern != NULL && !substitution && line_contains(
                 contents + start,
                 line_length,
                 pattern,
                 pattern_length
             ));
-        if (selected && command == 'i') {
+        if (!substitution && selected && command == 'i') {
             write_replacement(replacement);
         }
-        if (!selected || command != 'c') {
+        if (substitution) {
+            write_substituted_line(
+                contents + start,
+                line_length,
+                pattern,
+                pattern_length,
+                replacement,
+                replacement_length
+            );
+            if (end > start + line_length) {
+                command_write(STDOUT_FILENO, "\n");
+            }
+        } else if (!selected || command != 'c') {
             write(STDOUT_FILENO, contents + start, end - start);
         } else {
             write_replacement(replacement);

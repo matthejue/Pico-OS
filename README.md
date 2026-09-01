@@ -3037,8 +3037,10 @@ shell built-in and calls the existing process-list syscall from its own process.
 writes its result to stdout. Input can come from `< input.txt` or from the
 shell's file-backed pipeline. Expressions such as `5iNEW LINE`, `5cNEW LINE`,
 `5aNEW LINE`, and `/pattern/iNEW LINE` respectively insert before, change,
-append after, or insert before every matching line. Sed loads stdin into memory
-and disables `PICOOS_LOADING_BAR` so output is not mixed with progress text.
+append after, or insert before every matching line. `s/pattern/replacement/`
+replaces the first literal occurrence of `pattern` on every line. Sed loads
+stdin into memory and disables `PICOOS_LOADING_BAR` so output is not mixed with
+progress text.
 
 `ls.bin` preserves host listing order and hides names beginning with `.` unless
 `-a` is given. There is no sorting, long format, or recursion. `mkdir.bin` has no
