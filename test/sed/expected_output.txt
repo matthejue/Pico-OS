@@ -30,3 +30,10 @@ four
 five
 six
 process with pid 7 created
+one
+two
+very complex pattern here
+four
+five
+six
+process with pid 8 created
