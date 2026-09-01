@@ -6,6 +6,7 @@ cat.bin < source.txt
 cat.bin source.txt | sed.bin "5aAFTER" > pipeline-output.txt
 cat.bin pipeline-output.txt
 cat.bin missing.txt 2> errors.txt
+cat.bin missing-again.txt 2>> errors.txt
 cat.bin errors.txt
 echo.bin still-running
 poweroff.bin

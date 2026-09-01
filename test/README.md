@@ -103,13 +103,14 @@ Trailing whitespace is ignored for the comparison.
 
 The shell redirects a started process's standard input with `< path`, its
 standard output with `> path`, appends output with `>> path`, or redirects
-stderr with `2> path`:
+stderr with `2> path` and `2>> path`:
 
 ```text
 shell.bin < ./test/example/commands.txt
 echo.bin hello > ./test/example/output.txt
 echo.bin again >> ./test/example/output.txt
 cat.bin missing.txt 2> ./device/null.dev
+cat.bin missing-again.txt 2>> ./test/example/errors.txt
 cat.bin input.txt | sed.bin "5aNEW" > output.txt
 ```
 
@@ -135,7 +136,7 @@ make test
 
 This runs the configured library tests and the OS feature and shell tests
 normally. Use `make test-fast` to run the library tests followed by OS feature
-and shell tests with one shared OS boot per test group. Both targets print the
+and shell tests with shared OS sessions per test group. Both targets print the
 runtime of the OS feature group, the shell group, and their combined system
 tests in `MM:SS` format. At the end, combined targets repeat the library, OS
 feature, and shell result summaries under separate headings in execution order.
@@ -158,10 +159,11 @@ make test TEST_JOBS=4
 Combined targets such as `make test` and `make test-sys` ask once, then use
 the selected count for every nested test group.
 
-Fast OS and shell tests run serially inside one shared OS session, so
-`TEST_JOBS` does not parallelize `make test-os-fast` or
-`make test-shell-fast`. It only applies to the library-test part of
-`make test-fast`.
+Fast OS tests and compatible shell tests run serially inside one shared OS
+session, so `TEST_JOBS` does not parallelize `make test-os-fast` or
+`make test-shell-fast`. Shell scenarios that start another interactive shell
+use an independent session. `TEST_JOBS` only applies to the library-test part
+of `make test-fast`.
 
 Each assembler and emulator process receives its own temporary peripheral
 directory, so concurrent processes never share `sram.bin`. Tests use staged
@@ -192,13 +194,13 @@ make test-os
 make test-shell
 ```
 
-Run OS feature and shell tests with one shared OS boot per test group:
+Run OS feature and shell tests with shared OS boots per test group:
 
 ```sh
 make test-sys-fast
 ```
 
-Run only OS feature tests or shell tests through one shared OS boot:
+Run only OS feature tests or shell tests through shared OS boots:
 
 ```sh
 make test-os-fast
@@ -212,12 +214,20 @@ leftover test processes before continuing. The launcher removes
 `PICOOS_LOADING_BAR` from its environment first, so test launchers and their
 workers do not inherit loader UI output.
 
-For shell tests, the shell reads each `input.txt` and passes its lines to
-`eval()`. Before each test, `shell_reset()` removes test processes, resets
-descriptors, status values, process IDs, and the environment. Each test's
-output is captured separately. The line-editing test remains a raw UART
-command at the end of the same boot because it specifically tests backspace
-handling in `read_line()`.
+For compatible shell tests, the shell reads each `input.txt` and passes its
+lines to `eval()`. Before each test, `shell_reset()` removes test processes,
+resets descriptors, status values, process IDs, and the environment. Each
+test's stdout and stderr are captured together. The line-editing test remains
+a raw UART command at the end of the same boot because it specifically tests
+backspace handling in `read_line()`. Tests that start another interactive
+shell or write directly to `/device/terminal.dev` use an independent OS
+session because their behavior cannot be isolated through the shared capture
+file. `run_os_tests_fast.py` identifies these cases from `input.txt`: a line
+that is exactly `shell.bin` or ends in `/shell.bin` starts an interactive
+shell, and any line containing `/device/terminal.dev` writes directly to the
+terminal. This is behavior-based rather than a list of test-directory names.
+The runner similarly identifies raw UART tests from the line-editing escape
+sequences such as `\up`, `\b`, and `\ctrlC`.
 
 Run one configured OS test without comparing `expected_output.txt`:
 

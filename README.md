@@ -2757,9 +2757,9 @@ that shell image's `.data`, not in a kernel shell object:
 | `command_history_start`, `command_history_count` | Ring indices/count |
 
 The active command buffer is an 80-cell local array in `main()`'s userspace
-stack. Redirection temporarily reserves descriptors 3–6 for saved stdin, shell
-tests, saved stdout, and saved stderr; all descriptor state itself remains in
-the shell PCB's kernel-heap table.
+stack. Redirection temporarily reserves descriptors 3–7 for saved stdin,
+fast-test output, saved stdout, saved stderr, and fast-test error output; all
+descriptor state itself remains in the shell PCB's kernel-heap table.
 
 ## 12.2 Startup and main loop
 
@@ -2778,7 +2778,7 @@ terminal input.
 | `void remember_shell_command(char *command)` | `void` | Mutates the global eight-entry history ring; skips consecutive duplicates |
 | `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
 | `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
-| `bool run_process(int pid, char *arguments, bool background, char *stdin_path, char *stdout_path, bool append, char *stderr_path)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
+| `bool run_process(int pid, char *arguments, bool background, char *stdin_path, char *stdout_path, bool append_stdout, char *stderr_path, bool append_stderr)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
 | `bool continue_background_process(bool foreground)` | Whether a process was continued | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
 | `bool eval(char *command)` | Continue-shell flag | Selects a built-in or external execution path |
 | `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the interactive or redirected-input execution path |
@@ -2809,8 +2809,8 @@ later resumes the shell.
 
 The parser validates balanced single and double quotes, recognizes one
 unquoted `|`, removes a trailing `&`, handles final whitespace-preceded `<`,
-`>`, `>>`, and `2>` operators, splits the command name from its raw arguments,
-and expands `$NAME`, `$?`, and `$!`. A command containing `/` is loaded
+`>`, `>>`, `2>`, and `2>>` operators, splits the command name from its raw
+arguments, and expands `$NAME`, `$?`, and `$!`. A command containing `/` is loaded
 directly; another name is searched through
 colon-separated `PATH` entries.
 
@@ -2876,7 +2876,7 @@ or process-local `environ`. The shell has ten built-ins overall.
 | `export NAME=value` | Expands the complete assignment and stores/replaces the variable | `getenv` during expansion and `setenv(..., true)` |
 | `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | `chdir()` / syscall 32 |
 | `load PATH` | Loads a binary but leaves its PCB in `NEW` | `load()` / syscall 3 |
-| `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `<`, `>`, `>>`, and `2>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
+| `run PID [ARGUMENTS]` | Starts a previously loaded PCB; supports `&`, `<`, `>`, `>>`, `2>`, and `2>>` | `run`, and possibly `open`/`dup2`/`close`, `set_foreground_process`, `waitpid` |
 | `unload PID` | Terminates/removes the selected non-current process | `unload()` / syscall 5 |
 | `fg` | Makes the most recently tracked PID foreground, sends `SIGCONT`, and waits | `set_foreground_process`, `kill`, `waitpid` |
 | `bg` | Sends `SIGCONT` to the most recently tracked PID without waiting | `kill()` |
@@ -2922,8 +2922,9 @@ own stdout. Since `run()` deep-copies the descriptor table, the child's
 descriptor 1 retains the file path after the shell restores itself.
 
 For `COMMAND 2> PATH`, the shell performs the same operation for stderr with
-private descriptor 6 and opens the destination with truncation. Thus normal
-stdout stays visible while diagnostics can be inspected separately or sent to
+private descriptor 6 and opens the destination with truncation. `2>>` instead
+opens it for appending. Thus normal stdout stays visible while diagnostics can
+be inspected separately, accumulated across commands, or sent to
 `./device/null.dev`.
 
 The two paths under `/device` are exceptions to ordinary host-file
@@ -3158,9 +3159,9 @@ than relying only on locally installed binaries.
 | `make test-sys` | OS features then shell | One fresh boot per scenario |
 | `make test-os` | Kernel/OS feature scenarios | One fresh boot per scenario |
 | `make test-shell` | Interactive shell scenarios | One fresh boot per scenario |
-| `make test-sys-fast` | OS features then shell | One shared boot per group |
+| `make test-sys-fast` | OS features then shell | Shared boot per group; direct terminal cases isolated |
 | `make test-os-fast` | OS features | One shared boot |
-| `make test-shell-fast` | Shell | One shared boot |
+| `make test-shell-fast` | Shell | Shared boot; direct terminal cases isolated |
 
 Normal OS tests compile and assemble every program in one test directory,
 start the release-style EPROM bootloader, wait for shell prompts, inject UART
@@ -3173,6 +3174,13 @@ launcher redirects output, loads and waits for one test launcher, restores
 stdout, removes remaining test processes, destroys their descriptor tables,
 and resets the expected PID sequence. Fast shell tests additionally restore
 the initial environment, directory, private descriptors, `$?`, and `$!`.
+Shell scenarios that start another interactive shell or write directly to the
+terminal device use an independent boot so their terminal traffic cannot
+block or contaminate the shared capture. The fast runner recognizes these
+cases by scanning `input.txt`, not by naming individual test directories: an
+exact `shell.bin` command or a command ending in `/shell.bin` starts an
+interactive shell, while `/device/terminal.dev` identifies direct terminal
+output. It also recognizes raw UART tests from line-editing escape sequences.
 
 ```mermaid
 flowchart LR
