@@ -1,0 +1,65 @@
+// dependencies: ../../common/decimal.reti_blocks ../../library/stdlib/libstdlib.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks ../../library/mutex/libmutex.reti_blocks
+
+#include "shared.header"
+#include "../../common/decimal.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
+
+void build_worker_arguments(
+    char *arguments,
+    int worker_number,
+    int shared_memory_id
+) {
+    int length;
+
+    length = append_decimal(arguments, worker_number);
+
+    arguments[length] = ' ';
+    length = length + 1;
+    length = length + append_decimal(arguments + length, shared_memory_id);
+    arguments[length] = '\0';
+}
+
+void write_text(char *text) {
+    int length = 0;
+
+    while (text[length] != '\0') {
+        length = length + 1;
+    }
+    write(STDOUT_FILENO, text, length);
+}
+
+int main(void) {
+    int shared_memory_id;
+    int first_worker;
+    int second_worker;
+    struct SharedState *shared_state;
+    char first_worker_arguments[16];
+    char second_worker_arguments[16];
+
+    shared_memory_id = shm_open(
+        "shared-memory-mutex",
+        sizeof(struct SharedState)
+    );
+    shared_state = (struct SharedState *)mmap(shared_memory_id);
+    shared_state->workers = 0;
+    mutex_init(&(shared_state->mutex));
+    build_worker_arguments(first_worker_arguments, 1, shared_memory_id);
+    build_worker_arguments(second_worker_arguments, 2, shared_memory_id);
+
+    first_worker = load("test/shared_memory_mutex/worker.bin");
+    second_worker = load("test/shared_memory_mutex/worker.bin");
+    run(first_worker, first_worker_arguments, NULL);
+    run(second_worker, second_worker_arguments, NULL);
+
+    waitpid(first_worker);
+    waitpid(second_worker);
+    if (shared_state->workers == 2) {
+        write_text("workers: 2\n");
+    } else {
+        write_text("workers: invalid\n");
+    }
+    shm_unlink("shared-memory-mutex");
+    return 0;
+}
