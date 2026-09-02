@@ -1,0 +1,3 @@
+load test/exercise_sheet_4_heap/launcher.bin
+run 3
+poweroff.bin
