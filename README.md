@@ -148,10 +148,15 @@ previous chunk is handled at that syscall's return boundary.
 
 1. [Toolchain work required by PicoOS](#1-toolchain-work-required-by-picoos)
    - [1.1 PicoC-Compiler extensions](#11-picoc-compiler-extensions)
-     - [1.1.1 Linked `.sections` metadata](#111-linked-sections-metadata)
-     - [1.1.2 Generated `memory_constants.header` files](#112-generated-memory_constantsheader-files)
-     - [1.1.3 Custom userspace startup](#113-custom-userspace-startup)
-     - [1.1.4 Interrupt sections and naked functions](#114-interrupt-sections-and-naked-functions)
+     - [1.1.1 RETI pseudoinstructions](#111-reti-pseudoinstructions)
+       - [1.1.1.1 Interrupt-safe stack operations](#1111-interrupt-safe-stack-operations)
+       - [1.1.1.2 Loading 32-bit values](#1112-loading-32-bit-values)
+       - [1.1.1.3 Long jumps](#1113-long-jumps)
+       - [1.1.1.4 Expansion during linking](#1114-expansion-during-linking)
+     - [1.1.2 Linked `.sections` metadata](#112-linked-sections-metadata)
+     - [1.1.3 Generated `memory_constants.header` files](#113-generated-memory_constantsheader-files)
+     - [1.1.4 Custom userspace startup](#114-custom-userspace-startup)
+     - [1.1.5 Interrupt sections and naked functions](#115-interrupt-sections-and-naked-functions)
    - [1.2 RETI-Emulator extensions](#12-reti-emulator-extensions)
      - [1.2.1 Machine model and peripherals](#121-machine-model-and-peripherals)
      - [1.2.2 Debugger and terminal views](#122-debugger-and-terminal-views)
@@ -235,9 +240,11 @@ previous chunk is handled at that syscall's return boundary.
     - [13.2 Command behavior and limitations](#132-command-behavior-and-limitations)
     - [13.3 Errors and exit status](#133-errors-and-exit-status)
 14. [Use in operating-systems and real-time operating-systems lectures](#14-use-in-operating-systems-and-real-time-operating-systems-lectures)
-    - [14.1 Real-time operating-systems topics](#141-real-time-operating-systems-topics)
-    - [14.2 Operating-systems topics](#142-operating-systems-topics)
-    - [14.3 Exercise and teaching material](#143-exercise-and-teaching-material)
+    - [14.1 Operating-systems topics](#141-operating-systems-topics)
+      - [14.1.1 Understanding PicoOS and the kernel step by step in the RETI-Emulator](#1411-understanding-picoos-and-the-kernel-step-by-step-in-the-reti-emulator)
+      - [14.1.2 Understanding the heap, malloc(), and free() with PicoOS](#1412-understanding-the-heap-malloc-and-free-with-picoos)
+      - [14.1.3 Symbolic assembly for students](#1413-symbolic-assembly-for-students)
+    - [14.2 Real-time operating-systems topics](#142-real-time-operating-systems-topics)
 15. [Test system](#15-test-system)
     - [15.1 Test categories and repository integration](#151-test-categories-and-repository-integration)
     - [15.2 Normal and fast execution](#152-normal-and-fast-execution)
@@ -284,14 +291,24 @@ Useful narrower commands are:
 | Command | Purpose |
 | --- | --- |
 | `make firmware` | Build the complete firmware/release tree |
+| `make release-tree` / `make release-archive` | Build the release tree or create the release archive |
+| `make clean-firmware` / `make rebuild-firmware` | Remove generated firmware files or rebuild them |
 | `make device` | Add the terminal and null device markers under `binary/device` |
+| `make eprom` / `make kernel` | Build only the EPROM bootloader or kernel image |
+| `make system` / `make user` | Build the system or user programs |
+| `make run-firmware` | Run the kernel image directly in the debug TUI |
+| `make run-kernel` | Rebuild and run the kernel image directly |
+| `make bootload-debug` | Rebuild bootloader and kernel with source/debug metadata, then boot through the debug TUI |
 | `make bootload-dma` | Boot through the debug TUI with DMA enabled |
 | `make bootload-notui` | Boot directly in the terminal without the debug TUI |
 | `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
 | `make run-os OS_RUN_PATH=test/hello_world` | Run one configured OS scenario |
+| `make test` / `make test-fast` | Run all library, OS, and shell tests normally or with shared OS sessions |
 | `make test-lib` | Run the standalone library tests |
+| `make test-sys` / `make test-sys-fast` | Run OS feature and shell tests normally or with shared OS sessions |
 | `make test-os` | Run the OS feature tests |
 | `make test-shell` | Run the shell tests |
+| `make test-os-fast` / `make test-shell-fast` | Run only OS feature or shell tests with a shared boot |
 | `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
 | `make test-fast DMA=1` | Run the fast workflow with emulator DMA enabled |
 
@@ -382,7 +399,127 @@ needed both high-level facilities such as structures and separate compilation
 and low-level control over startup, sections, interrupt frames, and absolute
 machine addresses.
 
-### 1.1.1 Linked `.sections` metadata
+### 1.1.1 RETI pseudoinstructions
+
+The RETI hardware has no native stack instructions, its immediate fields are
+only 22 bits wide, and an ordinary `JUMP` contains only a relative 22-bit
+offset. The compiler therefore adds four pseudoinstructions to the RETI syntax
+used by generated `.reti_blocks` and PicoC `asm("...")` statements. They are
+represented in the normal RETI AST and replaced with concrete machine
+instructions during the final linking passes.
+
+| Pseudoinstruction | Purpose | Concrete size |
+| --- | --- | ---: |
+| `PUSH reg` | Reserves one stack cell and stores `reg` in it | 2 instructions |
+| `POP reg` | Loads the top stack cell into `reg` and releases it | 2 instructions |
+| `LOADI32 reg operand` | Loads a 32-bit literal, linked symbol, or `symbol +/- offset` | 3 instructions |
+| `JUMP32[relation] target` | Jumps to an immediate address or linked code label without the normal jump-range limit | 4--6 instructions when retained |
+
+`relation` is optional and uses the normal RETI conditions: `<`, `<=`, `>`,
+`>=`, `==`, `!=`, or `_NOP`. Thus `JUMP32 target` is unconditional, while
+`JUMP32== target` jumps only when the equality condition is set. Numeric
+operands and targets are accepted directly; symbols and symbolic offsets are
+resolved only after all compilation units and sections have been combined.
+
+#### 1.1.1.1 Interrupt-safe stack operations
+
+The RETI stack grows toward lower addresses. `PUSH` moves `SP` before writing
+the new value, while `POP` reads the value before moving `SP` back:
+
+| Pseudoinstruction | Expansion |
+| --- | --- |
+| `PUSH ACC` | `SUBI SP 1`<br>`STOREIN SP ACC 1` |
+| `POP ACC` | `LOADIN SP ACC 1`<br>`ADDI SP 1` |
+
+This order matters in PicoOS because a hardware interrupt can occur between
+the two concrete instructions. On a push, the earlier `SP` update protects the
+new stack cell from the interrupt frame. On a pop, the later update keeps the
+still-needed cell protected until it has been read.
+
+The compiler uses these operations for function arguments, return addresses,
+and saved `BAF` values. PicoOS also uses them directly in naked startup and
+interrupt code to construct and restore the activation record shared by the
+compiler, interrupt handlers, and dispatcher. For example, an ISR can preserve
+registers without spelling out the indexed stack accesses:
+
+```c
+asm("PUSH ACC");
+asm("PUSH IN1");
+/* Handle the interrupt */
+asm("POP IN1");
+asm("POP ACC");
+```
+
+#### 1.1.1.2 Loading 32-bit values
+
+`LOADI32 reg operand` provides a full 32-bit value even though the concrete
+`LOADI` instruction has only a signed 22-bit immediate. After resolving a
+symbol, the linker divides the value into a signed upper 22-bit part and an
+unsigned lower 10-bit part, then always emits:
+
+```reti
+LOADI reg upper_22_bits
+MULTI reg 1024
+ORI reg lower_10_bits
+```
+
+The result is the original 32-bit bit pattern. This works for values such as
+the tagged SRAM base `-2147483648` as well as linked addresses. A code label is
+resolved relative to `CS`, so code that needs the absolute address adds `CS`
+afterward. PicoOS's bootloader uses exactly this sequence conceptually:
+
+```c
+asm("LOADI32 ACC start_loaded_kernel");
+asm("ADD ACC CS");
+asm("MOVE ACC PC");
+```
+
+The same pseudoinstruction loads absolute segment and stack values generated
+in `memory_constants.header`, and the compiler itself uses it when constructing
+function pointers and return addresses.
+
+#### 1.1.1.3 Long jumps
+
+`JUMP32` avoids the signed 22-bit relative-offset limit of the hardware
+`JUMP`. For a symbolic target, the linker builds the target's `CS`-relative
+address in `ACC`, adds `CS`, and moves the absolute result into `PC`:
+
+```reti
+LOADI ACC upper_22_bits
+MULTI ACC 1024
+ORI ACC lower_10_bits
+ADD ACC CS
+MOVE ACC PC
+```
+
+A numeric target is treated as an absolute address, so its expansion omits
+`ADD ACC CS` and contains four instructions. A conditional form first emits a
+short jump with the opposite relation to skip over the long-jump sequence when
+the condition is false. It is therefore one instruction longer: six
+instructions for a symbolic target and five for an immediate target.
+
+Taken `JUMP32` operations use `ACC` as a scratch register. The compiler keeps
+function results in `IN2`, leaving `ACC` available for generated block and
+shared-epilogue jumps. It emits symbolic `JUMP32` nodes for ordinary PicoC
+control flow as well as accepting statements such as
+`asm("JUMP32 signal_epilogue");` in naked low-level code.
+
+#### 1.1.1.4 Expansion during linking
+
+Expansion is split across the two final RETI-side passes so instruction and
+label positions remain correct:
+
+1. `reti_patch` expands each `PUSH` and `POP`, removes an unconditional jump to
+   the immediately following block, and then records every block's concrete
+   instruction count and start position.
+2. `reti` resolves program-wide symbols, flattens the blocks, and expands
+   `LOADI32` and `JUMP32` using the now-final section and block addresses.
+
+Because inline assembly is parsed into the same AST as compiler-generated
+RETI, these rules and symbolic resolution apply identically to both. No
+pseudoinstruction reaches the emulator or assembled binary.
+
+### 1.1.2 Linked `.sections` metadata
 
 Every final link writes `program.reti` and `program.sections` together. The
 section file is not executable data; it is JSON-like layout metadata produced
@@ -446,7 +583,7 @@ flowchart LR
     L --> SRAM["encoded words copied to SRAM"]
 ```
 
-### 1.1.2 Generated `memory_constants.header` files
+### 1.1.3 Generated `memory_constants.header` files
 
 The kernel and EPROM bootloader need their own absolute addresses before an
 ordinary runtime object can tell them where they are. The compiler option
@@ -476,7 +613,7 @@ the `.sections` file retains program-relative values for loading and debug
 views. The bootloader reads the kernel's five-word binary header to load that
 image, but uses its own EPROM header before any kernel state exists.
 
-### 1.1.3 Custom userspace startup
+### 1.1.4 Custom userspace startup
 
 PicoOS links [`library/start/libstart.picoc`](library/start/libstart.picoc) as
 the custom startup unit. Its naked `_start` must see the initial stack exactly
@@ -486,7 +623,7 @@ initializes the process-local heap, clones the `envp` entries placed after
 The bootloader and kernel also use custom naked startup functions, but those
 install machine registers rather than enter an application `main()`.
 
-### 1.1.4 Interrupt sections and naked functions
+### 1.1.5 Interrupt sections and naked functions
 
 `__attribute__((section("ivt")))` tells the linker to place the declared
 function-pointer array in `.ivt` before ordinary `.text` and `.data`; the
@@ -2453,9 +2590,9 @@ becomes `IN1`.
 | --- | --- | --- |
 | `int kill(int pid, int signal_number)` | 0 or `-1`; signal 0 only probes existence | 27, `KillRequest` |
 | `int prctl(int option, int argument)` | 0 or `-1`; supports `PR_SET_PDEATHSIG` | 29, `PrctlRequest` |
-| `int shm_open(const char *name, size_t size)` | Existing/new shared-memory ID or `-1` | 21, `ShmOpenRequest` |
+| `int shm_open(char *name, size_t size)` | Existing/new shared-memory ID or `-1` | 21, `ShmOpenRequest` |
 | `void *mmap(int shared_memory_id)` | Shared absolute address or `NULL`; creates a PCB attachment | 22, ID directly |
-| `int shm_unlink(const char *name)` | 0 or `-1`; removes name and requests deferred destruction | 23, name pointer directly |
+| `int shm_unlink(char *name)` | 0 or `-1`; removes name and requests deferred destruction | 23, name pointer directly |
 | `bool testset(bool *lock_addr)` | Atomically writes 1 and returns the old lock value | No syscall; one RETI `TSL` instruction |
 | `void mutex_init(struct mutex *mutex)` | Clears lock and initializes embedded wait queue | No syscall |
 | `void mutex_lock(struct mutex *mutex)` | Acquires lock; contenders block instead of spinning | Uses `testset()` and syscall 11 through `sleep()` |
@@ -3070,51 +3207,217 @@ termination/stopping is reported with the PID and signal name.
 
 # 14. Use in operating-systems and real-time operating-systems lectures
 
-## 14.1 Real-time operating-systems topics
+PicoOS was developed primarily so that students can inspect implementations of
+operating-systems and real-time operating-systems lecture concepts directly in
+the code and while the OS is executing.
 
-The process-state constants, process-list scan, and dispatcher separate the
-state of work from selection and execution. Timer interrupts preempt
-userspace, while `yield()` voluntarily enters the same activation-saving path.
-Wait queues demonstrate event-driven blocking; `TSL` plus `mutex_lock()` and
-`mutex_unlock()` demonstrate how an atomic operation can be combined with
-blocking rather than continual spinning. The shared-memory mutex test then
-connects shared visibility to synchronization.
+## 14.1 Operating-systems topics
 
-The kernel is non-preemptive even though userspace is preemptive. That design
-keeps kernel data-structure mutation serialized and gives students a compact
-example in which preemption policy differs by execution context.
+PicoOS was developed primarily so that students can inspect implementations of
+concepts from the operating-systems lecture. It uses the host filesystem only
+through file descriptors rather than implementing an on-device filesystem.
 
-## 14.2 Operating-systems topics
-
-The project connects lecture concepts to concrete state:
-
-- the loaders demonstrate sections, binary metadata, relocation bases, and
-  initial stacks
-- the process list and PCBs demonstrate parent/child relationships, zombies,
-  exact-child waiting, and cleanup ownership
-- the IVT and handlers distinguish software interrupts, hardware interrupts,
-  and synchronous exceptions
-- activation records, scheduler, and dispatcher separate saving state,
-  choosing work, and restoring state
-- the three heap instances show one allocator managing different ownership
-  domains
-- descriptor tables show per-process handles and inheritance, while the
-  terminal shows a shared kernel object
-- shared memory plus a mutex shows that shared visibility still requires
-  synchronization
+| Operating-systems lecture topic | What students can inspect in PicoOS |
+| --- | --- |
+| Parent/child relationships and process loading | `load()`, `run()`, PCBs, parent PIDs, process images, zombies, `waitpid()`, and cleanup |
+| Signals | Pending signals in the PCB, signal delivery, stopping, continuing, and parent-death signals |
+| Interrupt vector tables and ISRs | The IVT, saved activation records, timer/UART handlers, and `RTI` |
+| Software, hardware, and synchronous interrupts | System calls, timer and UART interrupts, and CPU exceptions with their fixed exception vector |
+| `malloc()` / `free()` | Heap headers, first-fit allocation, block splitting, freeing, and merging adjacent free blocks |
+| Filesystem boundary | Per-process file descriptors, descriptor inheritance, and UART host requests instead of an on-device filesystem |
 
 Generated `.reti`, `.sections`, and debug files allow PicoC source, symbolic
 RETI, binary layout, and live machine state to be compared.
 
-## 14.3 Exercise and teaching material
+### 14.1.1 Understanding PicoOS and the kernel step by step in the RETI-Emulator
 
-The repository includes focused examples for allocation, freeing and block
-coalescing (`test/basic_malloc.picoc`, `basic_free.picoc`, and
-`basic_free_block_merging.picoc`), complete-process first-fit reuse
-(`test/process_memory_first_fit`), and course-named source such as
-`config/sheet7ex1_fib_2.picoc`. The compiler sibling additionally retains
-symbolic pass output and example programs from exercise sheets, so PicoC,
-linked RETI, `.sections`, and live emulator state can be compared.
+Students who want to understand one of the RTOS or OS lecture concepts above
+can follow it directly while PicoOS is executing in the RETI-Emulator. The
+relevant compiler and emulator options are:
+
+```console
+$ picoc_compiler -O1 -i -w -g -v -o program.reti program.picoc
+$ reti_emulator -d -c -D program.debuginfo program.reti
+```
+
+While PicoOS is running, students can use the following controls for the
+teaching uses described here. The RETI-Emulator documentation covers its other
+controls.
+
+| Keys or option | What students can inspect or do |
+| --- | --- |
+| `c`, then `(E)nter again` | Continue execution and stop it at any point to see the RETI instruction of the kernel/PicoOS code currently being executed |
+| `d` (`debug source`) | Show the PicoC source code from which the current RETI instruction resulted |
+| `A` (`Assign value`) | Correct a wrong register or memory cell and continue without starting again |
+| `r` (`restart`) | Quickly restart the emulator |
+| `S` / `R` (`Snapshot` / `Restore`) | Return to exactly the same state to repeat a scheduler decision, system call, or interrupt |
+| `e`, then `T` | Trigger and inspect an interrupt handler without waiting for a timer event or UART input |
+
+`d` uses `<program>.debuginfo`, or the file supplied with `-D`, and the
+matching `.pre` source file. It also shows annotations for global data,
+string literals, and the current stack frame's local variables and arguments.
+For example, SRAM rows in the debug TUI can look like this:
+
+| SRAM address | Value | Annotation in the debug TUI |
+| ---: | ---: | --- |
+| `8012` | `3` | `global current_pid@12` |
+| `8179` | `42` | `var timeslice@0` |
+| `8182` | `9001` | `return addr.` |
+| `8183` | `7` | `arg next_pid@0` |
+
+Their exact form is documented in the
+[RETI-Emulator README](../RETI-Emulator/README.md).
+
+The [PicoC-Compiler](../PicoC-Compiler/README.md) and
+[RETI-Emulator](../RETI-Emulator/README.md) documentation describe their
+command-line options.
+
+This lets students follow the PicoC-to-RETI translation patterns from the
+operating-systems lecture slides while the real kernel executes.
+
+<!-- TODO: Add the details for trying out memory-mapped devices with `(A)ssign value`. -->
+
+### 14.1.2 Understanding the heap, `malloc()`, and `free()` with PicoOS
+
+[`test/exercise_sheet_4_heap/launcher.picoc`](test/exercise_sheet_4_heap/launcher.picoc)
+can be used to understand PicoOS's heap, `malloc()`, and `free()`. It is based
+on an exercise from operating-systems exercise sheet 4 and uses the complete
+PicoOS heap implementation:
+
+```c
+// dependencies: ../../library/stdlib/libstdlib.reti_blocks
+
+#include "../../library/stdlib/stdlib.header"
+
+struct point {
+    int x;
+    int y;
+};
+
+int main(void) {
+    struct point *p1;
+    struct point *p3;
+    int *a;
+    struct point p2;
+
+    a = &(p2.x);
+    p2.x = 7;
+    p2.y = 4;
+
+    p1 = (struct point *)malloc(sizeof(struct point));
+    (*p1).y = *a;
+    p3 = p1;
+    p1 = &p2;
+
+    if ((*p1).y > 5) {
+        *a = 42;
+    } else {
+        *a = 1;
+    }
+
+    free(p3);
+    return 0;
+}
+```
+
+The test does not call `init_process_heap()` itself. Every OS test program is
+linked with the complete
+[`library/start/start.picoc`](library/start/start.picoc) through the compiler's
+`-C` option, so `_start` initializes the process heap before `main()`:
+
+```c
+#include "../stdlib/stdlib.header"
+#include "../unistd/unistd.header"
+
+int main(int argc, char **argv);
+void initialize_environment(char **environment);
+
+void start_process(int argc, char **argv) {
+    init_process_heap();
+    initialize_environment(argv + argc + 1);
+    exit(main(argc, argv));
+}
+
+__attribute__((naked))
+void _start(int argc, char *first_argument) {
+    start_process(argc, (char **)&first_argument);
+}
+```
+
+`_start()` → `start_process()` → `init_process_heap()` →
+`heap_init_region()` → `main()`.
+
+- `malloc()` uses first fit and splits a sufficiently large free block
+- `free()` marks the block free and merges adjacent free blocks
+- The last `malloc()` in the test checks that it reuses the address which was
+  just freed
+
+### 14.1.3 Symbolic assembly for students
+
+The [PicoC-Compiler](../PicoC-Compiler/README.md) supports structured,
+symbolic RETI assembly in `.reti_blocks` files. This example counts down from
+three, stores the final value in the global `result`, and then jumps to address
+zero. Labels can be used as jump targets, so branches do not need manually
+calculated instruction offsets:
+
+```reti
+  .ivt
+  .text
+main:
+  LOADI ACC 3
+loop:
+  SUBI ACC 1
+  JUMP> loop
+  STOREIN DS ACC result
+  JUMP 0
+  .data
+```
+
+A `.reti_blocks` file needs a matching `.st` symbol table with the same
+basename. Link the assembly with `-o`:
+
+```bash
+picoc_compiler -o exercise.reti exercise.reti_blocks
+```
+
+## 14.2 Real-time operating-systems topics
+
+PicoOS also connects with topics from the real-time operating-systems lecture,
+including mutexes, process states, scheduling, dispatching, `waitpid()`,
+wait-queue `sleep()`, and `wakeup()`.
+
+| Real-time operating-systems lecture topic | What students can inspect in PicoOS |
+| --- | --- |
+| Process states | Ready, running, blocked, stopped, zombie, and terminated processes in the PCB list |
+| Scheduling and dispatching | The scheduler chooses a ready process; the dispatcher saves and restores its activation record |
+| `waitpid()`, `sleep()`, and `wakeup()` | A process blocks in a wait queue until a child, mutex, or other event wakes it |
+| Mutexes | `mutex_lock()` blocks a contending process and `mutex_unlock()` wakes a waiting process |
+
+[`test/shared_memory_mutex/worker.picoc`](test/shared_memory_mutex/worker.picoc)
+is a minimal demonstration of `mutex_lock()` and `mutex_unlock()`. Two workers
+map the same `SharedState` and increment its counter. Worker 1 yields while
+holding the mutex, so the other worker must wait before entering the critical
+section:
+
+```c
+int main(int argc, char **argv) {
+    struct SharedState *shared_state;
+
+    shared_state = (struct SharedState *)mmap(atoi(argv[2]));
+    mutex_lock(&(shared_state->mutex));
+    shared_state->workers = shared_state->workers + 1;
+    if (atoi(argv[1]) == 1) {
+        yield();
+    }
+    mutex_unlock(&(shared_state->mutex));
+    return 0;
+}
+```
+
+the mutex, the yields can let multiple workers overwrite the same counter value.
+The launcher prints `workers: 2` after waiting for both workers. Without the
+mutex, the yield can let the second worker overwrite the counter value.
+the mutex, the yields can let multiple workers overwrite the same counter value.
 
 # 15. Test system
 

@@ -1,0 +1,19 @@
+// dependencies: ../../library/stdlib/libstdlib.reti_blocks ../../library/mutex/libmutex.reti_blocks ../../library/schedule/libschedule.reti_blocks ../../library/sys/mman/libmman.reti_blocks
+
+#include "shared.header"
+#include "../../library/schedule/schedule.header"
+#include "../../library/stdlib/stdlib.header"
+#include "../../library/sys/mman/mman.header"
+
+int main(int argc, char **argv) {
+    struct SharedState *shared_state;
+
+    shared_state = (struct SharedState *)mmap(atoi(argv[2]));
+    mutex_lock(&(shared_state->mutex));
+    shared_state->workers = shared_state->workers + 1;
+    if (atoi(argv[1]) == 1) {
+        yield();
+    }
+    mutex_unlock(&(shared_state->mutex));
+    return 0;
+}
