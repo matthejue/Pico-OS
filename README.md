@@ -205,9 +205,10 @@ previous chunk is handled at that syscall's return boundary.
 9. [Terminal, file descriptors, and host filesystem](#9-terminal-file-descriptors-and-host-filesystem)
    - [9.1 Per-process descriptor table](#91-per-process-descriptor-table)
    - [9.2 Global terminal](#92-global-terminal)
-   - [9.3 Descriptor and terminal functions](#93-descriptor-and-terminal-functions)
-   - [9.4 Opening, reading, writing, and seeking](#94-opening-reading-writing-and-seeking)
-   - [9.5 Working directories and host operations](#95-working-directories-and-host-operations)
+   - [9.3 Virtual device paths](#93-virtual-device-paths)
+   - [9.4 Descriptor and terminal functions](#94-descriptor-and-terminal-functions)
+   - [9.5 Opening, reading, writing, and seeking](#95-opening-reading-writing-and-seeking)
+   - [9.6 Working directories and host operations](#96-working-directories-and-host-operations)
 10. [Libraries and the userspace/kernel ABI](#10-libraries-and-the-userspacekernel-abi)
     - [10.1 System-call request structures](#101-system-call-request-structures)
       - [10.1.1 Process, wait, signal, and memory requests](#1011-process-wait-signal-and-memory-requests)
@@ -311,6 +312,29 @@ Useful narrower commands are:
 | `make test-os-fast` / `make test-shell-fast` | Run only OS feature or shell tests with a shared boot |
 | `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
 | `make test-fast DMA=1` | Run the fast workflow with emulator DMA enabled |
+
+### Release archive layout
+
+`make release-archive` first rebuilds the generated [`binary/`](binary/)
+release tree, verifies that it contains only release files, and packages its
+contents as `pico-os-runtime.tar.gz`. The archive is a runnable PicoOS runtime,
+not a copy of the source repository: it contains the files below and no test
+fixtures, PicoC sources, or libraries.
+
+| Archive path | Contents and purpose |
+| --- | --- |
+| [`binary/README.md`](binary/README.md) | Short release-specific startup and host-filesystem instructions. It becomes `README.md` at the archive root. |
+| [`binary/start-picoos.sh`](binary/start-picoos.sh), [`binary/start-picoos.ps1`](binary/start-picoos.ps1) | Linux/macOS/Android and Windows launchers. They find or download the tools, select the boot and kernel metadata, and start the emulator. |
+| [`binary/download-tools.sh`](binary/download-tools.sh), [`binary/download-tools.ps1`](binary/download-tools.ps1) | Download matching released `picoc_compiler` and `reti_emulator` binaries when they are not already available. |
+| [`binary/boot/`](binary/boot/) | `bootloader.reti`, the RETI EPROM image that loads and starts the kernel. |
+| [`binary/kernel/`](binary/kernel/) | `kernel.bin`, the loadable kernel image; `kernel.sections`, its linked memory-layout metadata; and `kernel.debuginfo`, its source/debug metadata. |
+| [`binary/system/`](binary/system/) | Loadable system-program binaries, currently `init.bin`. The test-only fast launcher is deliberately excluded. |
+| [`binary/user/`](binary/user/) | Loadable PicoOS command binaries, including `shell.bin` and the standard user commands built from [`user/`](user/). |
+| [`binary/config/`](binary/config/) | Runtime configuration copied from [`config/`](config/): the initial environment, emulator options, and PicoOS release version. |
+| [`binary/device/`](binary/device/) | `terminal.dev` and `null.dev` marker files. They represent PicoOS virtual device paths; they do not hold device data. |
+
+For the corresponding source-tree directories and local helper scripts, see
+[Repository layout](documentation/repository_layout.md).
 
 # 1. Toolchain work required by PicoOS
 
@@ -2258,13 +2282,20 @@ possible and need not fill the requested count.
 Callers retrieve this pointer once and pass it to terminal helpers. This avoids
 extra `kernel_terminal()` calls when one helper invokes another.
 
-The descriptor layer reaches this object through the virtual path
-`/device/terminal.dev`. Opening that path skips host-file requests, terminal
-reads use the input ring, terminal writes use UART output, and seeking fails.
-`/device/null.dev` is the second virtual device: reads immediately return EOF
-and writes succeed while discarding their bytes. The release tree contains
-visible marker files for both devices under `binary/device`; those files store
-no device data and are not their implementations.
+The descriptor layer reaches this object through the virtual device paths
+described below. They skip host-file requests, unlike ordinary paths.
+
+## 9.3 Virtual device paths
+
+The `/device` directory names kernel-provided devices rather than host files.
+The release tree has matching marker files in [`binary/device/`](binary/device/)
+so the paths are visible to users; those files hold no device data and are not
+the device implementations.
+
+| Device path | Role | Used by |
+| --- | --- | --- |
+| `/device/terminal.dev` | The terminal device. It is the initial path for standard input, output, and error; reads use the global terminal input ring and may block, writes go to UART output, and seeking fails. | [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L204), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L251) |
+| `/device/null.dev` | The null device. Reads return EOF immediately, writes report success after discarding their bytes, and seeking fails. | [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L204), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L251) |
 
 If the input ring is empty during a foreground read, `begin_terminal_read()`
 briefly disables UART delivery to prevent a lost wakeup, stores buffer/count in
@@ -2304,7 +2335,7 @@ sequenceDiagram
     end
 ```
 
-## 9.3 Descriptor and terminal functions
+## 9.4 Descriptor and terminal functions
 
 | Function | Return | Data-structure effect |
 | --- | --- | --- |
@@ -2329,7 +2360,7 @@ sequenceDiagram
 | `complete_pending_terminal_read(struct Process *process, struct Terminal *terminal)` | `void` | Internal: copies available input, writes saved `activation.in2`, clears pending fields, wakes reader |
 | `handle_uart_interrupt(void)` | `void` | Acknowledges byte, signals target or mutates terminal/reader PCB |
 
-## 9.4 Opening, reading, writing, and seeking
+## 9.5 Opening, reading, writing, and seeking
 
 | Flag | Meaning in `OpenRequest.flags` |
 | --- | --- |
@@ -2400,7 +2431,7 @@ sequenceDiagram
     K-->>A: Return count
 ```
 
-## 9.5 Working directories and host operations
+## 9.6 Working directories and host operations
 
 Every PCB owns a kernel-heap absolute working-directory string. PID 1 has no
 parent, so creation sends `pwd` to the emulator and stores the host startup
