@@ -2,6 +2,6 @@
 
 #include "../../../common/stddef.header"
 
-int shm_open(const char *name, size_t size);
+int shm_open(char *name, size_t size);
 void *mmap(int shared_memory_id);
-int shm_unlink(const char *name);
+int shm_unlink(char *name);
