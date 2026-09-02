@@ -2818,7 +2818,7 @@ kernel mechanisms.
 
 | Component | Responsibility |
 | --- | --- |
-| Kernel `main()` | Initialize global structures and devices, load PID 1, construct its first activation, and dispatch |
+| Kernel [`main()`](kernel/kernel.picoc#L31) | Initialize global structures and devices, load PID 1, construct its first activation, and dispatch |
 | Init | Read configuration, establish environment policy, load/run a shell, and restart it after a session |
 | Shell | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
 
@@ -2830,8 +2830,8 @@ sections describe configuration and restart policy.
 
 ### 11.2.1 Init startup code
 
-After the common userspace `libstart` code initializes init's local heap and
-environment and calls `main()`, init executes this complete startup/session
+After the common userspace [`libstart`](library/start/libstart.picoc) code initializes init's local heap and
+environment and calls [`main()`](system/init.picoc#L100), init executes this complete startup/session
 loop:
 
 ```c
@@ -2869,7 +2869,7 @@ int main(void) {
 }
 ```
 
-The helper `read_environment()` remains summarized in section 11.3 because
+The helper [`read_environment()`](system/init.picoc#L19) remains summarized in section 11.3 because
 its parsing loop is not part of the central startup control flow.
 
 ```mermaid
@@ -2905,24 +2905,24 @@ sequenceDiagram
 The kernel creates init's PCB before init exists. Since PID 1 has no parent
 from which to inherit a directory, PCB creation sends `<ESC>pwd<ESC>/` and
 stores a `kmalloc()` copy of the host startup path in
-`Process.working_directory`. Init otherwise uses the same public libraries and
+[`Process.working_directory`](kernel/process/process.header#L39). Init otherwise uses the same public libraries and
 syscalls as every other process.
 
 ## 11.3 Configuration and environment
 
-`read_environment()` allocates a 257-cell buffer, opens
-`./config/environment.txt` with `open(O_RDONLY)`, reads at most 256 cells,
+[`read_environment()`](system/init.picoc#L19) allocates a 257-cell buffer, opens
+[`config/environment.txt`](config/environment.txt) with `open(O_RDONLY)`, reads at most 256 cells,
 closes the descriptor, and parses newline/CRLF-separated `NAME=value` records.
 Each valid record is copied into the process heap by
 `setenv(name, value, true)`. The current configuration establishes
 `PATH=./user`; a build-time setting may additionally create
 `PICOOS_LOADING_BAR=true`.
 
-| Init function | Return | Important library calls and effect |
+| Init function | Return value / status | Library functions |
 | --- | --- | --- |
-| `void init_write_error(char *text)` | `void` | Calls `write(STDERR_FILENO, ...)` without changing persistent init state |
-| `bool read_environment(void)` | Success | Uses `malloc`, `open`, `read`, `close`, `setenv`, and `free`; changes the process-global `environ` array |
-| `int main(void)` | Failure status if setup/launch fails; otherwise loops | Uses `setenv`, `load`, `run`, and exact-child `waitpid` |
+| [`init_write_error()`](system/init.picoc#L10) | No value | [`write()`](library/unistd/io.picoc#L31) sends the diagnostic to standard error without changing persistent init state |
+| [`read_environment()`](system/init.picoc#L19) | `true` when the complete file was installed; `false` after an allocation, file, size, or syntax failure | [`malloc()`](library/stdlib/malloc.picoc#L35), [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`close()`](library/unistd/io.picoc#L41), [`setenv()`](library/stdlib/env.picoc#L126), and [`free()`](library/stdlib/malloc.picoc#L49); changes the process-global `environ` array |
+| [`main()`](system/init.picoc#L100) | Returns status 1 when setup or shell launch fails; otherwise does not return | [`setenv()`](library/stdlib/env.picoc#L126), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), and exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14) |
 
 Missing, unreadable, oversized, or malformed environment input makes init
 report an error and return status 1. `load()` is given the shell's direct path,
@@ -2931,7 +2931,7 @@ and descriptor values into the child.
 
 ## 11.4 Shell restart policy
 
-Init blocks on `waitpid(shell_pid)`, not on an arbitrary child notification.
+Init blocks on [`waitpid()`](library/sys/wait/wait.picoc#L14) for `shell_pid`, not on an arbitrary child notification.
 Entering the shell built-in `exit` therefore ends one shell process; init
 collects it and loads a new shell. `poweroff.bin` invokes the kernel shutdown
 syscall and halts PicoOS, while `reboot.bin` asks the kernel to disable active
@@ -2958,25 +2958,25 @@ that shell image's `.data`, not in a kernel shell object:
 
 | Global | Meaning and storage |
 | --- | --- |
-| `last_command_exit_status` | One integer used for `$?` |
-| `last_background_process_id` | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
-| `initial_shell_environment` | Process-heap deep copy used to reset isolated shell tests |
-| `initial_shell_working_directory[PATH_MAX]` | Embedded shell startup-directory copy used for test reset |
-| `shell_system_working_directory[PATH_MAX]` | Embedded immutable system-directory copy used for relative `PATH` entries |
-| `shell_executable_path[PATH_MAX]` | Embedded scratch buffer for one `PATH` candidate |
-| `shell_pipe_*` buffers | Embedded command and temporary-path storage for one two-command pipeline |
-| `command_history[8][80]` | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
-| `command_history_draft[80]` | Current unfinished line preserved while navigating history |
-| `command_history_start`, `command_history_count` | Ring indices/count |
+| [`last_command_exit_status`](user/shell.picoc#L30) | One integer used for `$?` |
+| [`last_background_process_id`](user/shell.picoc#L31) | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
+| [`initial_shell_environment`](user/shell.picoc#L32) | Process-heap deep copy used to reset isolated shell tests |
+| [`initial_shell_working_directory`](user/shell.picoc#L33) | Embedded shell startup-directory copy used for test reset |
+| [`shell_system_working_directory`](user/shell.picoc#L34) | Embedded immutable system-directory copy used for relative `PATH` entries |
+| [`shell_executable_path`](user/shell.picoc#L35) | Embedded scratch buffer for one `PATH` candidate |
+| [`shell_pipe_*`](user/shell.picoc#L36) buffers | Embedded command and temporary-path storage for one two-command pipeline |
+| [`command_history`](user/shell.picoc#L40) | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
+| [`command_history_draft`](user/shell.picoc#L43) | Current unfinished line preserved while navigating history |
+| [`command_history_start`](user/shell.picoc#L46), [`command_history_count`](user/shell.picoc#L47) | Ring indices/count |
 
 The active command buffer is an 80-cell local array in `main()`'s userspace
 stack. Redirection temporarily reserves descriptors 3–7 for saved stdin,
 fast-test output, saved stdout, saved stderr, and fast-test error output; all
-descriptor state itself remains in the shell PCB's kernel-heap table.
+descriptor state itself remains in the shell PCB's kernel-heap table. [`main()`](user/shell.picoc#L1589) first initializes the globals that represent a session; [`shell_reset()`](user/shell.picoc#L242) resets the test-specific state between cases.
 
 ## 12.2 Startup and main loop
 
-At startup the shell calls `set_foreground_process(0)`, configures
+At startup the shell calls [`set_foreground_process()`](library/unistd/process.picoc#L63), configures
 `prctl(PR_SET_PDEATHSIG, SIGKILL)`, clones its environment, and records both
 its current directory and the immutable system working directory. It then
 repeatedly calls `read_line()`, stores nonempty commands in history, and sends
@@ -2985,16 +2985,16 @@ the shell normally. Therefore, `shell.bin < commands.txt` reads and executes
 the newline-separated commands in `commands.txt` without requiring typed
 terminal input.
 
-| Important function | Return | Main effect and library calls |
+| Shell function | Return value / status | Library functions |
 | --- | --- | --- |
-| `int read_line(char *buffer, int capacity)` | Command length or `-1` at EOF | Repeatedly calls `read(0, ..., 1)`, edits the stack buffer, and updates history-navigation state |
-| `void remember_shell_command(char *command)` | `void` | Mutates the global eight-entry history ring; skips consecutive duplicates |
-| `char *expand_variables(char *arguments, char *result, int capacity)` | Expanded buffer or `NULL` | Uses `getenv()` and shell `$?`/`$!` globals while preserving quotes for argument parsing |
-| `int load_from_path(char *name)` | PID or 0 | Reads `PATH` with `getenv()`, builds candidates, and calls `load()` in order |
-| `bool run_process(int pid, char *arguments, bool background, char *stdin_path, char *stdout_path, bool append_stdout, char *stderr_path, bool append_stderr)` | Whether `run()` succeeded | Uses `open`, `dup2`, `close`, `run`, `set_foreground_process`, and `waitpid`; changes `$?`/`$!` state |
-| `bool continue_background_process(bool foreground)` | Whether a process was continued | Uses `kill(pid, SIGCONT)` and, for `fg`, assigns foreground input before continuing and waiting |
-| `bool eval(char *command)` | Continue-shell flag | Selects a built-in or external execution path |
-| `int main(int argc, char **argv)` | Shell exit status | Initializes signal/reset state and owns the interactive or redirected-input execution path |
+| [`read_line()`](user/shell.picoc#L262) | Command length, or `-1` at EOF | Repeatedly calls [`read()`](library/unistd/io.picoc#L6), edits the stack buffer, and updates history-navigation state |
+| [`remember_shell_command()`](user/shell.picoc#L148) | No value | Mutates the global eight-entry history ring and skips consecutive duplicates |
+| [`expand_variables()`](user/shell.picoc#L431) | Expanded buffer, or `NULL` if it does not fit | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing |
+| [`load_from_path()`](user/shell.picoc#L1160) | Loaded PID, or 0 | Reads `PATH` with [`getenv()`](library/stdlib/env.picoc#L115), builds candidates, and calls [`load()`](library/unistd/process.picoc#L17) in order |
+| [`run_process()`](user/shell.picoc#L997) | `true` when [`run()`](library/unistd/process.picoc#L31) succeeds; otherwise `false` | [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L45), [`close()`](library/unistd/io.picoc#L41), [`set_foreground_process()`](library/unistd/process.picoc#L63), and [`waitpid()`](library/sys/wait/wait.picoc#L14); changes `$?`/`$!` state |
+| [`continue_background_process()`](user/shell.picoc#L1090) | `true` when the tracked process was continued; otherwise `false` | [`kill()`](library/signal/signal.picoc#L14) and, for `fg`, [`set_foreground_process()`](library/unistd/process.picoc#L63) and [`waitpid()`](library/sys/wait/wait.picoc#L14) |
+| [`eval()`](user/shell.picoc#L1352) | `false` only for `exit`; otherwise `true` | Selects a built-in or external execution path |
+| [`main()`](user/shell.picoc#L1589) | Shell exit status | Initializes signal/reset state and owns the interactive or redirected-input execution path |
 
 ## 12.3 Line editing and history
 
@@ -3013,9 +3013,9 @@ them as editing operations:
 | Tab | Append one space if room remains in the 80-cell buffer |
 | Printable byte | Append it if space remains in the 80-cell buffer |
 
-`read(0, ..., 1)` blocks when the global terminal ring is empty. The command
+[`read()`](library/unistd/io.picoc#L6) blocks when the global terminal ring is empty. The command
 buffer and its stack frame remain intact while the PCB waits on
-`terminal.input_waiters`; the UART ISR writes the character and the dispatcher
+[`Terminal.input_waiters`](kernel/filesystem/terminal.header#L14); the UART ISR writes the character and the dispatcher
 later resumes the shell.
 
 ## 12.4 Parsing and command execution
@@ -3031,7 +3031,7 @@ Absolute `PATH` entries are used directly. A relative entry such as the
 configured `./user` is resolved from `shell_system_working_directory`, not
 from the shell instance's inherited or later current directory. Programs
 therefore remain discoverable after `cd` and from nested shells, while
-ordinary relative operands still use the PCB's current `working_directory`
+ordinary relative operands still use the PCB's current [`Process.working_directory`](kernel/process/process.header#L39)
 in kernel path normalization.
 
 ```mermaid
@@ -3199,28 +3199,28 @@ change its parent shell's environment, working directory, or descriptor table.
 
 | Binary | Behavior | Principal library functions called |
 | --- | --- | --- |
-| `shell.bin` | Interactive command interpreter that can read newline-separated commands from redirected stdin | `read`, `write`, `lseek`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `unlink`, `chdir`, `getcwd`, `command_is_help` |
-| `echo.bin` | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
-| `count.bin` | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
-| `cat.bin` | Copies named files or stdin to stdout; terminal stdin supports line editing | `open`, `read`, `write`, `lseek`, `close`, `unsetenv`, `command_write`, `command_is_help` |
-| `touch.bin` | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
-| `cp.bin` | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
-| `mv.bin` | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
-| `sed.bin` | Reads stdin and inserts, changes, or appends text at selected lines | `lseek`, `read`, `write`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
-| `ps.bin` | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
-| `ls.bin` | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
-| `mkdir.bin` | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
-| `pwd.bin` | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
-| `rm.bin` | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
-| `rmdir.bin` | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
-| `kill.bin` | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
-| `poweroff.bin` | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
-| `reboot.bin` | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
-| `uname.bin` | Prints the PicoOS version stored in `config/os-release.txt` | `open`, `read`, `write`, `close`, `command_write`, `command_is_help` |
+| [`shell.bin`](user/shell.picoc#L1589) | Interactive command interpreter that can read newline-separated commands from redirected stdin | `read`, `write`, `lseek`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `unlink`, `chdir`, `getcwd`, `command_is_help` |
+| [`echo.bin`](user/echo.picoc#L20) | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
+| [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
+| [`cat.bin`](user/cat.picoc#L103) | Copies named files or stdin to stdout; terminal stdin supports line editing | `open`, `read`, `write`, `lseek`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| [`touch.bin`](user/touch.picoc#L11) | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
+| [`cp.bin`](user/cp.picoc#L16) | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| [`mv.bin`](user/mv.picoc#L11) | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
+| [`sed.bin`](user/sed.picoc#L66) | Reads stdin and inserts, changes, or appends text at selected lines | `lseek`, `read`, `write`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
+| [`ps.bin`](user/ps.picoc#L11) | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
+| [`ls.bin`](user/ls.picoc#L13) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
+| [`mkdir.bin`](user/mkdir.picoc#L12) | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
+| [`pwd.bin`](user/pwd.picoc#L11) | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
+| [`rm.bin`](user/rm.picoc#L11) | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
+| [`rmdir.bin`](user/rmdir.picoc#L11) | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
+| [`kill.bin`](user/kill.picoc#L69) | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
+| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
+| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
+| [`uname.bin`](user/uname.picoc#L15) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | `open`, `read`, `write`, `close`, `command_write`, `command_is_help` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
-application helpers. `command_write(fd, text)` counts the string and calls
-`write()`. `command_is_help(argument)` recognizes `-h` and `--help`. These
+application helpers. [`command_write()`](common/user_command.picoc#L4) counts the string and calls
+[`write()`](library/unistd/io.picoc#L31). [`command_is_help()`](common/user_command.picoc#L13) recognizes `-h` and `--help`. These
 helpers allocate no state and use no request structure beyond the `IoRequest`
 created inside `write()`.
 
@@ -3466,12 +3466,12 @@ wait-queue `sleep()`, and `wakeup()`.
 | --- | --- |
 | Process states | Ready, running, blocked, stopped, zombie, and terminated processes in the PCB list |
 | Scheduling and dispatching | The scheduler chooses a ready process; the dispatcher saves and restores its activation record |
-| `waitpid()`, `sleep()`, and `wakeup()` | A process blocks in a wait queue until a child, mutex, or other event wakes it |
-| Mutexes | `mutex_lock()` blocks a contending process and `mutex_unlock()` wakes a waiting process |
+| [`waitpid()`](library/sys/wait/wait.picoc#L14), [`sleep()`](library/unistd/blocking.picoc#L9), and [`wakeup()`](library/unistd/blocking.picoc#L19) | A process blocks in a wait queue until a child, mutex, or other event wakes it |
+| Mutexes | [`mutex_lock()`](library/mutex/mutex.picoc#L18) blocks a contending process and [`mutex_unlock()`](library/mutex/mutex.picoc#L25) wakes a waiting process |
 
 [`test/shared_memory_mutex/worker.picoc`](test/shared_memory_mutex/worker.picoc)
-is a minimal demonstration of `mutex_lock()` and `mutex_unlock()`. Two workers
-map the same `SharedState` and increment its counter. Worker 1 yields while
+is a minimal demonstration of [`mutex_lock()`](library/mutex/mutex.picoc#L18) and [`mutex_unlock()`](library/mutex/mutex.picoc#L25). Two workers
+map the same [`SharedState`](test/shared_memory_mutex/shared.header#L5) and increment its [`workers`](test/shared_memory_mutex/shared.header#L6) counter. Worker 1 yields while
 holding the mutex, so the other worker must wait before entering the critical
 section:
 
@@ -3490,10 +3490,8 @@ int main(int argc, char **argv) {
 }
 ```
 
-the mutex, the yields can let multiple workers overwrite the same counter value.
 The launcher prints `workers: 2` after waiting for both workers. Without the
-mutex, the yield can let the second worker overwrite the counter value.
-the mutex, the yields can let multiple workers overwrite the same counter value.
+[`mutex`](test/shared_memory_mutex/shared.header#L7), the yield can let the second worker overwrite the counter value.
 
 # 15. Test system
 
@@ -3586,8 +3584,8 @@ flowchart LR
     end
 ```
 
-The line-editing scenario must still traverse raw UART and `read_line()`; it
-cannot be replaced by a direct `eval()` call. Library tests instead read their
+The line-editing scenario must still traverse raw UART and [`read_line()`](user/shell.picoc#L262); it
+cannot be replaced by a direct [`eval()`](user/shell.picoc#L1352) call. Library tests instead read their
 input/expected-output metadata, compile one program, apply a timeout, and
 compare normalized output. `TEST_BUILD_MODE=direct` is available when a test
 should bypass staged compilation artifacts and rebuild merged RETI directly
