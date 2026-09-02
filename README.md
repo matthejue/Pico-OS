@@ -787,6 +787,11 @@ bounded host services.
 
 # 2. Bootloading and kernel startup
 
+The toolchain produces the images and metadata used at runtime; this chapter
+follows those artifacts from reset through the first userspace dispatch. It
+also establishes the initialization order that later chapters rely on for
+kernel storage, interrupts, and processes.
+
 ## 2.1 Loading the kernel
 
 The EPROM bootloader in
@@ -889,6 +894,11 @@ dispatcher waits in kernel context until an interrupt makes one runnable.
 
 # 3. Kernel storage and ownership
 
+After startup has created the kernel's global state, the important question is
+which memory region owns each object and when that object can disappear. These
+rules connect process, descriptor, wait-queue, allocator, and shared-memory
+behavior throughout the later chapters.
+
 ## 3.1 Storage and lifetime
 
 The most important implementation distinction is not the C type but where an
@@ -941,6 +951,10 @@ flowchart TD
 ```
 
 # 4. Interrupts, system calls, and exceptions
+
+The ownership rules above describe the state that the kernel changes. This
+chapter shows the controlled entries that make those changes: software system
+calls, hardware interrupts, and synchronous CPU exceptions.
 
 ## 4.1 Interrupt vector table
 
@@ -1202,6 +1216,11 @@ entries temporarily disable the old boundary while changing stacks.
 | `receive_byte_over_uart(void)` | Received byte | Polls UART receive state and returns one byte; no kernel structure changes |
 
 # 5. Processes and the process table
+
+Interrupt and syscall handling ultimately operates on a current process and
+its saved machine state. This chapter defines the PCB, process image, and
+state transitions that the scheduler, dispatcher, and resource subsystems
+share.
 
 ## 5.1 Global process table
 
@@ -1489,6 +1508,10 @@ Process-loading functions are kept separately:
 | [`mark_process_ready_with_arguments(struct RunProcessRequest *request)`](kernel/process/process_arguments.picoc) | Success | Installs inherited descriptor copy, stores startup data, changes `NEW` to `READY` |
 
 # 6. Blocking, waiting, synchronization, and signals
+
+Process states become most visible when work cannot continue immediately.
+The mechanisms here use PCB fields and intrusive queues to preserve a blocked
+operation, while signals add explicit stop, continue, and termination paths.
 
 ## 6.1 Wait queues
 
@@ -1906,6 +1929,11 @@ sequenceDiagram
 ```
 
 # 8. Memory management and shared memory
+
+The process and synchronization mechanisms need both private allocations and
+data that multiple processes can reach. This chapter first explains the common
+heap implementation, then shows how PicoOS applies it to kernel, process, and
+shared-memory storage.
 
 ## 8.1 Three uses of one heap implementation
 
@@ -2741,6 +2769,10 @@ cost of trusting pointers in the single physical address space.
 
 # 11. Init process
 
+Once the kernel has loaded and dispatched its first process, userspace takes
+over session policy. Init connects the kernel's process-loading interface to
+the configured environment and the shell users interact with.
+
 ## 11.1 Purpose and separation of responsibilities
 
 [`system/init.picoc`](system/init.picoc) is the first userspace image loaded by
@@ -2756,6 +2788,10 @@ kernel mechanisms.
 | Shell | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
 
 ## 11.2 Startup sequence
+
+Init's responsibilities become a small startup path followed by a repeated
+shell session. The entry code below shows that handoff before the following
+sections describe configuration and restart policy.
 
 ### 11.2.1 Init startup code
 
@@ -2874,6 +2910,11 @@ system policy. They are not exposed through the normal `PATH=./user` command
 directory.
 
 # 12. Shell
+
+The shell is init's interactive child and turns terminal input into userspace
+process operations. It builds on the descriptor, signal, process, and library
+interfaces described above, then hands command execution to the applications
+in the next chapter.
 
 ## 12.1 Shell-owned data
 
@@ -3420,6 +3461,11 @@ mutex, the yield can let the second worker overwrite the counter value.
 the mutex, the yields can let multiple workers overwrite the same counter value.
 
 # 15. Test system
+
+The preceding chapters describe the runtime path from compiler output to user
+commands. The test system exercises that path at library, kernel, and
+interactive-shell levels, including the boundaries between the sibling
+projects.
 
 ## 15.1 Test categories and repository integration
 

@@ -1,0 +1,33 @@
+// dependencies: ../../library/stdlib/libstdlib.reti_blocks
+
+#include "../../library/stdlib/stdlib.header"
+
+struct point {
+    int x;
+    int y;
+};
+
+int main(void) {
+    struct point *p1;
+    struct point *p3;
+    int *a;
+    struct point p2;
+
+    a = &(p2.x);
+    p2.x = 7;
+    p2.y = 4;
+
+    p1 = (struct point *)malloc(sizeof(struct point));
+    (*p1).y = *a;
+    p3 = p1;
+    p1 = &p2;
+
+    if ((*p1).y > 5) {
+        *a = 42;
+    } else {
+        *a = 1;
+    }
+
+    free(p3);
+    return 0;
+}
