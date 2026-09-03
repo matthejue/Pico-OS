@@ -115,7 +115,7 @@ endef
 .PHONY: test test-fast test-lib test-all test_not_passed
 .PHONY: test-sys test-sys-fast
 .PHONY: test-os test-os-fast test-shell test-shell-fast
-.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user device shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
+.PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user device devices shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
 FORCE:
@@ -407,6 +407,8 @@ DEVICE_FILES := \
 	$(BINARY_DIR)/device/terminal.dev
 
 device: $(DEVICE_FILES)
+
+devices: device
 
 RUNTIME_FILES := \
 	$(BINARY_DIR)/config/environment.txt \
@@ -728,7 +730,7 @@ binary/kernel/kernel.bin: kernel/kernel.reti | binary/kernel
 run-firmware: kernel/kernel.reti binary/system/init.bin binary/user/shell.bin binary/user/poweroff.bin binary/config/environment.txt binary/device/terminal.dev
 	cd binary && ../run_reti_emulator_isolated.sh ../kernel/kernel.reti -d -c -O -r $(SRAM_SIZE) $(DMA_EMU_OPTION)
 
-bootload: firmware binary/device/terminal.dev
+bootload: firmware devices
 	cd binary && ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti -d -c -O -r $(SRAM_SIZE) -S kernel/kernel.sections -D kernel/kernel.debuginfo $(DMA_EMU_OPTION)
 
 bootload-dma:
