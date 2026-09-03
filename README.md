@@ -27,7 +27,7 @@ PicoOS is developed together with two sibling projects:
   models EPROM, SRAM, UART, interrupts, the timer, and CPU exceptions, and
   supplies the host-side file protocol
 - PicoOS provides the EPROM bootloader, kernel, libraries, init process, shell,
-  user programs, and integration tests
+  user programs, and tests
 
 ```mermaid
 flowchart LR
@@ -144,23 +144,109 @@ bounding its latency. Userspace wrappers transfer at most 1 KiB per syscall.
 They can request the next chunk directly because a timer observed during the
 previous chunk is handled at that syscall's return boundary.
 
+## Build and run
+
+The build expects `picoc_compiler`, `reti_emulator`, and `make` on `PATH`. The
+release-style boot path is:
+
+```console
+$ make bootload
+```
+
+This builds the bootloader, kernel, system programs, libraries, user programs,
+and device markers, then starts the RETI debugger with the EPROM bootloader.
+The command corresponds to:
+
+```console
+$ ./run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti \
+    -d -c -O -r 262144 \
+    -S kernel/kernel.sections -D kernel/kernel.debuginfo
+```
+
+`-e` selects the EPROM image, `-r` selects the 2^18-cell SRAM, `-d -c` opens
+the commented debug TUI, and `-S`/`-D` connect the compiler-generated kernel
+layout/debug information to the emulator. `-O` supplies the initial modeled OS
+context from which the first dispatcher `RTI` can leave. `-n 5` tells the
+emulator that five IVT entries will later be loaded into SRAM by the
+bootloader; they are not present in the initially parsed EPROM image.
+`make bootload-dma` adds DMA loading, while `make bootload-notui` omits `-d`
+and runs PicoOS directly in the terminal. The latter also accepts `DMA=1`.
+
+Capital `V` opens the raw UART terminal and `Ctrl+]` returns to the debug view.
+This single command therefore connects the generated bootloader, kernel
+`.sections` and `.debuginfo`, emulated memory/peripherals, UART host service,
+and the PicoOS userspace loaded after boot.
+
+Useful narrower commands are:
+
+| Command | Purpose |
+| --- | --- |
+| `make firmware` | Build the complete firmware/release tree |
+| `make release-tree` / `make release-archive` | Build the release tree or create the release archive |
+| `make clean-firmware` / `make rebuild-firmware` | Remove generated firmware files or rebuild them |
+| `make devices` | Add the terminal and null device markers under `binary/device` |
+| `make eprom` / `make kernel` | Build only the EPROM bootloader or kernel image |
+| `make system` / `make user` | Build the system or user programs |
+| `make run-firmware` | Run the kernel image directly in the debug TUI |
+| `make run-kernel` | Rebuild and run the kernel image directly |
+| `make bootload-debug` | Rebuild bootloader and kernel with source/debug metadata, then boot through the debug TUI |
+| `make bootload-dma` | Boot through the debug TUI with DMA enabled |
+| `make bootload-notui` | Boot directly in the terminal without the debug TUI |
+| `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
+| `make run-os OS_RUN_PATH=test/hello_world` | Run one configured OS scenario |
+| `make test` / `make test-fast` | Run all library, OS, and shell tests normally or with shared OS sessions |
+| `make test-lib` | Run the standalone library tests |
+| `make test-sys` / `make test-sys-fast` | Run OS feature and shell tests normally or with shared OS sessions |
+| `make test-os` | Run the OS feature tests |
+| `make test-shell` | Run the shell tests |
+| `make test-os-fast` / `make test-shell-fast` | Run only OS feature or shell tests with a shared boot |
+| `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
+| `make test-fast DMA=1` | Run the fast workflow with emulator DMA enabled |
+
+### Release archive layout
+
+`make release-archive` first rebuilds the generated [`binary/`](binary/)
+release tree, verifies that it contains only release files, and packages its
+contents as `pico-os-runtime.tar.gz`. The archive contains a complete PicoOS
+runtime and the scripts needed to start it in RETI-Emulator; it is not a copy
+of the source repository and contains no test fixtures, PicoC sources, or
+libraries.
+
+| Archive path | Contents and purpose |
+| --- | --- |
+| [`binary/README.md`](binary/README.md) | Short release-specific startup and host-filesystem instructions. It becomes `README.md` at the archive root. |
+| [`binary/start-picoos.sh`](binary/start-picoos.sh), [`binary/start-picoos.ps1`](binary/start-picoos.ps1) | Linux/macOS/Android and Windows launchers. They find or download the tools, select the boot and kernel metadata, and start the emulator. |
+| [`binary/download-tools.sh`](binary/download-tools.sh), [`binary/download-tools.ps1`](binary/download-tools.ps1) | Download matching released `picoc_compiler` and `reti_emulator` binaries when they are not already available. |
+| [`binary/boot/`](binary/boot/) | `bootloader.reti`, the RETI EPROM image that loads and starts the kernel. |
+| [`binary/kernel/`](binary/kernel/) | `kernel.bin`, the loadable kernel image; `kernel.sections`, its linked memory-layout metadata; and `kernel.debuginfo`, its source/debug metadata. |
+| [`binary/system/`](binary/system/) | Loadable system-program binaries, currently `init.bin`. The test-only fast launcher is deliberately excluded. |
+| [`binary/user/`](binary/user/) | Loadable PicoOS command binaries, including `shell.bin` and the standard user commands built from [`user/`](user/). |
+| [`binary/config/`](binary/config/) | Runtime configuration copied from [`config/`](config/): the initial environment, emulator options, and PicoOS release version. |
+| [`binary/device/`](binary/device/) | `terminal.dev` and `null.dev` marker files. They represent PicoOS virtual device paths; they do not hold device data. |
+
+For the corresponding source-tree directories and local helper scripts, see
+[Repository layout](documentation/repository_layout.md).
+
 ## Contents
 
-1. [Toolchain work required by PicoOS](#1-toolchain-work-required-by-picoos)
+1. [Toolchain extensions for PicoOS](#1-toolchain-extensions-for-picoos)
    - [1.1 PicoC-Compiler extensions](#11-picoc-compiler-extensions)
-     - [1.1.1 RETI pseudoinstructions](#111-reti-pseudoinstructions)
-       - [1.1.1.1 Interrupt-safe stack operations](#1111-interrupt-safe-stack-operations)
-       - [1.1.1.2 Loading 32-bit values](#1112-loading-32-bit-values)
-       - [1.1.1.3 Long jumps](#1113-long-jumps)
-       - [1.1.1.4 Expansion during linking](#1114-expansion-during-linking)
-     - [1.1.2 Linked `.sections` metadata](#112-linked-sections-metadata)
-     - [1.1.3 Generated `memory_constants.header` files](#113-generated-memory_constantsheader-files)
-     - [1.1.4 Custom userspace startup](#114-custom-userspace-startup)
-     - [1.1.5 Interrupt sections and naked functions](#115-interrupt-sections-and-naked-functions)
+     - [1.1.1 Compilation features](#111-compilation-features)
+     - [1.1.2 Extending the compilation pipeline](#112-extending-the-compilation-pipeline)
+     - [1.1.3 Separate compilation and linking](#113-separate-compilation-and-linking)
+     - [1.1.4 RETI pseudoinstructions](#114-reti-pseudoinstructions)
+       - [1.1.4.1 Interrupt-safe stack operations](#1141-interrupt-safe-stack-operations)
+       - [1.1.4.2 Loading 32-bit values](#1142-loading-32-bit-values)
+       - [1.1.4.3 Long jumps](#1143-long-jumps)
+       - [1.1.4.4 Expansion during linking](#1144-expansion-during-linking)
+     - [1.1.5 Linked `.sections` metadata](#115-linked-sections-metadata)
+     - [1.1.6 Generated `memory_constants.header` files](#116-generated-memory_constantsheader-files)
+     - [1.1.7 Custom userspace startup](#117-custom-userspace-startup)
+     - [1.1.8 Interrupt sections and naked functions](#118-interrupt-sections-and-naked-functions)
    - [1.2 RETI-Emulator extensions](#12-reti-emulator-extensions)
      - [1.2.1 Machine model and peripherals](#121-machine-model-and-peripherals)
      - [1.2.2 Debugger and terminal views](#122-debugger-and-terminal-views)
-   - [1.3 UART host protocol](#13-uart-host-protocol)
+     - [1.2.3 UART host protocol](#123-uart-host-protocol)
 2. [Bootloading and kernel startup](#2-bootloading-and-kernel-startup)
    - [2.1 Loading the kernel](#21-loading-the-kernel)
    - [2.2 Initializing the kernel](#22-initializing-the-kernel)
@@ -254,94 +340,12 @@ previous chunk is handled at that syscall's return boundary.
 17. [Limitations](#17-limitations)
 - [Appendix: Inspecting `.bin` files with `hexyl`](#appendix-inspecting-bin-files-with-hexyl)
 
-## Build and run
+# 1. Toolchain extensions for PicoOS
 
-The build expects `picoc_compiler`, `reti_emulator`, and `make` on `PATH`. The
-release-style boot path is:
-
-```console
-$ make bootload
-```
-
-This builds the bootloader, kernel, system programs, libraries, and user
-programs, then starts the RETI debugger with the EPROM bootloader. The command
-corresponds to:
-
-```console
-$ ./run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti \
-    -d -c -O -r 262144 \
-    -S kernel/kernel.sections -D kernel/kernel.debuginfo
-```
-
-`-e` selects the EPROM image, `-r` selects the 2^18-cell SRAM, `-d -c` opens
-the commented debug TUI, and `-S`/`-D` connect the compiler-generated kernel
-layout/debug information to the emulator. `-O` supplies the initial modeled OS
-context from which the first dispatcher `RTI` can leave. `-n 5` tells the
-emulator that five IVT entries will later be loaded into SRAM by the
-bootloader; they are not present in the initially parsed EPROM image.
-`make bootload-dma` adds DMA loading, while `make bootload-notui` omits `-d`
-and runs PicoOS directly in the terminal. The latter also accepts `DMA=1`.
-
-Capital `V` opens the raw UART terminal and `Ctrl+]` returns to the debug view.
-This single command therefore connects the generated bootloader, kernel
-`.sections` and `.debuginfo`, emulated memory/peripherals, UART host service,
-and the PicoOS userspace loaded after boot.
-
-Useful narrower commands are:
-
-| Command | Purpose |
-| --- | --- |
-| `make firmware` | Build the complete firmware/release tree |
-| `make release-tree` / `make release-archive` | Build the release tree or create the release archive |
-| `make clean-firmware` / `make rebuild-firmware` | Remove generated firmware files or rebuild them |
-| `make device` | Add the terminal and null device markers under `binary/device` |
-| `make eprom` / `make kernel` | Build only the EPROM bootloader or kernel image |
-| `make system` / `make user` | Build the system or user programs |
-| `make run-firmware` | Run the kernel image directly in the debug TUI |
-| `make run-kernel` | Rebuild and run the kernel image directly |
-| `make bootload-debug` | Rebuild bootloader and kernel with source/debug metadata, then boot through the debug TUI |
-| `make bootload-dma` | Boot through the debug TUI with DMA enabled |
-| `make bootload-notui` | Boot directly in the terminal without the debug TUI |
-| `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
-| `make run-os OS_RUN_PATH=test/hello_world` | Run one configured OS scenario |
-| `make test` / `make test-fast` | Run all library, OS, and shell tests normally or with shared OS sessions |
-| `make test-lib` | Run the standalone library tests |
-| `make test-sys` / `make test-sys-fast` | Run OS feature and shell tests normally or with shared OS sessions |
-| `make test-os` | Run the OS feature tests |
-| `make test-shell` | Run the shell tests |
-| `make test-os-fast` / `make test-shell-fast` | Run only OS feature or shell tests with a shared boot |
-| `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
-| `make test-fast DMA=1` | Run the fast workflow with emulator DMA enabled |
-
-### Release archive layout
-
-`make release-archive` first rebuilds the generated [`binary/`](binary/)
-release tree, verifies that it contains only release files, and packages its
-contents as `pico-os-runtime.tar.gz`. The archive is a runnable PicoOS runtime,
-not a copy of the source repository: it contains the files below and no test
-fixtures, PicoC sources, or libraries.
-
-| Archive path | Contents and purpose |
-| --- | --- |
-| [`binary/README.md`](binary/README.md) | Short release-specific startup and host-filesystem instructions. It becomes `README.md` at the archive root. |
-| [`binary/start-picoos.sh`](binary/start-picoos.sh), [`binary/start-picoos.ps1`](binary/start-picoos.ps1) | Linux/macOS/Android and Windows launchers. They find or download the tools, select the boot and kernel metadata, and start the emulator. |
-| [`binary/download-tools.sh`](binary/download-tools.sh), [`binary/download-tools.ps1`](binary/download-tools.ps1) | Download matching released `picoc_compiler` and `reti_emulator` binaries when they are not already available. |
-| [`binary/boot/`](binary/boot/) | `bootloader.reti`, the RETI EPROM image that loads and starts the kernel. |
-| [`binary/kernel/`](binary/kernel/) | `kernel.bin`, the loadable kernel image; `kernel.sections`, its linked memory-layout metadata; and `kernel.debuginfo`, its source/debug metadata. |
-| [`binary/system/`](binary/system/) | Loadable system-program binaries, currently `init.bin`. The test-only fast launcher is deliberately excluded. |
-| [`binary/user/`](binary/user/) | Loadable PicoOS command binaries, including `shell.bin` and the standard user commands built from [`user/`](user/). |
-| [`binary/config/`](binary/config/) | Runtime configuration copied from [`config/`](config/): the initial environment, emulator options, and PicoOS release version. |
-| [`binary/device/`](binary/device/) | `terminal.dev` and `null.dev` marker files. They represent PicoOS virtual device paths; they do not hold device data. |
-
-For the corresponding source-tree directories and local helper scripts, see
-[Repository layout](documentation/repository_layout.md).
-
-# 1. Toolchain work required by PicoOS
-
-PicoOS could not be implemented with the original teaching compiler and
-emulator unchanged. A substantial part of the project was extending both tools
-so that the OS could be written in PicoC while retaining inspectable RETI
-output.
+The original teaching compiler and emulator were not sufficient to build,
+compile, and emulate PicoOS. A substantial part of the project was extending
+both existing tools so the OS could be written in PicoC, linked as complete
+programs, booted, and inspected as RETI output.
 
 The detailed change histories are kept with the sibling projects in the
 [PicoC-Compiler feature history](https://github.com/matthejue/PicoC-Compiler/blob/linker_update/documentation/new_features_for_pico_os.md)
@@ -351,8 +355,79 @@ few extensions that appear directly in kernel source.
 
 ## 1.1 PicoC-Compiler extensions
 
-The compiler work spans the complete translation pipeline rather than one
-isolated backend change:
+PicoOS needs whole programs built from many files, headers that affect their
+inputs, a broader PicoC language, and control over final memory layout. The
+following compiler features were added to provide those capabilities.
+
+### 1.1.1 Compilation features
+
+| Feature | Contribution used by PicoOS |
+| --- | --- |
+| Installation | The compiler installation creates the environment and installs the `picoc_compiler` command |
+| Preprocessing | `#include`, include paths, `#pragma once`, object-like macros, line splicing, dependency output, and optional syntax checking |
+| Multiple translation units | Per-file compilation, symbol merging, cross-file calls/globals, and final program-wide linking |
+| Reusable build artifacts | `.reti_blocks` and `.st` retain lowered code, symbols, data, startup, and debug metadata for later links |
+| Automatic artifact reuse | Source/header hashes and compiler options decide whether an unchanged unit can be reused; Make dependency files expose the same inputs |
+| Broader PicoC syntax | `typedef`, casts, mixed declarations/statements, postfix increment, array-size inference, and compile-time integer simplification |
+| Pointer support | Pointer returns, `void *`, typed pointer arithmetic, dereference/member conditions, and compatible forward/repeated struct declarations |
+| Function pointers | Declarations, arrays, assignments, indirect calls, and statically emitted function addresses |
+| Variadic functions | Variadic declarations and the documented System-V-style stack-frame locations used by `printf()` and `scanf()` |
+| String and character data | Escapes, inferred local arrays, global strings, deduplicated string literals, and linker-safe literal names |
+| Inline RETI assembly | `asm("...")`, linked labels inside assembly, and safe pseudoinstructions such as `LOADI32`, `JUMP32`, `PUSH`, and `POP` |
+| Low-level functions | `__attribute__((naked))` suppresses compiler prologue/epilogue code for startup and interrupt handlers |
+| Custom sections | `__attribute__((section("ivt")))` places the vector table before `.text` and `.data` |
+| Interrupt-vector entries | `IVTE` resolves handler pointers into tagged SRAM addresses |
+| Runtime startup | Generated default `_start` or a replaceable custom `-C` startup such as PicoOS `libstart` |
+| Global initialization | `-O1` emits known scalar, string, struct, array, and function-pointer initializers directly into `.data` |
+| Shared epilogues | All ordinary returns converge on one generated restore/return block |
+| Section layout | Separate `.ivt`, `.text`, and `.data` regions and the paired final `.sections` file |
+| Linked labels | Human-readable labels remain until final patching, making generated RETI inspectable |
+| Kernel headers | `-k sram` and `-k eprom` generate `memory_constants.header` for code that has no PCB/runtime loader context |
+| Debug information | `.debuginfo` describes source ranges, globals, frames, arguments, calls, returns, and local variables for the emulator TUI |
+| Inspectable intermediates | Preprocessed source and named RETI-block stages make the result of individual compiler passes visible |
+| Source trap and RETI `NOP` | `debug;` lowers to the emulator trap and inline `NOP` remains a real instruction |
+
+### 1.1.2 Extending the compilation pipeline
+
+These features required more than individual backend changes. The original
+compiler accepted one PicoC file and transformed it directly into one RETI
+program. It used Lark to parse the source and a transformer to create the
+PicoC AST; its [passes](https://github.com/matthejue/PicoC-Compiler/blob/master/src/passes.py)
+and [AST transformer](https://github.com/matthejue/PicoC-Compiler/blob/master/src/ast_transformers.py)
+show the following lowering sequence. The boxed final group runs once for that
+one input file and produces that file's RETI program.
+
+```mermaid
+flowchart LR
+    source["One PicoC source file"]
+
+    subgraph frontend["Lexing and parsing"]
+        lexer["Lark lexer and parser"]
+        tree["Parse tree"]
+        ast["TransformerPicoC AST"]
+    end
+
+    subgraph compilation["Single-file compilation passes"]
+        shrink["picoc_shrink"]
+        blocks["picoc_blocks"]
+        anf["picoc_anf"]
+        reti_blocks["reti_blocks"]
+        patch["reti_patch"]
+        reti["reti"]
+    end
+
+    output["One RETI program"]
+
+    source --> lexer --> tree --> ast
+    ast --> shrink --> blocks --> anf --> reti_blocks --> patch --> reti --> output
+```
+
+For the added preprocessing, separate compilation, typing, and linking
+features, this pipeline was extended before and after the per-file passes.
+Preprocessing resolves includes, macros, and line splicing before parsing. The
+new symbol and typing passes check names, declarations, and types before
+lowering. A final program-wide linker merges compiled units, their symbols, and
+startup code before resolving final addresses.
 
 ```mermaid
 flowchart LR
@@ -391,39 +466,44 @@ flowchart LR
     reti_blocks --> merge --> patch --> reti --> output
 ```
 
-| Feature | Contribution used by PicoOS |
-| --- | --- |
-| Installation | The compiler installation creates the environment and installs the `picoc_compiler` command |
-| Preprocessing | `#include`, include paths, `#pragma once`, object-like macros, line splicing, dependency output, and optional syntax checking |
-| Multiple translation units | Per-file compilation, symbol merging, cross-file calls/globals, and final program-wide linking |
-| Reusable build artifacts | `.reti_blocks` and `.st` retain lowered code, symbols, data, startup, and debug metadata for later links |
-| Automatic artifact reuse | Source/header hashes and compiler options decide whether an unchanged unit can be reused; Make dependency files expose the same inputs |
-| Broader PicoC syntax | `typedef`, casts, mixed declarations/statements, postfix increment, array-size inference, and compile-time integer simplification |
-| Pointer support | Pointer returns, `void *`, typed pointer arithmetic, dereference/member conditions, and compatible forward/repeated struct declarations |
-| Function pointers | Declarations, arrays, assignments, indirect calls, and statically emitted function addresses |
-| Variadic functions | Variadic declarations and the documented System-V-style stack-frame locations used by `printf()` and `scanf()` |
-| String and character data | Escapes, inferred local arrays, global strings, deduplicated string literals, and linker-safe literal names |
-| Inline RETI assembly | `asm("...")`, linked labels inside assembly, and safe pseudoinstructions such as `LOADI32`, `JUMP32`, `PUSH`, and `POP` |
-| Low-level functions | `__attribute__((naked))` suppresses compiler prologue/epilogue code for startup and interrupt handlers |
-| Custom sections | `__attribute__((section("ivt")))` places the vector table before `.text` and `.data` |
-| Interrupt-vector entries | `IVTE` resolves handler pointers into tagged SRAM addresses |
-| Runtime startup | Generated default `_start` or a replaceable custom `-C` startup such as PicoOS `libstart` |
-| Global initialization | `-O1` emits known scalar, string, struct, array, and function-pointer initializers directly into `.data` |
-| Shared epilogues | All ordinary returns converge on one generated restore/return block |
-| Section layout | Separate `.ivt`, `.text`, and `.data` regions and the paired final `.sections` file |
-| Linked labels | Human-readable labels remain until final patching, making generated RETI inspectable |
-| Kernel headers | `-k sram` and `-k eprom` generate `memory_constants.header` for code that has no PCB/runtime loader context |
-| Debug information | `.debuginfo` describes source ranges, globals, frames, arguments, calls, returns, and local variables for the emulator TUI |
-| Inspectable intermediates | Preprocessed source and named RETI-block stages make the result of individual compiler passes visible |
-| Source trap and RETI `NOP` | `debug;` lowers to the emulator trap and inline `NOP` remains a real instruction |
+### 1.1.3 Separate compilation and linking
 
-These additions affected preprocessing, the syntax tree and PicoC AST, the
-per-file semantic/lowering passes, and the final linker. In particular, the OS
-needed both high-level facilities such as structures and separate compilation
-and low-level control over startup, sections, interrupt frames, and absolute
-machine addresses.
+PicoC separate compilation follows the familiar C object-file workflow. GCC
+and Clang use `-c` to turn one `.c` file, with its included `.h` headers, into
+an `.o` object file. Similarly, `picoc_compiler -c` turns one `.picoc` file,
+with its included `.header` files, into paired `.reti_blocks` and `.st` files.
+The former contains the lowered RETI blocks; the latter is a JSON symbol table
+used when later linking units. A conventional `.o` file stores its symbol table
+inside the object file instead.
 
-### 1.1.1 RETI pseudoinstructions
+```console
+$ gcc -c -O2 example/c/main.c example/c/math.c
+$ ls example/c
+main.c  main.h  main.o  math.c  math.h  math.o
+
+$ picoc_compiler -c -O1 example/picoc/main.picoc example/picoc/math.picoc
+$ ls example/picoc
+main.header  main.picoc  main.reti_blocks  main.st  math.header  math.picoc  math.reti_blocks  math.st
+
+$ gcc -o binary/c-example example/c/main.o example/c/math.o
+$ picoc_compiler -O1 -o binary/picoc-example.reti \
+    example/picoc/main.reti_blocks example/picoc/math.reti_blocks
+$ ls binary
+c-example  picoc-example.reti
+```
+
+The `-o` option selects the path and name of the linked executable: the native
+`binary/c-example` in the C command and the final linked RETI assembly
+`binary/picoc-example.reti` in the PicoC command. PicoC's paired artifacts
+keep the lowered code and linker metadata independently inspectable and
+reusable.
+
+> The PicoC/RETI toolchain keeps all metadata that accompanies compiled or
+> assembled RETI programs in separate JSON-like files rather than embedding it
+> in encoded RETI words. For example, `.st` holds linker symbols, `.sections`
+> holds the linked layout, and `.debuginfo` holds source/debug data.
+
+### 1.1.4 RETI pseudoinstructions
 
 The RETI hardware has no native stack instructions, its immediate fields are
 only 22 bits wide, and an ordinary `JUMP` contains only a relative 22-bit
@@ -445,7 +525,7 @@ instructions during the final linking passes.
 operands and targets are accepted directly; symbols and symbolic offsets are
 resolved only after all compilation units and sections have been combined.
 
-#### 1.1.1.1 Interrupt-safe stack operations
+#### 1.1.4.1 Interrupt-safe stack operations
 
 The RETI stack grows toward lower addresses. `PUSH` moves `SP` before writing
 the new value, while `POP` reads the value before moving `SP` back:
@@ -474,7 +554,7 @@ asm("POP IN1");
 asm("POP ACC");
 ```
 
-#### 1.1.1.2 Loading 32-bit values
+#### 1.1.4.2 Loading 32-bit values
 
 `LOADI32 reg operand` provides a full 32-bit value even though the concrete
 `LOADI` instruction has only a signed 22-bit immediate. After resolving a
@@ -502,7 +582,7 @@ The same pseudoinstruction loads absolute segment and stack values generated
 in `memory_constants.header`, and the compiler itself uses it when constructing
 function pointers and return addresses.
 
-#### 1.1.1.3 Long jumps
+#### 1.1.4.3 Long jumps
 
 `JUMP32` avoids the signed 22-bit relative-offset limit of the hardware
 `JUMP`. For a symbolic target, the linker builds the target's `CS`-relative
@@ -528,7 +608,7 @@ shared-epilogue jumps. It emits symbolic `JUMP32` nodes for ordinary PicoC
 control flow as well as accepting statements such as
 `asm("JUMP32 signal_epilogue");` in naked low-level code.
 
-#### 1.1.1.4 Expansion during linking
+#### 1.1.4.4 Expansion during linking
 
 Expansion is split across the two final RETI-side passes so instruction and
 label positions remain correct:
@@ -543,12 +623,13 @@ Because inline assembly is parsed into the same AST as compiler-generated
 RETI, these rules and symbolic resolution apply identically to both. No
 pseudoinstruction reaches the emulator or assembled binary.
 
-### 1.1.2 Linked `.sections` metadata
+### 1.1.5 Linked `.sections` metadata
 
-Every final link writes `program.reti` and `program.sections` together. The
-section file is not executable data; it is JSON-like layout metadata produced
-after the linker has fixed the locations of `.ivt`, `.text`, and `.data`. A
-typical userspace file has this form:
+Each completed link step emits `program.reti` together with
+`program.sections`. The JSON-like `.sections` file records the linked relative
+locations of `.ivt`, `.text`, and `.data`, allowing RETI-Emulator to create the
+load header and allowing PicoOS to place an image and initialize its segments,
+heap, and stack correctly. A typical userspace file has this form:
 
 ```json
 {
@@ -574,7 +655,10 @@ invocation instead creates reusable `.reti_blocks` and `.st` files because no
 complete program layout exists yet. Given `program.reti`, the emulator looks
 for `program.sections` automatically. `-S` is needed only for a differently
 named layout—for example when the EPROM bootloader is running while the TUI
-must display the kernel that will later occupy SRAM.
+must display the kernel that will later occupy SRAM. When RETI-Emulator runs
+`-a program.reti`, it reads this metadata while assembling the RETI program and
+prepends the resulting five layout words to the encoded RETI words in
+`program.bin`.
 
 The linked section metadata is the contract between compiler, emulator,
 bootloader, and process loader. When the emulator assembles a program to
@@ -588,11 +672,13 @@ bootloader, and process loader. When the emulator assembles a program to
 | 3 | `heap_size` | Configured heap size, or `-1` for the PicoOS default |
 | 4 | `stack_start` | Highest stack cell, or `-1` for the PicoOS default |
 
-The UART `load` response supplies the total word count separately to the
-bootloader. The userspace process loader obtains the same count from
-`file-size`. Both loaders consume the five header words and copy only the
-encoded RETI words after the header to SRAM. The allocated process image
-therefore contains only the linked program and its heap/stack room.
+The [UART host protocol](#123-uart-host-protocol) sends the total transfer word
+count before the image words themselves. Its `load` response supplies that
+count to the bootloader; the userspace process loader obtains the same count
+from `file-size` before requesting the file data. Both loaders consume the five
+header words and copy only the encoded RETI words after the header to SRAM. The
+allocated process image therefore contains only the linked program and its
+heap/stack room.
 
 ```mermaid
 flowchart LR
@@ -607,7 +693,7 @@ flowchart LR
     L --> SRAM["encoded words copied to SRAM"]
 ```
 
-### 1.1.3 Generated `memory_constants.header` files
+### 1.1.6 Generated `memory_constants.header` files
 
 The kernel and EPROM bootloader need their own absolute addresses before an
 ordinary runtime object can tell them where they are. The compiler option
@@ -637,7 +723,7 @@ the `.sections` file retains program-relative values for loading and debug
 views. The bootloader reads the kernel's five-word binary header to load that
 image, but uses its own EPROM header before any kernel state exists.
 
-### 1.1.4 Custom userspace startup
+### 1.1.7 Custom userspace startup
 
 PicoOS links [`library/start/libstart.picoc`](library/start/libstart.picoc) as
 the custom startup unit. Its naked `_start` must see the initial stack exactly
@@ -647,7 +733,7 @@ initializes the process-local heap, clones the `envp` entries placed after
 The bootloader and kernel also use custom naked startup functions, but those
 install machine registers rather than enter an application `main()`.
 
-### 1.1.5 Interrupt sections and naked functions
+### 1.1.8 Interrupt sections and naked functions
 
 `__attribute__((section("ivt")))` tells the linker to place the declared
 function-pointer array in `.ivt` before ordinary `.text` and `.data`; the
@@ -763,7 +849,7 @@ Escape. Raw view `V` forwards control and escape bytes—including `Ctrl+C`,
 appropriate view for the PicoOS shell because these bytes drive terminal
 signals and command-history editing.
 
-## 1.3 UART host protocol
+### 1.2.3 UART host protocol
 
 UART transports bytes only. PicoOS and the emulator place a small request
 protocol on top of it. Requests start with escape byte 27 and end with
@@ -962,6 +1048,12 @@ Kernel-heap metadata and process/shared data regions use different allocators.
 kernel object is allocated with userspace `malloc()`.
 
 ## 3.2 Ownership connections
+
+The diagram below traces the ownership chains behind the storage categories in
+the preceding table. Kernel globals anchor the process list; each PCB owns its
+process image and kernel-side state, while a shared-memory attachment refers to
+a registry entry that owns the shared data region. Embedded activation records
+and wait queues are released with their PCB rather than separately.
 
 ```mermaid
 flowchart TD
@@ -3197,26 +3289,26 @@ change its parent shell's environment, working directory, or descriptor table.
 
 ## 13.1 Applications and their library use
 
-| Binary | Behavior | Principal library functions called |
+| Binary and source | Behavior | Principal library functions called |
 | --- | --- | --- |
-| [`shell.bin`](user/shell.picoc#L1589) | Interactive command interpreter that can read newline-separated commands from redirected stdin | `read`, `write`, `lseek`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `unlink`, `chdir`, `getcwd`, `command_is_help` |
-| [`echo.bin`](user/echo.picoc#L20) | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
-| [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
-| [`cat.bin`](user/cat.picoc#L103) | Copies named files or stdin to stdout; terminal stdin supports line editing | `open`, `read`, `write`, `lseek`, `close`, `unsetenv`, `command_write`, `command_is_help` |
-| [`touch.bin`](user/touch.picoc#L11) | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
-| [`cp.bin`](user/cp.picoc#L16) | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
-| [`mv.bin`](user/mv.picoc#L11) | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
-| [`sed.bin`](user/sed.picoc#L66) | Reads stdin and inserts, changes, or appends text at selected lines | `lseek`, `read`, `write`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
-| [`ps.bin`](user/ps.picoc#L11) | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
-| [`ls.bin`](user/ls.picoc#L13) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
-| [`mkdir.bin`](user/mkdir.picoc#L12) | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
-| [`pwd.bin`](user/pwd.picoc#L11) | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
-| [`rm.bin`](user/rm.picoc#L11) | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
-| [`rmdir.bin`](user/rmdir.picoc#L11) | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
-| [`kill.bin`](user/kill.picoc#L69) | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
-| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
-| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
-| [`uname.bin`](user/uname.picoc#L15) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | `open`, `read`, `write`, `close`, `command_write`, `command_is_help` |
+| `shell.bin` ([`shell.picoc`](user/shell.picoc#L1589)) | Interactive command interpreter that can read newline-separated commands from redirected stdin | `read`, `write`, `lseek`, process/wait/signal/prctl APIs, environment/string helpers, `open`, `dup2`, `close`, `unlink`, `chdir`, `getcwd`, `command_is_help` |
+| `echo.bin` ([`echo.picoc`](user/echo.picoc#L20)) | Prints `argv[1..]` separated by spaces, converts `\n` inside an argument, and adds a newline | `printf()` |
+| `count.bin` ([`count.picoc`](user/count.picoc#L20)) | Counts forever with an optional busy-loop delay and yields after each displayed value | `printf`, `atoi`, `yield`, `command_is_help` |
+| `cat.bin` ([`cat.picoc`](user/cat.picoc#L103)) | Copies named files or stdin to stdout; terminal stdin supports line editing | `open`, `read`, `write`, `lseek`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| `touch.bin` ([`touch.picoc`](user/touch.picoc#L11)) | Creates each named file or updates its timestamps while preserving contents | `touch`, `command_write`, `command_is_help` |
+| `cp.bin` ([`cp.picoc`](user/cp.picoc#L16)) | Copies one file to another in 64-cell chunks | `open`, `read`, `write`, `close`, `unsetenv`, `command_write`, `command_is_help` |
+| `mv.bin` ([`mv.picoc`](user/mv.picoc#L11)) | Moves or renames one file or directory | `move`, `command_write`, `command_is_help` |
+| `sed.bin` ([`sed.picoc`](user/sed.picoc#L66)) | Reads stdin and inserts, changes, or appends text at selected lines | `lseek`, `read`, `write`, `malloc`, `free`, `unsetenv`, `command_write`, `command_is_help` |
+| `ps.bin` ([`ps.picoc`](user/ps.picoc#L11)) | Prints every process PID and canonical system-relative binary path | `list_processes`, `command_write`, `command_is_help` |
+| `ls.bin` ([`ls.picoc`](user/ls.picoc#L13)) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | `opendir`, `readdir`, `closedir`, `command_write`, `command_is_help` |
+| `mkdir.bin` ([`mkdir.picoc`](user/mkdir.picoc#L12)) | Creates every supplied directory and reports individual failures | `mkdir`, `command_write`, `command_is_help` |
+| `pwd.bin` ([`pwd.picoc`](user/pwd.picoc#L11)) | Prints the working directory copied from its PCB | `getcwd`, `command_write`, `command_is_help` |
+| `rm.bin` ([`rm.picoc`](user/rm.picoc#L11)) | Removes every supplied file and continues after errors | `unlink`, `command_write`, `command_is_help` |
+| `rmdir.bin` ([`rmdir.picoc`](user/rmdir.picoc#L11)) | Removes every supplied empty directory and continues after errors | `rmdir`, `command_write`, `command_is_help` |
+| `kill.bin` ([`kill.picoc`](user/kill.picoc#L69)) | Sends `SIGKILL` by default, a named/numbered signal, or signal 0 as a PID probe | `kill`, `atoi`, `yield`, `command_write`, `command_is_help` |
+| `poweroff.bin` ([`poweroff.picoc`](user/poweroff.picoc#L12)) | Halts PicoOS | `invoke_syscall(SYSCALL_SHUTDOWN, 0)`, `command_write`, `command_is_help` |
+| `reboot.bin` ([`reboot.picoc`](user/reboot.picoc#L12)) | Requests a kernel-controlled reboot | `invoke_syscall(SYSCALL_REBOOT, 0)`, `command_write`, `command_is_help` |
+| `uname.bin` ([`uname.picoc`](user/uname.picoc#L15)) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | `open`, `read`, `write`, `close`, `command_write`, `command_is_help` |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
 application helpers. [`command_write()`](common/user_command.picoc#L4) counts the string and calls
@@ -3503,7 +3595,10 @@ projects.
 ## 15.1 Test categories and repository integration
 
 The test system covers standalone libraries, full OS feature scenarios, and
-interactive shell behavior. Full OS tests compile and assemble programs, boot
+interactive shell behavior. Library tests are integration tests because they
+exercise library code together with the syscalls and kernel services it uses.
+OS feature and shell tests are system tests: they validate behavior through
+complete PicoOS sessions. Full OS tests compile and assemble programs, boot
 through EPROM, inject UART input, normalize terminal output, and compare
 fixtures. Fast mode reuses one boot while resetting process, descriptor,
 environment, and PID state between cases.
