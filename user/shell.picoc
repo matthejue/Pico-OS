@@ -31,7 +31,6 @@ int last_command_exit_status = 0;
 int last_background_process_id = 0;
 char **initial_shell_environment = NULL;
 char initial_shell_working_directory[PATH_MAX];
-char shell_system_working_directory[PATH_MAX];
 char shell_executable_path[PATH_MAX];
 char shell_pipe_left_command[SHELL_PIPE_COMMAND_CAPACITY];
 char shell_pipe_right_command[SHELL_PIPE_COMMAND_CAPACITY];
@@ -1139,21 +1138,10 @@ bool build_path_executable_path(
 ) {
     int length = strlen(directory) + strlen(name) + 2;
 
-    if (directory[0] != '/') {
-        length = length + strlen(shell_system_working_directory) + 1;
-    }
     if (length > PATH_MAX) {
         return false;
     }
-    if (directory[0] == '/') {
-        build_executable_path(directory, name, result);
-        return true;
-    }
-    strcpy(result, shell_system_working_directory);
-    strcat(result, "/");
-    strcat(result, directory);
-    strcat(result, "/");
-    strcat(result, name);
+    build_executable_path(directory, name, result);
     return true;
 }
 
@@ -1613,13 +1601,6 @@ int main(int argc, char **argv) {
     }
     if (getcwd(initial_shell_working_directory, PATH_MAX) == NULL) {
         shell_write_error_string("error: could not save working directory\n");
-        return 1;
-    }
-    if (get_system_working_directory(
-            shell_system_working_directory,
-            PATH_MAX
-        ) == NULL) {
-        shell_write_error_string("error: could not find system directory\n");
         return 1;
     }
     while (true) {

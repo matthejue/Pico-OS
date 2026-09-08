@@ -1,0 +1,10 @@
+process with pid 3 created
+filesystem sandbox passed
+process with pid 4 created
+0
+process with pid 5 created
+path-from-user
+process with pid 6 created
+process with pid 7 created
+/user
+process with pid 8 created
