@@ -17,22 +17,16 @@ struct Process *process_list_head = NULL;
 struct Process *process_list_tail = NULL;
 struct Process *active_process = NULL;
 int next_process_id = 1;
-char *initial_working_directory = NULL;
 
 void initialize_process_table(void) {
     process_list_head = NULL;
     process_list_tail = NULL;
     active_process = NULL;
     next_process_id = 1;
-    initial_working_directory = NULL;
 }
 
 struct Process *first_process(void) {
     return process_list_head;
-}
-
-char *system_working_directory(void) {
-    return initial_working_directory;
 }
 
 void list_processes(void) {
@@ -141,19 +135,7 @@ struct Process *create_process(
             parent->working_directory
         );
     } else {
-        process->working_directory = NULL;
-        initialize_working_directory(process);
-    }
-    if (process->working_directory == NULL) {
-        destroy_file_descriptor_table(process->file_descriptors);
-        kfree(process->binary_path);
-        kfree(process);
-        return NULL;
-    }
-    if (initial_working_directory == NULL) {
-        initial_working_directory = copy_process_path(
-            process->working_directory
-        );
+        process->working_directory = copy_process_path("/");
     }
     process->exit_status = 0;
     process->stop_signal = 0;

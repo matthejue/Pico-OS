@@ -22,7 +22,7 @@ struct ProcessLoad {
     int loaded_word_count;
     int loading_bar_update;
     bool uses_dma;
-    char *host_path;
+    char *path;
 };
 
 int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
@@ -69,7 +69,7 @@ void drain_process_bytes(int byte_count) {
 }
 
 void free_process_load(struct ProcessLoad *load) {
-    kfree(load->host_path);
+    kfree(load->path);
     kfree(load);
 }
 
@@ -96,15 +96,9 @@ int finish_process_load(struct Process *owner) {
         load->data_start,
         load->heap_start,
         load->heap_size,
-        system_relative_path(load->host_path)
+        system_relative_path(load->path)
     );
     int pid;
-
-    if (process == NULL) {
-        cancel_process_load(owner);
-        uart_print_string("error: could not create process\n");
-        return 0;
-    }
 
     pid = process->pid;
     owner->pending_load = NULL;
@@ -118,7 +112,6 @@ int begin_process_load(
     int *caller_context
 ) {
     char absolute_path[512];
-    char *host_path = path;
     int file_byte_count;
     int header_byte_count;
     int code_start;
@@ -136,15 +129,14 @@ int begin_process_load(
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return 0;
     }
-    host_path = absolute_path;
 
-    uart_send_host_request("file-size ", host_path);
+    uart_send_host_request("file-size ", absolute_path);
     file_byte_count = receive_word();
     if (file_byte_count < 20 || file_byte_count % 4 != 0) {
         return 0;
     }
 
-    uart_send_file_range_command(host_path, 0, 20);
+    uart_send_file_range_command(absolute_path, 0, 20);
     header_byte_count = receive_word();
     if (header_byte_count != 20) {
         if (header_byte_count > 0) {
@@ -188,13 +180,13 @@ int begin_process_load(
     load->payload_word_count = file_byte_count / 4 - 5;
     load->loaded_word_count = 0;
     load->uses_dma = false;
-    load->host_path = copy_process_path(host_path);
+    load->path = copy_process_path(absolute_path);
     owner->pending_load = load;
 
     uart_print_loading_bar_label(
         show_loading_bar,
         "load ",
-        system_relative_path(host_path)
+        system_relative_path(absolute_path)
     );
     load->loading_bar_update = uart_start_loading_bar(
         show_loading_bar,
@@ -206,7 +198,7 @@ int begin_process_load(
 
     if (dma_is_active()) {
         uart_send_file_range_command(
-            load->host_path,
+            load->path,
             20,
             load->payload_word_count * 4
         );
@@ -265,7 +257,7 @@ int continue_process_load(struct Process *owner) {
     }
     requested_bytes = requested_words * 4;
     uart_send_file_range_command(
-        load->host_path,
+        load->path,
         (load->loaded_word_count + 5) * 4,
         requested_bytes
     );
@@ -312,7 +304,6 @@ int load_process_chunk(
 
 int load_process(char *path, bool show_loading_bar) {
     char absolute_path[512];
-    char *host_path = path;
     int word_count;
     int code_start;
     int data_start;
@@ -325,13 +316,10 @@ int load_process(char *path, bool show_loading_bar) {
     int base_address;
     struct Process *process;
 
-    if (current_process() != NULL) {
-        if (!build_process_path(path, absolute_path, PATH_MAX)) {
-            return 0;
-        }
-        host_path = absolute_path;
+    if (!build_process_path(path, absolute_path, PATH_MAX)) {
+        return 0;
     }
-    uart_send_host_request("load ", host_path);
+    uart_send_host_request("load ", absolute_path);
 
     word_count = receive_word();
     if (word_count == -1) {
@@ -355,7 +343,7 @@ int load_process(char *path, bool show_loading_bar) {
     uart_print_loading_bar_label(
         show_loading_bar,
         "load ",
-        system_relative_path(host_path)
+        system_relative_path(absolute_path)
     );
     effective_stack_start = loaded_process_stack_start(
         heap_start,
@@ -388,14 +376,8 @@ int load_process(char *path, bool show_loading_bar) {
         data_start,
         heap_start,
         heap_size,
-        system_relative_path(host_path)
+        system_relative_path(absolute_path)
     );
-
-    if (process == NULL) {
-        pfree(base_address);
-        uart_print_string("error: could not create process\n");
-        return 0;
-    }
 
     return process->pid;
 }

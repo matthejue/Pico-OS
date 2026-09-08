@@ -20,16 +20,17 @@ To reach the terminal through the Debug TUI, use `(c)ontinue` by pressing `c`
 to run the bootloader, kernel, and init process startup. Then select `(V)iew
 raw terminal`. Press `Ctrl+]` to return to the Debug TUI.
 
-PicoOS exposes the host filesystem through RETI-Emulator UART services,
-including per-process working directories, directory listing, creation, and
-removal. The emulator uses `getcwd` once to provide its startup directory and
-checks later `chdir()` targets without changing its own working directory.
-Linux and macOS use `getcwd`, `stat`, `mkdir`, `opendir`, `unlink`, and `rmdir`
-directly. The Windows emulator build uses the corresponding
-underscore-prefixed functions where necessary; directory listing requires the
-`dirent` compatibility supplied by the supported MSYS2 build environment.
-Native Windows emulator builds without that compatibility are not supported
-for these host-filesystem services.
+The extracted release directory is PicoOS `/`: `/kernel`, `/boot`, `/system`,
+`/user`, `/config`, and `/device` refer to directories inside this runtime.
+PicoOS can create, read, write, move, and remove files there. Host `/tmp` is
+not mounted, and directory listings contain no artificial `tmp` entry. If you
+create a `tmp` directory inside this runtime, PicoOS can access it at `/tmp`
+as an ordinary directory.
+
+`..` cannot move above PicoOS `/`. The emulator rejects symlinks, Windows
+junctions, and file access through hard links or special host files. Use the
+updated RETI-Emulator with these binaries. Older emulator builds do not
+provide this filesystem boundary.
 
 `device/terminal.dev` is a dummy release marker for PicoOS's kernel terminal.
 Programs access the terminal through the virtual path `/device/terminal.dev`; the

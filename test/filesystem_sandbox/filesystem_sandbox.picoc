@@ -1,0 +1,54 @@
+// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/stat/libstat.reti_blocks ../../library/string/libstring.reti_blocks
+
+#include "../../library/fcntl/fcntl.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/stat/stat.header"
+#include "../../library/string/string.header"
+
+int main(void) {
+    char directory[512];
+    char contents[4];
+    int descriptor;
+
+    if (getcwd(directory, 512) == NULL || strcmp(directory, "/") != 0 ||
+        chdir("/../../") != 0 || getcwd(directory, 512) == NULL ||
+        strcmp(directory, "/") != 0) {
+        return 1;
+    }
+    if (open("/etc/passwd", O_RDONLY) != -1 || chdir("/etc") != -1 ||
+        rmdir("/") != -1) {
+        return 2;
+    }
+    if (mkdir("/test/filesystem_sandbox/work") != 0 ||
+        chdir("/test//filesystem_sandbox/./work") != 0 ||
+        getcwd(directory, 512) == NULL ||
+        strcmp(directory, "/test/filesystem_sandbox/work") != 0) {
+        return 3;
+    }
+    descriptor = creat("data");
+    if (descriptor < 0 || write(descriptor, "root", 4) != 4) {
+        return 4;
+    }
+    close(descriptor);
+    if (move("data", "renamed") != 0 || touch("renamed") != 0) {
+        return 5;
+    }
+    descriptor = open("../work/renamed", O_RDONLY);
+    if (descriptor < 0 || read(descriptor, contents, 4) != 4 ||
+        contents[0] != 'r' || contents[3] != 't') {
+        return 6;
+    }
+    close(descriptor);
+    if (unlink("renamed") != 0 || chdir("..") != 0 || rmdir("work") != 0 ||
+        chdir("/") != 0 || getcwd(directory, 512) == NULL ||
+        strcmp(directory, "/") != 0) {
+        return 7;
+    }
+    descriptor = open("/device/null.dev", O_WRONLY);
+    if (descriptor < 0 || write(descriptor, "null", 4) != 4) {
+        return 8;
+    }
+    close(descriptor);
+    write(STDOUT_FILENO, "filesystem sandbox passed\n", 26);
+    return 0;
+}

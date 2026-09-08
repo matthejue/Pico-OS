@@ -1,0 +1,9 @@
+./test/filesystem_sandbox/filesystem_sandbox.bin
+echo.bin $?
+cd /user
+echo.bin path-from-user
+shell.bin
+pwd.bin
+exit
+cd /
+poweroff.bin

@@ -310,7 +310,7 @@ PicoOS> echo.bin found through PATH
 found through PATH
 ```
 
-Init currently supplies `PATH=./user`. The shell uses an 80-cell command
+Init currently supplies `PATH=/user`. The shell uses an 80-cell command
 buffer. Double quotes are removed during expansion but do not preserve spaces
 as one argument; unmatched quotes produce an error. The current prompt is
 `PicoOS> `.
@@ -373,26 +373,27 @@ continues it, and Ctrl+C terminates it.
 PicoOS> pwd.bin
 PicoOS> ls.bin
 PicoOS> ls.bin -a
-PicoOS> cd /tmp
+PicoOS> cd /user
 PicoOS> ls.bin > files.txt
 PicoOS> mkdir.bin new-directory
 PicoOS> rm.bin files.txt
 PicoOS> rmdir.bin new-directory
 ```
 
-Every PCB owns an inherited absolute working-directory string. The kernel gives
-PID 1 the emulator startup directory while creating it and keeps an immutable
-copy as the system working directory. Relative `PATH` entries are looked up
-from this system directory, so commands such as `echo.bin` remain available
-after `cd /tmp` and from a nested shell. The kernel prefixes the calling
-process's current directory to other relative load and file paths. Loader
-labels and `ps.bin` paths are canonicalized relative to the system directory.
+Every PCB owns an inherited absolute PicoOS working-directory string. PID 1
+starts at `/`, which is the emulator's startup directory. Host `/tmp` is not
+mounted or artificially listed; `/tmp` refers only to a real runtime directory
+if one has been created. The default `PATH=/user` keeps commands available
+after changing directories and from nested shells. Other relative paths use
+the calling process's current directory. Loader labels and process listings
+omit the leading `/`. The emulator rejects paths that follow symlinks or
+junctions, and rejects file access through hard links or special host files.
 
 `ls.bin`, `mkdir.bin`, `pwd.bin`, `rm.bin`, and `rmdir.bin` call PicoOS library
 functions. `ls.bin` uses the `opendir()`, `readdir()`, and
 `closedir()` functions from `library/dirent`; it hides names beginning with `.`
 unless `-a` is given and prints only `d name` or `- name`. The syscalls use bounded `is-directory`,
-`ls`, `mkdir`, `pwd`, `unlink`, and `rmdir` UART frames. For `chdir()`, the
+`ls`, `mkdir`, `unlink`, and `rmdir` UART frames. For `chdir()`, the
 kernel combines the argument with the calling process's PCB directory and
 removes `.` and `..` components. It sends the resulting absolute path through
 `is-directory`; the emulator only checks whether that directory exists and
@@ -400,8 +401,8 @@ returns success or failure. After success, PicoOS stores the already-built path
 in the calling process's PCB. The emulator keeps its own working directory
 unchanged.
 
-For example, a PCB directory of `/opt/picoos/binary/user` and the argument
-`.././kernel` produce `/opt/picoos/binary/kernel`. PicoOS validates that path
+For example, a PCB directory of `/user` and the argument
+`.././kernel` produce `/kernel`. PicoOS validates that path
 and then stores it in the caller's PCB. `cd` is implemented as a shell built-in
 so this caller is the shell itself. Starting an ordinary child for `cd` would
 only change the child's PCB and would have no lasting effect on the shell.
