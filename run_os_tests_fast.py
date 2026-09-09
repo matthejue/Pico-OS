@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from run_os_tests import (
+    BINARY_TEST_ROOT,
     append_summary,
     build_test_programs,
     copy_staged_test_file,
@@ -98,19 +99,24 @@ def run_fast_session(
     uart_shell_test_dirs,
     extra_emu_args,
 ):
-    with tempfile.TemporaryDirectory(prefix="pico-os-fast-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="pico-os-fast-", dir=BINARY_TEST_ROOT
+    ) as directory:
         session_dir = Path(directory)
+        guest_session_dir = Path("/") / session_dir.resolve().relative_to(
+            Path("binary").resolve()
+        )
         input_lines = []
 
         if eval_shell_test_dirs:
             shell_manifest = session_dir / "s.txt"
             write_manifest(shell_manifest, eval_shell_test_dirs)
-            input_lines.append(f"run-shell-tests {shell_manifest}")
+            input_lines.append(f"run-shell-tests {guest_session_dir}/s.txt")
         if os_feature_test_dirs:
             os_feature_manifest = session_dir / "o.txt"
             write_manifest(os_feature_manifest, os_feature_test_dirs)
             input_lines.append(
-                f"{OS_FEATURE_TEST_LAUNCHER} {os_feature_manifest}"
+                f"{OS_FEATURE_TEST_LAUNCHER} {guest_session_dir}/o.txt"
             )
         for test_dir in uart_shell_test_dirs:
             input_lines.extend(

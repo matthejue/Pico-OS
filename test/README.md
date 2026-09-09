@@ -309,14 +309,13 @@ session allows 60 seconds per OS feature or shell test.
 
 The [filesystem sandbox test](filesystem_sandbox/) checks the PicoOS root,
 file operations, device paths, and command lookup after changing directories
-and starting a nested shell. Host `/tmp` is not mounted. The existing
+and starting a nested shell. Host `/tmp` is not mounted. The
 [file-descriptor test](file_descriptors/file_descriptors.picoc) and
-[stdio-file test](stdio_files/stdio_files.picoc) still use `/tmp` guest paths;
-they require a real runtime `tmp` directory or different test paths.
+[stdio-file test](stdio_files/stdio_files.picoc) each write `data.txt` inside
+their own staged directory under `binary/test/`, using `/test/…` guest paths.
 
-The [fast test runner](../run_os_tests_fast.py) also creates shell and OS-feature
-manifests in the host temporary directory, normally `/tmp`, and passes their
-absolute paths to PicoOS. Those manifests need to be placed inside the runtime
-and addressed through PicoOS paths before shared fast sessions can use them.
+The [fast test runner](../run_os_tests_fast.py) creates shell and OS-feature
+manifests in a temporary directory under `binary/test/` and passes their
+`/test/…` guest paths to PicoOS. It removes that directory after the session.
 Host-side temporary files used only by the test runners or emulator peripheral
 storage remain separate from guest filesystem requests.
