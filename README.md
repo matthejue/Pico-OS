@@ -2137,7 +2137,8 @@ instead, because continuing it does not satisfy that blocking operation.
 
 Termination of the currently [`RUNNING`](kernel/process/process.header#L14) PCB stores its signal in
 [`pending_termination_signal`](kernel/process/process.header#L63), because freeing the active interrupt-return
-context would be unsafe. Before a PCB is restored,
+context would be unsafe, and [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) ensures that the
+next safe syscall-return boundary enters the dispatcher. Before a PCB is restored,
 [`prepare_process_termination()`](kernel/signal.picoc#L124) clears that value and terminates the process
 through [`kill_process()`](kernel/signal.picoc#L70), causing the dispatcher to select another PCB. The
 more general
@@ -2167,6 +2168,7 @@ sequenceDiagram
     S->>K: kill(pid, signal) or kernel-generated signal
     alt target is currently RUNNING and must terminate
         K->>P: Store pending termination signal
+        K->>D: Request rescheduling at the safe return boundary
         D->>K: prepare_process_termination(P)
         K->>P: Terminate safely before restore
     else other target or stop/continue action
@@ -2200,7 +2202,7 @@ terminal ownership, and deferred destruction described above.
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
 | [`send_signal_by_pid()`](kernel/signal.picoc#L106) | `0` on delivery/probe; `-1` for an invalid signal, missing PID, or zombie | Finds target; signal 0 only checks existence | [`signal_number_is_valid()`](kernel/signal.picoc#L13), [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`send_signal_to_process()`](kernel/signal.picoc#L74) |
-| [`send_signal_to_process()`](kernel/signal.picoc#L74) | Returns no value | Continues, stops, terminates, or defers running-target termination | [`signal_number_is_valid()`](kernel/signal.picoc#L13), [`continue_process()`](kernel/signal.picoc#L49), [`stop_process()`](kernel/signal.picoc#L36), [`current_process()`](kernel/process/process.picoc#L61), [`kill_process()`](kernel/signal.picoc#L70) |
+| [`send_signal_to_process()`](kernel/signal.picoc#L74) | Returns no value | Continues, stops, terminates, or defers running-target termination and requests a safe reschedule | [`signal_number_is_valid()`](kernel/signal.picoc#L13), [`continue_process()`](kernel/signal.picoc#L49), [`stop_process()`](kernel/signal.picoc#L36), [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10), [`kill_process()`](kernel/signal.picoc#L70) |
 | [`kill_process()`](kernel/signal.picoc#L70) | Returns no value | Calls the general termination path with that termination signal's status | [`terminate_process()`](kernel/process/process.picoc#L303) |
 | [`stop_process()`](kernel/signal.picoc#L36) | Returns no value | Saves signal/prior state, changes to [`STOPPED`](kernel/process/process.header#L16), reports to waiters | [`suspend_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L76), [`notify_process_stopped()`](kernel/signal.picoc#L22) |
 | [`continue_process()`](kernel/signal.picoc#L49) | Returns no value | Resumes ordinary stops; a pending terminal read additionally requires input ownership | [`process_has_terminal_input()`](kernel/signal.picoc#L166), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
