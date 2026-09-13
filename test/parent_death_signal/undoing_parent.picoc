@@ -1,8 +1,8 @@
-// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/prctl/libprctl.reti_blocks ../../library/schedule/libschedule.reti_blocks
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/prctl/libprctl.reti_blocks ../../library/sys/wait/libwait.reti_blocks
 
 #include "../../library/unistd/unistd.header"
 #include "../../library/sys/prctl/prctl.header"
-#include "../../library/schedule/schedule.header"
+#include "../../library/sys/wait/wait.header"
 #include "../../library/signal/signal.header"
 #include "../../common/stddef.header"
 
@@ -18,7 +18,7 @@ int main(void) {
     );
     run(child, NULL, NULL);
 
-    // The child yields after disabling its inherited setting
-    yield();
+    // The child stops itself after disabling its inherited setting
+    waitpid(child);
     return child;
 }
