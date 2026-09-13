@@ -1,0 +1,21 @@
+// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks
+
+#include "../../library/fcntl/fcntl.header"
+#include "../../library/unistd/unistd.header"
+
+int main(void) {
+    char output[3];
+    int file_descriptor;
+
+    output[0] = 'A';
+    output[1] = 27;
+    output[2] = 'B';
+    write(STDOUT_FILENO, output, 3);
+
+    file_descriptor = open("config/os-release.txt", O_RDONLY);
+    if (file_descriptor < 0 || close(file_descriptor) != 0) {
+        return 1;
+    }
+    write(STDOUT_FILENO, "\nliteral UART output passed\n", 28);
+    return 0;
+}

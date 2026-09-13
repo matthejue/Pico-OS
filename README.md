@@ -2977,9 +2977,15 @@ successful chunks, it returns the count already transferred; it returns `-1` onl
 read. It does not need to yield between chunks because deferred timer requests are consumed when
 each syscall returns.
 
-[`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L204) validates write mode. Stdout
+[`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L213) validates write mode. Stdout
 sends bytes directly. Stderr temporarily selects host stderr. A regular file sends
 `write-at <offset> <path>`, sends the requested bytes, restores stdout, and advances its offset.
+[`write_uart_bytes()`](kernel/filesystem/filesystem.picoc#L195) checks its buffer for `<ESC>` before
+transmission. If it finds one, it sends `literal-output <count>`, so the emulator treats exactly that
+many following bytes as data. The binary byte therefore cannot be mistaken for the start of a
+host-control frame, while ordinary text output needs no extra frame. Checking in-memory bytes is
+cheaper than transmitting that extra frame and waiting for the UART after each of its bytes,
+especially for small terminal writes.
 Without [`O_APPEND`](common/file.header#L15), the descriptor offset selects where bytes overwrite
 the file, so seeking affects both reads and writes. With [`O_APPEND`](common/file.header#L15), the
 kernel requests the current file size immediately before every write and uses that as the offset,

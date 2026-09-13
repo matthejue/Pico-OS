@@ -1,0 +1,3 @@
+load test/uart_literal_output/launcher.bin
+run 3
+poweroff.bin
