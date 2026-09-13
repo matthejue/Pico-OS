@@ -1,7 +1,8 @@
-// dependencies: ../../library/sys/prctl/libprctl.reti_blocks ../../library/schedule/libschedule.reti_blocks
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/prctl/libprctl.reti_blocks ../../library/signal/libsignal.reti_blocks
 
+#include "../../library/unistd/unistd.header"
 #include "../../library/sys/prctl/prctl.header"
-#include "../../library/schedule/schedule.header"
+#include "../../library/signal/signal.header"
 #include "../../common/stddef.header"
 
 int main(void) {
@@ -9,8 +10,7 @@ int main(void) {
         return 1;
     }
 
-    yield();
+    kill(getpid(), SIGSTOP);
     while (true) {
-        yield();
     }
 }
