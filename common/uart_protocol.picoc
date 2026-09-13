@@ -108,3 +108,11 @@ void uart_send_file_write_command(char *path, int offset) {
     uart_print_character(27);
     uart_print_character('/');
 }
+
+void uart_send_literal_output_command(int count) {
+    uart_print_character(27);
+    uart_print_string("literal-output ");
+    uart_print_integer(count);
+    uart_print_character(27);
+    uart_print_character('/');
+}

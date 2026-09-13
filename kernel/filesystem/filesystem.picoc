@@ -194,7 +194,16 @@ int read_file_descriptor(struct IoRequest *request, int *caller_context) {
 
 void write_uart_bytes(char *buffer, int count) {
     int index = 0;
+    bool contains_control_escape = false;
 
+    while (index < count && !contains_control_escape) {
+        contains_control_escape = buffer[index] == 27;
+        index = index + 1;
+    }
+    if (contains_control_escape) {
+        uart_send_literal_output_command(count);
+    }
+    index = 0;
     while (index < count) {
         uart_print_character(buffer[index]);
         index = index + 1;
