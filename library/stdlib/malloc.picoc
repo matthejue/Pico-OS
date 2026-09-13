@@ -8,7 +8,7 @@ struct Heap process_heap;
 void *require_process_heap_allocation(void *memory, int size) {
     if (memory == NULL && size > 0) {
         // SYSCALL_PROCESS_HEAP_FULL
-        asm("LOADI ACC 31");
+        asm("LOADI ACC 18");
         asm("INT 0");
     }
 
@@ -20,12 +20,12 @@ void init_process_heap(void) {
     int heap_size;
 
     // SYSCALL_PROCESS_HEAP_START
-    asm("LOADI ACC 6");
+    asm("LOADI ACC 16");
     asm("INT 0");
     asm("STOREIN BAF IN2 0");
 
     // SYSCALL_PROCESS_HEAP_SIZE
-    asm("LOADI ACC 7");
+    asm("LOADI ACC 17");
     asm("INT 0");
     asm("STOREIN BAF IN2 -1");
 

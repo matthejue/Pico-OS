@@ -74,13 +74,14 @@ __attribute__((section("ivt")))
 void syscall_interrupt(void) {
     // These test syscalls use ACC for the selector and IN2 for the result
     // The UART cases tail-jump to the call-frame adapters above
-    asm("JUMP== 9");
+    asm("SUBI ACC 16");
+    asm("JUMP== 19");
     asm("SUBI ACC 1");
-    asm("JUMP== 12");
-    asm("SUBI ACC 5");
-    asm("JUMP== 15");
-    asm("SUBI ACC 1");
-    asm("JUMP== 17");
+    asm("JUMP== 21");
+    asm("SUBI ACC 12");
+    asm("JUMP== 5");
+    asm("SUBI ACC 9");
+    asm("JUMP== 8");
     asm("LOADI IN2 0");
     asm("RTI");
     asm("LOADI32 ACC send_byte_over_uart_syscall");

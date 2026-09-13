@@ -2,7 +2,7 @@
 
 void exit(int status) {
     // SYSCALL_EXIT
-    asm("LOADI ACC 9");
+    asm("LOADI ACC 6");
     asm("LOADIN BAF IN1 3");
     asm("INT 0");
 }

@@ -18,7 +18,7 @@ bool standard_streams_use_file_descriptors = false;
 
 void send_byte_over_uart(int value) {
     asm("LOADIN BAF IN1 3");
-    asm("LOADI ACC 0"); // SYSCALL_SEND_BYTE_OVER_UART
+    asm("LOADI ACC 29"); // SYSCALL_SEND_BYTE_OVER_UART
     asm("INT 0");
 }
 
@@ -26,7 +26,7 @@ int receive_byte_over_uart(void) {
     int value = 0;
 
     // Supports PicoC-Compiler tests linked with isrs.reti without PicoOS
-    asm("LOADI ACC 1"); // Legacy isrs.reti receive-byte syscall
+    asm("LOADI ACC 38"); // Legacy isrs.reti receive-byte syscall
     asm("INT 0");
     asm("STOREIN BAF IN2 0");
     return value;
