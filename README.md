@@ -232,7 +232,7 @@ These commands connect the generated bootloader, kernel `.sections` and
 `.debuginfo`, emulated memory/peripherals, UART host service, and the PicoOS
 userspace loaded after boot.
 
-The available tests comprise **12 library test classes, 22 OS test classes,
+The available tests comprise **12 library test classes, 23 OS test classes,
 and 28 shell test classes** in [`test/`](test/). Here a class means one
 standalone library source or one system-test directory, rather than each
 assertion inside it. [`run_sys_tests.sh`](run_sys_tests.sh) selects the standalone
@@ -313,7 +313,7 @@ userspace and tests. Use the nested links to jump to a specific mechanism.
        - [1.1.4.4 Expansion during linking](#1144-expansion-during-linking)
      - [1.1.5 Generated `memory_constants.header` files](#115-generated-memory_constantsheader-files)
      - [1.1.6 Custom userspace startup](#116-custom-userspace-startup)
-     - [1.1.7 Interrupt sections and naked functions](#117-interrupt-sections-and-naked-functions)
+     - [1.1.7 Program sections and low-level functions](#117-program-sections-and-low-level-functions)
    - [1.2 RETI-Emulator extensions](#12-reti-emulator-extensions)
      - [1.2.1 Debugger and terminal views](#121-debugger-and-terminal-views)
      - [1.2.2 Machine model and peripherals](#122-machine-model-and-peripherals)
@@ -444,10 +444,10 @@ following compiler features were added to provide those capabilities.
 | String and character data | Escapes, inferred local arrays, global strings, deduplicated string literals, and linker-safe literal names |
 | Inline RETI assembly | `asm("...")`, linked labels inside assembly, and safe pseudoinstructions such as `LOADI32`, `JUMP32`, `PUSH`, and `POP` |
 | Low-level functions | `__attribute__((naked))` suppresses compiler prologue/epilogue code for startup and interrupt handlers |
-| Custom sections | `__attribute__((section("ivt")))` places the vector table before `.text` and `.data` |
+| Custom sections | `__attribute__((section("ivt")))` places selected globals or functions in `.ivt`; ordinary functions and globals use `.text` and `.data` |
 | Interrupt-vector entries | `IVTE` resolves handler pointers into tagged SRAM addresses |
 | Runtime startup | Generated default entry or a replaceable custom `-C` startup such as PicoOS [`libstart`](library/start/libstart.picoc) |
-| Global initialization | `-O1` emits known scalar, string, struct, array, and function-pointer initializers directly into `.data` |
+| Global initialization | `-O1` emits known scalar, string, struct, array, and function-pointer initializers directly into `.data` or an attributed `.ivt` |
 | Shared epilogues | All ordinary returns converge on one generated restore/return block |
 | Section layout | Separate `.ivt`, `.text`, and `.data` regions and the paired final `.sections` file |
 | Linked labels | Human-readable labels remain until final patching, making generated RETI inspectable |
@@ -807,27 +807,121 @@ image, but uses its own EPROM header before any kernel state exists.
 
 ### 1.1.6 Custom userspace startup
 
-PicoOS links [`library/start/libstart.picoc`](library/start/libstart.picoc) as
-its custom startup unit. Its naked [`_start()`](library/start/start.picoc#L14) must see the initial stack
-exactly as the kernel built it. It passes the argument count and pointer table
-to [`start_process()`](library/start/start.picoc#L7), which initializes the process-local heap, clones
-the initial environment, calls the application's entry function, and sends its
-result through [`exit()`](library/stdlib/exit.picoc#L3). For the shell, that entry is
-[`main()`](user/shell.picoc#L1577).
+When no custom startup source is selected, a linked program with a global
+`main` receives a compiler-generated `_start`. The following source-equivalent
+example shows its control flow; `Exit` represents the compiler's internal exit
+operation rather than a PicoC function that application code can call:
 
-The bootloader's [`_start()`](boot/bootloader.picoc#L9) installs machine registers directly.
-The generated kernel entry uses the compiler's SRAM startup context before
-calling [`main()`](kernel/kernel.picoc#L31). The initial userspace stack that
-makes the application entry possible is shown in
-[Process image and initial stack](#54-process-image-and-initial-stack).
+```c
+void _start(void) {
+    main();
+    Exit(0);
+}
+```
 
-### 1.1.7 Interrupt sections and naked functions
+The generated entry runs any remaining global initializer code before calling
+`main`, then terminates with `LOADI ACC 0` and `JUMP 0` after `main` returns.
+The `-C PATH` / `--startup-source PATH` option instead links an additional
+PicoC or compiled `.reti_blocks` startup unit. If that unit defines `_start`,
+the compiler places it first in `.text` and uses it in place of the generated
+default; otherwise, the compiler still creates the default entry. Global
+initializer code precedes either form.
 
-`__attribute__((section("ivt")))` tells the linker to place the declared
-function-pointer array in `.ivt` before ordinary `.text` and `.data`; the
-attribute uses `"ivt"` without a leading dot. With compile-time global
-initialization, handler addresses become static vector words, so no startup
-code must run before the CPU can use the table. `IVTE` and the final linker
+PicoOS selects [`library/start/libstart.picoc`](library/start/libstart.picoc)
+for userspace with `-C library/start/libstart.picoc`. The wrapper records its
+compiled-library dependency and includes the actual startup implementation:
+
+```c
+// dependencies: ../stdlib/libstdlib.reti_blocks
+
+#include "start.picoc"
+```
+
+The included [`library/start/start.picoc`](library/start/start.picoc) contains
+the complete userspace startup path:
+
+```c
+#include "../stdlib/stdlib.header"
+#include "../unistd/unistd.header"
+
+int main(int argc, char **argv);
+void initialize_environment(char **environment);
+
+void start_process(int argc, char **argv) {
+    init_process_heap();
+    initialize_environment(argv + argc + 1);
+    exit(main(argc, argv));
+}
+
+__attribute__((naked))
+void _start(int argc, char *first_argument) {
+    start_process(argc, (char **)&first_argument);
+}
+```
+
+The naked [`_start()`](library/start/start.picoc#L14) sees the initial stack
+exactly as the kernel built it and treats
+[`&first_argument`](library/start/start.picoc#L14) as the start of `argv`.
+It passes that table to [`start_process()`](library/start/start.picoc#L7),
+which calls [`init_process_heap()`](library/stdlib/malloc.picoc#L18), clones
+the initial environment through
+[`initialize_environment()`](library/stdlib/env.picoc#L97), calls the
+application's `main`, and passes its result to
+[`exit()`](library/stdlib/exit.picoc#L3). The initial userspace stack is shown
+in [Process image and initial stack](#54-process-image-and-initial-stack).
+
+The following table distinguishes the entry used for each PicoOS image. The
+init process and shell are userspace programs, so they deliberately use the
+same startup path as every other system or user application.
+
+| Image | `_start` used | Next function |
+| --- | --- | --- |
+| EPROM bootloader | Its explicitly defined naked [`_start()`](boot/bootloader.picoc#L9), compiled as part of the bootloader without `-C` | [`boot_main()`](boot/bootloader.picoc#L41) |
+| SRAM kernel | Compiler-generated default `_start`, because the kernel is linked without `-C` | [`main()`](kernel/kernel.picoc#L31) |
+| Init process | [`libstart` `_start()`](library/start/start.picoc#L14), selected with `-C library/start/libstart.picoc` | [`main()`](system/init.picoc#L100) |
+| Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1577) |
+| Other system and user applications | [`libstart` `_start()`](library/start/start.picoc#L14), selected by the common userspace link rule | The application's `main` |
+
+### 1.1.7 Program sections and low-level functions
+
+The extended compilation and linking pipeline orders every linked image as
+`.ivt`, `.text`, then `.data`. These are regions of the final flat RETI
+program, not separate files. Their recorded boundaries are explained further
+in [Linked `.sections` metadata](#113-linked-sections-metadata).
+
+| Section | Default contents and addressing | How source selects it |
+| --- | --- | --- |
+| `.ivt` | Interrupt-vector words and, when requested, low-level functions; it begins at image offset 0 and uses `CS`-relative global references | Add `__attribute__((section("ivt")))` to a global variable, function declaration, or function definition |
+| `.text` | `_start` followed by ordinary functions and their instructions; execution and code labels are relative to `CS` | This is the default for functions |
+| `.data` | Ordinary global and static storage, addressed relative to `DS` | This is the default for global and static variables |
+
+The attribute string is `"ivt"` without a leading dot. The compiler currently
+supports this explicit section choice only for `.ivt`; it chooses `.text` and
+`.data` from whether a declaration is a function or stored data. For example,
+PicoOS places its global
+[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L22)
+array at the beginning of the kernel image:
+
+```c
+__attribute__((section("ivt")))
+void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
+    syscall_interrupt,
+    timer_interrupt,
+    uart_interrupt,
+    cpu_exception_interrupt,
+    dma_interrupt
+};
+```
+
+With `-O1`, compile-time-known initializers for global scalars, strings,
+structs, arrays, and function pointers are emitted directly as words in
+`.data`, or in `.ivt` when the declaration carries the section attribute.
+Runtime-dependent initializers still execute from startup code. Consequently,
+the five initialized function pointers in
+[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L22)
+are already the first five words of the kernel payload when the binary is
+loaded into SRAM. The interrupt hardware can therefore read the vector table
+immediately, before any `_start` code has executed. `IVTE` and the final linker
 patch pass encode those function addresses with the correct SRAM tag.
 
 `__attribute__((naked))` suppresses the normal PicoC function prologue,
@@ -1918,7 +2012,7 @@ direct helpers that establish the next ownership or scheduling step.
 | [`create_process()`](kernel/process/process.picoc#L88) | Returns a PCB pointer; kernel-heap exhaustion halts the OS | Allocates and initializes a PCB, paths, descriptor table, embedded queues, and list link; copies the parent's working directory or uses `/` when there is no parent | [`kmalloc()`](kernel/kmalloc.picoc#L23), [`current_process()`](kernel/process/process.picoc#L61), [`copy_process_path()`](kernel/process/process.picoc#L69), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
 | [`first_process()`](kernel/process/process.picoc#L28), [`current_process()`](kernel/process/process.picoc#L61) | Return the head or active PCB, possibly `NULL` | Read process-list globals only | — |
 | [`set_current_process()`](kernel/process/process.picoc#L65) | Returns no value | Replaces the active PCB global | — |
-| [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`list_processes()`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`; list function returns no value | Read/traverse the process list; the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L204) |
+| [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`list_processes()`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`; list function returns no value | Read/traverse the process list; the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L213) |
 | [`remove_process()`](kernel/process/process.picoc#L208) | Returns no value | Final destructor: unlinks queues/list and releases image, attachments, descriptor table, strings, and PCB | [`remove_from_wait_queue()`](kernel/process/process.picoc#L175), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`pfree()`](kernel/pmalloc.picoc#L47), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115), [`kfree()`](kernel/kmalloc.picoc#L38) |
 | [`orphan_and_signal_children()`](kernel/process/process.picoc#L278), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260) | Return no value | Update child parent fields or parent wait status/queue | [`remove_process()`](kernel/process/process.picoc#L208), [`send_signal_to_process()`](kernel/signal.picoc#L74), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415) |
 | [`terminate_process()`](kernel/process/process.picoc#L303), [`exit_process()`](kernel/process/process.picoc#L450), [`unload_process_by_pid()`](kernel/process/process.picoc#L327) | Termination returns no value; [`exit_process()`](kernel/process/process.picoc#L450) does not return normally; unload returns `true` on removal, `false` for a missing or current PID | Store status, make a PCB zombie, wake waiters, and remove it when permitted | [`orphan_and_signal_children()`](kernel/process/process.picoc#L278), [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`process_has_waiting_parent()`](kernel/process/process.picoc#L248), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260), [`remove_process()`](kernel/process/process.picoc#L208), [`terminate_process()`](kernel/process/process.picoc#L303), [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54), [`shutdown()`](kernel/kernel.picoc#L15) |
@@ -3918,7 +4012,7 @@ rm.bin pipeline-input.txt pipeline-output.txt
 The repository has **28 shell test classes**, counted as scenario directories with input/output
 fixtures that the runner classifies as shell tests. The
 [runner’s classification](run_os_tests.py#L115) is based on each scenario’s launcher and input
-script, not its directory name; the other **22 OS test classes** use the standard launcher script.
+script, not its directory name; the other **23 OS test classes** use the standard launcher script.
 Together with the **12 library test classes**, these are the categories described in the
 [test-system chapter](#15-test-system).
 
@@ -4369,7 +4463,7 @@ projects.
 
 ## 15.1 Test categories and repository integration
 
-The repository contains **62 test classes: 12 library, 22 OS feature, and
+The repository contains **63 test classes: 12 library, 23 OS feature, and
 28 shell classes**. Here, a class means one top-level library source or one
 system-test directory, which may contain several programs and checks. The
 table explains how the runners classify them, so a directory containing
@@ -4378,7 +4472,7 @@ PicoC code is not automatically counted as an OS feature class.
 | Test category | Classes | Classification and execution |
 | --- | ---: | --- |
 | Library | 12 | A top-level `.picoc` file in [`test/`](test/); direct RETI execution with test ISR support, without booting PicoOS |
-| OS feature | 22 | A directory with `launcher.picoc` and exactly the three input lines that load that launcher, run PID 3, and power off |
+| OS feature | 23 | A directory with `launcher.picoc` and exactly the three input lines that load that launcher, run PID 3, and power off |
 | Shell | 28 | Every other test directory; exercises command handling and application behavior through shell input |
 
 Library tests integrate library code with the compiler, emulator, and small
@@ -4407,9 +4501,9 @@ complete boot path shared by OS feature and shell tests.
 
 ```mermaid
 flowchart TD
-    T["62 test classes"] --> L["12 library classes"]
-    T --> S["50 system classes"]
-    S --> O["22 OS feature classes"]
+    T["63 test classes"] --> L["12 library classes"]
+    T --> S["51 system classes"]
+    S --> O["23 OS feature classes"]
     S --> H["28 shell classes"]
     L --> LC["Compile and run RETI with test ISRs<br/>Compare metadata-based expected output"]
     O --> K["Compile and assemble programs<br/>Boot EPROM, kernel, init, shell<br/>Run scenario and compare fixture"]
