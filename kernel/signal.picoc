@@ -1,5 +1,5 @@
 #include "signal.header"
-#include "process/process.header"
+#include "dispatcher.header"
 #include "filesystem/terminal.header"
 #include "../common/prctl.header"
 #include "../common/signal.header"
@@ -92,11 +92,12 @@ void send_signal_to_process(
         return;
     }
 
-    // A running process is still on the interrupt return path, so its
-    // termination is deferred until the next dispatch
+    // A running process can still own an interrupt or syscall return path, so
+    // termination is deferred and a safe reschedule is requested
     if (process == current_process() &&
         process->state == PROCESS_STATE_RUNNING) {
         process->pending_termination_signal = signal_number;
+        dispatcher_request_reschedule();
         return;
     }
 
