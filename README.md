@@ -233,7 +233,7 @@ These commands connect the generated bootloader, kernel `.sections` and
 userspace loaded after boot.
 
 The available tests comprise **12 library test classes, 22 OS test classes,
-and 27 shell test classes** in [`test/`](test/). Here a class means one
+and 28 shell test classes** in [`test/`](test/). Here a class means one
 standalone library source or one system-test directory, rather than each
 assertion inside it. [`run_sys_tests.sh`](run_sys_tests.sh) selects the standalone
 sources; [`run_os_tests.py`](run_os_tests.py) classifies OS and shell scenarios
@@ -1918,7 +1918,7 @@ direct helpers that establish the next ownership or scheduling step.
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
 | [`initialize_process_table()`](kernel/process/process.picoc#L21) | Returns no value | Resets process-list globals and the next PID | — |
-| [`create_process()`](kernel/process/process.picoc#L88) | Returns a PCB pointer; kernel-heap exhaustion halts the OS | Allocates and initializes a PCB, paths, descriptor table, embedded queues, and list link | [`kmalloc()`](kernel/kmalloc.picoc#L23), [`current_process()`](kernel/process/process.picoc#L61), [`copy_process_path()`](kernel/process/process.picoc#L69), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
+| [`create_process()`](kernel/process/process.picoc#L88) | Returns a PCB pointer; kernel-heap exhaustion halts the OS | Allocates and initializes a PCB, paths, descriptor table, embedded queues, and list link; copies the parent's working directory or uses `/` when there is no parent | [`kmalloc()`](kernel/kmalloc.picoc#L23), [`current_process()`](kernel/process/process.picoc#L61), [`copy_process_path()`](kernel/process/process.picoc#L69), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
 | [`first_process()`](kernel/process/process.picoc#L28), [`current_process()`](kernel/process/process.picoc#L61) | Return the head or active PCB, possibly `NULL` | Read process-list globals only | — |
 | [`set_current_process()`](kernel/process/process.picoc#L65) | Returns no value | Replaces the active PCB global | — |
 | [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`list_processes()`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`; list function returns no value | Read/traverse the process list; the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L204) |
@@ -1935,7 +1935,7 @@ when a reserved image becomes a PCB and when that PCB becomes runnable:
 
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
-| [`load_process()`](kernel/process/process_loader.picoc#L305) | Returns PID, or 0 on failure | Performs the boot-time continuous transfer and creates a [`NEW`](kernel/process/process.header#L12) PCB | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`create_process()`](kernel/process/process.picoc#L88) |
+| [`load_process()`](kernel/process/process_loader.picoc#L305) | Returns PID, or 0 on failure | Resolves the boot-time path from PicoOS `/`, performs the continuous transfer, and creates a [`NEW`](kernel/process/process.header#L12) PCB | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`create_process()`](kernel/process/process.picoc#L88) |
 | [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) | Returns a positive PID on completion, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L44) (-1) while work remains | Starts or advances the caller's load; DMA blocks for the full payload, polling receives at most 1 KiB per continuation; creates a [`NEW`](kernel/process/process.header#L12) PCB on completion | [`current_process()`](kernel/process/process.picoc#L61), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
 | [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) | Returns no value | Cancels an active DMA load if necessary; clears the caller's pending-load pointer and frees the partial image, copied path, and metadata | [`dma_transfer_status()`](common/dma.picoc#L21), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`pfree()`](kernel/pmalloc.picoc#L47), [`free_process_load()`](kernel/process/process_loader.picoc#L71) |
 | [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) | Returns no value | Writes initial stack/tables/strings into the image and sets activation [`sp`](kernel/process/process.header#L25)/[`baf`](kernel/process/process.header#L26) | [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`process_environment_count()`](kernel/process/process_arguments.picoc#L89), [`process_string_cell_count()`](kernel/process/process_arguments.picoc#L103), [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`copy_process_string()`](kernel/process/process_arguments.picoc#L113), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5), [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9) |
@@ -3047,8 +3047,8 @@ root listings have no artificial `tmp` entry. A PicoOS path `/tmp` refers only t
 `tmp` directory inside the runtime, if one has been created.
 
 All UART filesystem commands use this boundary, including binary loading, reads, writes, directory
-listing, and moves. `..` stops at `/`. The emulator rejects symlinks, Windows junctions, and
-file access through hard links or special host files. The guest root cannot be removed or renamed
+listing, and moves. `..` stops at `/`. The emulator does not follow symlinks or Windows junctions
+and does not open hard-linked or special host files. The guest root cannot be removed or renamed
 through its PicoOS paths. Explicit emulator command-line inputs, such as boot assembly and debug metadata,
 still use host paths.
 
@@ -3057,14 +3057,14 @@ A child receives its own copy of the parent’s current string. Changing directo
 before freeing the old copy and installing the new one. It never changes the emulator process’s
 actual working directory.
 
-Path normalization starts at `/`, prepends the PCB directory for a relative path, removes repeated
-separators and `.`, resolves `..` without moving above root, and enforces
-[`PATH_MAX`](common/file.header#L21). The table below shows which functions only copy kernel state
-and which request host validation or file operations.
+Path normalization starts at `/`, prepends the current PCB directory for a relative path when a
+process is running, removes repeated separators and `.`, resolves `..` without moving above root,
+and enforces [`PATH_MAX`](common/file.header#L21). The table below shows which functions only copy
+kernel state and which request host validation or file operations.
 
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
-| [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) | `true` on a normalized path that fits; otherwise `false` | Reads current PCB directory and writes a normalized local result | [`append_path_segments()`](kernel/filesystem/host_filesystem.picoc#L37), [`current_process()`](kernel/process/process.picoc#L61) |
+| [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) | `true` on a nonempty normalized path that fits; otherwise `false` | Writes an absolute PicoOS path; relative input starts from the current PCB directory, or from `/` before the first process exists | [`append_path_segments()`](kernel/filesystem/host_filesystem.picoc#L37), [`current_process()`](kernel/process/process.picoc#L61) |
 | [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121) | Pointer to the input path or the text after its leading `/` | Removes the leading `/` for program names and loading labels | — |
 | [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128) | Returns no value | Allocates a new kernel copy, frees old string, and replaces PCB pointer | [`copy_process_path()`](kernel/process/process.picoc#L69), [`kfree()`](kernel/kmalloc.picoc#L38) |
 | [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156) | `0` on success; `-1` when the stored directory is missing or the destination capacity is too small | Copies the PCB directory into the caller buffer | [`copy_working_directory()`](kernel/filesystem/host_filesystem.picoc#L135), [`current_process()`](kernel/process/process.picoc#L61) |
@@ -3204,7 +3204,7 @@ initialize their corresponding request structures before the call.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`OpenRequest.path`](common/file.header#L27) | Relative or absolute host-backed path | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125); [`open()`](library/fcntl/fcntl.picoc#L5)/[`fopen()`](library/stdio/stdio.picoc#L125) and syscall 15; normalized and copied into the selected descriptor |
+| [`OpenRequest.path`](common/file.header#L27) | Relative or absolute PicoOS path to a host-backed file or kernel device | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125); [`open()`](library/fcntl/fcntl.picoc#L5)/[`fopen()`](library/stdio/stdio.picoc#L125) and syscall 15; normalized and copied into the selected descriptor |
 | [`OpenRequest.flags`](common/file.header#L28) | Access mode plus [`O_CREAT`](common/file.header#L13), [`O_TRUNC`](common/file.header#L14), or [`O_APPEND`](common/file.header#L15) | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125); copied into the descriptor; create/truncate decide open requests and append changes later write positioning |
 | [`IoRequest.file_descriptor`](common/file.header#L32) | Entry number in the current PCB’s eight-entry table | First initialized by [`read()`](library/unistd/io.picoc#L6)/[`write()`](library/unistd/io.picoc#L31) or stdio I/O wrappers; [`read()`](library/unistd/io.picoc#L6)/[`write()`](library/unistd/io.picoc#L31) and syscalls 16/17 |
 | [`IoRequest.buffer`](common/file.header#L33) | Userspace destination for read or source for write | First initialized by [`read()`](library/unistd/io.picoc#L6)/[`write()`](library/unistd/io.picoc#L31) or stdio I/O wrappers; used directly during the call; for a blocked terminal read the caller's PCB temporarily retains the destination pointer |
@@ -3598,10 +3598,9 @@ sequenceDiagram
     participant S as Shell child
 
     K->>F: load_process("system/init.bin", loading_bar_enabled)
-    F->>H: ESC load system/init.bin ESC /
+    F->>H: ESC load /system/init.bin ESC /
     H-->>F: Header and encoded init program
-    F->>H: ESC pwd ESC / for PID 1 directory
-    H-->>F: Startup directory length and bytes
+    F->>F: Create PID 1 with working directory /
     K->>Init: Build initial stack, make READY, and dispatch
     Init->>F: open/read ./config/environment.txt
     F->>H: ESC file-size path ESC / and ESC read-range ... ESC /
@@ -3623,10 +3622,13 @@ sequenceDiagram
     end
 ```
 
-The kernel creates init's PCB before init exists. Since PID 1 has no parent from which to inherit a
-directory, PCB creation sends `<ESC>pwd<ESC>/` and stores a [`kmalloc()`](kernel/kmalloc.picoc#L23)
-copy of the host startup path in [`Process.working_directory`](kernel/process/process.header#L39).
-Init otherwise uses the same public libraries and syscalls as every other process.
+The kernel creates init's PCB before any current process exists. Therefore
+[`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) resolves the relative
+`system/init.bin` input from PicoOS `/` and sends `/system/init.bin` to the emulator. Since PID 1
+also has no parent from which to inherit a directory, [`create_process()`](kernel/process/process.picoc#L88)
+stores a [`kmalloc()`](kernel/kmalloc.picoc#L23) copy of `/` directly in
+[`Process.working_directory`](kernel/process/process.header#L39); no `pwd` request is needed. Init
+otherwise uses the same public libraries and syscalls as every other process.
 
 ## 11.3 Configuration and environment
 
@@ -3932,7 +3934,7 @@ rm.bin pipeline-input.txt pipeline-output.txt
 
 ## 12.8 Shell-test support
 
-The repository has **24 shell test classes**, counted as scenario directories with input/output
+The repository has **28 shell test classes**, counted as scenario directories with input/output
 fixtures that the runner classifies as shell tests. The
 [runner’s classification](run_os_tests.py#L115) is based on each scenario’s launcher and input
 script, not its directory name; the other **22 OS test classes** use the standard launcher script.
@@ -4026,8 +4028,9 @@ replaces the first literal occurrence of `pattern` on every line. Sed loads
 stdin into memory and disables `PICOOS_LOADING_BAR` so output is not mixed with
 progress text.
 
-[`ls.bin`](user/ls.picoc) preserves host listing order and hides names beginning with `.` unless
-`-a` is given. It prefixes directories with `d ` and other entries with `- `. There is no sorting, long format, or recursion. [`mkdir.bin`](user/mkdir.picoc) has no
+[`ls.bin`](user/ls.picoc) receives entries sorted by name from the emulator and hides names
+beginning with `.` unless `-a` is given. It prefixes directories with `d ` and other entries with
+`- `. There is no long format or recursion. [`mkdir.bin`](user/mkdir.picoc) has no
 `-p`; [`rm.bin`](user/rm.picoc) has no force/recursive mode; [`rmdir.bin`](user/rmdir.picoc) removes only empty
 directories. [`mkdir.bin`](user/mkdir.picoc), [`rm.bin`](user/rm.picoc), and [`rmdir.bin`](user/rmdir.picoc) continue through later
 operands after an individual error.
@@ -4439,10 +4442,10 @@ complete boot path shared by OS feature and shell tests.
 
 ```mermaid
 flowchart TD
-    T["61 test classes"] --> L["12 library classes"]
-    T --> S["49 system classes"]
+    T["62 test classes"] --> L["12 library classes"]
+    T --> S["50 system classes"]
     S --> O["22 OS feature classes"]
-    S --> H["27 shell classes"]
+    S --> H["28 shell classes"]
     L --> LC["Compile and run RETI with test ISRs<br/>Compare metadata-based expected output"]
     O --> K["Compile and assemble programs<br/>Boot EPROM, kernel, init, shell<br/>Run scenario and compare fixture"]
     H --> K
