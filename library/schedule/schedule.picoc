@@ -3,6 +3,6 @@
 
 void yield(void) {
     asm("LOADI IN1 0");
-    asm("LOADI ACC 13"); // SYSCALL_YIELD
+    asm("LOADI ACC 15"); // SYSCALL_YIELD
     asm("INT 0");
 }
