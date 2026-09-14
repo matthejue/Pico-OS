@@ -11,6 +11,8 @@
 #define OS_INTERRUPT_VECTOR_COUNT 5
 
 void timer_interrupt(void);
+void timer_interrupt_process(void);
+void timer_interrupt_kernel_return(void);
 void timer_interrupt_after_reschedule_request(void);
 void syscall_interrupt(void);
 void syscall_interrupt_restore(void);
@@ -42,6 +44,41 @@ void timer_interrupt(void) {
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
 
+    // Process interrupts must leave the nearly exhausted process stack before
+    // calling kernel functions. Kernel interrupts keep their live kernel stack
+    asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
+    asm("SUB ACC DS");
+    asm("JUMP32>= timer_interrupt_process");
+
+    asm("LOADI32 ACC timer_interrupt_kernel_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC dispatcher_request_reschedule");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void timer_interrupt_kernel_return(void) {
+    // The pending request is consumed when this kernel work returns to a process
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+
+__attribute__((naked))
+void timer_interrupt_process(void) {
+    // BAF keeps old_sp while loading kernel CS, DS and SP
+    asm("MOVE SP BAF");
+    asm("LOADI IN1 0");
+    write_stack_heap_boundary_from_in1();
+    asm(KERNEL_SP_START_ASM);
+    activate_kernel_stack_boundary();
+
     asm("LOADI32 ACC timer_interrupt_after_reschedule_request");
     asm("ADD ACC CS");
     asm("PUSH ACC");
@@ -52,31 +89,6 @@ void timer_interrupt(void) {
 
 __attribute__((naked))
 void timer_interrupt_after_reschedule_request(void) {
-    /*
-     * Restores kernel regs when the interrupted instruction belongs to the
-     * kernel code segment. The pending request is consumed when that kernel
-     * work next returns to a process
-     */
-    asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
-    asm("SUB ACC DS");
-    asm("JUMP>= 14"); // Only process code executes at or above this boundary
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-
-    // BAF keeps old_sp while loading kernel CS, DS and SP
-    asm("MOVE SP BAF");
-    asm("LOADI IN1 0");
-    write_stack_heap_boundary_from_in1();
-    asm(KERNEL_CS_START_ASM);
-    asm(KERNEL_DS_START_ASM);
-    asm(KERNEL_SP_START_ASM);
-    activate_kernel_stack_boundary();
-
     // Passes the interrupted stack frame to the dispatcher
     asm("PUSH BAF"); // Caller context
 
