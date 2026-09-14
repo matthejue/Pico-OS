@@ -121,16 +121,16 @@ with source code and compiler options:
 
 | Image | 32-bit words | Size |
 | --- | ---: | ---: |
-| [`kernel.bin`](binary/kernel/kernel.bin) ([`kernel.picoc`](kernel/kernel.picoc)) | 42,464 | 0.169856 MB |
-| [`init.bin`](binary/system/init.bin) ([`init.picoc`](system/init.picoc)) | 10,795 | 0.043180 MB |
-| [`shell.bin`](binary/user/shell.bin) ([`shell.picoc`](user/shell.picoc)) | 33,462 | 0.133848 MB |
-| [`cat.bin`](binary/user/cat.bin) ([`cat.picoc`](user/cat.picoc)) | 9,890 | 0.039560 MB |
+| [`kernel.bin`](binary/kernel/kernel.bin) ([`kernel.picoc`](kernel/kernel.picoc)) | 41,635 | 0.166540 MB |
+| [`init.bin`](binary/system/init.bin) ([`init.picoc`](system/init.picoc)) | 10,696 | 0.042784 MB |
+| [`shell.bin`](binary/user/shell.bin) ([`shell.picoc`](user/shell.picoc)) | 32,493 | 0.129972 MB |
+| [`cat.bin`](binary/user/cat.bin) ([`cat.picoc`](user/cat.picoc)) | 9,791 | 0.039164 MB |
 | [`echo.bin`](binary/user/echo.bin) ([`echo.picoc`](user/echo.picoc)) | 11,961 | 0.047844 MB |
 
 A conservative calculation can count the headers as if they also occupied
 SRAM. With the resident [`kernel.bin`](kernel/kernel.picoc), [`init.bin`](system/init.picoc), and [`shell.bin`](user/shell.picoc) images,
-`262,144 - (42,464 + 10,795 + 33,462) = 175,423` words remain. That space
-could hold `floor(175,423 / 9,890) = 17` copies of [`cat.bin`](user/cat.picoc). The loader
+`262,144 - (41,635 + 10,696 + 32,493) = 177,320` words remain. That space
+could hold `floor(177,320 / 9,791) = 18` copies of [`cat.bin`](user/cat.picoc). The loader
 actually keeps the five header words out of the copied program image. This is
 only an image-size comparison—a running process also needs heap and stack
 space—but it gives a useful scale for the available memory.
@@ -1214,7 +1214,7 @@ initialization or shutdown effects.
 
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
-| [`main()`](kernel/kernel.picoc#L31) | Returns `0` only if dispatch does not take control | Initializes kernel heaps, terminal, process table, shared-memory registry, DMA, and interrupt registers; loads and makes PID 1 ready | [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), [`initialize_process_table()`](kernel/process/process.picoc#L21), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9), [`initialize_shared_memory()`](kernel/shared_memory.picoc#L9), [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`load_process()`](kernel/process/process_loader.picoc#L305), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54) |
+| [`main()`](kernel/kernel.picoc#L31) | Returns `0` only if dispatch does not take control | Initializes kernel heaps, terminal, process table, shared-memory registry, DMA, and interrupt registers; loads and makes PID 1 ready | [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), [`initialize_process_table()`](kernel/process/process.picoc#L21), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9), [`initialize_shared_memory()`](kernel/shared_memory.picoc#L9), [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`load_process()`](kernel/process/process_loader.picoc#L305), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
 | [`shutdown()`](kernel/kernel.picoc#L15) | Does not return | Stops execution in the current instruction; allocated objects remain because the machine stops | — |
 | [`reboot()`](kernel/kernel.picoc#L19) | Does not return | Disables hardware interrupts and stack protection, then jumps to the EPROM bootloader | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`periphery_write_register()`](kernel/periphery.picoc#L11) |
 
@@ -1252,7 +1252,7 @@ process-memory storage so readers can see which operation releases each object.
 | Kernel/process-memory heap descriptors | Kernel `.data` globals | Static | [`kmalloc()`](kernel/kmalloc.picoc#L23)/[`pmalloc()`](kernel/pmalloc.picoc#L20) | Whole kernel run |
 | Heap block headers | Inside managed heap region | Written by allocator | Linked from [`struct Heap`](common/heap.header#L11) | Split/merged dynamically |
 | Syscall request objects | Usually userspace stack | Local struct | Pointer in `IN1` | One wrapper call; the kernel never retains the request pointer |
-| Interrupt saved frame | Interrupted process stack | Register pushes and return cell | [`caller_context`](kernel/dispatcher.picoc#L70) | Until return/copy |
+| Interrupt saved frame | Interrupted process stack | Register pushes and return cell | [`caller_context`](kernel/dispatcher.picoc#L71) | Until return/copy |
 | Interrupt vector table | Kernel `.ivt` section | Linked static array | CPU vector lookup | Whole kernel run |
 
 Kernel-heap metadata and process/shared data regions use different allocators.
@@ -1312,9 +1312,9 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
 | ---: | --- | --- |
 | 0 | [`syscall_interrupt()`](interrupt_service_routines/isrs.picoc#L74) | Software `INT 0` from userspace |
 | 1 | [`timer_interrupt()`](interrupt_service_routines/isrs.picoc#L68) | Timer device |
-| 2 | [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L183) | UART receive device |
-| 3 | [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L159) | Fixed synchronous CPU exception vector |
-| 4 | [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L221) | DMA completion on the hardware custom-device line |
+| 2 | [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L195) | UART receive device |
+| 3 | [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171) | Fixed synchronous CPU exception vector |
+| 4 | [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L233) | DMA completion on the hardware custom-device line |
 
 An `INT` automatically saves only the interrupted return PC. Each ISR
 explicitly saves any general registers it needs. `RTI` reloads the PC from
@@ -1328,11 +1328,11 @@ arrays and writes periphery registers 3–8; neither array uses [`kmalloc()`](ke
 ## 4.2 Saved interrupt frame
 
 System calls and process timer preemption create the same process-stack frame.
-[`caller_context`](kernel/dispatcher.picoc#L70) points to its free cell:
+[`caller_context`](kernel/dispatcher.picoc#L71) points to its free cell:
 
 | Offset | Stored value |
 | ---: | --- |
-| `+0` | Free cell addressed by [`caller_context`](kernel/dispatcher.picoc#L70) |
+| `+0` | Free cell addressed by [`caller_context`](kernel/dispatcher.picoc#L71) |
 | `+1` | Saved `DS` |
 | `+2` | Saved `CS` |
 | `+3` | Saved `BAF` |
@@ -1341,8 +1341,8 @@ System calls and process timer preemption create the same process-stack frame.
 | `+6` | Saved `ACC` |
 | `+7` | Return PC saved by interrupt entry |
 
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) copies offsets 1–6 into the current PCB’s
-embedded activation and records [`activation.sp`](kernel/process/process.header#L25) = [`caller_context`](kernel/dispatcher.picoc#L70) + 6. The
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) copies offsets 1–6 into the current PCB’s
+embedded activation and records [`activation.sp`](kernel/process/process.header#L25) = [`caller_context`](kernel/dispatcher.picoc#L71) + 6. The
 return PC remains at [`activation.sp`](kernel/process/process.header#L25) + 1 for the later `RTI`.
 
 ## 4.3 System-call path
@@ -1353,10 +1353,10 @@ result, matching the normal PicoC function-return convention. The naked entry
 saves the process registers, disables the process boundary while changing
 stacks, installs kernel segments and the kernel stack, and calls the normal C
 dispatcher. The complete
-[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L92) entry,
-[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L131)
+[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) entry,
+[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143)
 continuation, and
-[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L146)
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
 restoration stub are:
 
 ```c
@@ -1486,7 +1486,7 @@ individual request structures.
 | --- | --- | --- | --- |
 | System control | 0–1 | Shutdown, reboot | [`shutdown()`](kernel/kernel.picoc#L15), [`reboot()`](kernel/kernel.picoc#L19) |
 | Process management | 2–12 | Load, run, list, unload, exit, exact-child wait, PID query, test-process reset, terminal ownership, signal delivery, parent-death setting | [`load_process_chunk()`](kernel/process/process_loader.picoc#L292), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`list_processes()`](kernel/process/process.picoc#L32), [`unload_process_by_pid()`](kernel/process/process.picoc#L327), [`exit_process()`](kernel/process/process.picoc#L450), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L368), [`current_process()`](kernel/process/process.picoc#L61), [`remove_test_processes()`](kernel/process/process.picoc#L347), [`set_foreground_process()`](kernel/signal.picoc#L146), [`send_signal_by_pid()`](kernel/signal.picoc#L106), [`set_parent_death_signal()`](kernel/signal.picoc#L135) |
-| Scheduling | 13–15 | Queue sleep, queue wakeup, yield | [`sleep_on_wait_queue()`](kernel/process/process.picoc#L410), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) |
+| Scheduling | 13–15 | Queue sleep, queue wakeup, yield | [`sleep_on_wait_queue()`](kernel/process/process.picoc#L410), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) |
 | Process memory | 16–21 | Heap start, heap size, heap-exhaustion handling, shared-memory open, map, unlink | [`process_heap_start()`](kernel/process/process.picoc#L438), [`process_heap_size()`](kernel/process/process.picoc#L444), [`handle_process_heap_full_exception()`](kernel/exception.picoc#L81), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151) |
 | Descriptors and I/O | 22–29 | Descriptor availability, open, read, write, close, seek, duplicate, direct UART byte send | Selector 22 returns 1 directly; [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L213), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L143), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L260), [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L160), [`send_byte_over_uart()`](kernel/uart_hardware.picoc#L9) |
 | Paths and directories | 30–37 | Change/get working directory, make/read directory, unlink file, remove directory, move path, touch file | [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156), [`make_host_directory()`](kernel/filesystem/host_filesystem.picoc#L177), [`read_host_directory()`](kernel/filesystem/host_filesystem.picoc#L187), [`unlink_host_file()`](kernel/filesystem/host_filesystem.picoc#L208), [`remove_host_directory()`](kernel/filesystem/host_filesystem.picoc#L212), [`move_host_path()`](kernel/filesystem/host_filesystem.picoc#L216), [`touch_host_file()`](kernel/filesystem/host_filesystem.picoc#L234) |
@@ -1502,9 +1502,11 @@ referenced value, such as a path or shared-memory name.
 
 The timer is mapped to vector 1 with priority 1 and activated with an interval
 of 1000 instructions after init becomes ready. The complete
-[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L31) entry and
-[`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L54)
-continuation are:
+[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) entry,
+[`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62),
+[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74), and
+[`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L91)
+continuations are:
 
 ```c
 __attribute__((naked))
@@ -1522,6 +1524,41 @@ void timer_interrupt(void) {
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
 
+    // Process interrupts must leave the nearly exhausted process stack before
+    // calling kernel functions. Kernel interrupts keep their live kernel stack
+    asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
+    asm("SUB ACC DS");
+    asm("JUMP32>= timer_interrupt_process");
+
+    asm("LOADI32 ACC timer_interrupt_kernel_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC dispatcher_request_reschedule");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void timer_interrupt_kernel_return(void) {
+    // The pending request is consumed when this kernel work returns to a process
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+
+__attribute__((naked))
+void timer_interrupt_process(void) {
+    // BAF keeps old_sp while loading kernel CS, DS and SP
+    asm("MOVE SP BAF");
+    asm("LOADI IN1 0");
+    write_stack_heap_boundary_from_in1();
+    asm(KERNEL_SP_START_ASM);
+    activate_kernel_stack_boundary();
+
     asm("LOADI32 ACC timer_interrupt_after_reschedule_request");
     asm("ADD ACC CS");
     asm("PUSH ACC");
@@ -1532,31 +1569,6 @@ void timer_interrupt(void) {
 
 __attribute__((naked))
 void timer_interrupt_after_reschedule_request(void) {
-    /*
-     * Restores kernel regs when the interrupted instruction belongs to the
-     * kernel code segment. The pending request is consumed when that kernel
-     * work next returns to a process
-     */
-    asm("LOADIN SP ACC 7"); // Interrupted PC above the six saved registers
-    asm("SUB ACC DS");
-    asm("JUMP>= 14"); // Only process code executes at or above this boundary
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-
-    // BAF keeps old_sp while loading kernel CS, DS and SP
-    asm("MOVE SP BAF");
-    asm("LOADI IN1 0");
-    write_stack_heap_boundary_from_in1();
-    asm(KERNEL_CS_START_ASM);
-    asm(KERNEL_DS_START_ASM);
-    asm(KERNEL_SP_START_ASM);
-    activate_kernel_stack_boundary();
-
     // Passes the interrupted stack frame to the dispatcher
     asm("PUSH BAF"); // Caller context
 
@@ -1569,14 +1581,21 @@ void timer_interrupt_after_reschedule_request(void) {
 }
 ```
 
-The entry tail-calls
-[`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10). Its
-continuation either returns directly with `RTI`, or installs the kernel stack
-boundary through
-[`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2) and
-[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11) before
-tail-calling
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70).
+After saving six registers, the entry reads the interrupted `PC` seven cells
+above `SP` and compares it with the kernel data-segment boundary. It does this
+before building a call frame: [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10)
+needs stack space, and calling it while `SP` still referred to an almost-full
+process stack could cross that process's stack/heap boundary after kernel `CS`
+and `DS` were already active. The resulting fault would then appear to be a
+kernel stack overflow instead of the intended user-process stack overflow.
+
+For a userspace interruption, [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)
+preserves the process frame in `BAF`, disables its boundary while changing
+stacks, installs `KERNEL_SP_START_ASM`, and activates the kernel boundary before
+requesting rescheduling. Its continuation then passes the preserved frame to
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71). For a kernel
+interruption, [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62)
+keeps the live kernel stack, restores the saved registers, and executes `RTI`.
 
 If the timer interrupted userspace, its process activation is saved and goes
 through the scheduler immediately. If it interrupted kernel code, that code
@@ -1625,7 +1644,7 @@ Divide-by-zero, stack overflow, and illegal instruction set cause register 11
 and enter vector 3. The exception ISR retains the interrupted code segment long
 enough to identify a kernel or process fault, then loads the kernel context.
 The complete
-[`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L159)
+[`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171)
 entry is:
 
 ```c
@@ -1763,14 +1782,14 @@ struct ActivationRecord {
 
 | Attribute | Meaning | Used by |
 | --- | --- | --- |
-| [`in1`](kernel/process/process.header#L22), [`in2`](kernel/process/process.header#L23), [`acc`](kernel/process/process.header#L24) | General argument/result registers at the suspension point | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`sp`](kernel/process/process.header#L25) | Free cell immediately below the saved return PC on the process stack | First initialized by [`create_process()`](kernel/process/process.picoc#L88); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`baf`](kernel/process/process.header#L26) | Base address of the interrupted PicoC function frame | First initialized by [`create_process()`](kernel/process/process.picoc#L88); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`in1`](kernel/process/process.header#L22), [`in2`](kernel/process/process.header#L23), [`acc`](kernel/process/process.header#L24) | General argument/result registers at the suspension point | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`sp`](kernel/process/process.header#L25) | Free cell immediately below the saved return PC on the process stack | First initialized by [`create_process()`](kernel/process/process.picoc#L88); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`baf`](kernel/process/process.header#L26) | Base address of the interrupted PicoC function frame | First initialized by [`create_process()`](kernel/process/process.picoc#L88); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L88); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 
 These are the RETI registers required to resume a process.
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) fills the
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) fills the
 record from an interrupt frame.
 [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) reads it by fixed
 PCB offsets and restores the registers. It is not a pointer to a stack frame
@@ -1815,12 +1834,12 @@ struct Process {
 | Attribute | Meaning | Used by |
 | --- | --- | --- |
 | [`pid`](kernel/process/process.header#L32) | Assigned from the global counter when the PCB is created; never changes | First initialized by [`create_process()`](kernel/process/process.picoc#L88); read by [`find_process_by_pid()`](kernel/process/process.picoc#L161) and [`wait_for_process_by_pid()`](kernel/process/process.picoc#L368) |
-| [`state`](kernel/process/process.header#L33) | [`NEW`](kernel/process/process.header#L12), [`READY`](kernel/process/process.header#L13), [`RUNNING`](kernel/process/process.header#L14), [`BLOCKED`](kernel/process/process.header#L15), [`STOPPED`](kernel/process/process.header#L16), or [`ZOMBIE`](kernel/process/process.header#L17) | First initialized by [`create_process()`](kernel/process/process.picoc#L88); changed by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), queue helpers, [`stop_process()`](kernel/signal.picoc#L36), [`continue_process()`](kernel/signal.picoc#L49), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L42), and [`terminate_process()`](kernel/process/process.picoc#L303) |
+| [`state`](kernel/process/process.header#L33) | [`NEW`](kernel/process/process.header#L12), [`READY`](kernel/process/process.header#L13), [`RUNNING`](kernel/process/process.header#L14), [`BLOCKED`](kernel/process/process.header#L15), [`STOPPED`](kernel/process/process.header#L16), or [`ZOMBIE`](kernel/process/process.header#L17) | First initialized by [`create_process()`](kernel/process/process.picoc#L88); changed by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), queue helpers, [`stop_process()`](kernel/signal.picoc#L36), [`continue_process()`](kernel/signal.picoc#L49), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), and [`terminate_process()`](kernel/process/process.picoc#L303) |
 | [`base_address`](kernel/process/process.header#L34), [`size`](kernel/process/process.header#L35) | Absolute start and total cell count of the [`pmalloc()`](kernel/pmalloc.picoc#L20) process image | First initialized by [`create_process()`](kernel/process/process.picoc#L88); released by [`remove_process()`](kernel/process/process.picoc#L208) |
 | [`heap_start`](kernel/process/process.header#L36), [`heap_size`](kernel/process/process.header#L37) | Process-relative userspace heap start and cell count from the binary header/defaults | First initialized by [`create_process()`](kernel/process/process.picoc#L88); read by [`process_heap_start()`](kernel/process/process.picoc#L438), [`process_heap_size()`](kernel/process/process.picoc#L444), and [`process_stack_boundary()`](kernel/exception.picoc#L18) |
 | [`binary_path`](kernel/process/process.header#L38) | PCB-owned executable path; also copied to [`argv[0]`](kernel/process/process_arguments.picoc#L140) | First initialized by [`create_process()`](kernel/process/process.picoc#L88); copied by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), printed by [`list_processes()`](kernel/process/process.picoc#L32), freed by [`remove_process()`](kernel/process/process.picoc#L208) |
 | [`working_directory`](kernel/process/process.header#L39) | PCB-owned absolute PicoOS path, copied from the parent or initialized to `/` for PID 1 | First initialized by [`create_process()`](kernel/process/process.picoc#L88) through copying; read by [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), replaced by [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), freed by [`remove_process()`](kernel/process/process.picoc#L208) |
-| [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context used by dispatcher and blocked syscall returns | First initialized by [`create_process()`](kernel/process/process.picoc#L88); updated by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70), and [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183); restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context used by dispatcher and blocked syscall returns | First initialized by [`create_process()`](kernel/process/process.picoc#L88); updated by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183); restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`file_descriptors`](kernel/process/process.header#L42) | Kernel-heap descriptor table and entry array owned by this PCB | First initialized by [`create_process()`](kernel/process/process.picoc#L88) through [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35); inherited by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241); destroyed by [`remove_process()`](kernel/process/process.picoc#L208) |
 | [`waiting_status_ptr`](kernel/process/process.header#L44) | Pointer into this process’s suspended userspace [`waitpid()`](library/sys/wait/wait.picoc#L14) frame | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L88); set by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L368); written and cleared by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260) or [`notify_process_stopped()`](kernel/signal.picoc#L22) |
 | [`waiters`](kernel/process/process.header#L46) | Embedded FIFO queue of processes waiting for this process | First initialized by [`create_process()`](kernel/process/process.picoc#L88); filled by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L368); drained by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260) or [`notify_process_stopped()`](kernel/signal.picoc#L22) |
@@ -2015,9 +2034,9 @@ direct helpers that establish the next ownership or scheduling step.
 | [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`list_processes()`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`; list function returns no value | Read/traverse the process list; the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L213) |
 | [`remove_process()`](kernel/process/process.picoc#L208) | Returns no value | Final destructor: unlinks queues/list and releases image, attachments, descriptor table, strings, and PCB | [`remove_from_wait_queue()`](kernel/process/process.picoc#L175), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`pfree()`](kernel/pmalloc.picoc#L47), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115), [`kfree()`](kernel/kmalloc.picoc#L38) |
 | [`orphan_and_signal_children()`](kernel/process/process.picoc#L278), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260) | Return no value | Update child parent fields or parent wait status/queue | [`remove_process()`](kernel/process/process.picoc#L208), [`send_signal_to_process()`](kernel/signal.picoc#L74), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415) |
-| [`terminate_process()`](kernel/process/process.picoc#L303), [`exit_process()`](kernel/process/process.picoc#L450), [`unload_process_by_pid()`](kernel/process/process.picoc#L327) | Termination returns no value; [`exit_process()`](kernel/process/process.picoc#L450) does not return normally; unload returns `true` on removal, `false` for a missing or current PID | Store status, make a PCB zombie, wake waiters, and remove it when permitted | [`orphan_and_signal_children()`](kernel/process/process.picoc#L278), [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`process_has_waiting_parent()`](kernel/process/process.picoc#L248), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260), [`remove_process()`](kernel/process/process.picoc#L208), [`terminate_process()`](kernel/process/process.picoc#L303), [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54), [`shutdown()`](kernel/kernel.picoc#L15) |
+| [`terminate_process()`](kernel/process/process.picoc#L303), [`exit_process()`](kernel/process/process.picoc#L450), [`unload_process_by_pid()`](kernel/process/process.picoc#L327) | Termination returns no value; [`exit_process()`](kernel/process/process.picoc#L450) does not return normally; unload returns `true` on removal, `false` for a missing or current PID | Store status, make a PCB zombie, wake waiters, and remove it when permitted | [`orphan_and_signal_children()`](kernel/process/process.picoc#L278), [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`process_has_waiting_parent()`](kernel/process/process.picoc#L248), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L260), [`remove_process()`](kernel/process/process.picoc#L208), [`terminate_process()`](kernel/process/process.picoc#L303), [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`shutdown()`](kernel/kernel.picoc#L15) |
 | [`wait_for_process_by_pid()`](kernel/process/process.picoc#L368) | Returns `true` after immediate status/error collection; blocking dispatch normally resumes userspace with saved `IN2 = 1` | Collects status or records the caller's status pointer and blocks it on a child queue | [`current_process()`](kernel/process/process.picoc#L61), [`find_process_by_pid()`](kernel/process/process.picoc#L161), [`remove_process()`](kernel/process/process.picoc#L208), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L410) |
-| [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L410), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415), [`remove_from_wait_queue()`](kernel/process/process.picoc#L175) | Enqueue/remove return no value; wake returns `false` for an empty queue and `true` after removing one waiter; sleep dispatches before resuming userspace | Maintain intrusive wait links and blocked/ready state | [`current_process()`](kernel/process/process.picoc#L61), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) |
+| [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L410), [`wakeup_wait_queue()`](kernel/process/process.picoc#L415), [`remove_from_wait_queue()`](kernel/process/process.picoc#L175) | Enqueue/remove return no value; wake returns `false` for an empty queue and `true` after removing one waiter; sleep dispatches before resuming userspace | Maintain intrusive wait links and blocked/ready state | [`current_process()`](kernel/process/process.picoc#L61), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) |
 | [`process_heap_start()`](kernel/process/process.picoc#L438), [`process_heap_size()`](kernel/process/process.picoc#L444) | Return current process's absolute heap start or heap size | Read current PCB memory fields only | [`current_process()`](kernel/process/process.picoc#L61) |
 | [`remove_test_processes()`](kernel/process/process.picoc#L347) | Returns no value | Removes all PCBs except PID 1, PID 2, and the caller; resets the next PID to 3 only when the caller is PID 2 | [`remove_process()`](kernel/process/process.picoc#L208) |
 
@@ -2436,7 +2455,7 @@ one.
 Immediate timer preemption, deferred timer requests,
 [`yield()`](library/schedule/schedule.picoc#L4), terminal blocking, queues, and
 [`waitpid()`](library/sys/wait/wait.picoc#L14) eventually pass a saved frame to
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70). The complete function below shows
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71). The complete function below shows
 how it preserves the caller’s registers and leaves an already blocked or stopped state intact:
 
 ```c
@@ -2468,15 +2487,15 @@ without switching inside the kernel, and
 frame through this same path at return. Selecting a process for dispatch clears the request, even if
 it is the same process again.
 
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54) schedules and calls
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) schedules and calls
 [`prepare_process_termination()`](kernel/signal.picoc#L124) before running a PCB. Deferred
 termination can remove that PCB, requiring another pass. If processes exist but none is runnable,
 the loop repeatedly scans in kernel context until an interrupt makes one ready. If the process list
-is empty, [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54) returns.
+is empty, [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) returns.
 
 ## 7.3 Restoring
 
-[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L42) updates old/new states and the
+[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) updates old/new states and the
 global active pointer, then enters [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21).
 The complete restoration code below shows why this last step must be naked: it installs another
 process’s stack and finishes with `RTI`, without a normal function return.
@@ -2488,11 +2507,12 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN SP BAF 2");
     asm("LOADIN SP IN1 3");
 
-    // Installs the process boundary without creating a call frame
+    // Restores SP before the process boundary so an interrupt cannot compare the
+    // kernel stack against the process heap during this context-switch window
+    asm("LOADIN BAF SP 11");
     write_stack_heap_boundary_from_in1();
 
-    // Restores the saved activation record while BAF still points to the process
-    asm("LOADIN BAF SP 11");
+    // Restores the remaining activation record while BAF still points to the process
     asm("LOADIN BAF CS 13");
     asm("LOADIN BAF DS 14");
     asm("LOADIN BAF IN1 8");
@@ -2506,24 +2526,25 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
 ```
 
 The fixed offsets are why [`activation`](kernel/process/process.header#L40) must remain at its
-defined PCB position. The helper writes the boundary, restores the activation, and leaves kernel
-code through `RTI`. The table below connects the scheduler and dispatcher functions to their state
-changes and direct calls.
+defined PCB position. The helper restores `SP` before installing the process boundary, so an
+interrupt cannot compare the still-active kernel stack with the selected process's heap boundary.
+It then restores the remaining activation and leaves kernel code through `RTI`. The table below
+connects the scheduler and dispatcher functions to their state changes and direct calls.
 
 | Kernel function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
 | [`scheduler_next_process()`](kernel/scheduler.picoc#L12) | Runnable PCB, or `NULL` when none is runnable | Reads process-list and active-PCB globals | [`first_process()`](kernel/process/process.picoc#L28), [`current_process()`](kernel/process/process.picoc#L61), [`scheduler_can_run()`](kernel/scheduler.picoc#L4) |
 | [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) | Returns no value | Sets [`reschedule_requested`](kernel/dispatcher.picoc#L8) after timer expiry | — |
-| [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14) | Returns if no request is pending, or dispatch finds an empty process list | Dispatches from the syscall frame when a timer request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) |
-| [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70) | Returns only if scheduling finds an empty process list; otherwise leaves through `RTI` | Copies the saved frame into PCB activation and may change `RUNNING` to `READY` | [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54) |
-| [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54) | Leaves through `RTI` for a runnable PCB; spins while existing PCBs cannot run; returns for an empty list | Schedules, consumes deferred signal actions, and retries when a selected PCB has a pending termination signal | [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`first_process()`](kernel/process/process.picoc#L28), [`prepare_process_termination()`](kernel/signal.picoc#L124), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L42) |
-| [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L42) | Does not return normally | Updates states, clears the reschedule request, and sets the active PCB | [`current_process()`](kernel/process/process.picoc#L61), [`set_current_process()`](kernel/process/process.picoc#L65), [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), [`process_stack_boundary()`](kernel/exception.picoc#L18) |
+| [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14) | Returns if no request is pending, or dispatch finds an empty process list | Dispatches from the syscall frame when a timer request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) |
+| [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | Returns only if scheduling finds an empty process list; otherwise leaves through `RTI` | Copies the saved frame into PCB activation and may change `RUNNING` to `READY` | [`current_process()`](kernel/process/process.picoc#L61), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
+| [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | Leaves through `RTI` for a runnable PCB; spins while existing PCBs cannot run; returns for an empty list | Schedules, consumes deferred signal actions, and retries when a selected PCB has a pending termination signal | [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`first_process()`](kernel/process/process.picoc#L28), [`prepare_process_termination()`](kernel/signal.picoc#L124), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
+| [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) | Does not return normally | Updates states, clears the reschedule request, and sets the active PCB | [`current_process()`](kernel/process/process.picoc#L61), [`set_current_process()`](kernel/process/process.picoc#L65), [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), [`process_stack_boundary()`](kernel/exception.picoc#L18) |
 | [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) | Leaves through `RTI` | Writes the stack boundary to periphery register 10 and restores activation | [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2) |
 
 The sequence diagram follows an immediate switch from process A to a runnable process B through
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70),
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L54), and
-[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L42). The selection loop matters:
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71),
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), and
+[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43). The selection loop matters:
 [`prepare_process_termination()`](kernel/signal.picoc#L124) can reject the scheduler’s candidate
 before any registers are restored. Deferred timer requests enter this same path at
 [syscall return](#44-timer-isr-and-preemption).
@@ -2615,12 +2636,12 @@ kernel code/data sizes change:
 | SRAM offset | Region and ownership |
 | ---: | --- |
 | `0..4` | Five-cell kernel `.ivt` |
-| `5..41703` | Kernel `.text` beginning at [`KERNEL_CS_START_ASM`](kernel/memory_constants.header#L6) |
-| `41704..42458` | Kernel `.data`, including process-list pointers, terminal, registry heads, and heap descriptors |
-| `42459..46554` | 4096-cell kernel heap beginning at [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) |
-| `46555..49269` | Reserved room for the downward-growing kernel stack |
-| `49270` | Initial kernel `SP`, the free cell immediately below its first stack value |
-| `49271..262143` | Global process-memory heap beginning at [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) |
+| `5..40897` | Kernel `.text` beginning at [`KERNEL_CS_START_ASM`](kernel/memory_constants.header#L6) |
+| `40898..41629` | Kernel `.data`, including process-list pointers, terminal, registry heads, and heap descriptors |
+| `41630..45725` | 4096-cell kernel heap beginning at [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) |
+| `45726..48440` | Reserved room for the downward-growing kernel stack |
+| `48441` | Initial kernel `SP`, the free cell immediately below its first stack value |
+| `48442..262143` | Global process-memory heap beginning at [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) |
 
 The interrupt boundary for kernel execution is the final kernel-heap cell. The process-memory heap
 shares its free-block list between complete process images and shared-memory data regions. The
@@ -3033,7 +3054,7 @@ functions do not turn that allocation failure into a normal error.
 | [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35) | Number of bytes copied | Pops terminal bytes into a process buffer | [`pop_terminal_byte()`](kernel/filesystem/terminal.picoc#L26) |
 | [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49) | Returns no value | Inserts at tail and may discard the oldest byte | — |
 | [`suspend_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L76) | Returns no value | Detaches a stopped reader from active terminal waiters while retaining its PCB request | [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`remove_from_wait_queue()`](kernel/process/process.picoc#L175) |
-| [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135) | Immediate count, or a saved result on later resumption after blocking/stopping | Reads ring or fills pending fields, queues PCB, saves activation, and dispatches | [`current_process()`](kernel/process/process.picoc#L61), [`process_has_terminal_input()`](kernel/signal.picoc#L166), [`send_signal_to_process()`](kernel/signal.picoc#L74), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L70), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395) |
+| [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135) | Immediate count, or a saved result on later resumption after blocking/stopping | Reads ring or fills pending fields, queues PCB, saves activation, and dispatches | [`current_process()`](kernel/process/process.picoc#L61), [`process_has_terminal_input()`](kernel/signal.picoc#L166), [`send_signal_to_process()`](kernel/signal.picoc#L74), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L395) |
 | [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) | Returns no value | With UART delivery temporarily disabled, fills a stopped foreground reader’s buffer immediately or requeues it; sets [`Process.stopped_from_state`](kernel/process/process.header#L62) for continuation | [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`remove_from_wait_queue()`](kernel/process/process.picoc#L175), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`enqueue_terminal_reader()`](kernel/filesystem/terminal.picoc#L62) |
 | [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183) | Returns no value | Copies input, writes saved [`activation.in2`](kernel/process/process.header#L23), clears pending fields, and marks the selected reader ready | [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`remove_from_wait_queue()`](kernel/process/process.picoc#L175) |
 | [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) | Returns no value | Acknowledges byte, signals target, or mutates terminal/reader PCB | [`terminal_input_process()`](kernel/signal.picoc#L170), [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`periphery_write_register()`](kernel/periphery.picoc#L11), [`handle_terminal_signal_character()`](kernel/signal.picoc#L183), [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183) |
