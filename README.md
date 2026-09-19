@@ -353,7 +353,6 @@ Use the nested links to jump directly to a mechanism or reference table.
    - [3.6 Shared-memory entries and mappings](#36-shared-memory-entries-and-mappings)
       - [3.6.1 Named entries and per-process attachments](#361-named-entries-and-per-process-attachments)
       - [3.6.2 Mapping, unlinking, and deferred destruction](#362-mapping-unlinking-and-deferred-destruction)
-      - [3.6.3 Shared-memory test scenarios](#363-shared-memory-test-scenarios)
 1. [Processes and process lifecycle](#4-processes-and-process-lifecycle)
    - [4.1 Global process list and current process](#41-global-process-list-and-current-process)
    - [4.2 Saved process activation](#42-saved-process-activation)
@@ -2213,17 +2212,18 @@ kernel code/data sizes change:
 
 The interrupt boundary for kernel execution is the final kernel-heap cell. The process-memory heap
 shares its free-block list between complete process images and shared-memory data regions. The
-diagram follows increasing SRAM addresses and places both heaps relative to kernel code, data, and
-stack. Its arrows show memory order, not pointers or function calls.
+memory-allocation diagram places adjoining regions from lower to higher SRAM addresses. Its widths
+group the regions for readability and are not proportional to their sizes.
 
 ```mermaid
-flowchart LR
-    IVT["kernel .ivt"] --> KT["kernel .text"]
-    KT --> KD["kernel .data<br/>heap descriptors and registries"]
-    KD --> KH["kernel heap<br/>PCBs and metadata"]
-    KH --> KS["kernel stack space"]
-    KS --> PM["process-memory heap<br/>images + shared-memory data"]
-    PM --> END["end of SRAM"]
+block-beta
+    columns 12
+    IVT["kernel .ivt<br/>0–4"]:1
+    KT["kernel .text<br/>5–40955"]:3
+    KD["kernel .data<br/>40956–41687"]:2
+    KH["kernel heap<br/>41688–45783"]:2
+    KS["kernel stack space<br/>45784–48499"]:2
+    PM["process-memory heap<br/>48500–262143"]:2
 ```
 
 ## 3.4 Linked code, data, heap, and stack address ranges
@@ -2241,7 +2241,7 @@ generated kernel metadata as a concrete example of the corresponding `.sections`
 | [`codesegment_start`](kernel/kernel.sections#L3) | Added to [`base_address`](kernel/process/process.header#L34) for initial `CS`/entry |
 | [`datasegment_start`](kernel/kernel.sections#L4) | Added to [`base_address`](kernel/process/process.header#L34) for `DS` |
 | [`heap_start`](kernel/process/process.header#L36) | First header of the process-global [`process_heap`](library/stdlib/malloc.picoc#L6) |
-| [`heap_start + heap_size - 1`](kernel/exception.picoc#L19) | Inclusive boundary installed in periphery register 10 |
+| [`heap_start + heap_size - 1`](kernel/exception.picoc#L19) | Inclusive heap boundary installed in periphery register 10; the RETI emulator raises a stack-overflow exception when an instruction decreases `SP` below it |
 | [`stack_start`](kernel/process/process_loader.picoc#L121) | Initial free `SP`; the stack grows downward through the gap above the heap |
 
 The kernel relocates only by adding the image's absolute
@@ -2254,12 +2254,25 @@ range.
 ## 3.5 Heap and allocator function reference
 [\[↑ TOC\]](#contents)
 
-The common allocator is linked directly into both kernel and library targets. The table places
-each function name first and follows it with `Shared/Common`, `Kernel only`, or `Library only` in
-parentheses. Directly linked library callers do not cross a syscall boundary and appear before
-direct kernel callers. Kernel-heap exhaustion panics; process-memory allocation instead returns
-[`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (0), allowing a loader or shared-memory request
-to fail.
+These functions implement the heap and allocation mechanisms used throughout PicoOS. The same
+[`common/heap.picoc`](common/heap.picoc) implementation is linked into the kernel and included in
+the userspace [`libstdlib`](library/stdlib/libstdlib.picoc), so it becomes kernel code in the first
+case and library code in the second. Kernel wrappers use [`kmalloc()`](kernel/kmalloc.picoc#L23)
+for [`Process`](kernel/process/process.header#L31) structures and other kernel metadata, while
+[`pmalloc()`](kernel/pmalloc.picoc#L20) reserves complete process images and shared-memory data
+regions from the process-memory heap. Each program's [`malloc()`](library/stdlib/malloc.picoc#L35)
+instead manages the userspace heap inside that process image; startup obtains its bounds through
+syscalls 16 and 17, but later block searches and updates run directly in the linked library code.
+
+User-facing operations that allocate outside the calling process's local heap enter the kernel.
+[`load()`](library/unistd/process.picoc#L17) reaches process loading and its [`pmalloc()`](kernel/pmalloc.picoc#L20)
+allocation through syscall 2. [`shm_open()`](library/sys/mman/mman.picoc#L15) reaches
+[`open_shared_memory()`](kernel/shared_memory.picoc#L92) through syscall 19, which allocates kernel
+metadata with [`kmalloc()`](kernel/kmalloc.picoc#L23) and the shared data with
+[`pmalloc()`](kernel/pmalloc.picoc#L20). [`mmap()`](library/sys/mman/mman.picoc#L23) reaches
+[`map_shared_memory()`](kernel/shared_memory.picoc#L130) through syscall 20, which allocates a
+kernel attachment record. The table distinguishes these target-specific wrappers from the common
+functions linked directly into each target.
 
 | Kernel / Library Function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
@@ -2280,8 +2293,8 @@ to fail.
 | [`kmalloc(size)`](kernel/kmalloc.picoc#L23) (Kernel only) | Kernel pointer; panics on positive allocation failure | Allocates from the kernel heap | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_process()`](kernel/process/process.picoc#L89), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`copy_file_path()`](kernel/filesystem/file_descriptor.picoc#L6), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
 | [`krealloc(ptr, size)`](kernel/kmalloc.picoc#L31) (Kernel only) | Kernel pointer; panics on positive allocation failure | Reallocates a kernel-heap block | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_realloc_from()`](common/heap.picoc#L87) | — |
 | [`kfree(ptr)`](kernel/kmalloc.picoc#L38) (Kernel only) | Returns no value | Releases and merges a kernel-heap block | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`remove_process()`](kernel/process/process.picoc#L209), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128), [`copy_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L82), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L143) |
-| [`pmalloc(size)`](kernel/pmalloc.picoc#L20) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (0) for invalid size/no fit | Allocates a process image or shared-data region | [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`prealloc(start, size)`](kernel/pmalloc.picoc#L31) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (0) for invalid size/no fit | Reallocates a process-memory region | [`heap_realloc_from()`](common/heap.picoc#L87) | — |
+| [`pmalloc(size)`](kernel/pmalloc.picoc#L20) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for invalid size/no fit | Allocates a process image or shared-data region | [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`prealloc(start, size)`](kernel/pmalloc.picoc#L31) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for invalid size/no fit | Reallocates a process-memory region | [`heap_realloc_from()`](common/heap.picoc#L87) | — |
 | [`pfree(start)`](kernel/pmalloc.picoc#L47) (Kernel only) | Returns no value | Releases and merges a process-memory region | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`remove_process()`](kernel/process/process.picoc#L209) |
 
 The decision graph follows [`heap_realloc_from()`](common/heap.picoc#L87) for a valid existing block
@@ -2311,10 +2324,12 @@ between arbitrary process data accesses and other memory.
 ## 3.6 Shared-memory entries and mappings
 [\[↑ TOC\]](#contents)
 
-The kernel keeps one linked-list entry for every named shared-memory region. Each
-process that maps a region keeps its own attachment record. The first subsection
-defines these records; the next follows their lifetime through mapping and
-unlinking.
+Shared memory gives multiple processes access to the same physical cells, so a value written by
+one process is visible to the others that map the region. PicoOS allocates each shared-memory data
+region with [`pmalloc()`](kernel/pmalloc.picoc#L20) from the same process-memory heap that holds
+complete process images. A process image and a shared-memory region are separate allocations, but
+both occupy the payload of a [`BlockHeader`](common/heap.header#L5) in that heap. The kernel keeps a
+named entry for each shared region and a separate attachment record in every process that maps it.
 
 ### 3.6.1 Named entries and per-process attachments
 [\[↑ TOC\]](#contents)
@@ -2331,9 +2346,10 @@ do not own it.
 in [`kernel/shared_memory.picoc`](kernel/shared_memory.picoc). They are part of the kernel's global
 data, not heap allocations. The head points to the first entry in the kernel's linked list or is
 `NULL` when the list is empty. The ID counter supplies the next unique numeric ID when
-[`open_shared_memory()`](kernel/shared_memory.picoc#L92) creates an entry; both globals are reset by
-[`initialize_shared_memory()`](kernel/shared_memory.picoc#L9). The two field tables explain the
-kernel's linked list first and each process’s attachment list second.
+[`open_shared_memory()`](kernel/shared_memory.picoc#L92) creates an entry.
+[`initialize_shared_memory()`](kernel/shared_memory.picoc#L9) initializes both globals during
+kernel startup. The two field tables explain the kernel's linked list first and each process’s
+attachment list second.
 
 ```c
 struct SharedMemoryEntry {
@@ -2356,33 +2372,25 @@ user process stack. [`open_shared_memory()`](kernel/shared_memory.picoc#L92) all
 [`SharedMemoryEntry`](kernel/shared_memory.header#L8), plus its copied name, as separate
 [`kmalloc()`](kernel/kmalloc.picoc#L23) allocations in the kernel heap. It then allocates the
 shared-data region separately with [`pmalloc()`](kernel/pmalloc.picoc#L20). The entry stores that
-region's start address in its [`address`](kernel/shared_memory.header#L11) field. Like a complete
-process image, the data region has its own generic [`BlockHeader`](common/heap.header#L5)
-immediately before its payload in the process-memory heap. It shares neither that header nor the
-kernel heap with the entry and name allocations.
+region's start address in its [`address`](kernel/shared_memory.header#L11) field. The shared data is
+therefore separate from the entry and name allocations in the kernel heap.
 
 Each call to [`map_shared_memory()`](kernel/shared_memory.picoc#L130) allocates one
 [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) with
 [`kmalloc()`](kernel/kmalloc.picoc#L23), also in the kernel heap. The attachment is linked from the
 current PCB's [`shared_memory_attachments`](kernel/process/process.header#L55) field, points back to
-the linked-list entry, and accounts for that process's mapping. This lets
-[`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) find and free the attachment
-when the process is removed. The [`SharedMemoryEntry`](kernel/shared_memory.header#L8) remains in
-the kernel's linked list for name/ID lookup, records the shared-data address and mapping count, and
-returns the same absolute data pointer to every mapper.
+the linked-list entry, and accounts for that process's mapping. The
+[`SharedMemoryEntry`](kernel/shared_memory.header#L8) remains the single object used for name and ID
+lookup, records the data address and mapping count, and returns the same absolute data pointer to
+every mapper.
 
 The [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) is needed because a
 [`SharedMemoryEntry`](kernel/shared_memory.header#L8) alone does not say which process must release
-a mapping.
-For example, if two processes map one ID, there is one [`SharedMemoryEntry`](kernel/shared_memory.header#L8)
-and two [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) records: one in each PCB.
-When one process exits, [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) walks
-only that PCB's attachment list, frees its record, and decrements the entry's
-[`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12). The other process's
-[`SharedMemoryAttachment`](kernel/shared_memory.header#L17) and the shared-data region remain. A
-[`SharedMemoryAttachment`](kernel/shared_memory.header#L17) therefore does not hold shared bytes or
-give the process a different address; it records that this process currently maps the
-[`SharedMemoryEntry`](kernel/shared_memory.header#L8).
+a mapping during process cleanup. If two processes map one ID, there is one
+[`SharedMemoryEntry`](kernel/shared_memory.header#L8) and two
+[`SharedMemoryAttachment`](kernel/shared_memory.header#L17) records, one linked from each PCB. An
+attachment does not hold shared bytes or give its process a different address; it records which
+entry that process maps.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
@@ -2404,48 +2412,22 @@ owning the entry itself.
 ### 3.6.2 Mapping, unlinking, and deferred destruction
 [\[↑ TOC\]](#contents)
 
-With the entry and attachment roles established, their lifetime can be
-followed through the public operations. Opening an existing name returns its ID
-and does not resize it. Unlink removes the name immediately.
-With no attachment the entry is destroyed; otherwise it survives by ID until release. The old ID can
-still be mapped while that entry exists, and opening the former name can create a new entry. Process
-removal decrements counts and frees attachments. If [`shm_unlink()`](library/sys/mman/mman.picoc#L27)
-already removed a [`SharedMemoryEntry`](kernel/shared_memory.header#L8)'s name, the kernel removes
-that [`SharedMemoryEntry`](kernel/shared_memory.header#L8) from its linked list and frees it only
-when its [`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12) reaches zero. A
-count of zero means no process still maps or uses the shared-memory data region. The graph shows two
-PCBs pointing through their own attachments to one shared entry and data region; those two mappings
-account for its reference count of 2.
+With the entry and attachment roles established, the public operations define their lifetime.
+[`shm_unlink()`](library/sys/mman/mman.picoc#L27) frees the name and marks the existing
+[`SharedMemoryEntry`](kernel/shared_memory.header#L8) for destruction, so the object can no longer
+be obtained through that name. Existing attachments and their absolute data addresses remain
+valid. The old numeric ID can also still be mapped while the entry exists, whereas opening the
+former name creates a new entry. If no attachment exists at unlink time, destruction is immediate.
 
-[`shm_open()`](library/sys/mman/mman.picoc#L15) returns a numeric ID, not a pointer to the shared
-bytes. The code below shows Process A creating a counter and passing its ID to Process B as a startup
-argument. Both processes call [`mmap()`](library/sys/mman/mman.picoc#L23) because both access the
-counter. Process B does not call [`shm_open()`](library/sys/mman/mman.picoc#L15), because it already
-received the ID.
-
-```c
-// Process A
-int shared_memory_id_a;
-int *counter_a;
-
-shared_memory_id_a = shm_open("counter", 1);
-counter_a = (int *)mmap(shared_memory_id_a);
-counter_a[0] = 0;
-
-// Starts Process B with shared_memory_id_a as its first argument
-
-// Process B
-int shared_memory_id_b = atoi(argv[1]);
-int *counter_b = (int *)mmap(shared_memory_id_b);
-
-counter_b[0] = counter_b[0] + 1;
-```
-
-`counter_a` and `counter_b` contain the same absolute address. A process that only creates the
-region for another process, or only passes its ID, does not need to call
-[`mmap()`](library/sys/mman/mman.picoc#L23). The [`shared_memory`](test/shared_memory/) launcher
-and workers demonstrate the alternative where every process calls
-[`shm_open()`](library/sys/mman/mman.picoc#L15) with the same name and then maps the returned ID.
+There is no `munmap()` operation. Every successful [`mmap()`](library/sys/mman/mman.picoc#L23)
+therefore adds one attachment and increments
+[`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12), even when one process maps
+the same ID more than once. When [`remove_process()`](kernel/process/process.picoc#L209) removes a
+process, [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) uses that PCB's
+attachment list to find each referenced entry, free the attachment, and decrement the count once
+for that mapping. The entry and its [`pmalloc()`](kernel/pmalloc.picoc#L20) data region are destroyed
+only after unlink has been requested and the count reaches zero. The graph shows the structure
+before cleanup, with two attachments accounting for a count of 2.
 
 ```mermaid
 flowchart LR
@@ -2457,16 +2439,65 @@ flowchart LR
     G["shared-memory list head"] --> E
 ```
 
-The linked list beginning at [`shared_memory_list_head`](kernel/shared_memory.picoc#L6) finds an
-entry by name or ID. Each PCB's attachment list records which reference counts must be released when
-that process disappears. There is no `munmap()` call, so every successful
-[`mmap(id)`](library/sys/mman/mman.picoc#L23) creates one
-attachment and one reference even if the same process maps the ID more than once. The sequence below
-follows [`shm_open()`](library/sys/mman/mman.picoc#L15),
-[`mmap()`](library/sys/mman/mman.picoc#L23), and [`shm_unlink()`](library/sys/mman/mman.picoc#L27)
-across two processes, then shows
-[`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) freeing the data only after the
-last attachment disappears.
+[`shm_open()`](library/sys/mman/mman.picoc#L15) returns a numeric ID, and
+[`mmap()`](library/sys/mman/mman.picoc#L23) returns the shared address. The following PicoC launcher
+opens and maps one cell, writes `7`, and starts a worker with the shared-memory name as
+[`argv[1]`](kernel/process/process_arguments.picoc#L190). After
+[`waitpid()`](library/sys/wait/wait.picoc#L14) returns, the launcher observes the worker's change to
+the same cell.
+
+```c
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
+
+int main(void) {
+    int shared_memory_id;
+    int *shared_value;
+    int worker_pid;
+    int result = 1;
+
+    shared_memory_id = shm_open("shared-value", 1);
+    shared_value = (int *)mmap(shared_memory_id);
+    shared_value[0] = 7;
+
+    worker_pid = load("test/shared_value/worker.bin");
+    run(worker_pid, "shared-value", NULL);
+    waitpid(worker_pid);
+
+    if (shared_value[0] == 8) {
+        result = 0;
+    }
+    shm_unlink("shared-value");
+    return result;
+}
+```
+
+The worker uses the same name to obtain the existing ID, maps the region, reads `7`, and writes `8`.
+These are the complete source-level steps needed for the second process to access the region; the
+[`load()`](library/unistd/process.picoc#L17) and [`run()`](library/unistd/process.picoc#L31) calls in
+the launcher perform process creation and startup rather than hiding them in a comment.
+
+```c
+// dependencies: ../../library/sys/mman/libmman.reti_blocks
+
+#include "../../library/sys/mman/mman.header"
+
+int main(int argc, char **argv) {
+    int shared_memory_id;
+    int *shared_value;
+
+    shared_memory_id = shm_open(argv[1], 1);
+    shared_value = (int *)mmap(shared_memory_id);
+    shared_value[0] = shared_value[0] + 1;
+    return 0;
+}
+```
+
+The sequence diagram follows the same operations through the kernel and then continues through
+unlink and process cleanup to show the deferred destruction rule.
 
 ```mermaid
 sequenceDiagram
@@ -2476,19 +2507,19 @@ sequenceDiagram
     participant PM as Process-memory heap
     participant B as Process B
 
-    A->>K: shm_open("counter", size), syscall 19
+    A->>K: shm_open("shared-value", 1), syscall 19
     K->>KH: kmalloc entry and copied name
     K->>PM: pmalloc shared cells
     K-->>A: Numeric ID
     A->>K: mmap(id), syscall 20
     K->>KH: kmalloc attachment linked from A PCB
     K-->>A: Same absolute address with references = 1
-    B->>K: shm_open("counter", size)
-    K-->>B: Existing ID and unchanged size
+    B->>K: shm_open("shared-value", 1)
+    K-->>B: Existing ID
     B->>K: mmap(id)
     K->>KH: kmalloc attachment linked from B PCB
     K-->>B: Same absolute address with references = 2
-    A->>K: shm_unlink("counter"), syscall 21
+    A->>K: shm_unlink("shared-value"), syscall 21
     K->>KH: Free name and mark unlink requested
     Note over K,PM: Entry and cells remain while references exist
     A->>K: Process removal
@@ -2510,49 +2541,13 @@ internal kernel operations.
 | [`map_shared_memory(shared_memory_id)`](kernel/shared_memory.picoc#L130) | Address, or `NULL` for an unknown ID or no current process | For every successful mapping, creates one [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) with [`kmalloc()`](kernel/kmalloc.picoc#L23), links it from the current PCB's [`shared_memory_attachments`](kernel/process/process.header#L55) field, points it at the existing [`SharedMemoryEntry`](kernel/shared_memory.header#L8), and increments that entry's count | [`current_process()`](kernel/process/process.picoc#L62), [`find_shared_memory_by_id()`](kernel/shared_memory.picoc#L57), [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Library functions:** [`mmap()`](library/sys/mman/mman.picoc#L23)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`unlink_shared_memory(name)`](kernel/shared_memory.picoc#L151) | `0` on unlink; `-1` for a null or unknown name | Frees the name and marks the existing [`SharedMemoryEntry`](kernel/shared_memory.header#L8) for removal; destroys that [`SharedMemoryEntry`](kernel/shared_memory.header#L8) immediately only when its mapping count is zero | [`find_shared_memory_by_name()`](kernel/shared_memory.picoc#L45), [`kfree()`](kernel/kmalloc.picoc#L38), [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) | **Library functions:** [`shm_unlink()`](library/sys/mman/mman.picoc#L27)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 |  |  |  |  |  |
-| [`initialize_shared_memory(void)`](kernel/shared_memory.picoc#L9) | Returns no value | Resets the shared-memory list head and next ID | — | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`initialize_shared_memory(void)`](kernel/shared_memory.picoc#L9) | Returns no value | Initializes the shared-memory list head and next ID | — | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 | [`release_process_shared_memory(process)`](kernel/shared_memory.picoc#L172) | Returns no value | Walks one PCB's [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) list, frees every [`SharedMemoryAttachment`](kernel/shared_memory.header#L17), and decrements the referenced [`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12); destroys an unlinked [`SharedMemoryEntry`](kernel/shared_memory.header#L8) after its last attachment is released | [`kfree()`](kernel/kmalloc.picoc#L38), [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) | **Kernel functions:** [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`destroy_shared_memory_entry(entry)`](kernel/shared_memory.picoc#L69) | Returns no value | Removes one [`SharedMemoryEntry`](kernel/shared_memory.header#L8) from the kernel's linked list, frees its [`SharedMemoryEntry.address`](kernel/shared_memory.header#L11) data region with [`pfree()`](kernel/pmalloc.picoc#L47), and frees the [`SharedMemoryEntry`](kernel/shared_memory.header#L8) and its name with [`kfree()`](kernel/kmalloc.picoc#L38) | [`pfree()`](kernel/pmalloc.picoc#L47), [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) |
 
-Shared memory provides visibility, not mutual exclusion. The shared-memory mutual-exclusion test
-places a mutex and its queue in the shared data region.
-
-### 3.6.3 Shared-memory test scenarios
-[\[↑ TOC\]](#contents)
-
-The repository exercises the ownership rules above in three of its **23 OS
-test classes**:
-[`shared_memory`](test/shared_memory/), [`shared_memory_mutex`](test/shared_memory_mutex/), and
-[`shared_memory_mutual_exclusion`](test/shared_memory_mutual_exclusion/). The
-[test-system chapter](#14-test-system) explains their execution.
-
-The basic shared-memory scenario starts several worker processes with the same name and different
-array indices. Each calls [`shm_open()`](library/sys/mman/mman.picoc#L15) and
-[`mmap()`](library/sys/mman/mman.picoc#L23), writes one distinct cell, and exits. The launcher waits
-for them and observes all values through its own mapping, demonstrating that the returned addresses
-refer to the same physical data rather than copies.
-
-The mutual-exclusion scenario deliberately shares one value. The declaration from
-[`shared.header`](test/shared_memory_mutual_exclusion/shared.header) below shows how
-[`SharedState.value`](test/shared_memory_mutual_exclusion/shared.header#L6) and
-[`SharedState.mutex`](test/shared_memory_mutual_exclusion/shared.header#L7) occupy the same region:
-
-```c
-struct SharedState {
-    int value;
-    struct mutex mutex;
-};
-```
-
-The [`launcher`](test/shared_memory_mutual_exclusion/launcher.picoc#L44) creates a region of the
-size of [`SharedState`](test/shared_memory_mutual_exclusion/shared.header#L5), initializes the value
-and embedded mutex, and passes the numeric shared-memory ID to workers. The first
-[`worker`](test/shared_memory_mutual_exclusion/worker.picoc#L30) yields while holding the lock; the
-launcher disables the timer so this order is controlled by voluntary yields. The other worker's
-`TSL` sees the locked cell and its [`sleep()`](library/unistd/blocking.picoc#L9) queues that PCB on
-the shared embedded wait queue; [`mutex_unlock()`](library/mutex/mutex.picoc#L25) clears the cell
-and wakes it. This connects the process-memory allocation, per-PCB attachment records, atomic
-emulator instruction, kernel wait queues, scheduler, and dispatcher in one test.
+Shared memory provides visibility, not mutual exclusion. [Section 15.2](#152-real-time-operating-systems-topics)
+shows how a shared [`mutex`](library/mutex/mutex.header#L6) protects data accessed by more than one
+process.
 
 # 4. Processes and process lifecycle
 [\[↑ TOC\]](#contents)
