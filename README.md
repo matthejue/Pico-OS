@@ -278,7 +278,9 @@ space—but it gives a useful scale for the available memory.
 ### RETI execution model
 [\[↓ TOC\]](#contents)
 
-RETI chooses an address space from the two highest address bits:
+The RETI memory map determines where the bootloader, peripherals, and PicoOS
+runtime execute. The CPU selects one of these address spaces from the two
+highest address bits:
 
 | High bits | Address space | PicoOS use |
 | --- | --- | --- |
@@ -2171,9 +2173,11 @@ allocates/copies/frees.
 ## 3.2 Kernel, process-memory, and per-process heap instances
 [\[↑ TOC\]](#contents)
 
-The next table shows which descriptor and memory region each allocator uses. Allocator sizes are
-RETI memory cells. PicoC’s scalar values occupy one 32-bit cell, so no separate byte-alignment layer
-is needed in these heaps.
+PicoOS uses the common allocator in three ownership domains: kernel objects,
+process images and shared-memory regions, and each process's local allocations.
+The table shows which descriptor and memory region each allocator uses.
+Allocator sizes are RETI memory cells. PicoC’s scalar values occupy one 32-bit
+cell, so no separate byte-alignment layer is needed in these heaps.
 
 | Heap instance | Descriptor location | Managed region | Contents |
 | --- | --- | --- | --- |
@@ -2589,9 +2593,12 @@ available for process-table order.
 ## 4.2 Saved process activation
 [\[↑ TOC\]](#contents)
 
-The [`struct ActivationRecord`](kernel/process/process.header#L21) is embedded
-in the PCB. The definition below fixes the register order used by assembly;
-the following attribute table explains who initializes and later uses each value:
+The process list identifies the current PCB and the PCBs available to the
+scheduler. To stop one process and later resume it, the kernel also preserves
+its CPU state in the embedded
+[`struct ActivationRecord`](kernel/process/process.header#L21). The definition
+below fixes the register order used by assembly; the following attribute table
+explains who initializes and later uses each value:
 
 ```c
 struct ActivationRecord {
@@ -2623,9 +2630,10 @@ and is not allocated separately.
 ## 4.3 Process control block fields
 [\[↑ TOC\]](#contents)
 
-The current PCB layout below groups the image, activation, resource pointers,
-and wait/signal state in one object. The following attribute table connects
-those fields to their initializers and consumers:
+The activation record is only the CPU-state part of a PCB. The complete layout
+below also groups image metadata, resource pointers, and wait/signal state in
+the same object. The following attribute table connects those fields to their
+initializers and consumers:
 
 ```c
 struct Process {
@@ -2685,9 +2693,13 @@ there is no address translation or protection between processes.
 ## 4.4 Process image and initial userspace stack
 [\[↑ TOC\]](#contents)
 
-The boot-time [`load_process()`](kernel/process/process_loader.picoc#L305) and
-userspace [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) paths each
-allocate one contiguous region from the global process-memory heap. The first subsection shows the image regions, and the second explains the startup values stored on its stack.
+The PCB fields above describe a process image by its address, size, and heap
+range. The boot-time [`load_process()`](kernel/process/process_loader.picoc#L305)
+and userspace
+[`load_process_chunk()`](kernel/process/process_loader.picoc#L292) paths each
+allocate that image as one contiguous region from the global process-memory
+heap. The first subsection shows its regions, and the second explains the
+startup values stored on its stack.
 
 ### 4.4.1 Code, data, heap, and stack placement
 [\[↑ TOC\]](#contents)
@@ -2734,9 +2746,11 @@ the process heap, so parent and child environment arrays become independent.
 ## 4.5 Process states and transitions
 [\[↑ TOC\]](#contents)
 
-The table lists the six PCB states and their numeric values. The state diagram
-then shows the usual load/run, blocking, signal, and termination paths; removal
-ends the PCB's lifetime rather than assigning another state value.
+A process state records its place in the lifecycle and determines whether the
+scheduler may select it. The table lists PicoOS's six states and their numeric
+values. The state diagram then shows the usual load/run, blocking, signal, and
+termination paths; removal ends the PCB's lifetime rather than assigning
+another state value.
 
 | State | Numeric value | Meaning | Typical transition |
 | --- | --- | --- | --- |
@@ -2897,9 +2911,11 @@ destroys the descriptor table, and frees PCB-owned strings and the PCB with
 ## 4.8 Process-table and lifecycle function reference
 [\[↑ TOC\]](#contents)
 
-The table below collects functions that own the global process list, process
-state, parent-child relationships, and final PCB removal. Process loading is
-covered next; wait-queue operations have their own reference in
+Process lifecycle management is split between the list and ownership
+operations collected here and the loading and run-setup operations in the next
+subsection. This table covers the global process list, process state,
+parent-child relationships, and final PCB removal. Wait-queue operations have
+their own reference in
 [Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes).
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
@@ -2919,8 +2935,9 @@ covered next; wait-queue operations have their own reference in
 ## 4.9 Process-loader and run-setup function reference
 [\[↑ TOC\]](#contents)
 
-The next table follows executable transfer, cleanup, and run setup. It shows
-when a reserved image becomes a PCB and when that PCB becomes runnable:
+Loading reserves and fills a process image, while run setup later installs its
+inherited descriptors and startup data. The table follows both phases and
+shows when a reserved image becomes a PCB and when that PCB becomes runnable:
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
@@ -3685,8 +3702,9 @@ the device.
 ## 7.6 File-descriptor creation, inheritance, duplication, and cleanup
 [\[↑ TOC\]](#contents)
 
-The table below collects descriptor-lifecycle operations. I/O operations that
-consume these entries are documented separately afterward.
+Descriptor lifecycle operations create, copy, replace, and release the entries
+that each process uses for I/O. The table collects those operations; the calls
+that consume the entries are documented separately afterward.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
@@ -4236,9 +4254,9 @@ init, and the first dispatch enters userspace.
 ## 10.1 Loading the kernel from the EPROM bootloader
 [\[↑ TOC\]](#contents)
 
-The EPROM bootloader in
-[`boot/bootloader.picoc`](boot/bootloader.picoc) has three important
-functions:
+The EPROM bootloader establishes the first execution context, transfers the
+kernel image into SRAM, and hands control to it. Three functions in
+[`boot/bootloader.picoc`](boot/bootloader.picoc) divide those responsibilities:
 
 | Bootloader function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
@@ -4709,6 +4727,11 @@ parent terminates, with termination propagating to further descendants that reta
 ## 12.7 Input/output redirection
 [\[↑ TOC\]](#contents)
 
+The shell implements redirection by rearranging its descriptors before
+[`run()`](library/unistd/process.picoc#L31) copies them into the child, then
+restoring its own descriptors. The cases below show how this works for stdin,
+stdout, and stderr.
+
 For `COMMAND < PATH`, the shell saves stdin in private descriptor 3, closes descriptor 0, and opens
 the path read-only into that lowest free slot. It starts the child with the resulting descriptor
 table and then restores its own stdin. For example, `cat.bin < input.txt` uses cat's ordinary
@@ -4870,6 +4893,10 @@ argument. [`echo.bin`](user/echo.picoc) keeps `-h` and `--help` as ordinary text
 
 ## 13.2 Command behavior and supported options
 [\[↑ TOC\]](#contents)
+
+The application overview identifies each command's main purpose. This section
+records the accepted operands and options, along with behavior that differs
+from familiar Unix commands.
 
 [`echo.bin`](user/echo.picoc) always returns 0 and implements no `-n` option. [`count.bin`](user/count.picoc) accepts
 at most one nonnegative loop-count delay; its delay is not measured in milliseconds, and
