@@ -11,7 +11,7 @@ minimal userspace.
 The current userspace contains **14 distinct libraries**, including the startup
 library in [`library/`](library/), and **18 user applications** in
 [`user/`](user/), including the [shell](user/shell.picoc). The kernel exposes
-**38 implemented syscalls**; [the syscall overview](#25-system-call-dispatch-and-return-path)
+**38 implemented syscalls**; [the syscall overview](#251-system-call-groups)
 explains their selector numbers and subsystem connections.
 
 The project deliberately does not imitate the scale of Linux or claim POSIX
@@ -326,13 +326,22 @@ Use the nested links to jump directly to a mechanism or reference table.
       - [2.4.2 Process, wait, signal, and memory request structures](#242-process-wait-signal-and-memory-request-structures)
       - [2.4.3 File and directory request structures](#243-file-and-directory-request-structures)
       - [2.4.4 Request-pointer ownership and lifetime](#244-request-pointer-ownership-and-lifetime)
-   - [2.5 System-call dispatch and return path](#25-system-call-dispatch-and-return-path)
+   - [2.5 Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace)
+      - [2.5.1 System-call groups](#251-system-call-groups)
    - [2.6 Timer interrupts and userspace preemption](#26-timer-interrupts-and-userspace-preemption)
-   - [2.7 Kernel non-preemption and deferred rescheduling](#27-kernel-non-preemption-and-deferred-rescheduling)
-   - [2.8 UART receive interrupt path](#28-uart-receive-interrupt-path)
-   - [2.9 DMA completion interrupt path](#29-dma-completion-interrupt-path)
-   - [2.10 CPU exceptions and stack-boundary faults](#210-cpu-exceptions-and-stack-boundary-faults)
-   - [2.11 Interrupt, syscall, and exception function reference](#211-interrupt-syscall-and-exception-function-reference)
+      - [2.6.1 Kernel non-preemption and deferred rescheduling](#261-kernel-non-preemption-and-deferred-rescheduling)
+   - [2.7 UART receive interrupt path](#27-uart-receive-interrupt-path)
+   - [2.8 DMA completion interrupt path](#28-dma-completion-interrupt-path)
+   - [2.9 CPU exceptions and runtime errors](#29-cpu-exceptions-and-runtime-errors)
+      - [2.9.1 CPU exception entry and registers](#291-cpu-exception-entry-and-registers)
+      - [2.9.2 Supported exceptions and allocation errors](#292-supported-exceptions-and-allocation-errors)
+      - [2.9.3 Interrupt, system-call, and exception function reference](#293-interrupt-system-call-and-exception-function-reference)
+         - [2.9.3.1 Exception policy and stack boundaries](#2931-exception-policy-and-stack-boundaries)
+         - [2.9.3.2 System-call selection](#2932-system-call-selection)
+         - [2.9.3.3 Interrupt-controller configuration](#2933-interrupt-controller-configuration)
+         - [2.9.3.4 Memory-mapped periphery access](#2934-memory-mapped-periphery-access)
+         - [2.9.3.5 Polled UART access](#2935-polled-uart-access)
+         - [2.9.3.6 DMA waiting and completion](#2936-dma-waiting-and-completion)
 1. [Memory management and shared memory](#3-memory-management-and-shared-memory)
    - [3.1 Heap block layout and allocation algorithm](#31-heap-block-layout-and-allocation-algorithm)
    - [3.2 Kernel, process-memory, and per-process heap instances](#32-kernel-process-memory-and-per-process-heap-instances)
@@ -1244,10 +1253,11 @@ signals and command-history editing.
 [\[↑ TOC\]](#contents)
 
 Interrupts are the controlled entry points for software requests, hardware
-events, and synchronous CPU faults. This chapter keeps the vector table,
-system-call ABI, dispatch path, preemption rules, device interrupts, and
-exceptions together so later kernel chapters can refer to one execution
-boundary.
+events, and synchronous CPU faults. Library functions use system calls to
+request kernel services, while timer and device interrupts let the kernel
+respond to events that do not originate in the running process. CPU exceptions
+use the same interrupt-entry machinery to report instructions that cannot
+complete safely.
 
 ## 2.1 RETI interrupt entry and the interrupt vector table
 [\[↑ TOC\]](#contents)
@@ -1284,13 +1294,54 @@ explicitly saves any general registers it needs. `RTI` reloads the PC from
 
 The vector table fixes the kernel entry order, while the interrupt controller
 connects hardware devices to those entries and chooses between pending events.
-The following globals provide the mappings and priorities installed during
-kernel startup.
+[`interrupt_device_isrs[]`](kernel/interrupt_controller.picoc#L3) maps
+timer/DMA/UART to `1/4/2`, and
+[`interrupt_device_priorities[]`](kernel/interrupt_controller.picoc#L9) assigns
+priorities `1/1/2`. UART can therefore interrupt the timer or DMA handler,
+while timer and DMA requests at the same priority wait for the active handler
+to finish.
 
-The interrupt controller has two static global arrays in kernel `.data`.
-[`interrupt_device_isrs[]`](kernel/interrupt_controller.picoc#L3) maps timer/DMA/UART to `1/4/2`, and
-[`interrupt_device_priorities[]`](kernel/interrupt_controller.picoc#L9) assigns `1/1/2`. Initialization reads these
-arrays and writes periphery registers 3–8; neither array uses [`kmalloc()`](kernel/kmalloc.picoc#L23).
+The following excerpt shows how startup applies those arrays. It disables each
+device before restoring the configured vector and priority. The timer remains
+inactive until [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34)
+sets its 1000-instruction interval after init is ready:
+
+```c
+int interrupt_device_isrs[INTERRUPT_DEVICE_COUNT] = {
+    1,                            // INTERRUPT_DEVICE_INTTIMER (index 0)
+    4,                            // INTERRUPT_DEVICE_DMA (index 1)
+    2                             // INTERRUPT_DEVICE_UART (index 2)
+};
+
+int interrupt_device_priorities[INTERRUPT_DEVICE_COUNT] = {
+    1, // INTERRUPT_DEVICE_INTTIMER (index 0)
+    1, // INTERRUPT_DEVICE_DMA (index 1)
+    2  // INTERRUPT_DEVICE_UART (index 2)
+};
+
+void interrupt_controller_initialize(void) {
+    int device = 0;
+    int interrupt_index;
+    int priority;
+
+    while (device < INTERRUPT_DEVICE_COUNT) {
+        interrupt_controller_disable_device(device);
+        interrupt_index = interrupt_device_isrs[device];
+        priority = interrupt_device_priorities[device];
+
+        if (interrupt_index != INTERRUPT_CONTROLLER_DISABLED) {
+            interrupt_controller_assign_device(device, interrupt_index, priority);
+        }
+
+        device = device + 1;
+    }
+}
+```
+
+The two arrays have static storage in kernel `.data`; they do not use
+[`kmalloc()`](kernel/kmalloc.picoc#L23). Terminal reads may temporarily disable
+and restore the UART mapping so their buffer checks cannot race with the UART
+interrupt service routine.
 
 ## 2.3 Saved interrupt stack frame
 [\[↑ TOC\]](#contents)
@@ -1450,13 +1501,13 @@ remains safe because the caller’s stack is suspended. A blocked or stopped ter
 retains the destination buffer and count in the PCB, as shown in
 [Blocking and completing terminal reads](#73-blocking-and-completing-terminal-reads).
 
-## 2.5 System-call dispatch and return path
+## 2.5 Handling system calls and returning to userspace
 [\[↑ TOC\]](#contents)
 
 The [system-call ABI](#24-system-call-abi) enters vector 0 with the selector
 and argument already placed in registers. The naked entry saves the process
 registers, disables the process boundary while changing stacks, installs
-kernel segments and the kernel stack, and calls the normal C dispatcher. The
+kernel segments and the kernel stack, and calls the C handler. The
 complete [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104)
 entry, [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143)
 continuation, and
@@ -1533,16 +1584,45 @@ void syscall_interrupt_restore(void) {
 }
 ```
 
-[`handle_syscall()`](kernel/syscall.picoc#L16) implements **38 syscalls** in
-the continuous selector range **0–37**. Every selector in that range reaches a
-kernel operation. The declarations in
-[`common/syscall.header`](common/syscall.header) and the branches in
-[`handle_syscall()`](kernel/syscall.picoc#L16) keep related operations
-adjacent; the groups are organizational and do not affect dispatch.
+Once the assembly entry has installed the kernel stack,
+[`handle_syscall()`](kernel/syscall.picoc#L16) selects the requested operation
+with an `if`/`else if` chain. Simple calls pass their argument directly, while
+larger calls cast it to the request structure defined by the ABI. The excerpt
+shows both forms and a call that also needs the saved process context; the
+remaining selectors follow the same pattern:
+
+```c
+int handle_syscall(int syscall_number, int argument, int *caller_context) {
+    if (syscall_number == SYSCALL_SHUTDOWN) {
+        shutdown();
+        return 1;
+    } else if (syscall_number == SYSCALL_REBOOT) {
+        reboot();
+        return 1;
+    } else if (syscall_number == SYSCALL_LOAD_PROCESS) {
+        return load_process_chunk(
+            ((struct LoadProcessRequest *)argument)->path,
+            ((struct LoadProcessRequest *)argument)->show_loading_bar,
+            caller_context
+        );
+    } else if (syscall_number == SYSCALL_RUN_PROCESS_WITH_ARGUMENTS) {
+        return mark_process_ready_with_arguments((struct RunProcessRequest *)argument);
+    } else if (syscall_number == SYSCALL_LIST_PROCESSES) {
+        list_processes();
+        return 1;
+    } else if (syscall_number == SYSCALL_UNLOAD_PROCESS) {
+        return unload_process_by_pid(argument);
+    }
+
+    // ...
+
+    return 0;
+}
+```
 
 The following sequence connects the assembly above to the C syscall handler
 and the scheduling decision at return. It shows a call whose subsystem returns
-normally; a blocking syscall instead saves its frame and dispatches from
+normally; a blocking syscall instead saves its frame and switches processes
 inside the subsystem, as shown in [blocking and waking](#62-blocking-with-sleep-and-waking-with-wakeup).
 
 ```mermaid
@@ -1574,7 +1654,7 @@ sequenceDiagram
 
 Immediate syscalls replace the saved `IN2` with the C return value. Before
 restoring the other registers, the return stub checks whether a timer requested
-rescheduling while the kernel was running. A pending request dispatches from
+rescheduling while the kernel was running. A pending request switches from
 the saved frame; otherwise the stub restores the process boundary and executes
 `RTI`. Saved `ACC` remains the syscall number, while saved `IN2` carries the
 result through either path.
@@ -1583,12 +1663,20 @@ The userspace [`load()`](library/unistd/process.picoc#L17) and regular-file
 [`read()`](library/unistd/io.picoc#L6) wrappers repeat chunk syscalls while
 work remains without explicitly yielding. Blocking, yielding, exiting,
 deferred timer scheduling, and deferred termination may save or replace the
-activation and dispatch another process instead.
+activation and switch to another process instead.
 
-The selector table below groups the implemented calls by subsystem. Its
-`Kernel functions` column identifies the entry points reached by each group;
-the preceding [ABI subsection](#24-system-call-abi) defines the corresponding
-request structures.
+### 2.5.1 System-call groups
+[\[↑ TOC\]](#contents)
+
+PicoOS implements **38 syscalls** in the continuous selector range **0–37**.
+Every selector in that range reaches a kernel operation, and related selectors
+are adjacent in [`common/syscall.header`](common/syscall.header) and
+[`handle_syscall()`](kernel/syscall.picoc#L16).
+
+The table groups these calls by subsystem. Its `Kernel functions` column shows
+the entry points reached by each group, while the preceding
+[ABI section](#24-system-call-abi) defines the request structures used for
+multi-argument calls.
 
 | Group | Selectors | Purpose, in selector order | Kernel functions |
 | --- | --- | --- | --- |
@@ -1705,7 +1793,7 @@ resumes directly and the pending request is consumed by the next syscall-return
 path. This keeps kernel execution non-preemptive without losing a time slice
 that expires inside a syscall.
 
-## 2.7 Kernel non-preemption and deferred rescheduling
+### 2.6.1 Kernel non-preemption and deferred rescheduling
 [\[↑ TOC\]](#contents)
 
 The timer interrupt behaves differently in userspace and in the kernel. That
@@ -1729,7 +1817,7 @@ a timer observed during the previous chunk is handled at that syscall's return
 boundary. With DMA, process loading starts one complete payload transfer and
 blocks its caller until the DMA completion interrupt wakes it.
 
-## 2.8 UART receive interrupt path
+## 2.7 UART receive interrupt path
 [\[↑ TOC\]](#contents)
 
 UART is mapped to vector 2 at the higher priority 2. The naked vector entry
@@ -1765,7 +1853,7 @@ ring; if the foreground process is waiting, the handler copies into that
 process's pending read buffer, writes the result into its saved
 [`activation.in2`](kernel/process/process.header#L23), and wakes it.
 
-## 2.9 DMA completion interrupt path
+## 2.8 DMA completion interrupt path
 [\[↑ TOC\]](#contents)
 
 DMA completion uses vector 4 on the custom-device interrupt line. The naked
@@ -1776,23 +1864,96 @@ head of the global [`dma_waiters`](kernel/dma.picoc#L6) queue; the interrupted
 context is then restored with `RTI`. Process loading later explains how a
 caller enters this queue while a UART-to-SRAM transfer is active.
 
+The interrupt service routine and its C handler are short enough to show
+together. The assembly preserves the interrupted stack in `BAF`, and the
+handler only wakes the process waiting for the completed transfer:
+
+```c
+__attribute__((naked))
+void dma_interrupt(void) {
+    // Saves the interrupted context while the kernel completes the DMA wait
+    asm("PUSH ACC");
+    asm("PUSH IN1");
+    asm("PUSH IN2");
+    asm("PUSH BAF");
+    asm("PUSH CS");
+    asm("PUSH DS");
+
+    // BAF keeps the interrupted stack while the handler uses kernel segments
+    asm("MOVE SP BAF");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+
+    asm("LOADI32 ACC dma_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC handle_dma_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void dma_interrupt_return(void) {
+    // Restores the context that was active before the DMA interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+
+void handle_dma_interrupt(void) {
+    wakeup_wait_queue(&dma_waiters);
+}
+```
+
 [`initialize_dma()`](kernel/dma.picoc#L9) initializes that queue once and records
 the result in [`dma_initialized`](kernel/dma.picoc#L7). A later
 [`start_dma_uart_receive()`](kernel/dma.picoc#L18) accepts a transfer only when
 DMA is active, the device is idle, and no process is already waiting. It stores
 the load-continuation result in the saved syscall frame, blocks the caller,
-programs the transfer, and dispatches. This permits one kernel-managed DMA
+programs the transfer, and switches processes. This permits one kernel-managed DMA
 load at a time; the completion interrupt makes its caller ready again.
 
-## 2.10 CPU exceptions and stack-boundary faults
+## 2.9 CPU exceptions and runtime errors
 [\[↑ TOC\]](#contents)
 
-Divide-by-zero, stack overflow, and illegal instruction set cause register 11
-and enter vector 3. The exception ISR retains the interrupted code segment long
-enough to identify a kernel or process fault, then loads the kernel context.
-The complete
+Device interrupts report work that completed outside the CPU, but a CPU
+exception stops an instruction that cannot continue safely. PicoOS also has
+dedicated handlers for heap exhaustion, which is detected by its allocators
+rather than by the CPU. In both cases the kernel must decide whether it can
+terminate one process or whether the whole system has become unsafe.
+
+### 2.9.1 CPU exception entry and registers
+[\[↑ TOC\]](#contents)
+
+The RETI CPU model in the emulator detects division or modulo by zero, a
+protected stack crossing, and an illegal instruction while executing RETI
+code. It records the cause and enters the fixed CPU-exception vector 3
+directly. This entry does not use the hardware interrupt controller mappings
+or priorities described in
+[Section 2.2](#22-interrupt-controller-mappings-and-priorities).
+
+Two memory-mapped periphery registers take part in stack protection and
+exception reporting. The table states which side writes each register and what
+PicoOS reads from it:
+
+| Register | Written by | Contents and use |
+| ---: | --- | --- |
+| 10, [`STACK_HEAP_BOUNDARY_REGISTER`](kernel/exception.header#L5) | PicoOS | `0` disables stack protection. Any other value is the active boundary; the emulator raises a stack-overflow exception when an instruction decreases `SP` to a value below it. [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11) writes [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) + [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4) − 1. A process boundary is [`base_address`](kernel/process/process.header#L34) + [`heap_start`](kernel/process/process.header#L36) + [`heap_size`](kernel/process/process.header#L37) − 1. |
+| 11, [`CPU_EXCEPTION_CAUSE_REGISTER`](kernel/exception.header#L6) | RETI CPU/emulator | `0` means no exception has been recorded, `1` means division or modulo by zero, `2` means stack overflow, and `3` means illegal instruction. Guest writes are ignored. [`handle_cpu_exception()`](kernel/exception.picoc#L70) reads this value after exception entry. |
+
+When the emulator detects a fault, it stores the cause exposed through register
+11 and starts the fixed exception entry, which saves the PC on the current
+stack and jumps to vector 3. The interrupt service
+routine preserves the interrupted `CS`, disables the old boundary while
+changing stacks, installs the kernel segments and stack, and restores the
+kernel boundary. The complete
 [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171)
-entry is:
+entry shows these steps:
 
 ```c
 __attribute__((naked))
@@ -1820,8 +1981,14 @@ void cpu_exception_interrupt(void) {
 }
 ```
 
-The normal C policy in
-[`handle_cpu_exception()`](kernel/exception.picoc#L70) is:
+The saved `CS` distinguishes the two outcomes. If user code was interrupted,
+[`handle_cpu_exception()`](kernel/exception.picoc#L70) writes a message through
+descriptor 1 and [`exit_process()`](kernel/process/process.picoc#L451)
+terminates the current process with status
+[`PROCESS_EXIT_STATUS_EXCEPTION`](kernel/process/process.header#L19). If the
+fault occurred with the kernel code segment active, the handler writes the
+kernel-panic message directly over UART and [`shutdown()`](kernel/kernel.picoc#L15)
+halts with `JUMP 0`. The C handler implements that choice as follows:
 
 ```c
 void handle_cpu_exception(int interrupted_kernel_cs_difference) {
@@ -1837,48 +2004,120 @@ void handle_cpu_exception(int interrupted_kernel_cs_difference) {
 }
 ```
 
-A user fault prints through descriptor 1 and terminates only the current
-process. A kernel fault prints directly over UART and halts. Process heap
-exhaustion is not a CPU exception; userspace invokes syscall 18, which calls
-[`handle_process_heap_full_exception()`](kernel/exception.picoc#L82). Kernel-heap exhaustion calls
-[`panic_kernel_heap_full()`](kernel/exception.picoc#L89).
+The dispatcher writes the selected process boundary before `RTI`. The
+system-call entry, the userspace branch of the timer interrupt, and the CPU
+exception entry temporarily write `0` while moving from the process stack to
+the kernel stack, then activate the kernel boundary.
 
-Periphery register 10 protects the active heap/stack boundary:
-
-- kernel boundary: [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) + [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4) − 1
-- process boundary: [`base_address`](kernel/process/process.header#L34) + [`heap_start`](kernel/process/process.header#L36) + [`heap_size`](kernel/process/process.header#L37) − 1
-
-The dispatcher installs the selected process boundary before `RTI`. Interrupt
-entries temporarily disable the old boundary while changing stacks.
-
-## 2.11 Interrupt, syscall, and exception function reference
+### 2.9.2 Supported exceptions and allocation errors
 [\[↑ TOC\]](#contents)
 
-The entries below separate returned status, state changes, and direct calls so
-the interrupt boundary can be followed into the owning subsystem. The `Called by` column
-distinguishes ordinary C callers from system-call, hardware-interrupt, and
-CPU-exception entry paths.
+The table covers every CPU exception emitted by the RETI emulator, the two
+allocation failures routed through dedicated exception or panic handlers, and
+exhaustion of the separate process-memory pool. Invalid syscall arguments,
+missing files, and rejected process images use normal failure return values
+instead and are not fatal runtime errors.
+
+| Condition | Trigger | Entry or reported cause | PicoOS handling |
+| --- | --- | --- | --- |
+| Division or modulo by zero | A RETI `DIV`, `DIVI`, `MOD`, or `MODI` instruction has a zero divisor | CPU exception cause `1`; fixed vector 3 | [`handle_cpu_exception()`](kernel/exception.picoc#L70) reports division by zero. It terminates the current process with exception status for a userspace fault, or reports a kernel panic and shuts down for a kernel fault. |
+| Stack overflow | An instruction decreases `SP` below the active boundary in periphery register 10 | CPU exception cause `2`; fixed vector 3 | [`handle_cpu_exception()`](kernel/exception.picoc#L70) reports process stack overflow and terminates that process, or reports kernel stack overflow and shuts down. |
+| Illegal instruction | The fetched word is not a valid RETI instruction, or instruction decoding reaches an unsupported opcode | CPU exception cause `3`; fixed vector 3 | [`handle_cpu_exception()`](kernel/exception.picoc#L70) reports an illegal instruction and applies the process-or-kernel policy above. The message helper also treats any unexpected cause value as illegal instruction. |
+| Process heap full | [`malloc()`](library/stdlib/malloc.picoc#L35) or [`realloc()`](library/stdlib/malloc.picoc#L42) cannot satisfy a positive-size allocation | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) invokes syscall 18 | [`handle_process_heap_full_exception()`](kernel/exception.picoc#L82) reports `Process terminated: heap full` through descriptor 1 and terminates the current process with exception status. |
+| Kernel heap full | [`kmalloc()`](kernel/kmalloc.picoc#L23) or [`krealloc()`](kernel/kmalloc.picoc#L31) cannot satisfy a positive-size allocation | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9) calls the panic handler directly | [`panic_kernel_heap_full()`](kernel/exception.picoc#L89) writes `Kernel panic: kernel heap full` directly over UART and shuts down. |
+| Process-memory pool exhausted | [`pmalloc()`](kernel/pmalloc.picoc#L20) cannot reserve a contiguous process image or shared-memory region | Returns [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3); no CPU exception is raised | [`begin_process_load()`](kernel/process/process_loader.picoc#L109) and [`load_process()`](kernel/process/process_loader.picoc#L305) report `error: not enough process memory` and fail the load. [`open_shared_memory()`](kernel/shared_memory.picoc#L92) frees the new entry and returns `-1`. The running process and kernel continue. |
+
+### 2.9.3 Interrupt, system-call, and exception function reference
+[\[↑ TOC\]](#contents)
+
+The kernel functions below implement the interrupt setup, system-call handling,
+device access, and failure policies described in the preceding sections. They
+are grouped by source file so each table shows one part of the implementation.
+The `Called by` entries list direct source callers, relevant userspace library
+entry points, and interrupt or system-call entry points separately.
+
+#### 2.9.3.1 Exception policy and stack boundaries
+[\[↑ TOC\]](#contents)
+
+Functions in [`kernel/exception.picoc`](kernel/exception.picoc) manage the
+active stack boundary and decide whether a fault terminates a process or the
+kernel. The table also includes the two heap-exhaustion handlers implemented in
+that file.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`handle_process_heap_full_exception(void)`](kernel/exception.picoc#L82) | Does not return normally | Writes a diagnostic through descriptor 1 and terminates the current PCB | [`write_process_exception_message()`](kernel/exception.picoc#L29), [`exit_process()`](kernel/process/process.picoc#L451) | **Library functions:** [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`send_byte_over_uart(value)`](kernel/uart_hardware.picoc#L9) | Returns no value | Polls UART state and transmits the low byte; changes no kernel structure | [`switch_to_periphery_address_space()`](kernel/uart_hardware.picoc#L1) | **Library functions:** [`send_byte_over_uart()`](library/stdio/stdio.picoc#L19)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-|  |  |  |  |  |
-| [`periphery_read_register(register_index)`](kernel/periphery.picoc#L5) | Returns the selected periphery value | Reads one memory-mapped periphery cell; changes no kernel structure | — | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`handle_cpu_exception()`](kernel/exception.picoc#L70), [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
-| [`periphery_write_register(register_index, value)`](kernel/periphery.picoc#L11) | Returns no value | Changes one memory-mapped periphery cell | — | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`reboot()`](kernel/kernel.picoc#L19) |
-| [`interrupt_controller_initialize(void)`](kernel/interrupt_controller.picoc#L41) | Returns no value | Rewrites timer, DMA, and UART mappings/priorities in periphery registers 3–8 from [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) and [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`interrupt_controller_assign_device(device, interrupt_index, priority)`](kernel/interrupt_controller.picoc#L59) | Returns no value | Writes one device vector and priority | [`periphery_write_register()`](kernel/periphery.picoc#L11), [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
-| [`interrupt_controller_disable_device(device)`](kernel/interrupt_controller.picoc#L23) | Returns no value | Writes mapping 255 and priority 0 for one device | [`periphery_write_register()`](kernel/periphery.picoc#L11), [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`reboot()`](kernel/kernel.picoc#L19), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
-| [`interrupt_controller_activate_timer(void)`](kernel/interrupt_controller.picoc#L34) | Returns no value | Writes the 1000-instruction timer interval | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`activate_kernel_stack_boundary(void)`](kernel/exception.picoc#L11) | Returns no value | Selects the kernel heap end in periphery register 10 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System calls:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104)<br>**Hardware interrupts:** Timer via [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**CPU exceptions:** via [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`process_stack_boundary(process)`](kernel/exception.picoc#L18) | Returns one PCB's absolute heap end | Reads the process [`base_address`](kernel/process/process.header#L34), [`heap_start`](kernel/process/process.header#L36), and [`heap_size`](kernel/process/process.header#L37) | — | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
-| [`activate_current_process_stack_boundary(void)`](kernel/exception.picoc#L22) | Returns no value | Writes the current PCB boundary to periphery register 10 | [`periphery_write_register()`](kernel/periphery.picoc#L11), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`current_process()`](kernel/process/process.picoc#L62) | **System calls:** return through [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158) |
-| [`handle_cpu_exception(interrupted_kernel_cs_difference)`](kernel/exception.picoc#L70) | Does not return normally | Reads exception cause; shuts down for a kernel fault or terminates the current PCB for a process fault | [`periphery_read_register()`](kernel/periphery.picoc#L5), [`print_cpu_exception_message()`](kernel/exception.picoc#L44), [`shutdown()`](kernel/kernel.picoc#L15), [`exit_process()`](kernel/process/process.picoc#L451) | **CPU exceptions:** CPU exception vector via [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171) |
-| [`panic_kernel_heap_full(void)`](kernel/exception.picoc#L89) | Does not return | Writes a UART diagnostic and shuts down | [`uart_print_string()`](common/uart_protocol.picoc#L73), [`shutdown()`](kernel/kernel.picoc#L15) | **Kernel functions:** [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9) |
-| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Selector-dependent result; may not return through this activation | Delegates to the process, wait, signal, memory, file, or directory subsystem; may mutate, block, dispatch, or terminate | See the `Kernel functions` column in [System-call dispatch and return path](#25-system-call-dispatch-and-return-path) | **System calls:** system-call instruction via [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) |
-| [`receive_byte_over_uart(void)`](kernel/uart_hardware.picoc#L24) | Returns one received byte | Polls UART state and returns one byte; changes no kernel structure | [`switch_to_periphery_address_space()`](kernel/uart_hardware.picoc#L1) | **Library functions:** [`fgetc()`](library/stdio/stdio.picoc#L178)<br>**Kernel functions:** [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_receive_string()`](kernel/filesystem/host_filesystem.picoc#L10) |
+| [`handle_process_heap_full_exception(void)`](kernel/exception.picoc#L82) | Does not return normally | Writes a diagnostic through descriptor 1 and terminates the current PCB with exception status | [`write_process_exception_message()`](kernel/exception.picoc#L29), [`exit_process()`](kernel/process/process.picoc#L451) | **Library functions:** [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) through syscall 18<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`activate_kernel_stack_boundary(void)`](kernel/exception.picoc#L11) | Returns no value | Writes the kernel heap end to periphery register 10 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104)<br>**Hardware interrupts:** timer via [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`process_stack_boundary(process)`](kernel/exception.picoc#L18) | Returns the process's absolute heap end | Reads [`base_address`](kernel/process/process.header#L34), [`heap_start`](kernel/process/process.header#L36), and [`heap_size`](kernel/process/process.header#L37); changes no state | — | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
+| [`activate_current_process_stack_boundary(void)`](kernel/exception.picoc#L22) | Returns no value | Writes the current process boundary to periphery register 10 | [`current_process()`](kernel/process/process.picoc#L62), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call return:** [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158) |
+| [`handle_cpu_exception(interrupted_kernel_cs_difference)`](kernel/exception.picoc#L70) | Does not return normally | Reads register 11; terminates the current PCB for a process fault or shuts down for a kernel fault | [`periphery_read_register()`](kernel/periphery.picoc#L5), [`print_cpu_exception_message()`](kernel/exception.picoc#L44), [`shutdown()`](kernel/kernel.picoc#L15), [`exit_process()`](kernel/process/process.picoc#L451) | **CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171) |
+| [`panic_kernel_heap_full(void)`](kernel/exception.picoc#L89) | Does not return | Writes a UART kernel-panic message and shuts down | [`uart_print_string()`](common/uart_protocol.picoc#L73), [`shutdown()`](kernel/kernel.picoc#L15) | **Kernel functions:** [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9) |
+
+#### 2.9.3.2 System-call selection
+[\[↑ TOC\]](#contents)
+
+[`kernel/syscall.picoc`](kernel/syscall.picoc) contains the C handler reached
+after the system-call interrupt has installed the kernel context. Its table row
+summarizes the selector-dependent behavior whose individual targets appear in
+the [system-call groups](#251-system-call-groups).
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Returns the selected operation's result for immediate calls. Calls that switch processes leave through the saved interrupt frame; exit, shutdown, and reboot do not return normally | Selects one of 38 kernel operations and may change process, scheduler, memory, descriptor, or host-filesystem state | The kernel functions in [System-call groups](#251-system-call-groups) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) after userspace executes `INT 0` |
+
+#### 2.9.3.3 Interrupt-controller configuration
+[\[↑ TOC\]](#contents)
+
+Functions in
+[`kernel/interrupt_controller.picoc`](kernel/interrupt_controller.picoc)
+translate device numbers into controller registers, install vector and priority
+values, and activate the timer. The table identifies every direct caller of the
+four public configuration functions.
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`interrupt_controller_initialize(void)`](kernel/interrupt_controller.picoc#L41) | Returns no value | Rewrites timer, DMA, and UART mappings and priorities in periphery registers 3–8 from [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) and [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`interrupt_controller_assign_device(device, interrupt_index, priority)`](kernel/interrupt_controller.picoc#L59) | Returns no value | Writes one device's vector and priority | [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
+| [`interrupt_controller_disable_device(device)`](kernel/interrupt_controller.picoc#L23) | Returns no value | Writes mapping 255 and priority 0 for one device | [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`reboot()`](kernel/kernel.picoc#L19), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
+| [`interrupt_controller_activate_timer(void)`](kernel/interrupt_controller.picoc#L34) | Returns no value | Writes the 1000-instruction interval to periphery register 9 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+
+#### 2.9.3.4 Memory-mapped periphery access
+[\[↑ TOC\]](#contents)
+
+[`kernel/periphery.picoc`](kernel/periphery.picoc) provides the two small
+helpers used to read and write memory-mapped periphery cells. The following
+table shows all direct kernel callers of these helpers.
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`periphery_read_register(register_index)`](kernel/periphery.picoc#L5) | Returns the selected periphery value | Reads one memory-mapped periphery cell; changes no kernel state | — | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`handle_cpu_exception()`](kernel/exception.picoc#L70), [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
+| [`periphery_write_register(register_index, value)`](kernel/periphery.picoc#L11) | Returns no value | Writes one memory-mapped periphery cell | — | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`reboot()`](kernel/kernel.picoc#L19) |
+
+#### 2.9.3.5 Polled UART access
+[\[↑ TOC\]](#contents)
+
+The target-specific functions in
+[`kernel/uart_hardware.picoc`](kernel/uart_hardware.picoc) implement polled
+UART access for kernel and shared/common code. Their table distinguishes those
+directly linked callers from the userspace wrapper that reaches the send
+function through syscall 29.
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`send_byte_over_uart(value)`](kernel/uart_hardware.picoc#L9) | Returns no value | Sends the low byte through UART register 0 and polls UART status; changes no kernel structure | [`switch_to_periphery_address_space()`](kernel/uart_hardware.picoc#L1) | **Library functions:** [`send_byte_over_uart()`](library/stdio/stdio.picoc#L19) through syscall 29<br>**Shared/Common functions:** [`uart_print_character()`](common/uart_protocol.picoc#L21), linked directly to the kernel implementation<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`receive_byte_over_uart(void)`](kernel/uart_hardware.picoc#L24) | Returns one received byte | Polls UART status and reads UART register 1; changes no kernel structure | [`switch_to_periphery_address_space()`](kernel/uart_hardware.picoc#L1) | **Shared/Common functions:** [`receive_word()`](common/uart_protocol.picoc#L7), linked directly to the kernel implementation<br>**Kernel functions:** [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90), [`uart_receive_string()`](kernel/filesystem/host_filesystem.picoc#L10) |
+
+#### 2.9.3.6 DMA waiting and completion
+[\[↑ TOC\]](#contents)
+
+Functions in [`kernel/dma.picoc`](kernel/dma.picoc) connect process loading to
+the DMA device and its completion interrupt. The table follows the waiting
+process from setup through the interrupt that makes it runnable again.
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
 | [`initialize_dma(void)`](kernel/dma.picoc#L9) | Returns no value | Initializes [`dma_waiters`](kernel/dma.picoc#L6) and sets [`dma_initialized`](kernel/dma.picoc#L7) once when DMA is active; otherwise changes nothing | [`dma_is_active()`](common/dma.picoc#L17) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31), [`start_dma_uart_receive()`](kernel/dma.picoc#L18) |
-| [`start_dma_uart_receive(destination, word_count, caller_context)`](kernel/dma.picoc#L18) | Returns `false` when DMA is unavailable, busy, or already has a waiter; after a successful transfer setup, dispatches and returns `true` when the caller resumes | Stores the internal continuation result in the caller's saved frame, blocks the caller on [`dma_waiters`](kernel/dma.picoc#L6), and starts a UART-to-SRAM transfer | [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`dma_transfer_status()`](common/dma.picoc#L21), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L396), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109) |
+| [`start_dma_uart_receive(destination, word_count, caller_context)`](kernel/dma.picoc#L18) | Returns `false` when DMA is unavailable, busy, or already has a waiter. Successful setup does not return through the current kernel call; the process later resumes from its saved interrupt frame with [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L49) | Stores the continuation result in the saved syscall frame, blocks the caller on [`dma_waiters`](kernel/dma.picoc#L6), starts a UART-to-SRAM transfer, and switches processes | [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`dma_transfer_status()`](common/dma.picoc#L21), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L396), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109) |
 | [`handle_dma_interrupt(void)`](kernel/dma.picoc#L40) | Returns no value | Wakes the first PCB waiting for DMA completion on [`dma_waiters`](kernel/dma.picoc#L6) | [`wakeup_wait_queue()`](kernel/process/process.picoc#L416) | **Hardware interrupts:** DMA completion via [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L233) |
 
 # 3. Memory management and shared memory
@@ -2845,7 +3084,7 @@ The sequence diagram follows an immediate switch from process A to a runnable pr
 [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43). The selection loop matters:
 [`prepare_process_termination()`](kernel/signal.picoc#L125) can reject the scheduler’s candidate
 before any registers are restored. Deferred timer requests enter this same path at
-[system-call return](#25-system-call-dispatch-and-return-path).
+[system-call return](#25-handling-system-calls-and-returning-to-userspace).
 
 ```mermaid
 sequenceDiagram
@@ -4593,7 +4832,7 @@ reporting.
 The table lists all 18 programs, links each source at its entry point, and
 identifies the main library calls behind its behavior. These calls come from
 the [14 libraries](#81-library-overview-and-dependencies), which expose the
-[38 kernel syscalls](#25-system-call-dispatch-and-return-path) where a kernel service is needed.
+[38 kernel syscalls](#251-system-call-groups) where a kernel service is needed.
 Shared command helpers are explained below the table.
 
 | Binary (source link) | Behavior | Library functions |
@@ -5205,7 +5444,7 @@ explanation:
   [copied descriptor state](#71-per-process-file-descriptor-table) rather than shared
   open-file descriptions
 - [linked-list round-robin scanning](#51-round-robin-process-selection) rather than a separate ready queue
-- [non-preemptive kernel execution and deferred rescheduling](#27-kernel-non-preemption-and-deferred-rescheduling)
+- [non-preemptive kernel execution and deferred rescheduling](#261-kernel-non-preemption-and-deferred-rescheduling)
 - wait-queue [`sleep()`](library/unistd/blocking.picoc#L9) rather than timed sleep
 - exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14) rather than a general wait interface
 - [six fixed-action signals](#64-process-signals) and one
