@@ -129,7 +129,7 @@ hello PicoOS
 ```
 
 The first command creates a [`NEW`](kernel/process/process.header#L12) process; the second makes it ready and waits
-for its exit. [Process states and transitions](#45-process-states-and-transitions) connects these
+for its exit. [Process states and transitions](#44-process-states-and-transitions) connects these
 commands to the PCB transitions.
 
 This short session crosses the complete runtime boundary: the generated
@@ -355,22 +355,22 @@ Use the nested links to jump directly to a mechanism or reference table.
       - [3.6.2 Mapping, unlinking, and deferred destruction](#362-mapping-unlinking-and-deferred-destruction)
 1. [Processes and process lifecycle](#4-processes-and-process-lifecycle)
    - [4.1 Global process list and current process](#41-global-process-list-and-current-process)
-   - [4.2 Saved process activation](#42-saved-process-activation)
-   - [4.3 Process control block fields](#43-process-control-block-fields)
-   - [4.4 Process image and initial userspace stack](#44-process-image-and-initial-userspace-stack)
-      - [4.4.1 Code, data, heap, and stack placement](#441-code-data-heap-and-stack-placement)
-      - [4.4.2 Initial `argc`, `argv`, and `envp`](#442-initial-argc-argv-and-envp)
-   - [4.5 Process states and transitions](#45-process-states-and-transitions)
-   - [4.6 Loading and starting a process](#46-loading-and-starting-a-process)
-      - [4.6.1 Executable transfer with polling or DMA](#461-executable-transfer-with-polling-or-dma)
-      - [4.6.2 Changing a completed image from `NEW` to `READY`](#462-changing-a-completed-image-from-new-to-ready)
-   - [4.7 Parent-child relationships, termination, and reaping](#47-parent-child-relationships-termination-and-reaping)
-   - [4.8 Process-table and lifecycle function reference](#48-process-table-and-lifecycle-function-reference)
-   - [4.9 Process-loader and run-setup function reference](#49-process-loader-and-run-setup-function-reference)
+   - [4.2 Process control block fields](#42-process-control-block-fields)
+   - [4.3 Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack)
+      - [4.3.1 Code, data, heap, and stack placement](#431-code-data-heap-and-stack-placement)
+      - [4.3.2 Initial `argc`, `argv`, and `envp`](#432-initial-argc-argv-and-envp)
+   - [4.4 Process states and transitions](#44-process-states-and-transitions)
+   - [4.5 Loading and starting a process](#45-loading-and-starting-a-process)
+      - [4.5.1 Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
+      - [4.5.2 Changing a completed image from `NEW` to `READY`](#452-changing-a-completed-image-from-new-to-ready)
+   - [4.6 Parent-child relationships, termination, and reaping](#46-parent-child-relationships-termination-and-reaping)
+   - [4.7 Process-table and lifecycle function reference](#47-process-table-and-lifecycle-function-reference)
+   - [4.8 Process-loader and run-setup function reference](#48-process-loader-and-run-setup-function-reference)
 1. [Scheduling and context switching](#5-scheduling-and-context-switching)
    - [5.1 Round-robin process selection](#51-round-robin-process-selection)
-   - [5.2 Saving the current process and selecting the next process](#52-saving-the-current-process-and-selecting-the-next-process)
-   - [5.3 Restoring the selected process and returning with `RTI`](#53-restoring-the-selected-process-and-returning-with-rti)
+   - [5.2 Saved process activation](#52-saved-process-activation)
+   - [5.3 Saving the current process and selecting the next process](#53-saving-the-current-process-and-selecting-the-next-process)
+   - [5.4 Restoring the selected process and returning with `RTI`](#54-restoring-the-selected-process-and-returning-with-rti)
 1. [Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes)
    - [6.1 Wait-queue structure and intrusive PCB links](#61-wait-queue-structure-and-intrusive-pcb-links)
    - [6.2 Blocking with `sleep()` and waking with `wakeup()`](#62-blocking-with-sleep-and-waking-with-wakeup)
@@ -763,7 +763,7 @@ the initial environment through
 [`initialize_environment()`](library/stdlib/env.picoc#L97), calls the
 application's `main`, and passes its result to
 [`exit()`](library/stdlib/exit.picoc#L3). The initial userspace stack is shown
-in [Process image and initial stack](#44-process-image-and-initial-userspace-stack).
+in [Process image and initial stack](#43-process-image-and-initial-userspace-stack).
 
 #### 1.1.4.4 Startup functions used by PicoOS images
 [\[↑ TOC\]](#contents)
@@ -1032,7 +1032,7 @@ uses `read-range` to obtain the header and encoded payload. Both loaders
 consume the five header words and copy only the encoded RETI words to SRAM.
 The allocated process image therefore contains only the linked program and its
 heap/stack room. The combined transfer and loading sequence appears in
-[Process image and initial stack](#44-process-image-and-initial-userspace-stack).
+[Process image and initial stack](#43-process-image-and-initial-userspace-stack).
 
 ### 1.1.8 Generated memory constants for the bootloader and kernel
 [\[↑ TOC\]](#contents)
@@ -2552,9 +2552,11 @@ process.
 # 4. Processes and process lifecycle
 [\[↑ TOC\]](#contents)
 
-Memory regions become executable processes only after the kernel records their
-identity, resources, saved registers, and state. This chapter defines that
-representation, then follows loading, startup, termination, and final removal.
+The memory regions from the previous chapter become useful when the kernel
+treats each executing program as a process. A process combines a program's
+memory with the identity, resources, saved registers, and state that let the
+operating system manage it independently. This chapter defines that
+abstraction, then follows loading, startup, termination, and final removal.
 
 ## 4.1 Global process list and current process
 [\[↑ TOC\]](#contents)
@@ -2585,50 +2587,14 @@ The scheduler scans this same list. There is no separate ready queue. Blocking
 queues use a different intrusive link inside each PCB, so [`next`](kernel/process/process.header#L53) remains
 available for process-table order.
 
-## 4.2 Saved process activation
+## 4.2 Process control block fields
 [\[↑ TOC\]](#contents)
 
-The process list identifies the current PCB and the PCBs available to the
-scheduler. To stop one process and later resume it, the kernel also preserves
-its CPU state in the embedded
-[`struct ActivationRecord`](kernel/process/process.header#L21). The definition
-below fixes the register order used by assembly; the following attribute table
-explains who initializes and later uses each value:
-
-```c
-struct ActivationRecord {
-    int in1;
-    int in2;
-    int acc;
-    int sp;
-    int baf;
-    int cs;
-    int ds;
-};
-```
-
-| Attribute | Meaning | Used by |
-| --- | --- | --- |
-| [`in1`](kernel/process/process.header#L22), [`in2`](kernel/process/process.header#L23), [`acc`](kernel/process/process.header#L24) | General argument/result registers at the suspension point | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`sp`](kernel/process/process.header#L25) | Free cell immediately below the saved return PC on the process stack | First initialized by [`create_process()`](kernel/process/process.picoc#L89); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`baf`](kernel/process/process.header#L26) | Base address of the interrupted PicoC function frame | First initialized by [`create_process()`](kernel/process/process.picoc#L89); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-
-These are the RETI registers required to resume a process.
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) fills the
-record from an interrupt frame.
-[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) reads it by fixed
-PCB offsets and restores the registers. It is not a pointer to a stack frame
-and is not allocated separately.
-
-## 4.3 Process control block fields
-[\[↑ TOC\]](#contents)
-
-The activation record is only the CPU-state part of a PCB. The complete layout
-below also groups image metadata, resource pointers, and wait/signal state in
-the same object. The following attribute table connects those fields to their
-initializers and consumers:
+A process control block (PCB) is the kernel's record for one process. Its
+fields keep identity, image metadata, resource pointers, saved CPU state, and
+wait/signal state together while the process moves through its lifecycle. The
+following definition and attribute table show the complete layout and connect
+each field to its initializers and consumers:
 
 ```c
 struct Process {
@@ -2668,7 +2634,7 @@ struct Process {
 | [`heap_start`](kernel/process/process.header#L36), [`heap_size`](kernel/process/process.header#L37) | Process-relative userspace heap start and cell count from the binary header/defaults | First initialized by [`create_process()`](kernel/process/process.picoc#L89); read by [`process_heap_start()`](kernel/process/process.picoc#L439), [`process_heap_size()`](kernel/process/process.picoc#L445), and [`process_stack_boundary()`](kernel/exception.picoc#L18) |
 | [`binary_path`](kernel/process/process.header#L38) | PCB-owned executable path; also copied to [`argv[0]`](kernel/process/process_arguments.picoc#L140) | First initialized by [`create_process()`](kernel/process/process.picoc#L89); copied by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), printed by [`list_processes()`](kernel/process/process.picoc#L32), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`working_directory`](kernel/process/process.header#L39) | PCB-owned absolute PicoOS path, copied from the parent or initialized to `/` for PID 1 | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through copying; read by [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), replaced by [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
-| [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context used by dispatcher and blocked syscall returns | First initialized by [`create_process()`](kernel/process/process.picoc#L89); updated by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183); restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context needed later by the dispatcher; [Section 5.2](#52-saved-process-activation) explains its fields | First initialized by [`create_process()`](kernel/process/process.picoc#L89); later maintained by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183), and [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`file_descriptors`](kernel/process/process.header#L42) | Kernel-heap descriptor table and entry array owned by this PCB | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35); inherited by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241); destroyed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`waiting_status_ptr`](kernel/process/process.header#L44) | Pointer into this process’s suspended userspace [`waitpid()`](library/sys/wait/wait.picoc#L14) frame | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89); set by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L369); written and cleared by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) or [`notify_process_stopped()`](kernel/signal.picoc#L22) |
 | [`waiters`](kernel/process/process.header#L46) | Embedded FIFO queue of processes waiting for this process | First initialized by [`create_process()`](kernel/process/process.picoc#L89); filled by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L369); drained by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) or [`notify_process_stopped()`](kernel/signal.picoc#L22) |
@@ -2685,34 +2651,51 @@ The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers;
 there is no address translation or protection between processes.
 
-## 4.4 Process image and initial userspace stack
+## 4.3 Process image and initial userspace stack
 [\[↑ TOC\]](#contents)
 
-The PCB fields above describe a process image by its address, size, and heap
-range. The boot-time [`load_process()`](kernel/process/process_loader.picoc#L305)
-and userspace
-[`load_process_chunk()`](kernel/process/process_loader.picoc#L292) paths each
-allocate that image as one contiguous region from the global process-memory
-heap. The first subsection shows its regions, and the second explains the
-startup values stored on its stack.
+A process image is the prepared initial memory state from which a process will
+execute. It places the linked `.ivt`, `.text`, and `.data` sections at their
+expected offsets and reserves room for the userspace heap and stack. `.text`
+contains executable instructions, while `.data` holds static data; with the
+PicoC-Compiler [`-O1` option](../PicoC-Compiler/README.md#command-line-options),
+values known at compile time are written directly into `.data` or `.ivt`.
 
-### 4.4.1 Code, data, heap, and stack placement
+The compiler records this layout in `program.sections`, and RETI-Emulator uses
+it when assembling `program.bin` to prepend the five-word header described in
+[Section 1.1.7](#117-linked-sections-metadata-and-the-five-word-binary-header).
+The loader consumes that header to size the allocation and set the linked
+section bases, but copies only the following program words into the process
+image. The header's heap and stack values reserve the remaining space. The
+initial userspace stack is then built at the high end of that region, so its
+entry point, arguments, and environment are part of the prepared state from
+which execution begins.
+
+The PCB fields above describe the allocated image by its address, size, and
+heap range. The boot-time [`load_process()`](kernel/process/process_loader.picoc#L305)
+and userspace [`load_process_chunk()`](kernel/process/process_loader.picoc#L292)
+paths each allocate it as one contiguous region from the global process-memory
+heap. The first subsection shows these regions, and the second explains the
+startup values stored on the stack.
+
+### 4.3.1 Code, data, heap, and stack placement
 [\[↑ TOC\]](#contents)
 
-The diagram orders a process image from low to high addresses. The stack grows
-back toward the heap, whose final cell is protected by the active boundary
-register:
+Within the allocated region, the diagram orders a process image from low to
+high addresses. The stack grows back toward the heap, whose final cell is
+protected by the active boundary register:
 
 ```mermaid
 flowchart LR
-    B["base_address"] --> C["code / .text"]
+    B["base_address"] --> V["optional interrupt vector table / .ivt"]
+    V --> C["executable instructions / .text"]
     C --> D["globals / .data"]
     D --> H["userspace heap<br/>BlockHeaders + allocations"]
     H --> F["free stack space"]
     F --> S["initial stack at high address<br/>stack grows downward"]
 ```
 
-### 4.4.2 Initial `argc`, `argv`, and `envp`
+### 4.3.2 Initial `argc`, `argv`, and `envp`
 [\[↑ TOC\]](#contents)
 
 Once those regions have been placed and the image has been loaded,
@@ -2738,14 +2721,13 @@ Arguments and the initial environment are process-image data, not persistent
 kernel allocations. Userspace [`libstart`](library/start/libstart.picoc) later clones the environment into
 the process heap, so parent and child environment arrays become independent.
 
-## 4.5 Process states and transitions
+## 4.4 Process states and transitions
 [\[↑ TOC\]](#contents)
 
-A process state records its place in the lifecycle and determines whether the
-scheduler may select it. The table lists PicoOS's six states and their numeric
-values. The state diagram then shows the usual load/run, blocking, signal, and
-termination paths; removal ends the PCB's lifetime rather than assigning
-another state value.
+Process states show where each process is in its lifecycle: whether it can run,
+is waiting or stopped, or has finished. The operating system uses them to
+decide which processes the scheduler may select and which lifecycle work is
+still pending. The table lists PicoOS's six states and their numeric values.
 
 | State | Numeric value | Meaning | Typical transition |
 | --- | --- | --- | --- |
@@ -2755,6 +2737,22 @@ another state value.
 | [`BLOCKED`](kernel/process/process.header#L15) | 3 | PCB is linked into one wait queue | Terminal read, DMA completion wait, [`waitpid()`](library/sys/wait/wait.picoc#L14), or [`sleep()`](library/unistd/blocking.picoc#L9) |
 | [`STOPPED`](kernel/process/process.header#L16) | 4 | Suspended by [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), or [`SIGTTIN`](common/signal.header#L9) | Signal subsystem |
 | [`ZOMBIE`](kernel/process/process.header#L17) | 5 | Terminated status retained for a parent | [`terminate_process()`](kernel/process/process.picoc#L304) |
+
+[`ZOMBIE`](kernel/process/process.header#L17) separates the end of execution
+from final removal. A normal [`exit()`](library/stdlib/exit.picoc#L3), a fatal
+CPU exception or signal, and explicit unloading all reach
+[`terminate_process()`](kernel/process/process.picoc#L304), which records the
+exit status and changes the state. If a live parent has not already waited,
+the PID, parent relationship, and [`exit_status`](kernel/process/process.header#L60)
+must remain available for a later [`waitpid()`](library/sys/wait/wait.picoc#L14);
+PicoOS retains the rest of the PCB-owned resources until that collection as
+well. The separate state keeps the scheduler from running a finished process
+without making it disappear before its parent can collect the result. An
+orphan or a child whose parent was already waiting is removed immediately.
+
+The state diagram shows the usual load/run, blocking, signal, and termination
+paths. Removal ends the PCB's lifetime rather than assigning another state
+value.
 
 ```mermaid
 stateDiagram-v2
@@ -2778,14 +2776,21 @@ stateDiagram-v2
     ZOMBIE --> [*]: waitpid collection or orphan cleanup
 ```
 
-## 4.6 Loading and starting a process
+## 4.5 Loading and starting a process
 [\[↑ TOC\]](#contents)
 
-Loading reserves and fills an image before run setup constructs its initial
-stack. The transfer must finish before a `NEW` process can be prepared and
-made eligible for scheduling.
+Before a process can execute, the prepared process image described in
+[Section 4.3](#43-process-image-and-initial-userspace-stack) must be loaded into
+memory. The loader reserves one contiguous region, copies the linked sections,
+and leaves the header-defined heap and stack space in place, establishing the
+layout from which execution will begin. It then creates the PCB and sets the
+initial code, data, stack, and frame register values. Run setup builds the
+initial userspace stack, and [`init_process_heap()`](library/stdlib/malloc.picoc#L18)
+initializes the reserved heap when the process first starts. The dispatcher
+later restores the saved register values before transferring control to the
+process.
 
-### 4.6.1 Executable transfer with polling or DMA
+### 4.5.1 Executable transfer with polling or DMA
 [\[↑ TOC\]](#contents)
 
 Loading and starting are deliberately separate operations. The sequence below
@@ -2868,7 +2873,7 @@ the loader does not allocate code, heap, and stack as separate blocks. The parti
 removed; a retained zombie can therefore still own an unfinished load. A PCB for the new process is only
 created after the last chunk arrives.
 
-### 4.6.2 Changing a completed image from `NEW` to `READY`
+### 4.5.2 Changing a completed image from `NEW` to `READY`
 [\[↑ TOC\]](#contents)
 
 Completing [`load_process()`](kernel/process/process_loader.picoc#L305) or
@@ -2886,7 +2891,7 @@ table, and installs the copy. PID 1 has no running caller and keeps its initial
 standard table. The parent PID and working directory, in contrast, are
 established when the image is loaded.
 
-## 4.7 Parent-child relationships, termination, and reaping
+## 4.6 Parent-child relationships, termination, and reaping
 [\[↑ TOC\]](#contents)
 
 Loading and run setup create a live process; termination unwinds the same
@@ -2903,7 +2908,7 @@ shared-memory attachments and any pending process load, calls
 destroys the descriptor table, and frees PCB-owned strings and the PCB with
 [`kfree()`](kernel/kmalloc.picoc#L38).
 
-## 4.8 Process-table and lifecycle function reference
+## 4.7 Process-table and lifecycle function reference
 [\[↑ TOC\]](#contents)
 
 Process lifecycle management is split between the list and ownership
@@ -2927,7 +2932,7 @@ their own reference in
 | [`remove_process(process)`](kernel/process/process.picoc#L209) | Returns no value | Final destructor: unlinks queues/list and releases image, attachments, descriptor table, strings, and PCB | [`remove_from_wait_queue()`](kernel/process/process.picoc#L176), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`pfree()`](kernel/pmalloc.picoc#L47), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115), [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`remove_test_processes()`](kernel/process/process.picoc#L348), [`terminate_process()`](kernel/process/process.picoc#L304), [`unload_process_by_pid()`](kernel/process/process.picoc#L328), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L369) |
 | [`orphan_and_signal_children(parent)`](kernel/process/process.picoc#L279), [`wake_parent_waiting_for_process(process, status)`](kernel/process/process.picoc#L261) | Return no value | Update child parent fields or parent wait status/queue | [`remove_process()`](kernel/process/process.picoc#L209), [`send_signal_to_process()`](kernel/signal.picoc#L74), [`wakeup_wait_queue()`](kernel/process/process.picoc#L416) | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
 
-## 4.9 Process-loader and run-setup function reference
+## 4.8 Process-loader and run-setup function reference
 [\[↑ TOC\]](#contents)
 
 Loading reserves and fills a process image, while run setup later installs its
@@ -2996,7 +3001,43 @@ struct Process *scheduler_next_process(void) {
 Including `RUNNING` permits the current process to be selected again when it is the only runnable
 one.
 
-## 5.2 Saving the current process and selecting the next process
+## 5.2 Saved process activation
+[\[↑ TOC\]](#contents)
+
+Selecting a PCB is not enough to resume it: the dispatcher also needs the CPU
+state from the point where that process stopped. Each PCB therefore embeds a
+[`struct ActivationRecord`](kernel/process/process.header#L21). Its fixed field
+order is used directly by assembly, and the following table explains who
+initializes and later uses each value:
+
+```c
+struct ActivationRecord {
+    int in1;
+    int in2;
+    int acc;
+    int sp;
+    int baf;
+    int cs;
+    int ds;
+};
+```
+
+| Attribute | Meaning | Used by |
+| --- | --- | --- |
+| [`in1`](kernel/process/process.header#L22), [`in2`](kernel/process/process.header#L23), [`acc`](kernel/process/process.header#L24) | General argument/result registers at the suspension point | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`sp`](kernel/process/process.header#L25) | Free cell immediately below the saved return PC on the process stack | First initialized by [`create_process()`](kernel/process/process.picoc#L89); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`baf`](kernel/process/process.header#L26) | Base address of the interrupted PicoC function frame | First initialized by [`create_process()`](kernel/process/process.picoc#L89); rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L89); saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+
+These are the RETI registers required to resume a process.
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) fills the
+record from an interrupt frame, and
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) reads it by fixed
+PCB offsets to restore the registers. The record is embedded in the PCB; it is
+neither a pointer to a stack frame nor a separate allocation.
+
+## 5.3 Saving the current process and selecting the next process
 [\[↑ TOC\]](#contents)
 
 Immediate timer preemption, deferred timer requests,
@@ -3040,7 +3081,7 @@ termination can remove that PCB, requiring another pass. If processes exist but 
 the loop repeatedly scans in kernel context until an interrupt makes one ready. If the process list
 is empty, [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) returns.
 
-## 5.3 Restoring the selected process and returning with `RTI`
+## 5.4 Restoring the selected process and returning with `RTI`
 [\[↑ TOC\]](#contents)
 
 [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) updates old/new states and the
@@ -4458,7 +4499,7 @@ kernel loading: [`load_process()`](kernel/process/process_loader.picoc#L305) loa
 whereas the userspace [`load()`](library/unistd/process.picoc#L17) wrapper invokes
 [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) for each shell. The latter uses
 bounded UART ranges, or DMA when enabled, as described under
-[Executable transfer with polling or DMA](#461-executable-transfer-with-polling-or-dma).
+[Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
 
 ```mermaid
 sequenceDiagram
@@ -5376,7 +5417,7 @@ behind each topic; these are teaching mechanisms, with no deadline guarantees.
 
 | Real-time operating-systems lecture topic | What students can inspect in PicoOS |
 | --- | --- |
-| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`Process`](kernel/process/process.header#L31) list; [termination and removal](#47-parent-child-relationships-termination-and-reaping) are separate steps |
+| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`Process`](kernel/process/process.header#L31) list; [termination and removal](#46-parent-child-relationships-termination-and-reaping) are separate steps |
 | Scheduling and dispatching | The scheduler chooses a ready process; the dispatcher saves and restores its activation record |
 | [`waitpid()`](library/sys/wait/wait.picoc#L14), [`sleep()`](library/unistd/blocking.picoc#L9), and [`wakeup()`](library/unistd/blocking.picoc#L19) | A process blocks in a wait queue until a child, mutex, or other event wakes it |
 | Mutexes | [`mutex_lock()`](library/mutex/mutex.picoc#L18) blocks a contending process and [`mutex_unlock()`](library/mutex/mutex.picoc#L25) wakes a waiting process |
@@ -5468,7 +5509,7 @@ retain the removed implementation-specific points.
   open-file descriptions
 - [linked-list round-robin scanning](#51-round-robin-process-selection) rather than a separate ready queue
 - [non-preemptive kernel execution and deferred rescheduling](#261-kernel-non-preemption-and-deferred-rescheduling)
-- [fixed/default process heap and stack sizing](#44-process-image-and-initial-userspace-stack)
+- [fixed/default process heap and stack sizing](#43-process-image-and-initial-userspace-stack)
   with no dynamic stack growth
 - limited [formatting, scanning](#86-standard-io-formatting-and-scanning), [shell parsing](#124-command-parsing-expansion-and-execution),
   and [standard-library subsets](#87-library-organization-scope-and-limitations)
@@ -5488,7 +5529,7 @@ retain the removed implementation-specific points.
 [\[↑ TOC\]](#contents)
 
 [`hexyl`](https://github.com/sharkdp/hexyl) helps connect the
-[process-image layout](#44-process-image-and-initial-userspace-stack) to the bytes in a
+[process-image layout](#43-process-image-and-initial-userspace-stack) to the bytes in a
 generated `.bin` file. Each RETI word occupies four file bytes in big-endian
 order. The first five words form a **20-byte loader header**, followed by the
 image payload. The table gives byte offsets for finding those header words;
