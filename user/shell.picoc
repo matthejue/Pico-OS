@@ -48,7 +48,7 @@ int command_history_count = 0;
 bool eval(char *command);
 
 void shell_write_character(char character) {
-    write(STDOUT_FILENO, &character, 1);
+    write_without_uart_escape_check(STDOUT_FILENO, &character, 1);
 }
 
 void shell_write(int file_descriptor, char *text) {
@@ -57,7 +57,7 @@ void shell_write(int file_descriptor, char *text) {
     while (text[length] != '\0') {
         length = length + 1;
     }
-    write(file_descriptor, text, length);
+    write_without_uart_escape_check(file_descriptor, text, length);
 }
 
 void shell_write_string(char *text) {
@@ -80,7 +80,7 @@ void shell_write_decimal(int value) {
     char buffer[12];
     int length = append_decimal(buffer, value);
 
-    write(STDOUT_FILENO, buffer, length);
+    write_without_uart_escape_check(STDOUT_FILENO, buffer, length);
 }
 
 void report_process_created(int pid) {
@@ -133,7 +133,7 @@ int erase_shell_line_suffix(int length, int retained_length) {
         index = index + 1;
     }
     if (erased_length > 0) {
-        write(STDOUT_FILENO, shell_line_erase_sequence, erased_length * 3);
+        write_without_uart_escape_check(STDOUT_FILENO, shell_line_erase_sequence, erased_length * 3);
     }
     return retained_length;
 }
@@ -186,7 +186,7 @@ int replace_shell_line(
     }
     buffer[replacement_length] = '\0';
     if (replacement_length > 0) {
-        write(STDOUT_FILENO, buffer, replacement_length);
+        write_without_uart_escape_check(STDOUT_FILENO, buffer, replacement_length);
     }
     return replacement_length;
 }

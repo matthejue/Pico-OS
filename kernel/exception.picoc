@@ -36,6 +36,7 @@ void write_process_exception_message(char *message) {
     request.file_descriptor = STDOUT_FILENO;
     request.buffer = message;
     request.count = length;
+    request.protect_uart_control = false;
     request.show_loading_bar = false;
     write_file_descriptor(&request);
 }

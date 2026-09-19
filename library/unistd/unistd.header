@@ -7,6 +7,8 @@
 int invoke_syscall(int number, int argument);
 int read(int file_descriptor, void *buffer, int count);
 int write(int file_descriptor, void *buffer, int count);
+// Writes a buffer known not to contain the UART control escape
+int write_without_uart_escape_check(int file_descriptor, char *buffer, int count);
 int close(int file_descriptor);
 int dup2(int old_file_descriptor, int new_file_descriptor);
 int lseek(int file_descriptor, int offset, int origin);
