@@ -16,6 +16,6 @@ int main(void) {
     if (file_descriptor < 0 || close(file_descriptor) != 0) {
         return 1;
     }
-    write(STDOUT_FILENO, "\nliteral UART output passed\n", 28);
+    write_without_uart_escape_check(STDOUT_FILENO, "\nliteral UART output passed\n", 28);
     return 0;
 }

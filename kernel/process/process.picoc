@@ -52,6 +52,7 @@ void list_processes(void) {
         request.file_descriptor = STDOUT_FILENO;
         request.buffer = line;
         request.count = index + 1;
+        request.protect_uart_control = false;
         request.show_loading_bar = false;
         write_file_descriptor(&request);
         process = process->next;

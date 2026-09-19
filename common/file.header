@@ -32,6 +32,7 @@ struct IoRequest {
     int file_descriptor;
     char *buffer;
     int count;
+    bool protect_uart_control;
     bool show_loading_bar;
     int transferred;
     int loading_bar_update;

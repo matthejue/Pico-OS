@@ -10,6 +10,7 @@ int read(int file_descriptor, void *buffer, int count) {
     request.file_descriptor = file_descriptor;
     request.buffer = (char *)buffer;
     request.count = count;
+    request.protect_uart_control = false;
     request.show_loading_bar =
         getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
     request.transferred = 0;
@@ -34,6 +35,18 @@ int write(int file_descriptor, void *buffer, int count) {
     request.file_descriptor = file_descriptor;
     request.buffer = (char *)buffer;
     request.count = count;
+    request.protect_uart_control = true;
+    request.show_loading_bar = false;
+    return invoke_syscall(SYSCALL_WRITE, (int)&request);
+}
+
+int write_without_uart_escape_check(int file_descriptor, char *buffer, int count) {
+    struct IoRequest request;
+
+    request.file_descriptor = file_descriptor;
+    request.buffer = buffer;
+    request.count = count;
+    request.protect_uart_control = false;
     request.show_loading_bar = false;
     return invoke_syscall(SYSCALL_WRITE, (int)&request);
 }

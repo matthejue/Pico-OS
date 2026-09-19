@@ -191,6 +191,7 @@ int fgetc(FILE *stream) {
     request.file_descriptor = stream->file_descriptor;
     request.buffer = &value;
     request.count = 1;
+    request.protect_uart_control = false;
     request.show_loading_bar = false;
     request.transferred = 0;
     request.complete = false;
@@ -217,6 +218,7 @@ int fputc(int character, FILE *stream) {
     request.file_descriptor = stream->file_descriptor;
     request.buffer = &value;
     request.count = 1;
+    request.protect_uart_control = true;
     request.show_loading_bar = false;
     if (invoke_stdio_syscall(SYSCALL_WRITE, (int)&request) != 1) {
         return -1;
@@ -249,6 +251,7 @@ int fputs(char *text, FILE *stream) {
     request.file_descriptor = stream->file_descriptor;
     request.buffer = text;
     request.count = length;
+    request.protect_uart_control = true;
     request.show_loading_bar = false;
     return invoke_stdio_syscall(SYSCALL_WRITE, (int)&request);
 }
