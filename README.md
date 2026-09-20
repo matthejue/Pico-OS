@@ -2687,8 +2687,10 @@ abstraction, then follows loading, startup, termination, and final removal.
 ## 4.1 Global process list and current process
 [\[↑ TOC\]](#contents)
 
-The process table is a singly linked list, not an array and not one
-[`kmalloc()`](kernel/kmalloc.picoc#L23) allocation. These four definitions in
+The name *process table* describes the collection's role, not its concrete data
+structure. PicoOS implements it as a singly linked list of PCBs, not as a fixed
+array or a dynamically resized array. There is no separately allocated table
+object. Instead, these four definitions in
 [`kernel/process/process.picoc`](kernel/process/process.picoc) are globals in
 kernel `.data`:
 
@@ -2699,19 +2701,51 @@ struct Process *active_process = NULL;
 int next_process_id = 1;
 ```
 
-[`process_list_head`](kernel/process/process.picoc#L16) is the traversal entry,
-[`process_list_tail`](kernel/process/process.picoc#L17) makes append cheap,
-[`active_process`](kernel/process/process.picoc#L18) is the PCB whose activation
-is currently in the CPU, and [`next_process_id`](kernel/process/process.picoc#L19)
-supplies monotonically increasing PIDs. Each linked
-[`struct Process`](kernel/process/process.header#L31) PCB is separately allocated
-with [`kmalloc()`](kernel/kmalloc.picoc#L23). [`first_process()`](kernel/process/process.picoc#L28)
-and [`current_process()`](kernel/process/process.picoc#L62) provide access to the
-important globals.
+Each node is one [`struct Process`](kernel/process/process.header#L31) PCB: the
+complete kernel record for one process. Its
+[`next`](kernel/process/process.header#L53) field points to the following PCB,
+and the final node uses `NULL` for that field.
+[`process_list_head`](kernel/process/process.picoc#L16) points to the first node
+and is the starting point for traversal, while
+[`process_list_tail`](kernel/process/process.picoc#L17) points to the final node
+so a new PCB can be appended without first walking the list.
+[`active_process`](kernel/process/process.picoc#L18) is not a separate PCB or a
+separate list entry: it points to the node for the process whose saved
+activation is currently loaded into the CPU, or is `NULL` while no process is
+active.
+[`next_process_id`](kernel/process/process.picoc#L19) supplies monotonically
+increasing PIDs. [`first_process()`](kernel/process/process.picoc#L28) and
+[`current_process()`](kernel/process/process.picoc#L62) provide access to the
+head and active PCB respectively, while
+[`find_process_by_pid()`](kernel/process/process.picoc#L162) finds process state
+by walking the same list from its head.
+
+[`initialize_process_table()`](kernel/process/process.picoc#L21) only clears the
+three PCB pointers and resets the next PID; it does not allocate an array or
+reserve PCB slots. [`create_process()`](kernel/process/process.picoc#L89)
+allocates each new PCB separately from the kernel heap with
+[`kmalloc()`](kernel/kmalloc.picoc#L23), initializes it, clears its list link,
+and appends it after the tail. For the first process, both the head and tail
+point to that PCB. Later insertions connect the old tail to the new PCB and
+then advance the tail. Consequently, the process list grows one kernel-heap
+allocation at a time and is never resized or reallocated as one block.
+
+Final removal works on the individual node rather than marking a reusable
+slot. [`remove_process()`](kernel/process/process.picoc#L209) walks from the
+head to find the PCB and its predecessor, removes the PCB from any wait queue,
+and bypasses it by changing either the head pointer or the predecessor's list
+link. It also moves the tail pointer when the final node is removed and updates
+the active-process pointer if it referred to that node. After unlinking the
+PCB, the function releases its owned resources and frees the PCB itself with
+[`kfree()`](kernel/kmalloc.picoc#L38).
+[Section 4.6](#46-parent-child-relationships-termination-and-reaping) explains
+when a terminated PCB can be removed and which resources final removal
+releases.
 
 The scheduler scans this same list. There is no separate ready queue. Blocking
-queues use a different intrusive link inside each PCB, so [`next`](kernel/process/process.header#L53) remains
-available for process-table order.
+queues use a different intrusive link inside each PCB, so
+[`next`](kernel/process/process.header#L53) remains available for process-table
+order.
 
 ## 4.2 Process control block fields
 [\[↑ TOC\]](#contents)
