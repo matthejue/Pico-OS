@@ -17,6 +17,7 @@ README.txt
 *.ast
 *.rast
 *.json
+kernel/kernel.overview
 !/.vscode/
 !/.vscode/settings.json
 !/.vscode/tasks.json

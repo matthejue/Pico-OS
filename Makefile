@@ -421,6 +421,7 @@ RUNTIME_FILES := \
 	$(BINARY_DIR)/boot/bootloader.reti \
 	$(BINARY_DIR)/kernel/kernel.sections \
 	$(BINARY_DIR)/kernel/kernel.debuginfo \
+	$(BINARY_DIR)/kernel/kernel.overview \
 	$(BINARY_DIR)/download-tools.sh \
 	$(BINARY_DIR)/download-tools.ps1 \
 	$(BINARY_DIR)/start-picoos.sh \
@@ -490,6 +491,9 @@ binary/kernel/kernel.sections: kernel/kernel.reti | binary/kernel
 
 binary/kernel/kernel.debuginfo: kernel/kernel.reti | binary/kernel
 	cp kernel/kernel.debuginfo $@
+
+binary/kernel/kernel.overview: kernel/kernel.overview | binary/kernel
+	cp $< $@
 
 binary/start-picoos.sh: start-picoos.sh | binary
 	cp $< $@
@@ -721,6 +725,17 @@ kernel/kernel.reti: $(KERNEL_PICOC_SOURCES) $(KERNEL_HEADERS) kernel/memory_cons
 		-O1 -i -w -s -g -v \
 		$(KERNEL_MEMORY_OPTIONS) \
 		-o kernel/kernel.reti
+
+kernel/kernel.overview: kernel/kernel.reti generate_overview_layout.py
+	python3 generate_overview_layout.py \
+		--symbol-table kernel/kernel.st \
+		--reti kernel/kernel.reti \
+		--isr-source interrupt_service_routines/os_isrs.picoc \
+		--syscall-source kernel/syscall.picoc \
+		--syscall-header common/syscall.header \
+		--process-header kernel/process/process.header \
+		--memory-header kernel/memory_constants.header \
+		--output $@
 
 binary/kernel/kernel.bin: kernel/kernel.reti | binary/kernel
 	@$(assemble_binary)
