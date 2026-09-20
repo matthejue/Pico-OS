@@ -22,7 +22,7 @@ PicoC compiler.
 dependency as one compilation unit. Compile-only commands use
 `--dependency-file`, so Make also tracks the headers and included PicoC files
 reported by the compiler. Unchanged units do not need another compiler
-process; when a compiler process is required, its embedded cache validation
+process, when a compiler process is required, its embedded cache validation
 still decides whether compilation work can be reused.
 
 After the units are ready, independent link and emulator jobs run in parallel.

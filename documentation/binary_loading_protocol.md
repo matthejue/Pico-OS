@@ -16,7 +16,7 @@ subtract five before copying the executable payload into SRAM.
 The UART `load` response uses `UINT32_MAX` when the host path is missing or
 unreadable, does not name a regular file, or has an unrepresentable word count.
 An existing empty regular file returns a zero word count. Both PicoOS loaders
-reject responses shorter than the five-word binary header; the bootloader stops
+reject responses shorter than the five-word binary header, the bootloader stops
 instead of waiting for metadata that was not sent, while the process loader
 returns a failed load result.
 
@@ -28,6 +28,6 @@ heap.
 
 The kernel loader receives and discards the binary `heap_start` and `heap_size`
 words. Kernel allocation uses `KERNEL_HEAP_START` and `KERNEL_HEAP_SIZE` from
-the compiler-generated `kernel/memory_constants.header`; the generated heap
+the compiler-generated `kernel/memory_constants.header`, the generated heap
 size is 4096 cells. The bootloader retains its existing end-of-SRAM kernel
 stack default when binary `stack_start` is `-1`.

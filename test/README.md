@@ -44,7 +44,7 @@ raw_output.txt
 
 `raw_output.txt` is the complete emulator stdout stream. `output.txt` is the
 normalized output used for comparison. Loader requests use
-`<esc>load <path><esc>/`, where `<esc>` is ASCII byte 27; the emulator consumes
+`<esc>load <path><esc>/`, where `<esc>` is ASCII byte 27, the emulator consumes
 these control frames instead of writing them to stdout.
 
 ## PicoC Programs
@@ -122,7 +122,7 @@ to a newline character while printing its arguments.
 
 A shell whose stdin is redirected executes newline-separated commands with its
 ordinary line reader and exits successfully at EOF. Use `shell.bin < FILE` to
-run commands from a file; the shell does not accept a file path argument. The
+run commands from a file, the shell does not accept a file path argument. The
 one supported `|` is sequential and uses a temporary file, not a streaming
 kernel pipe.
 
@@ -241,7 +241,7 @@ mode, it also writes `raw_output.txt` and `output.txt`.
 When `config/os_run_emu_opts.txt` contains `-d`, `make run-os` starts
 `reti_emulator` directly on the current terminal so the ncurses debug TUI can
 use stdin and stdout. In that debug mode `input.txt` is not piped into the
-emulator and stdout is not captured; enter UART input manually through the TUI.
+emulator and stdout is not captured, enter UART input manually through the TUI.
 
 ## opts Configuration
 

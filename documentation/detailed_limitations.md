@@ -12,7 +12,7 @@ The following limitations describe the two supported waiting mechanisms.
 
 - [`sleep()`](../library/unistd/blocking.picoc#L9) blocks the current process on
   a caller-supplied wait queue until [`wakeup()`](../library/unistd/blocking.picoc#L19)
-  wakes it; it cannot wait for a specified duration.
+  wakes it, it cannot wait for a specified duration.
 - [`waitpid()`](../library/sys/wait/wait.picoc#L14) waits for one exact child
   PID and has no options argument or general interface for waiting on any
   child.

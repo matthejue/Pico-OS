@@ -33,5 +33,5 @@ updated RETI-Emulator with these binaries. Older emulator builds do not
 provide this filesystem boundary.
 
 `device/terminal.dev` is a dummy release marker for PicoOS's kernel terminal.
-Programs access the terminal through the virtual path `/device/terminal.dev`; the
+Programs access the terminal through the virtual path `/device/terminal.dev`, the
 dummy file does not contain terminal data.

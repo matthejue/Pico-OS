@@ -13,7 +13,7 @@ pair. `--show-input-files` prints that choice.
 
 PicoOS deliberately does not duplicate this validation. Its Make rules only
 coordinate unique units, final links, and parallel test jobs. Library-test
-compile-only rules pass `--dependency-file`; the compiler writes an exact Make
+compile-only rules pass `--dependency-file`, the compiler writes an exact Make
 dependency rule from the same preprocessing metadata used by its cache.
 
 The relevant PicoOS implementation locations are:

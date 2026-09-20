@@ -1,7 +1,7 @@
 # Repository layout
 
 This page maps the PicoOS source tree to the generated runtime tree. Source
-directories are compiled or copied into [`binary/`](../binary/); `make
+directories are compiled or copied into [`binary/`](../binary/), `make
 release-archive` packages only the files that remain in that directory.
 
 ## Source and support directories
@@ -17,11 +17,11 @@ and its test and documentation material.
 | [`interrupt_service_routines/`](../interrupt_service_routines/) | Interrupt-vector-table and operating-system interrupt-service-routine sources. |
 | [`kernel/`](../kernel/) | Kernel source and headers: startup, dispatching, scheduling, processes, memory, system calls, interrupts, devices, and host filesystem support. Its [`filesystem/`](../kernel/filesystem/) and [`process/`](../kernel/process/) subdirectories group those subsystems. |
 | [`library/`](../library/) | Userspace PicoC libraries. Each subdirectory implements a library area such as standard I/O, strings, process and file operations, allocation, signals, mutexes, and startup code. |
-| [`system/`](../system/) | Privileged system userspace programs. [`init.picoc`](../system/init.picoc) is the first process started by the kernel; [`fast_os_test_launcher.picoc`](../system/fast_os_test_launcher.picoc) is built only for the fast test workflow. |
+| [`system/`](../system/) | Privileged system userspace programs. [`init.picoc`](../system/init.picoc) is the first process started by the kernel, [`fast_os_test_launcher.picoc`](../system/fast_os_test_launcher.picoc) is built only for the fast test workflow. |
 | [`user/`](../user/) | Normal userspace command sources, including the shell and commands such as `cat`, `ls`, `mkdir`, and `ps`. |
-| [`test/`](../test/) | Standalone library tests and OS/shell test fixtures. Scenario subdirectories normally contain PicoC programs, `input.txt`, and `expected_output.txt`; [`test/README.md`](../test/README.md) describes the test layout. |
+| [`test/`](../test/) | Standalone library tests and OS/shell test fixtures. Scenario subdirectories normally contain PicoC programs, `input.txt`, and `expected_output.txt`, [`test/README.md`](../test/README.md) describes the test layout. |
 | [`documentation/`](.) | Additional technical documentation, diagrams, and supporting material for PicoOS. |
-| [`binary/`](../binary/) | Generated release tree. It is cleared and rebuilt by `make release-tree`; it is not the source of truth for PicoOS code. See [Release archive layout](../README.md#release-archive-layout). |
+| [`binary/`](../binary/) | Generated release tree. It is cleared and rebuilt by `make release-tree`, it is not the source of truth for PicoOS code. See [Release archive layout](../README.md#release-archive-layout). |
 
 The root also contains [`Makefile`](../Makefile), which defines the build,
 release, and test targets, and generated local-development files such as
@@ -32,7 +32,7 @@ generated files are not part of the source or release archive layout.
 
 These scripts are used from the repository root unless stated otherwise. The
 release copies only the start and tool-download scripts listed in the last
-column; the other scripts support local development and testing.
+column, the other scripts support local development and testing.
 
 | Script | Purpose | Included in release archive |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ column; the other scripts support local development and testing.
 | [`run_sys_tests.sh`](../run_sys_tests.sh) | Runs the shell-based system-test workflow, optionally limiting it to failed tests or using direct compilation. | No |
 | [`select_test_jobs.sh`](../select_test_jobs.sh) | Selects or validates the parallel-job count for system tests. | No |
 | [`send_keypresses.py`](../send_keypresses.py) | Opens a graphical terminal and replays configured key presses for manual TUI interaction. It requires Python GUI-input packages. | No |
-| [`start-picoos.sh`](../start-picoos.sh) | Starts a PicoOS runtime on Linux, macOS, or Android; it can download missing tools and accepts emulator options. | Yes |
+| [`start-picoos.sh`](../start-picoos.sh) | Starts a PicoOS runtime on Linux, macOS, or Android, it can download missing tools and accepts emulator options. | Yes |
 | [`start-picoos.ps1`](../start-picoos.ps1) | PowerShell launcher for starting a PicoOS runtime on Windows. | Yes |
 | [`update_code_index.py`](../update_code_index.py) | Regenerates [`compile_commands.json`](../compile_commands.json) for editor code navigation over PicoC sources. | No |
-| [`run.py`](../run.py) | Legacy Python launcher that attempts to run `source.main`; it is not used by the PicoOS build, release, or test targets. | No |
+| [`run.py`](../run.py) | Legacy Python launcher that attempts to run `source.main`, it is not used by the PicoOS build, release, or test targets. | No |

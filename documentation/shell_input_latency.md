@@ -24,7 +24,7 @@ result from deciding the value. The complete script is
 [`measure_shell_input_delay.py`](measure_shell_input_delay.py).
 
 The script records the start and end with Python's `time.perf_counter_ns()`.
-This clock returns nanoseconds; one millisecond is 1,000,000 nanoseconds. It
+This clock returns nanoseconds, one millisecond is 1,000,000 nanoseconds. It
 therefore subtracts the two values and divides by 1,000,000 to get
 milliseconds. The exact conversion is
 `(finished_ns - started_ns) / 1_000_000`.

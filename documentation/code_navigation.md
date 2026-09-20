@@ -28,7 +28,7 @@ implemented across the following translation units:
 | Statement in `kernel/kernel.picoc` | Definition | README explanation |
 | --- | --- | --- |
 | `activate_kernel_stack_boundary()` | [`kernel/exception.picoc`](../kernel/exception.picoc) | [Stack-overflow boundary](../README.md#441-stack-overflow-boundary) |
-| `debug;` | Compiler statement used directly in [`kernel/kernel.picoc`](../kernel/kernel.picoc); it is not a function | [PicoC-Compiler extensions](../README.md#picoc-compiler-extensions) |
+| `debug;` | Compiler statement used directly in [`kernel/kernel.picoc`](../kernel/kernel.picoc), it is not a function | [PicoC-Compiler extensions](../README.md#picoc-compiler-extensions) |
 | `init_kernel_heap()` | [`kernel/kmalloc.picoc`](../kernel/kmalloc.picoc) | [Heap initialization](../README.md#921-heap-initialization) |
 | `initialize_process_table()` | [`kernel/process/process.picoc`](../kernel/process/process.picoc) | [Process table](../README.md#51-process-table) |
 | `init_process_memory_heap()` | [`kernel/pmalloc.picoc`](../kernel/pmalloc.picoc) | [Heap initialization](../README.md#921-heap-initialization) and [process memory allocation](../README.md#94-process-memory-allocation) |
@@ -69,10 +69,10 @@ kernel-wide terminal object:
 | Expose the userspace syscall wrappers | [`library/unistd`](../library/unistd) |
 
 `FileDescriptorTable` contains only descriptor entries. Standard descriptors
-store `/device/terminal.dev` in the same path field used by regular files; the
+store `/device/terminal.dev` in the same path field used by regular files, the
 filesystem recognizes that path and enters the shared `Terminal`, which is
 initialized once by the kernel. The UART ISR enters `handle_uart_interrupt()`
-in `terminal.picoc`; descriptor-based terminal reads and the single-character
+in `terminal.picoc`, descriptor-based terminal reads and the single-character
 input syscall both enter `begin_terminal_read()` there. The release-tree marker
 for this virtual device is
 [`binary/device/terminal.dev`](../binary/device/terminal.dev). The Makefile

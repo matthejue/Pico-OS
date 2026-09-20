@@ -36,7 +36,7 @@ The same algorithm manages three independent regions:
 | `pmalloc()` / `pfree()` | Processes and shared-memory backing |
 
 A failed positive-size user allocation terminates only that process with
-`Process terminated: heap full`; a failed kernel allocation prints
+`Process terminated: heap full`, a failed kernel allocation prints
 `Kernel panic: kernel heap full` and shuts PicoOS down.
 
 Relevant commits: `7006d2bf2320`, `ec2bbc1cb1fa`, `25765026d228`,
@@ -292,7 +292,7 @@ int status = waitpid(child);
 | Parent calls `waitpid()` later | Status returns to the parent and the child is removed |
 
 `waitpid()` accepts one exact child PID, with no options argument. It returns a
-signal-specific stopped status for `SIGSTOP`, `SIGTSTP`, or `SIGTTIN`;
+signal-specific stopped status for `SIGSTOP`, `SIGTSTP`, or `SIGTTIN`,
 `WIFSTOPPED(status)` identifies all three cases.
 
 Relevant commits: `babb464d0b8a`, `e8104b49736a`, `7f0da4af5dfd`,
@@ -312,7 +312,7 @@ found through PATH
 
 Init currently supplies `PATH=/user`. The shell uses an 80-cell command
 buffer. Double quotes are removed during expansion but do not preserve spaces
-as one argument; unmatched quotes produce an error. The current prompt is
+as one argument, unmatched quotes produce an error. The current prompt is
 `PicoOS> `.
 
 Relevant commits: `01fa0b234f00`, `285fec05bd52`, `8d9e84b0355d`,
@@ -330,7 +330,7 @@ PicoOS> echo.bin status: $?
 status: 1
 ```
 
-`&` starts a process without waiting. `$!` is the most recent background PID;
+`&` starts a process without waiting. `$!` is the most recent background PID,
 `$?` is the most recent foreground status. A background launch does not replace
 `$?`. `fg` and `bg` operate on the one most recently tracked background or
 stopped process.
@@ -350,7 +350,7 @@ second
 ```
 
 `echo.bin` separates arguments with one space and adds a final newline. It
-expands only backslash-`n`; the shell passes that sequence unchanged to other
+expands only backslash-`n`, the shell passes that sequence unchanged to other
 programs. Options such as `-n` are not implemented.
 
 Relevant commits: `285fec05bd52`, `36979558d57e`, `87ffd61d28e8`
@@ -363,7 +363,7 @@ PicoOS> count.bin 10000
 ```
 
 `count.bin` counts upward forever on one terminal line. Its optional argument
-sets the busy-loop iterations between values; the default is 25,000. The
+sets the busy-loop iterations between values, the default is 25,000. The
 program is useful for trying terminal job control: Ctrl+Z stops it, `fg`
 continues it, and Ctrl+C terminates it.
 
@@ -382,7 +382,7 @@ PicoOS> rmdir.bin new-directory
 
 Every PCB owns an inherited absolute PicoOS working-directory string. PID 1
 starts at `/`, which is the emulator's startup directory. Host `/tmp` is not
-mounted or artificially listed; `/tmp` refers only to a real runtime directory
+mounted or artificially listed, `/tmp` refers only to a real runtime directory
 if one has been created. The default `PATH=/user` keeps commands available
 after changing directories and from nested shells. Other relative paths use
 the calling process's current directory. Loader labels and process listings
@@ -391,12 +391,12 @@ junctions, and rejects file access through hard links or special host files.
 
 `ls.bin`, `mkdir.bin`, `pwd.bin`, `rm.bin`, and `rmdir.bin` call PicoOS library
 functions. `ls.bin` uses the `opendir()`, `readdir()`, and
-`closedir()` functions from `library/dirent`; it hides names beginning with `.`
+`closedir()` functions from `library/dirent`, it hides names beginning with `.`
 unless `-a` is given and prints only `d name` or `- name`. The syscalls use bounded `is-directory`,
 `ls`, `mkdir`, `unlink`, and `rmdir` UART frames. For `chdir()`, the
 kernel combines the argument with the calling process's PCB directory and
 removes `.` and `..` components. It sends the resulting absolute path through
-`is-directory`; the emulator only checks whether that directory exists and
+`is-directory`, the emulator only checks whether that directory exists and
 returns success or failure. After success, PicoOS stores the already-built path
 in the calling process's PCB. The emulator keeps its own working directory
 unchanged.
@@ -465,7 +465,7 @@ Each process has eight descriptor slots:
 | `2` | UART-backed standard error |
 | `3..7` | Host-backed files |
 
-The emulator provides the host files; PicoOS does not store a filesystem in
+The emulator provides the host files, PicoOS does not store a filesystem in
 SRAM. Reads request only the needed range, while a separate file-size request
 supports existence checks and `SEEK_END`. `open()`, `creat()`, `read()`,
 `write()`, `close()`, `lseek()`, and `dup2()` are implemented.
@@ -524,7 +524,7 @@ cat: missing.txt: could not open file
 ```
 
 `cat.bin` reads each named file in 64-cell chunks and handles partial writes to
-stdout. With no path it reads stdin; redirected files are copied byte-for-byte,
+stdout. With no path it reads stdin, redirected files are copied byte-for-byte,
 while terminal input supports Backspace/Delete, Enter, and Ctrl+D. Editing
 feedback stays on stderr when stdout is redirected, so `cat.bin > file.txt`
 can be used interactively. It continues with later named files where possible
@@ -601,13 +601,13 @@ redirected descriptor while the shell restores its terminal descriptor.
 
 A shell with redirected stdin uses its ordinary line reader, executes each
 newline-separated command from the input file, and exits at EOF. Commands from
-a file are therefore run with `shell.bin < FILE`; the shell does not accept a
+a file are therefore run with `shell.bin < FILE`, the shell does not accept a
 file path argument.
 
 `<` redirects input, `>` truncates output, `>>` appends output, `2>` truncates
 and redirects stderr, and `2>>` appends stderr. `/device/null.dev` accepts and
 discards output. One two-command `|` is implemented sequentially through a
-temporary file; arbitrary descriptor syntax and streaming or longer pipelines
+temporary file, arbitrary descriptor syntax and streaming or longer pipelines
 are not implemented.
 
 Relevant commits: `04588d05f985`, `36979558d57e`
@@ -648,7 +648,7 @@ Faults identify the affected context and produce a specific result:
 | Kernel | Heap full | `Kernel panic: kernel heap full` |
 
 A user fault exits that process with status 1 and lets PicoOS dispatch another
-one. CPU faults use exception vector 3; heap-full uses a dedicated syscall.
+one. CPU faults use exception vector 3, heap-full uses a dedicated syscall.
 User diagnostics go through the process's stdout descriptor, so `>` can capture
 them.
 
@@ -667,26 +667,26 @@ prctl(PR_SET_PDEATHSIG, SIGKILL);
 | `SIGCONT` | Continue a stopped process |
 | `SIGSTOP` | Stop a process |
 | `SIGTSTP` | Stop a process |
-| `SIGTTIN` | Stop a process; generated for a background terminal read |
+| `SIGTTIN` | Stop a process, generated for a background terminal read |
 
 Signals have fixed kernel actions and cannot be caught or ignored. Ctrl+C sends
-`SIGINT` to the foreground process; Ctrl+Z sends `SIGTSTP`. `fg`
+`SIGINT` to the foreground process, Ctrl+Z sends `SIGTSTP`. `fg`
 makes the most recently tracked job the terminal input owner before resuming it
-with `SIGCONT`; `bg` resumes ordinary stopped jobs without transferring input.
+with `SIGCONT`, `bg` resumes ordinary stopped jobs without transferring input.
 A background process that reads terminal stdin receives `SIGTTIN` and cannot
 continue that pending read until it becomes foreground. New input does not
 automatically choose or continue a stopped reader. The shell's `fg` command
 selects its tracked process, gives it terminal ownership, and sends `SIGCONT`.
 The pending userspace buffer/count remains in that process's PCB, while stopped
 readers are not left in the terminal's active wait queue. In debugger mode,
-these shortcuts require RETI-Emulator's `(V)iew raw terminal`; its normal
+these shortcuts require RETI-Emulator's `(V)iew raw terminal`, its normal
 `(v)iew terminal` keeps host control-key handling active. A configured
 parent-death signal is inherited by later children.
 
-Unix/Linux allows `SIGINT` to be caught and handled but never `SIGKILL`; PicoOS
+Unix/Linux allows `SIGINT` to be caught and handled but never `SIGKILL`, PicoOS
 does not implement handlers, so both have the same termination effect.
 Unix/Linux similarly makes `SIGSTOP` uncatchable while `SIGTSTP` and `SIGTTIN`
-can normally be caught or ignored; PicoOS gives all three the same stop effect.
+can normally be caught or ignored, PicoOS gives all three the same stop effect.
 The shell reports process creation and signal-driven foreground stops or
 termination on separate lines.
 
@@ -728,7 +728,7 @@ error: unmatched quote
 ```
 
 Init likewise distinguishes a missing, unreadable, oversized, or malformed
-environment file. `cat.bin` reports path and I/O failures;
+environment file. `cat.bin` reports path and I/O failures,
 `kill.bin` reports usage, PID, signal, and process lookup errors. The commands
 return failure where appropriate, so `$?` exposes the result.
 
@@ -757,7 +757,7 @@ stack like this:
 | `datasegment_start` | `11595` | `.data` begins |
 | `heap_start` | `11621` | 2000-word heap begins |
 | Heap end | `13621` | First word above the heap and lower stack boundary |
-| `stack_start` | `14621` | Initial stack pointer; the stack grows downward |
+| `stack_start` | `14621` | Initial stack pointer, the stack grows downward |
 
 All five shown keys are required. A file whose SRAM image begins with numeric
 interrupt-vector entries may additionally contain
