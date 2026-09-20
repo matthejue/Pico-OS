@@ -212,19 +212,22 @@ readme-pdf:
 	@set -euo pipefail; \
 	build_dir="$$(mktemp -d)"; \
 	trap 'rm -rf "$$build_dir"' EXIT; \
-	if [[ ! -x "$(README_PDF_MERMAID)" ]]; then \
+	if [[ ! -x "$(README_PDF_MERMAID)" ]] || ! "$(README_PDF_MERMAID)" --version >/dev/null 2>&1; then \
 		mkdir -p "$(README_PDF_TOOL_DIR)"; \
 		PUPPETEER_SKIP_DOWNLOAD=true yarn --cwd "$(README_PDF_TOOL_DIR)" add --no-lockfile @mermaid-js/mermaid-cli puppeteer; \
 	fi; \
-	PUPPETEER_EXECUTABLE_PATH="$$(command -v chromium)" \
+	browser="$$(command -v chromium || command -v chromium-browser)"; \
+	if [[ -z "$$browser" ]]; then \
+		echo "README PDF export requires Chromium (install chromium or chromium-browser)." >&2; \
+		exit 1; \
+	fi; \
+	PUPPETEER_EXECUTABLE_PATH="$$browser" \
 	PUPPETEER_SKIP_DOWNLOAD=true \
 	MERMAID_CLI='$(README_PDF_MERMAID)' \
 	MERMAID_OUTPUT_DIR="$$build_dir" \
 	pandoc README.md \
 		--from=gfm \
 		--standalone \
-		--toc \
-		--toc-depth=3 \
 		--pdf-engine=xelatex \
 		--lua-filter=documentation/readme_pdf_mermaid.lua \
 		--include-in-header=documentation/readme_pdf_header.tex \
