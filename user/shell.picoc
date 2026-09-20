@@ -12,6 +12,7 @@
 #include "../common/user_command.header"
 
 #define SHELL_COMMAND_BUFFER_CAPACITY 80
+#define SHELL_INPUT_BUFFER_CAPACITY 128
 #define SHELL_PIPE_COMMAND_CAPACITY 160
 #define SHELL_COMMAND_HISTORY_CAPACITY 8
 #define SHELL_CTRL_U 21
@@ -42,8 +43,11 @@ char command_history[
 char command_history_draft[SHELL_COMMAND_BUFFER_CAPACITY];
 // Keeps the complete erase sequence outside the process stack
 char shell_line_erase_sequence[(SHELL_COMMAND_BUFFER_CAPACITY - 1) * 3];
+char shell_input_buffer[SHELL_INPUT_BUFFER_CAPACITY];
 int command_history_start = 0;
 int command_history_count = 0;
+int shell_input_index = 0;
+int shell_input_count = 0;
 
 bool eval(char *command);
 
@@ -232,10 +236,17 @@ int append_shell_line_character(
 ) {
     if (length < capacity - 1) {
         buffer[length] = character;
-        shell_write_character(character);
         return length + 1;
     }
     return length;
+}
+
+void flush_shell_line_echo(char *buffer, int start, int count) {
+    write_without_uart_escape_check(
+        STDOUT_FILENO,
+        buffer + start,
+        count
+    );
 }
 
 bool shell_reset(void) {
@@ -258,6 +269,24 @@ bool is_line_whitespace(char value) {
     return value == ' ' || value == '\t';
 }
 
+int read_shell_character(char *character) {
+    if (shell_input_index >= shell_input_count) {
+        shell_input_count = read(
+            STDIN_FILENO,
+            shell_input_buffer,
+            SHELL_INPUT_BUFFER_CAPACITY
+        );
+        shell_input_index = 0;
+        if (shell_input_count <= 0) {
+            return shell_input_count;
+        }
+    }
+
+    *character = shell_input_buffer[shell_input_index];
+    shell_input_index = shell_input_index + 1;
+    return 1;
+}
+
 int read_line(char *buffer, int capacity) {
     int length = 0;
     int history_position = 0;
@@ -265,13 +294,24 @@ int read_line(char *buffer, int capacity) {
     char character;
     int read_result;
     int retained_length;
+    int echo_start = 0;
+    int echo_count = 0;
     bool complete = false;
     bool process_character;
 
     shell_write_string("PicoOS> ");
     while (!complete) {
-        read_result = read(STDIN_FILENO, &character, 1);
+        read_result = read_shell_character(&character);
         if (read_result == 1) {
+            if (
+                echo_count > 0 &&
+                (escape_sequence_state != 0 ||
+                 (character != '\t' &&
+                  (character < ' ' || character == 127)))
+            ) {
+                flush_shell_line_echo(buffer, echo_start, echo_count);
+                echo_count = 0;
+            }
             process_character = true;
             if (escape_sequence_state == 1) {
                 if (character == '[' || character == 'O') {
@@ -352,13 +392,27 @@ int read_line(char *buffer, int capacity) {
                     if (character == '\t') {
                         character = ' ';
                     }
+                    retained_length = length;
                     length = append_shell_line_character(
                         buffer,
                         length,
                         capacity,
                         character
                     );
+                    if (length > retained_length) {
+                        if (echo_count == 0) {
+                            echo_start = retained_length;
+                        }
+                        echo_count = echo_count + 1;
+                    }
                 }
+            }
+            if (
+                echo_count > 0 &&
+                shell_input_index >= shell_input_count
+            ) {
+                flush_shell_line_echo(buffer, echo_start, echo_count);
+                echo_count = 0;
             }
         } else if (length == 0) {
             return -1;

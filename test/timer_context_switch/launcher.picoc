@@ -20,7 +20,7 @@ int main(void) {
     set_timer_interval(100);
     run(worker, NULL, NULL);
     status = waitpid(worker);
-    set_timer_interval(1000);
+    set_timer_interval(5000);
     if (status == 0) {
         printf("timer context switches survived\n");
     } else {

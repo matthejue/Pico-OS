@@ -341,7 +341,9 @@ lectures follow.
    - [2.5 Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace)
       - [2.5.1 System-call groups](#251-system-call-groups)
    - [2.6 Timer interrupts and userspace preemption](#26-timer-interrupts-and-userspace-preemption)
-      - [2.6.1 Kernel non-preemption and deferred rescheduling](#261-kernel-non-preemption-and-deferred-rescheduling)
+      - [2.6.1 Timer interrupt path](#261-timer-interrupt-path)
+      - [2.6.2 Kernel non-preemption and deferred rescheduling](#262-kernel-non-preemption-and-deferred-rescheduling)
+      - [2.6.3 Shell character delay for different timer intervals](#263-shell-character-delay-for-different-timer-intervals)
    - [2.7 UART receive interrupt path](#27-uart-receive-interrupt-path)
    - [2.8 DMA completion interrupt path](#28-dma-completion-interrupt-path)
    - [2.9 CPU exceptions and runtime errors](#29-cpu-exceptions-and-runtime-errors)
@@ -1323,7 +1325,7 @@ to finish.
 The following excerpt shows how startup applies those arrays. It disables each
 device before restoring the configured vector and priority. The timer remains
 inactive until [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34)
-sets its 1000-instruction interval after init is ready:
+sets its 5,000-instruction interval after init is ready:
 
 ```c
 int interrupt_device_isrs[INTERRUPT_DEVICE_COUNT] = {
@@ -1710,12 +1712,21 @@ multi-argument calls.
 [\[↑ TOC\]](#contents)
 
 The timer is mapped to vector 1 with priority 1 and activated with an interval
-of 1000 instructions after init becomes ready. The complete
-[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) entry,
-[`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62),
+of 5,000 instructions after init becomes ready. The interval counts emulated
+instructions rather than wall-clock time. The [timer interval measurement and
+selection](#263-shell-character-delay-for-different-timer-intervals) explains why PicoOS
+uses this value. [Interactive line editing](#123-interactive-line-editing-and-command-history)
+separately reduces the time spent receiving and printing typed characters.
+
+### 2.6.1 Timer interrupt path
+[\[↑ TOC\]](#contents)
+
+The complete [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33)
+entry, [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62),
 [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74), and
 [`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L91)
-continuations are:
+continuations are shown below so the context-switch work behind that tradeoff is
+visible:
 
 ```c
 __attribute__((naked))
@@ -1812,7 +1823,7 @@ resumes directly and the pending request is consumed by the next syscall-return
 path. This keeps kernel execution non-preemptive without losing a time slice
 that expires inside a syscall.
 
-### 2.6.1 Kernel non-preemption and deferred rescheduling
+### 2.6.2 Kernel non-preemption and deferred rescheduling
 [\[↑ TOC\]](#contents)
 
 The timer interrupt behaves differently in userspace and in the kernel. That
@@ -1836,6 +1847,21 @@ a timer observed during the previous chunk is handled at that syscall's return
 boundary. With DMA, process loading starts one complete payload transfer and
 blocks its caller until the DMA completion interrupt wakes it.
 
+### 2.6.3 Shell character delay for different timer intervals
+[\[↑ TOC\]](#contents)
+
+Choosing the interval is useful because it decides how often PicoOS can give a
+waiting shell or program a turn, while every timer interrupt also takes time
+away from useful program work. The measurement times character delay while an
+endless empty loop is running.
+
+![Measured character delay for each timer interrupt interval](documentation/images/timer_interval_measurements.png)
+
+**PicoOS uses 5,000 instructions because it was the best balance:** character
+delay was nearly the same as at 10,000, but 10,000 can make the shell wait
+longer. Shorter intervals waste more time switching programs. The method,
+results, and tradeoffs are in
+[Shell input latency and timer interval](documentation/shell_input_latency.md).
 ## 2.7 UART receive interrupt path
 [\[↑ TOC\]](#contents)
 
@@ -2098,7 +2124,7 @@ four public configuration functions.
 | [`interrupt_controller_initialize(void)`](kernel/interrupt_controller.picoc#L41) | Returns no value | Rewrites timer, DMA, and UART mappings and priorities in periphery registers 3–8 from [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) and [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 | [`interrupt_controller_assign_device(device, interrupt_index, priority)`](kernel/interrupt_controller.picoc#L59) | Returns no value | Writes one device's vector and priority | [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
 | [`interrupt_controller_disable_device(device)`](kernel/interrupt_controller.picoc#L23) | Returns no value | Writes mapping 255 and priority 0 for one device | [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`reboot()`](kernel/kernel.picoc#L19), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) |
-| [`interrupt_controller_activate_timer(void)`](kernel/interrupt_controller.picoc#L34) | Returns no value | Writes the 1000-instruction interval to periphery register 9 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`interrupt_controller_activate_timer(void)`](kernel/interrupt_controller.picoc#L34) | Returns no value | Writes the 5,000-instruction interval to periphery register 9 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 
 #### 2.9.3.4 Memory-mapped periphery access
 [\[↑ TOC\]](#contents)
@@ -5565,7 +5591,7 @@ retain the removed implementation-specific points.
   [copied descriptor state](#71-per-process-file-descriptor-table) rather than shared
   open-file descriptions
 - [linked-list round-robin scanning](#51-round-robin-process-selection) rather than a separate ready queue
-- [non-preemptive kernel execution and deferred rescheduling](#261-kernel-non-preemption-and-deferred-rescheduling)
+- [non-preemptive kernel execution and deferred rescheduling](#262-kernel-non-preemption-and-deferred-rescheduling)
 - [fixed/default process heap and stack sizing](#43-process-image-and-initial-userspace-stack)
   with no dynamic stack growth
 - limited [formatting, scanning](#86-standard-io-formatting-and-scanning), [shell parsing](#124-command-parsing-expansion-and-execution),

@@ -58,7 +58,7 @@ int main(void) {
     run(worker, NULL, NULL);
     loaded_process = load(LOAD_TARGET_PATH);
 
-    set_timer_interval(1000);
+    set_timer_interval(5000);
     waitpid(worker);
     passed = read_periphery_register(DMA_ACTIVE_REGISTER) == 1 &&
              read_periphery_register(DMA_STATUS_REGISTER) ==

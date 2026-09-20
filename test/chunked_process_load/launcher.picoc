@@ -32,7 +32,7 @@ int main(void) {
 
     loaded_process = load(LOAD_TARGET_PATH);
 
-    set_timer_interval(1000);
+    set_timer_interval(5000);
     waitpid(worker);
     passed = *worker_ran && loaded_process > 0;
     unload(loaded_process);

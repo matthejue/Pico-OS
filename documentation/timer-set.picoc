@@ -1,0 +1,18 @@
+#include "../library/stdlib/stdlib.header"
+
+void set_timer_interval(int interval) {
+    asm("STOREIN BAF DS 0");
+    asm("LOADI DS 1048576");
+    asm("MULTI DS 1024");
+    asm("LOADIN BAF ACC 3");
+    asm("STORE ACC 9");
+    asm("LOADIN BAF DS 0");
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        return 1;
+    }
+    set_timer_interval(atoi(argv[1]));
+    return 0;
+}
