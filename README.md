@@ -1866,9 +1866,64 @@ results, and tradeoffs are in
 ## 2.7 UART receive interrupt path
 [\[↑ TOC\]](#contents)
 
-UART is mapped to vector 2 at the higher priority 2. The naked vector entry
-temporarily enters kernel code, calls [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), and restores
-the exact interrupted context. The C portion is:
+UART is mapped to vector 2 at the higher priority 2. The naked
+[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L195) entry
+temporarily enters kernel code, calls
+[`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), and continues
+through [`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L220)
+to restore the exact interrupted context. The interrupt service routine below
+shows this entry and return sequence:
+
+```c
+__attribute__((naked))
+void uart_interrupt(void) {
+    // Saves the interrupted context while the kernel transfers one input byte
+    asm("PUSH ACC");
+    asm("PUSH IN1");
+    asm("PUSH IN2");
+    asm("PUSH BAF");
+    asm("PUSH CS");
+    asm("PUSH DS");
+
+    // BAF keeps the interrupted stack while the handler uses kernel segments
+    // Keeping SP avoids overwriting a suspended kernel call frame when all
+    // processes are blocked and the dispatcher is waiting for an interrupt
+    asm("MOVE SP BAF");
+    asm(KERNEL_CS_START_ASM);
+    asm(KERNEL_DS_START_ASM);
+
+    asm("LOADI32 ACC uart_interrupt_return");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC handle_uart_interrupt");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+
+__attribute__((naked))
+void uart_interrupt_return(void) {
+    // Restores the context that was active before the UART interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+```
+
+[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L195) first saves
+the six registers used by interrupted code. It keeps the interrupted `SP` in
+`BAF`, installs the kernel code and data segments, and jumps to
+[`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) with
+[`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L220) as
+the return address. The return continuation restores the interrupted stack and
+registers before `RTI` resumes the interrupted instruction stream.
+
+With that context protected, the C handler can acknowledge and dispatch the
+received byte without changing the state that the interrupted code observes:
 
 ```c
 void handle_uart_interrupt(void) {
@@ -1893,7 +1948,7 @@ void handle_uart_interrupt(void) {
 }
 ```
 
-The ISR acknowledges one byte. `Ctrl+C` becomes [`SIGINT`](common/signal.header#L4) and `Ctrl+Z` becomes
+The C handler acknowledges one byte. `Ctrl+C` becomes [`SIGINT`](common/signal.header#L4) and `Ctrl+Z` becomes
 [`SIGTSTP`](common/signal.header#L8) for the foreground process. Any other byte enters the global terminal
 ring; if the foreground process is waiting, the handler copies into that
 process's pending read buffer, writes the result into its saved
