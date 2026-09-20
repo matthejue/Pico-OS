@@ -797,7 +797,7 @@ same startup path as every other system or user application.
 | EPROM bootloader | Its explicitly defined naked [`_start()`](boot/bootloader.picoc#L9), compiled as part of the bootloader without `-C` | [`boot_main()`](boot/bootloader.picoc#L41) |
 | SRAM kernel | Compiler-generated default `_start`, because the kernel is linked without `-C` | [`main()`](kernel/kernel.picoc#L31) |
 | Init process | [`libstart` `_start()`](library/start/start.picoc#L14), selected with `-C library/start/libstart.picoc` | [`main()`](system/init.picoc#L100) |
-| Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1577) |
+| Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1631) |
 | Other system and user applications | [`libstart` `_start()`](library/start/start.picoc#L14), selected by the common userspace link rule | The application's `main` |
 
 ### 1.1.5 Program sections, interrupt-vector entries, and linker placement
@@ -1862,6 +1862,7 @@ delay was nearly the same as at 10,000, but 10,000 can make the shell wait
 longer. Shorter intervals waste more time switching programs. The method,
 results, and tradeoffs are in
 [Shell input latency and timer interval](documentation/shell_input_latency.md).
+
 ## 2.7 UART receive interrupt path
 [\[↑ TOC\]](#contents)
 
@@ -4500,7 +4501,7 @@ policy and the shell’s command handling.
 | --- | --- |
 | Kernel [`main()`](kernel/kernel.picoc#L31) | Initialize global structures and devices, load PID 1, construct its first activation, and dispatch |
 | [`Init`](system/init.picoc#L100) | Read configuration, establish environment policy, load/run a shell, and restart it after a session |
-| [`Shell`](user/shell.picoc#L1577) | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
+| [`Shell`](user/shell.picoc#L1631) | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
 
 ## 11.2 Initial environment configuration
 [\[↑ TOC\]](#contents)
@@ -4645,7 +4646,7 @@ Init and [`fast_os_test_launcher`](system/fast_os_test_launcher.picoc) live unde
 [\[↑ TOC\]](#contents)
 
 The shell is init's interactive child and turns terminal input into userspace process operations.
-[`shell.picoc`](user/shell.picoc#L1577) is one of the **18 user applications** in [`user`](user/):
+[`shell.picoc`](user/shell.picoc#L1631) is one of the **18 user applications** in [`user`](user/):
 the shell plus 17 standalone commands, listed under
 [User applications and commands](#13-user-applications-and-commands). It builds on
 the descriptor, signal, process, and library interfaces described above, then
@@ -4663,22 +4664,24 @@ command editing and pipelines:
 
 | Global | Meaning and storage |
 | --- | --- |
-| [`last_command_exit_status`](user/shell.picoc#L30) | One integer used for `$?` |
-| [`last_background_process_id`](user/shell.picoc#L31) | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
-| [`initial_shell_environment`](user/shell.picoc#L32) | Process-heap deep copy used to reset isolated shell tests |
-| [`initial_shell_working_directory`](user/shell.picoc#L33) | Embedded shell startup-directory copy used for test reset |
-| [`shell_executable_path`](user/shell.picoc#L34) | Embedded scratch buffer for one `PATH` candidate |
-| [`shell_pipe_left_command`](user/shell.picoc#L35), [`shell_pipe_right_command`](user/shell.picoc#L36), [`shell_pipe_path`](user/shell.picoc#L37) | Embedded command and temporary-path storage for one two-command pipeline |
-| [`command_history`](user/shell.picoc#L39) | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
-| [`command_history_draft`](user/shell.picoc#L42) | Current unfinished line preserved while navigating history |
-| [`command_history_start`](user/shell.picoc#L45), [`command_history_count`](user/shell.picoc#L46) | Ring indices/count |
+| [`last_command_exit_status`](user/shell.picoc#L31) | One integer used for `$?` |
+| [`last_background_process_id`](user/shell.picoc#L32) | Most recently tracked background/stopped PID used for `$!`, `fg`, and `bg` |
+| [`initial_shell_environment`](user/shell.picoc#L33) | Process-heap deep copy used to reset isolated shell tests |
+| [`initial_shell_working_directory`](user/shell.picoc#L34) | Embedded shell startup-directory copy used for test reset |
+| [`shell_executable_path`](user/shell.picoc#L35) | Embedded scratch buffer for one `PATH` candidate |
+| [`shell_pipe_left_command`](user/shell.picoc#L36), [`shell_pipe_right_command`](user/shell.picoc#L37), [`shell_pipe_path`](user/shell.picoc#L38) | Embedded command and temporary-path storage for one two-command pipeline |
+| [`command_history`](user/shell.picoc#L40) | Embedded ring containing at most eight recent commands; only consecutive duplicates are suppressed |
+| [`command_history_draft`](user/shell.picoc#L43) | Current unfinished line preserved while navigating history |
+| [`shell_input_buffer`](user/shell.picoc#L46) | Up to 128 input bytes retained across command lines so one [`read()`](library/unistd/io.picoc#L6) can drain the kernel terminal ring |
+| [`command_history_start`](user/shell.picoc#L47), [`command_history_count`](user/shell.picoc#L48) | History ring indices/count |
+| [`shell_input_index`](user/shell.picoc#L49), [`shell_input_count`](user/shell.picoc#L50) | Next retained input byte and number of valid bytes in [`shell_input_buffer`](user/shell.picoc#L46) |
 
-The active command buffer is an 80-cell local array in [`main()`](user/shell.picoc#L1577)'s
+The active command buffer is an 80-cell local array in [`main()`](user/shell.picoc#L1631)'s
 userspace stack. Redirection temporarily reserves descriptors 3–7 for saved stdin, fast-test output,
 saved stdout, saved stderr, and fast-test error output; all descriptor state itself remains in the
-shell PCB's kernel-heap table. [`main()`](user/shell.picoc#L1577) initializes the environment and
+shell PCB's kernel-heap table. [`main()`](user/shell.picoc#L1631) initializes the environment and
 directory snapshots; the status and history counters have zero initializers in the image, and
-command helpers fill the scratch buffers; [`shell_reset()`](user/shell.picoc#L241) resets the
+command helpers fill the scratch buffers; [`shell_reset()`](user/shell.picoc#L252) resets the
 test-specific state between cases.
 
 ## 12.2 Shell startup and command loop
@@ -4687,8 +4690,8 @@ test-specific state between cases.
 At startup the shell calls [`set_foreground_process()`](library/unistd/process.picoc#L63),
 configures [`prctl(PR_SET_PDEATHSIG, SIGKILL)`](library/sys/prctl/prctl.picoc#L14), clones its
 environment, and records its current directory. It
-then repeatedly calls [`read_line()`](user/shell.picoc#L261), stores nonempty commands in history,
-and sends them to [`eval()`](user/shell.picoc#L1340). [`read_line()`](user/shell.picoc#L261) returns
+then repeatedly calls [`read_line()`](user/shell.picoc#L290), stores nonempty commands in history,
+and sends them to [`eval()`](user/shell.picoc#L1394). [`read_line()`](user/shell.picoc#L290) returns
 `-1` at EOF, so redirected stdin ends the shell normally. Therefore, `shell.bin < commands.txt`
 reads and executes the newline-separated commands in `commands.txt` without requiring typed terminal
 input. The function table below links the main loop’s operations to their library calls and local
@@ -4696,14 +4699,15 @@ effects.
 
 | Shell function | Return value / status | Library functions |
 | --- | --- | --- |
-| [`read_line(buffer, capacity)`](user/shell.picoc#L261) | Command length, or `-1` at EOF | Repeatedly calls [`read()`](library/unistd/io.picoc#L6), echoes known escape-free output through [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), edits the stack buffer, and updates history-navigation state |
-| [`remember_shell_command(command)`](user/shell.picoc#L147) | No value | [`strcmp()`](library/string/string.picoc#L34) and [`strcpy()`](library/string/string.picoc#L4); mutates the global eight-entry history ring and skips consecutive duplicates |
-| [`expand_variables(arguments, result, capacity)`](user/shell.picoc#L430) | Expanded buffer (truncated to capacity minus one), or `NULL` for a null input | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing; expansion also occurs inside single quotes |
-| [`load_from_path(name)`](user/shell.picoc#L1148) | Loaded PID, or 0 | Reads `PATH` with [`getenv()`](library/stdlib/env.picoc#L115), builds candidates, and calls [`load()`](library/unistd/process.picoc#L17) in order |
-| [`run_process(pid, arguments, background, stdin_path, stdout_path, append_stdout, stderr_path, append_stderr)`](user/shell.picoc#L996) | `true` when [`run()`](library/unistd/process.picoc#L31) succeeds; otherwise `false` | [`run()`](library/unistd/process.picoc#L31), [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`set_foreground_process()`](library/unistd/process.picoc#L63), and [`waitpid()`](library/sys/wait/wait.picoc#L14); changes `$?`/`$!` state |
-| [`continue_background_process(foreground)`](user/shell.picoc#L1089) | `true` when the tracked process was continued; otherwise `false` | [`kill()`](library/signal/signal.picoc#L14) and, for `fg`, [`set_foreground_process()`](library/unistd/process.picoc#L63) and [`waitpid()`](library/sys/wait/wait.picoc#L14) |
-| [`eval(command)`](user/shell.picoc#L1340) | `false` only for `exit`; otherwise `true` | Selects a built-in or external execution path |
-| [`main(argc, argv)`](user/shell.picoc#L1577) | Shell exit status | [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`set_foreground_process()`](library/unistd/process.picoc#L63), [`clone_environment()`](library/stdlib/env.picoc#L205), [`getcwd()`](library/unistd/working_directory.picoc#L11), [`lseek()`](library/unistd/io.picoc#L66), and [`unsetenv()`](library/stdlib/env.picoc#L157); initializes signal/reset state and owns the interactive or redirected-input execution path |
+| [`read_shell_character(character)`](user/shell.picoc#L272) | 1 after returning one byte, 0 at EOF, or the negative [`read()`](library/unistd/io.picoc#L6) error | Refills [`shell_input_buffer`](user/shell.picoc#L46) with one [`read()`](library/unistd/io.picoc#L6) and returns retained bytes one at a time across command lines |
+| [`read_line(buffer, capacity)`](user/shell.picoc#L290) | Command length, or `-1` at EOF | Calls [`read_shell_character()`](user/shell.picoc#L272), batches consecutive printable echoes through [`flush_shell_line_echo()`](user/shell.picoc#L244), flushes them before editing controls, edits the stack buffer, and updates history-navigation state |
+| [`remember_shell_command(command)`](user/shell.picoc#L151) | No value | [`strcmp()`](library/string/string.picoc#L34) and [`strcpy()`](library/string/string.picoc#L4); mutates the global eight-entry history ring and skips consecutive duplicates |
+| [`expand_variables(arguments, result, capacity)`](user/shell.picoc#L484) | Expanded buffer (truncated to capacity minus one), or `NULL` for a null input | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing; expansion also occurs inside single quotes |
+| [`load_from_path(name)`](user/shell.picoc#L1202) | Loaded PID, or 0 | Reads `PATH` with [`getenv()`](library/stdlib/env.picoc#L115), builds candidates, and calls [`load()`](library/unistd/process.picoc#L17) in order |
+| [`run_process(pid, arguments, background, stdin_path, stdout_path, append_stdout, stderr_path, append_stderr)`](user/shell.picoc#L1050) | `true` when [`run()`](library/unistd/process.picoc#L31) succeeds; otherwise `false` | [`run()`](library/unistd/process.picoc#L31), [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`set_foreground_process()`](library/unistd/process.picoc#L63), and [`waitpid()`](library/sys/wait/wait.picoc#L14); changes `$?`/`$!` state |
+| [`continue_background_process(foreground)`](user/shell.picoc#L1143) | `true` when the tracked process was continued; otherwise `false` | [`kill()`](library/signal/signal.picoc#L14) and, for `fg`, [`set_foreground_process()`](library/unistd/process.picoc#L63) and [`waitpid()`](library/sys/wait/wait.picoc#L14) |
+| [`eval(command)`](user/shell.picoc#L1394) | `false` only for `exit`; otherwise `true` | Selects a built-in or external execution path |
+| [`main(argc, argv)`](user/shell.picoc#L1631) | Shell exit status | [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`set_foreground_process()`](library/unistd/process.picoc#L63), [`clone_environment()`](library/stdlib/env.picoc#L205), [`getcwd()`](library/unistd/working_directory.picoc#L11), [`lseek()`](library/unistd/io.picoc#L66), and [`unsetenv()`](library/stdlib/env.picoc#L157); initializes signal/reset state and owns the interactive or redirected-input execution path |
 
 ## 12.3 Interactive line editing and command history
 [\[↑ TOC\]](#contents)
@@ -4724,16 +4728,22 @@ terminator:
 | Tab | Append one space if room remains in the 80-cell buffer |
 | Printable byte | Append it if space remains in the 80-cell buffer |
 
-[`read()`](library/unistd/io.picoc#L6) blocks when the global terminal ring is empty. The command
+[`read_shell_character()`](user/shell.picoc#L272) refills the shell's 128-byte input buffer with one
+[`read()`](library/unistd/io.picoc#L6). If several typed bytes have accumulated in the kernel ring,
+this drains them together instead of making one syscall per byte; bytes after a newline remain
+available for the next command. The read blocks when the global terminal ring is empty. The command
 buffer and its stack frame remain intact while the PCB waits on
 [`Terminal.input_waiters`](kernel/filesystem/terminal.header#L14); the UART ISR writes the character
 and the dispatcher later resumes [`shell.bin`](user/shell.picoc).
-[`shell_write_character()`](user/shell.picoc#L50),
-[`erase_shell_line_suffix()`](user/shell.picoc#L125), and
-[`replace_shell_line()`](user/shell.picoc#L171) use
+[`read_line()`](user/shell.picoc#L290) passes consecutive printable bytes to
+[`flush_shell_line_echo()`](user/shell.picoc#L244) in one call and flushes them before applying an
+editing control. [`shell_write_character()`](user/shell.picoc#L54),
+[`erase_shell_line_suffix()`](user/shell.picoc#L129), and
+[`replace_shell_line()`](user/shell.picoc#L175) use
 [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43) because the application consumes input escape sequences
 and only passes known escape-free characters, backspaces, spaces, and newlines to these output
-paths. This avoids scanning the echoed buffer before every typed character is shown.
+paths. This avoids scanning known-safe output and avoids one output syscall per byte when input has
+accumulated.
 
 ## 12.4 Command parsing, expansion, and execution
 [\[↑ TOC\]](#contents)
@@ -4741,7 +4751,7 @@ paths. This avoids scanning the echoed buffer before every typed character is sh
 The parser validates balanced single and double quotes and recognizes one unquoted `|` before
 selecting a built-in or external command. For external commands and the `run` built-in, it removes a
 trailing `&`, extracts final whitespace-preceded `<`, `>`, `>>`, `2>`, and `2>>` redirections, and
-separates the command/PID from its raw arguments. [`run_process()`](user/shell.picoc#L996) expands
+separates the command/PID from its raw arguments. [`run_process()`](user/shell.picoc#L1050) expands
 `$NAME`, `$?`, and `$!` in those arguments; `export` expands its assignment separately. Expansion
 preserves quote characters, including single quotes, and truncates at the output buffer limit.
 Command names and redirection paths are not expanded. A command containing `/` is loaded directly;
@@ -4751,8 +4761,8 @@ The configured `PATH=/user` uses the PicoOS root, so commands remain discoverabl
 and from nested shells. A relative entry supplied by the user is resolved from the shell's current
 [`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths. The
 sequence below follows a successful command without a pipeline through
-[`eval()`](user/shell.picoc#L1340), [`load_from_path()`](user/shell.picoc#L1148), and
-[`run_process()`](user/shell.picoc#L996). It shows that redirection changes the shell’s descriptors
+[`eval()`](user/shell.picoc#L1394), [`load_from_path()`](user/shell.picoc#L1202), and
+[`run_process()`](user/shell.picoc#L1050). It shows that redirection changes the shell’s descriptors
 before [`run()`](library/unistd/process.picoc#L31), so the child inherits those values.
 
 ```mermaid
@@ -4807,8 +4817,8 @@ operations they use.
 
 | Built-in | Behavior | Library functions |
 | --- | --- | --- |
-| `exit` | Accepts no argument and returns false from [`eval()`](user/shell.picoc#L1340), ending this shell session | No immediate syscall; [`libstart`](library/start/libstart.picoc) later calls [`exit(main_result)`](library/stdlib/exit.picoc#L3) |
-| `eval COMMAND` | Recursively evaluates the remaining text in the same shell state | Re-enters [`eval()`](user/shell.picoc#L1340); resulting command calls apply normally |
+| `exit` | Accepts no argument and returns false from [`eval()`](user/shell.picoc#L1394), ending this shell session | No immediate syscall; [`libstart`](library/start/libstart.picoc) later calls [`exit(main_result)`](library/stdlib/exit.picoc#L3) |
+| `eval COMMAND` | Recursively evaluates the remaining text in the same shell state | Re-enters [`eval()`](user/shell.picoc#L1394); resulting command calls apply normally |
 | `run-shell-tests MANIFEST` | Runs scripted shell test directories and resets shell state between them | [`open`](library/fcntl/fcntl.picoc#L5), [`read`](library/unistd/io.picoc#L6), [`lseek`](library/unistd/io.picoc#L66), [`close`](library/unistd/io.picoc#L54), [`dup2`](library/unistd/io.picoc#L58), [`chdir`](library/unistd/working_directory.picoc#L4), [`reset_processes`](library/unistd/process.picoc#L59), environment clone/restore helpers |
 | `export NAME=value` | Expands the complete assignment and stores/replaces the variable | [`getenv`](library/stdlib/env.picoc#L115) during expansion and [`setenv(..., true)`](library/stdlib/env.picoc#L126) |
 | `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | [`chdir()`](library/unistd/working_directory.picoc#L4) / syscall 30 |
@@ -4871,9 +4881,9 @@ stays visible while diagnostics can be inspected separately, accumulated across 
 The two paths under `/device` are exceptions to ordinary host-file redirection.
 `/device/terminal.dev` connects output to UART, while `/device/null.dev` accepts and discards it.
 The kernel does not truncate or write either marker file when the normalized path is exactly one of
-those two special paths. The sequence below follows [`redirect_output()`](user/shell.picoc#L965),
+those two special paths. The sequence below follows [`redirect_output()`](user/shell.picoc#L1019),
 [`run()`](library/unistd/process.picoc#L31), and
-[`restore_standard_descriptors()`](user/shell.picoc#L928) for stdout. The write branch explains why
+[`restore_standard_descriptors()`](user/shell.picoc#L982) for stdout. The write branch explains why
 append needs a size request while ordinary output uses its saved offset.
 
 ```mermaid
@@ -4915,7 +4925,7 @@ streaming kernel pipe, which determines both the execution order and the
 limitations described here.
 
 One `LEFT | RIGHT` operator is supported. For two foreground external commands,
-[`run_pipeline()`](user/shell.picoc#L725) runs `LEFT` to completion with stdout redirected to a
+[`run_pipeline()`](user/shell.picoc#L779) runs `LEFT` to completion with stdout redirected to a
 hidden `.picoos-pipe-PID.tmp` file, then runs `RIGHT` with that file as stdin and removes it. This
 supports finite commands such as `cat.bin file.txt | sed.bin "5aNEW" > file2.txt`, but it is
 sequential rather than streaming and does not support longer pipelines. Combining `&` with a
@@ -4950,12 +4960,12 @@ Together with the **12 library test classes**, these are the categories describe
 shell snapshots its initial environment and directory, closes private descriptors, resets non-system
 processes/PIDs, redirects test output as required, evaluates each input line, and restores state.
 This is why test-reset helpers appear in the userspace/kernel ABI even though they are not normal
-interactive facilities. [`run_shell_test_manifest()`](user/shell.picoc#L1306) calls
-[`run_shell_test()`](user/shell.picoc#L1212) for each listed scenario, and
-[`shell_reset()`](user/shell.picoc#L241) restores processes, descriptors 3–7, environment,
+interactive facilities. [`run_shell_test_manifest()`](user/shell.picoc#L1360) calls
+[`run_shell_test()`](user/shell.picoc#L1266) for each listed scenario, and
+[`shell_reset()`](user/shell.picoc#L252) restores processes, descriptors 3–7, environment,
 directory, `$?`, and `$!` between cases. The [fast runner](run_os_tests_fast.py) sends raw editing
 input through UART and uses separate sessions for nested interactive shells and direct terminal
-output; those scenarios cannot be represented by calls to [`eval()`](user/shell.picoc#L1340) alone.
+output; those scenarios cannot be represented by calls to [`eval()`](user/shell.picoc#L1394) alone.
 
 # 13. User applications and commands
 [\[↑ TOC\]](#contents)
@@ -4979,7 +4989,7 @@ Shared command helpers are explained below the table.
 
 | Binary (source link) | Behavior | Library functions |
 | --- | --- | --- |
-| [`shell.bin`](user/shell.picoc#L1577) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11); see [Shell](#12-shell) for the other calls |
+| [`shell.bin`](user/shell.picoc#L1631) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11); see [Shell](#12-shell) for the other calls |
 | [`echo.bin`](user/echo.picoc#L20) | Prints [`argv[1..]`](user/echo.picoc#L20) separated by spaces, converts `\n` inside an argument, and adds a newline | [`printf()`](library/stdio/stdio.picoc#L354) |
 | [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | [`printf()`](library/stdio/stdio.picoc#L354), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
 | [`cat.bin`](user/cat.picoc#L103) | Copies named files or stdin to stdout; terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
@@ -5004,8 +5014,8 @@ and calls; neither helper keeps persistent state.
 
 | Kernel function (shared helper) | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`command_write(file_descriptor, text)`](common/user_command.picoc#L4) | No return value; the write result is ignored | Counts the text and writes it to the selected descriptor, such as stdout or stderr; the call creates an [`IoRequest`](common/file.header#L31) inside the library | [`write()`](library/unistd/io.picoc#L32) | **User applications:** [`cat_usage()`](user/cat.picoc#L21), [`count_usage()`](user/count.picoc#L12), [`cp_usage()`](user/cp.picoc#L11), [`edit_standard_input()`](user/cat.picoc#L48), [`kill_write_usage()`](user/kill.picoc#L58), [`ls_usage()`](user/ls.picoc#L7), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`mkdir_usage()`](user/mkdir.picoc#L7), [`mv_usage()`](user/mv.picoc#L6), [`poweroff_usage()`](user/poweroff.picoc#L7), [`print_path_error()`](user/cat.picoc#L13), [`ps_usage()`](user/ps.picoc#L6), [`pwd_usage()`](user/pwd.picoc#L6), [`reboot_usage()`](user/reboot.picoc#L7), [`rm_usage()`](user/rm.picoc#L6), [`rmdir_usage()`](user/rmdir.picoc#L6), [`sed_usage()`](user/sed.picoc#L61), [`shell_usage()`](user/shell.picoc#L71), [`touch_usage()`](user/touch.picoc#L6), [`uname_usage()`](user/uname.picoc#L10), [`write_replacement()`](user/sed.picoc#L56) |
-| [`command_is_help(argument)`](common/user_command.picoc#L13) | `true` for exactly `-h` or `--help`; `false` otherwise | Reads the argument without changing it | None | **User applications:** [`eval()`](user/shell.picoc#L1340), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/poweroff.picoc#L12), [`main()`](user/ps.picoc#L11), [`main()`](user/reboot.picoc#L12), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`main()`](user/shell.picoc#L1577) |
+| [`command_write(file_descriptor, text)`](common/user_command.picoc#L4) | No return value; the write result is ignored | Counts the text and writes it to the selected descriptor, such as stdout or stderr; the call creates an [`IoRequest`](common/file.header#L31) inside the library | [`write()`](library/unistd/io.picoc#L32) | **User applications:** [`cat_usage()`](user/cat.picoc#L21), [`count_usage()`](user/count.picoc#L12), [`cp_usage()`](user/cp.picoc#L11), [`edit_standard_input()`](user/cat.picoc#L48), [`kill_write_usage()`](user/kill.picoc#L58), [`ls_usage()`](user/ls.picoc#L7), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`mkdir_usage()`](user/mkdir.picoc#L7), [`mv_usage()`](user/mv.picoc#L6), [`poweroff_usage()`](user/poweroff.picoc#L7), [`print_path_error()`](user/cat.picoc#L13), [`ps_usage()`](user/ps.picoc#L6), [`pwd_usage()`](user/pwd.picoc#L6), [`reboot_usage()`](user/reboot.picoc#L7), [`rm_usage()`](user/rm.picoc#L6), [`rmdir_usage()`](user/rmdir.picoc#L6), [`sed_usage()`](user/sed.picoc#L61), [`shell_usage()`](user/shell.picoc#L75), [`touch_usage()`](user/touch.picoc#L6), [`uname_usage()`](user/uname.picoc#L10), [`write_replacement()`](user/sed.picoc#L56) |
+| [`command_is_help(argument)`](common/user_command.picoc#L13) | `true` for exactly `-h` or `--help`; `false` otherwise | Reads the argument without changing it | None | **User applications:** [`eval()`](user/shell.picoc#L1394), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/poweroff.picoc#L12), [`main()`](user/ps.picoc#L11), [`main()`](user/reboot.picoc#L12), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`main()`](user/shell.picoc#L1631) |
 
 Every user program except [`echo.bin`](user/echo.picoc) uses [`command_is_help()`](common/user_command.picoc#L13) for a sole help
 argument. [`echo.bin`](user/echo.picoc) keeps `-h` and `--help` as ordinary text to print.
@@ -5053,7 +5063,7 @@ operands after an individual error.
 [`kill.bin`](user/kill.picoc) accepts [`SIGINT`](common/signal.header#L4), [`SIGKILL`](common/signal.header#L5), [`SIGCONT`](common/signal.header#L6), [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), and
 [`SIGTTIN`](common/signal.header#L9) by name without a leading `-`, or by number. Signal 0 checks
 existence without delivery. It yields after success so the target can be
-selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1373): the former
+selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1427): the former
 invokes syscall 0 and halts the OS, whereas the latter lets init start a new
 shell. [`reboot.bin`](user/reboot.picoc) invokes syscall 1, which performs a full bootloader and
 kernel startup without ending the emulator process.
@@ -5096,7 +5106,7 @@ errors but does not check write results, and [`sed.bin`](user/sed.picoc) does no
 writes or fully validate expressions. [`echo.bin`](user/echo.picoc) also ignores output failures.
 A zero exit status therefore does not guarantee that all output was written.
 For the status transfer from a child to the shell, see
-[`run_process()`](user/shell.picoc#L996) and
+[`run_process()`](user/shell.picoc#L1050) and
 [Exact-child waiting](#63-exact-child-waiting).
 
 # 14. Test system
@@ -5204,7 +5214,7 @@ Fast mode reuses a boot but explicitly resets mutable state.
 loads and starts one test launcher, restores its own stdout, waits for the
 child, then calls [`reset_processes()`](library/unistd/process.picoc#L59) to remove remaining test processes and
 reset PID allocation. The child retains its inherited output descriptor.
-Fast shell tests additionally use [`shell_reset()`](user/shell.picoc#L241) to restore the initial
+Fast shell tests additionally use [`shell_reset()`](user/shell.picoc#L252) to restore the initial
 environment, working directory, private descriptors, `$?`, and `$!`.
 
 The flowchart compares the order of work in the normal runner and the shared
@@ -5232,8 +5242,8 @@ flowchart TD
 The fast runner scans `input.txt` for cases that require an independent boot:
 an exact [`shell.bin`](user/shell.picoc) command, a command ending in `/shell.bin`, or a line
 containing `/device/terminal.dev`. It identifies raw UART cases through
-line-editing escape sequences. Those cases still traverse UART and [`read_line()`](user/shell.picoc#L261)
-at the end of the shared boot instead of going through [`eval()`](user/shell.picoc#L1340) directly.
+line-editing escape sequences. Those cases still traverse UART and [`read_line()`](user/shell.picoc#L290)
+at the end of the shared boot instead of going through [`eval()`](user/shell.picoc#L1394) directly.
 
 Library tests instead read input/expected-output metadata, compile one program,
 apply a five-second emulator timeout, and compare output with trailing
