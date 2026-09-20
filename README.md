@@ -14,12 +14,21 @@ library in [`library/`](library/), and **18 user applications** in
 **38 implemented syscalls**; [the syscall overview](#251-system-call-groups)
 explains their selector numbers and subsystem connections.
 
-The project deliberately does not imitate the scale of Linux or claim POSIX
-conformance. There is no virtual memory, MMU, process isolation, disk, or
-on-device filesystem. All code and data use one physical 32-bit address space,
-and filesystem operations are forwarded over UART to the RETI-Emulator host.
-The small scope is intentional: a reader can connect a userspace call to its
-interrupt entry, kernel data-structure changes, and eventual context switch.
+[POSIX](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap01.html)
+is a family of standards for portable Unix-like operating-system interfaces
+and command behavior. It standardizes source-level C interfaces and headers
+for processes, signals, file descriptors, paths and directories, terminals,
+and shared memory, as well as shell syntax, common utilities, environment
+variables, and command-line conventions. These areas are relevant because
+PicoOS uses the same recognizable names and basic conventions for its
+libraries, descriptor-based I/O, process control, environment, shell, and
+commands. PicoOS deliberately implements only a small subset and does not
+claim POSIX conformance. There is no virtual memory, MMU, process isolation,
+disk, or on-device filesystem. All code and data use one physical 32-bit
+address space, and filesystem operations are forwarded over UART to the
+RETI-Emulator host. The small scope is intentional: a reader can connect a
+userspace call to its interrupt entry, kernel data-structure changes, and
+eventual context switch.
 
 This README is a report on what was implemented and how the main parts fit
 together. It emphasizes kernel state, ownership, and lifecycle rather than
@@ -290,9 +299,10 @@ highest address bits:
 
 ## Contents
 
-The introductory sections above explain what PicoOS is, how to run it, and which physical platform it targets. The numbered chapters below begin with the compiler and emulator extensions, establish the kernel mechanisms, then follow the runtime handoff from the bootloader through init and the shell to user applications.
-
-Use the nested links to jump directly to a mechanism or reference table.
+The chapters cover toolchain extensions and kernel functionality, then follow
+startup from the bootloader through the kernel, init, and the shell to the
+individual user applications. Testing and the use of PicoOS in OS and RTOS
+lectures follow.
 
 1. [Toolchain extensions for PicoOS](#1-toolchain-extensions-for-picoos)
    - [1.1 PicoC-Compiler extensions](#11-picoc-compiler-extensions)
@@ -612,11 +622,15 @@ layout, and `.debuginfo` holds source/debug data.
 ### 1.1.3 System V ABI stack frames and call cleanup
 [\[↑ TOC\]](#contents)
 
-The PicoC-Compiler uses a System-V-style calling convention so compiled code,
-hand-written wrappers, startup functions, and interrupt code agree on the
-location of arguments and saved control state. The three parts below cover the
-ordinary stack frame, its shared return path, and the frame-free functions used
-for low-level control transfers.
+The [System V Application Binary Interface (ABI)](https://github.com/hjl-tools/x86-psABI/wiki/x86-64-psABI-1.0.pdf)
+is a family of specifications that defines how separately compiled machine
+code interoperates, including calling conventions, register use, and stack
+frames. The linked AMD64 supplement is a common reference; PicoC adapts the
+same general model to RETI rather than implementing the AMD64 ABI. This
+convention lets compiled code, hand-written wrappers, startup functions, and
+interrupt code agree on the location of arguments and saved control state. The
+three parts below cover the ordinary stack frame, its shared return path, and
+the frame-free functions used for low-level control transfers.
 
 #### 1.1.3.1 Stack-frame layout and caller cleanup
 [\[↑ TOC\]](#contents)
@@ -761,9 +775,13 @@ It passes that table to [`start_process()`](library/start/start.picoc#L7),
 which calls [`init_process_heap()`](library/stdlib/malloc.picoc#L18), clones
 the initial environment through
 [`initialize_environment()`](library/stdlib/env.picoc#L97), calls the
-application's `main`, and passes its result to
+application's [`main()`](library/start/start.picoc#L4), and passes its result to
 [`exit()`](library/stdlib/exit.picoc#L3). The initial userspace stack is shown
 in [Process image and initial stack](#43-process-image-and-initial-userspace-stack).
+PicoOS [`libstart`](library/start/libstart.picoc) is therefore a small
+counterpart to the startup support normally supplied with `libc`: it prepares
+runtime state before calling [`main()`](library/start/start.picoc#L4) and turns
+the return value into an exit status.
 
 #### 1.1.4.4 Startup functions used by PicoOS images
 [\[↑ TOC\]](#contents)
@@ -2192,6 +2210,32 @@ own [`BlockHeader`](common/heap.header#L5) immediately before its payload. Thus 
 header, and their headers are not in the kernel heap. The separate kernel heap is used only by
 [`kmalloc()`](kernel/kmalloc.picoc#L23) allocations such as PCBs and shared-memory metadata.
 
+The diagram places the complete SRAM address space from lower to higher
+addresses. The kernel comes first, and [`kmalloc()`](kernel/kmalloc.picoc#L23)
+manages only its heap. After the kernel stack, the process-memory arena contains
+whole process images and shared-memory regions allocated by
+[`pmalloc()`](kernel/pmalloc.picoc#L20); within each process image, userspace
+[`malloc()`](library/stdlib/malloc.picoc#L35) manages only that process's heap.
+The example allocation order and widths are illustrative because first-fit
+allocation can place process images and shared-memory regions in a different
+order at runtime.
+
+<!-- Slidev: Use the same left-to-right style as the existing memory-layout and memory-allocation diagrams. -->
+
+```mermaid
+block-beta
+    columns 15
+    IVT["kernel .ivt"]:1
+    KT["kernel .text"]:2
+    KD["kernel .data"]:2
+    KH["kernel heap<br/>kmalloc"]:2
+    KS["kernel stack"]:2
+    P1["process image A<br/>pmalloc region<br/>contains userspace malloc heap"]:2
+    SM["shared memory<br/>pmalloc region"]:1
+    P2["process image B<br/>pmalloc region<br/>contains userspace malloc heap"]:2
+    FREE["free process-memory arena"]:1
+```
+
 ## 3.3 Kernel SRAM memory map
 [\[↑ TOC\]](#contents)
 
@@ -2681,18 +2725,23 @@ startup values stored on the stack.
 ### 4.3.1 Code, data, heap, and stack placement
 [\[↑ TOC\]](#contents)
 
-Within the allocated region, the diagram orders a process image from low to
-high addresses. The stack grows back toward the heap, whose final cell is
-protected by the active boundary register:
+Within the region reserved by [`pmalloc()`](kernel/pmalloc.picoc#L20), the
+diagram orders a process image from its
+[`base_address`](kernel/process/process.header#L34) toward higher addresses.
+[`malloc()`](library/stdlib/malloc.picoc#L35) manages the userspace heap, while
+the stack grows back toward the heap and the final heap cell is protected by
+the active boundary register. The widths group the regions for readability and
+are not proportional to their sizes.
 
 ```mermaid
-flowchart LR
-    B["base_address"] --> V["optional interrupt vector table / .ivt"]
-    V --> C["executable instructions / .text"]
-    C --> D["globals / .data"]
-    D --> H["userspace heap<br/>BlockHeaders + allocations"]
-    H --> F["free stack space"]
-    F --> S["initial stack at high address<br/>stack grows downward"]
+block-beta
+    columns 12
+    V["optional .ivt"]:1
+    C[".text<br/>executable instructions"]:3
+    D[".data<br/>globals"]:2
+    H["userspace heap<br/>malloc<br/>BlockHeaders + allocations"]:2
+    F["free stack space"]:2
+    S["initial stack<br/>high address<br/>grows left toward heap"]:2
 ```
 
 ### 4.3.2 Initial `argc`, `argv`, and `envp`
@@ -3953,7 +4002,14 @@ Public interfaces live under [`library`](library/); structures and constants
 shared with the kernel live under [`common`](common/); kernel-private
 structures remain under [`kernel`](kernel/). The complete syscall ABI and its
 request structures are documented under [System-call ABI](#24-system-call-abi), while
-this chapter organizes the public wrappers and pure userspace facilities.
+this chapter organizes the public wrappers and pure userspace facilities. The
+interfaces that follow POSIX conventions cover process, wait, and signal
+operations; descriptor and directory I/O; standard streams; and shared memory.
+Calls such as
+[`open()`](library/fcntl/fcntl.picoc#L5),
+[`waitpid()`](library/sys/wait/wait.picoc#L14), and
+[`mmap()`](library/sys/mman/mman.picoc#L23) resemble their Unix counterparts,
+although PicoOS implements only the behavior documented here.
 
 ## 8.1 Library overview and dependencies
 [\[↑ TOC\]](#contents)
@@ -4408,7 +4464,8 @@ it, followed by the policy applied when a shell exits.
 [\[↑ TOC\]](#contents)
 
 [`system/init.picoc`](system/init.picoc) is the first userspace image loaded by the kernel and
-becomes PID 1. It establishes the initial environment, repeatedly starts one shell, and waits for
+becomes PID 1. Like an init system such as `systemd` on Linux, it starts the userspace session;
+PicoOS init only establishes the initial environment, repeatedly starts one shell, and waits for
 that exact shell. Keeping this policy in userspace prevents configuration and session behavior from
 becoming kernel mechanisms. The responsibility table separates kernel setup from init’s session
 policy and the shell’s command handling.
