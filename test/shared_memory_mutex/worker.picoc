@@ -5,6 +5,7 @@
 #include "../../library/stdlib/stdlib.header"
 #include "../../library/sys/mman/mman.header"
 
+// AI used: GitHub Copilot through GitHub Education
 int main(int argc, char **argv) {
     struct SharedState *shared_state;
 

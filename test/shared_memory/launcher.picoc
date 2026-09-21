@@ -5,6 +5,7 @@
 #include "../../library/sys/wait/wait.header"
 #include "../../library/sys/mman/mman.header"
 
+// AI used: GitHub Copilot through GitHub Education
 int main(void) {
     int first_worker;
     int second_worker;

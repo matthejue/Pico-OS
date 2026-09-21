@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# AI used: GitHub Copilot through GitHub Education
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import difflib

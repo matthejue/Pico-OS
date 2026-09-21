@@ -1,3 +1,4 @@
+# AI used: GitHub Copilot through GitHub Education
 """Measures how long PicoOS takes to echo a typed character under CPU load."""
 
 import os

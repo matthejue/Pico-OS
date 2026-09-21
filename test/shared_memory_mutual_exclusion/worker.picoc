@@ -27,6 +27,7 @@ void write_worker_message(
     }
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int main(int argc, char **argv) {
     int worker_number = atoi(argv[1]);
     int shared_memory_id = atoi(argv[2]);

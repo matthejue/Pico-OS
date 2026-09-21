@@ -3,6 +3,7 @@
 #include "../../library/sys/mman/mman.header"
 #include "../../library/stdlib/stdlib.header"
 
+// AI used: GitHub Copilot through GitHub Education
 int main(int argc, char **argv) {
     int shared_memory_id;
     int *shared_values;

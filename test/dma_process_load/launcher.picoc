@@ -41,6 +41,7 @@ void set_timer_interval(int interval) {
     write_periphery_register(9, interval);
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int main(void) {
     int shared_id;
     bool *worker_ran;

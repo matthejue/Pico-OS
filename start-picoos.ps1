@@ -1,3 +1,4 @@
+# AI used: GitHub Copilot through GitHub Education
 [CmdletBinding()]
 param(
     [string]$RetiEmulator,

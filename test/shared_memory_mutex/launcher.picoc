@@ -6,6 +6,7 @@
 #include "../../library/sys/wait/wait.header"
 #include "../../library/sys/mman/mman.header"
 
+// AI used: GitHub Copilot through GitHub Education
 void build_worker_arguments(
     char *arguments,
     int worker_number,
@@ -30,6 +31,7 @@ void write_text(char *text) {
     write(STDOUT_FILENO, text, length);
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int main(void) {
     int shared_memory_id;
     int first_worker;

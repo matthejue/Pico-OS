@@ -287,6 +287,7 @@ int read_shell_character(char *character) {
     return 1;
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int read_line(char *buffer, int capacity) {
     int length = 0;
     int history_position = 0;
@@ -481,6 +482,7 @@ bool is_environment_name_character(char value) {
            (value >= '0' && value <= '9');
 }
 
+// AI used: GitHub Copilot through GitHub Education
 char *expand_variables(char *arguments, char *result, int capacity) {
     char special_parameter[SHELL_SPECIAL_PARAMETER_BUFFER_CAPACITY];
     int argument_index = 0;
@@ -714,6 +716,7 @@ int find_output_redirection(char *command) {
     return index;
 }
 
+// AI used: GitHub Copilot through GitHub Education
 bool insert_redirection(
     char *command,
     char *redirection,
@@ -863,6 +866,7 @@ bool redirection_starts_at(
     return command[index] == '2' && command[index + 1] == '>';
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int strip_redirection(
     char *command,
     int file_descriptor,
@@ -1263,6 +1267,7 @@ char *read_shell_test_file(char *path, int *size) {
     return contents;
 }
 
+// AI used: GitHub Copilot through GitHub Education
 bool run_shell_test(char *test_directory) {
     char capture_path[SHELL_EXECUTABLE_PATH_CAPACITY];
     char input_path[SHELL_EXECUTABLE_PATH_CAPACITY];
@@ -1357,6 +1362,7 @@ bool run_shell_test(char *test_directory) {
     return passed;
 }
 
+// AI used: GitHub Copilot through GitHub Education
 bool run_shell_test_manifest(char *path) {
     char *manifest;
     int index = 0;

@@ -1,3 +1,4 @@
+# AI used: GitHub Copilot through GitHub Education
 SHELL := /bin/bash
 
 # ----------------------------------------------------------------------

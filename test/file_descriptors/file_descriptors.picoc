@@ -8,6 +8,7 @@
 #define TEST_BINARY "test/file_descriptors/file_descriptors.bin"
 #define TERMINAL_PATH "/device/terminal.dev"
 
+// AI used: GitHub Copilot through GitHub Education
 int main(int argc, char **argv) {
     char buffer[32];
     int file_descriptor;

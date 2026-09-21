@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# AI used: GitHub Copilot through GitHub Education
 
 if [[ -n "${TEST_JOBS:-}" ]]; then
   if [[ ! "$TEST_JOBS" =~ ^[1-9][0-9]*$ ]]; then

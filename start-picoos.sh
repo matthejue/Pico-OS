@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# AI used: GitHub Copilot through GitHub Education
 
 set -euo pipefail
 

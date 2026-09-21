@@ -45,6 +45,7 @@ int copy_file_descriptor(int file_descriptor) {
     return count < 0;
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int edit_standard_input(void) {
     char buffer[CAT_INPUT_LINE_CAPACITY];
     char character;

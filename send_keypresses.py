@@ -1,5 +1,6 @@
 #!/home/areo/.virtualenv/bin/python3
 #!/usr/bin/env python3
+# AI used: GitHub Copilot through GitHub Education
 """
 Launch a TUI in a visible terminal window and replay keypresses (xdotool-style) via Python.
 

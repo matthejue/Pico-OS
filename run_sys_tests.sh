@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# AI used: GitHub Copilot through GitHub Education
 
 NOT_PASSED_TESTS_FILE="./config/not_passed_tests.txt"
 RESULT_FILE="./test/tests.res"

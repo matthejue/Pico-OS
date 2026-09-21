@@ -1,3 +1,4 @@
+// AI used for the complete application: GitHub Copilot through GitHub Education
 // dependencies: ../common/user_command.reti_blocks ../library/unistd/libunistd.reti_blocks
 
 #include "../common/loading_bar.header"

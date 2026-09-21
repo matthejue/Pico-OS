@@ -1,3 +1,4 @@
+# AI used: GitHub Copilot through GitHub Education
 """Creates the timer-interval measurement figure used in the documentation."""
 
 from pathlib import Path

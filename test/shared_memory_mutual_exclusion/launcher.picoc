@@ -24,6 +24,7 @@ void deactivate_timer_interrupt(void) {
     asm("LOADIN BAF DS 0"); // Restore DS after periphery access
 }
 
+// AI used: GitHub Copilot through GitHub Education
 void build_worker_arguments(
     char *arguments,
     int worker_number,
@@ -41,6 +42,7 @@ void build_worker_arguments(
     arguments[length] = '\0';
 }
 
+// AI used: GitHub Copilot through GitHub Education
 int main(void) {
     int shared_memory_id;
     struct SharedState *shared_state;
