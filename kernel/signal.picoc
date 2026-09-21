@@ -7,8 +7,9 @@
 #define TERMINAL_INTERRUPT_CHARACTER 3
 #define TERMINAL_STOP_CHARACTER 26
 
-int foreground_process_id = 0;
-int terminal_input_process_id = 0;
+// Stores 0 without a registered owner, a negative PID for input ownership with
+// terminal-generated signals suppressed, or a positive PID for both roles
+int foreground_process_target = 0;
 
 bool signal_number_is_valid(int signal_number) {
     return signal_number == SIGINT ||
@@ -148,8 +149,7 @@ int set_foreground_process(int pid) {
     struct Process *process;
 
     if (pid == 0) {
-        foreground_process_id = 0;
-        terminal_input_process_id = current_process()->pid;
+        foreground_process_target = -current_process()->pid;
         return 0;
     }
 
@@ -159,20 +159,28 @@ int set_foreground_process(int pid) {
         return -1;
     }
 
-    foreground_process_id = pid;
-    terminal_input_process_id = pid;
+    foreground_process_target = pid;
     return 0;
 }
 
+int terminal_input_owner_id(void) {
+    if (foreground_process_target < 0) {
+        return -foreground_process_target;
+    }
+    return foreground_process_target;
+}
+
 bool process_has_terminal_input(struct Process *process) {
-    return process != NULL && process->pid == terminal_input_process_id;
+    return process != NULL &&
+           process->pid == terminal_input_owner_id();
 }
 
 struct Process *terminal_input_process(void) {
     struct Process *process;
+    int owner_id = terminal_input_owner_id();
 
-    if (terminal_input_process_id != 0) {
-        process = find_process_by_pid(terminal_input_process_id);
+    if (owner_id != 0) {
+        process = find_process_by_pid(owner_id);
         if (process != NULL &&
             process->state != PROCESS_STATE_ZOMBIE) {
             return process;
@@ -193,9 +201,11 @@ bool handle_terminal_signal_character(int value) {
         return false;
     }
 
-    foreground_process = find_process_by_pid(
-        foreground_process_id
-    );
+    if (foreground_process_target <= 0) {
+        return true;
+    }
+
+    foreground_process = find_process_by_pid(foreground_process_target);
     if (foreground_process != NULL) {
         send_signal_to_process(
             foreground_process,
