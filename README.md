@@ -11,7 +11,7 @@ minimal userspace.
 The current userspace contains **15 distinct libraries**, including the startup
 library in [`library/`](library/), and **18 user applications** in
 [`user/`](user/), including the [shell](user/shell.picoc). The kernel exposes
-**38 implemented syscalls**, [the syscall overview](#251-system-call-groups)
+**38 implemented syscalls**, [the syscall overview](#252-system-call-groups)
 explains their selector numbers and subsystem connections.
 
 [POSIX](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap01.html)
@@ -339,7 +339,8 @@ lectures follow.
       - [2.4.3 File and directory request structures](#243-file-and-directory-request-structures)
       - [2.4.4 Request-pointer ownership and lifetime](#244-request-pointer-ownership-and-lifetime)
    - [2.5 Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace)
-      - [2.5.1 System-call groups](#251-system-call-groups)
+      - [2.5.1 Selecting the return path](#251-selecting-the-return-path)
+      - [2.5.2 System-call groups](#252-system-call-groups)
    - [2.6 Timer interrupts and userspace preemption](#26-timer-interrupts-and-userspace-preemption)
       - [2.6.1 Timer interrupt path](#261-timer-interrupt-path)
       - [2.6.2 Kernel non-preemption and deferred rescheduling](#262-kernel-non-preemption-and-deferred-rescheduling)
@@ -1526,9 +1527,26 @@ retains the destination buffer and count in the PCB, as shown in
 [\[↑ TOC\]](#contents)
 
 The [system-call ABI](#24-system-call-abi) enters vector 0 with the selector
-and argument already placed in registers. The naked entry saves the process
-registers, disables the process boundary while changing stacks, installs
-kernel segments and the kernel stack, and calls the C handler. The
+and argument already placed in registers. This entry does not pass through the
+dispatcher. The RETI interrupt mechanism decrements the current process's
+`SP`, stores the `INT 0` instruction's PC at `SP + 1`, and loads the handler PC
+from vector 0. It does not select the kernel stack, change `CS` or `DS`, or
+save any general register.
+
+The naked assembly entry completes that work before any C code runs. While the
+process stack is still active, it pushes `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and
+`DS`, producing the [saved interrupt frame](#23-saved-interrupt-stack-frame).
+It then copies the frame's free-cell address from `SP` to `BAF`; this value is
+the [`caller_context`](kernel/dispatcher.picoc#L71) passed through the kernel.
+Only after the complete process context is on that stack does the entry
+temporarily disable stack-overflow
+checking by writing `0` to periphery register 10, load the kernel `CS`, `DS`,
+and `SP`, and re-enable checking with the kernel stack boundary. It sets `IN1`
+to `0` for
+[`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2), then
+reuses `IN2` and `ACC` to build the C call after their process values are safe
+in the saved frame. Its later argument and return-address pushes therefore use
+the kernel stack. The
 complete [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104)
 entry, [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143)
 continuation, and
@@ -1605,6 +1623,26 @@ void syscall_interrupt_restore(void) {
 }
 ```
 
+The three context-loading macros come from the generated
+[`kernel/memory_constants.header`](kernel/memory_constants.header):
+[`KERNEL_CS_START_ASM`](kernel/memory_constants.header#L6) and
+[`KERNEL_DS_START_ASM`](kernel/memory_constants.header#L7) contain `LOADI32`
+instructions for the absolute linked segment bases, and
+[`KERNEL_SP_START_ASM`](kernel/memory_constants.header#L8) contains the
+`LOADI32 SP` instruction for the top of the kernel stack. The build rule in
+[`Makefile`](Makefile#L716) runs `picoc_compiler` with `-k sram`, the configured
+`--heap-size` and `--stack-size`, and all kernel sources. The compiler links far
+enough to calculate `codesegment_start`, `datasegment_start`, `heap_start`, and
+`stack_start`, writes their absolute SRAM values into the header, and then the
+normal kernel build includes that header through
+[`os_isrs.picoc`](interrupt_service_routines/os_isrs.picoc#L3). The same file's
+[`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) and
+[`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4) define the boundary
+installed by
+[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). The complete
+set of generated values is described in
+[Section 1.1.8](#118-generated-memory-constants-for-the-bootloader-and-kernel).
+
 Once the assembly entry has installed the kernel stack,
 [`handle_syscall()`](kernel/syscall.picoc#L16) selects the requested operation
 with an `if`/`else if` chain. Simple calls pass their argument directly, while
@@ -1641,10 +1679,27 @@ int handle_syscall(int syscall_number, int argument, int *caller_context) {
 }
 ```
 
-The following sequence connects the assembly above to the C syscall handler
-and the scheduling decision at return. It shows a call whose subsystem returns
-normally, a blocking syscall instead saves its frame and switches processes
-inside the subsystem, as shown in [blocking and waking](#62-blocking-with-sleep-and-waking-with-wakeup).
+### 2.5.1 Selecting the return path
+[\[↑ TOC\]](#contents)
+
+After [`handle_syscall()`](kernel/syscall.picoc#L16) returns, its result is in
+`IN2`. [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143)
+first copies that value into saved `IN2` at `caller_context[4]`, then calls
+[`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14) with
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
+as the return address.
+
+If no rescheduling is pending, the check returns to
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158),
+so that stub restores the calling process directly. If rescheduling is pending,
+the check enters the dispatcher and does not return to the restoration stub.
+The dispatcher copies saved `IN2` from `caller_context[4]` to
+[`activation.in2`](kernel/process/process.header#L23), preserving the syscall
+result until it restores that process. Therefore, the result survives because
+it is moved from `IN2` into the saved frame and then into the PCB activation.
+
+The following sequence shows these two outcomes after the syscall handler
+returns.
 
 ```mermaid
 sequenceDiagram
@@ -1673,20 +1728,15 @@ sequenceDiagram
     end
 ```
 
-Immediate syscalls replace the saved `IN2` with the C return value. Before
-restoring the other registers, the return stub checks whether a timer requested
-rescheduling while the kernel was running. A pending request switches from
-the saved frame, otherwise the stub restores the process boundary and executes
-`RTI`. Saved `ACC` remains the syscall number, while saved `IN2` carries the
-result through either path.
+When [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
+runs, it restores the saved registers, including the result in `IN2`, and then
+executes `RTI`. On the dispatcher path, the dispatcher later restores the same
+register values from the PCB and executes `RTI` itself, so
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
+is not executed afterward. In short, the restoration stub runs only when the
+syscall handler returns and the rescheduling check also returns normally.
 
-The userspace [`load()`](library/unistd/process.picoc#L17) and regular-file
-[`read()`](library/unistd/io.picoc#L6) wrappers repeat chunk syscalls while
-work remains without explicitly yielding. Blocking, yielding, exiting,
-deferred timer scheduling, and deferred termination may save or replace the
-activation and switch to another process instead.
-
-### 2.5.1 System-call groups
+### 2.5.2 System-call groups
 [\[↑ TOC\]](#contents)
 
 PicoOS implements **38 syscalls** in the continuous selector range **0–37**.
@@ -2048,11 +2098,25 @@ PicoOS reads from it:
 | 11, [`CPU_EXCEPTION_CAUSE_REGISTER`](kernel/exception.header#L6) | RETI CPU/emulator | `0` means no exception has been recorded, `1` means division or modulo by zero, `2` means stack overflow, and `3` means illegal instruction. Guest writes are ignored. [`handle_cpu_exception()`](kernel/exception.picoc#L70) reads this value after exception entry. |
 
 When the emulator detects a fault, it stores the cause exposed through register
-11 and starts the fixed exception entry, which saves the PC on the current
-stack and jumps to vector 3. The interrupt service
-routine preserves the interrupted `CS`, disables the old boundary while
-changing stacks, installs the kernel segments and stack, and restores the
-kernel boundary. The complete
+11 and starts the fixed exception entry. As with a syscall, the automatic
+mechanism decrements the current `SP`, leaves a PC value at `SP + 1`, and loads
+vector 3; because `RTI` advances after loading that cell, the saved value is one
+instruction address before the faulting instruction so a returning handler
+could retry it.
+No PicoOS exception path actually retries it.
+
+Unlike [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104),
+the assembly exception entry does not push `ACC`, `IN1`, `IN2`, `BAF`, `CS`, or
+`DS`. The old stack therefore retains only the automatically saved PC. This is
+intentional because a userspace CPU exception always terminates the process,
+while a kernel CPU exception shuts down the system. The entry keeps the
+interrupted `CS` only temporarily in `BAF`, writes `0` to the stack-boundary
+register, and overwrites `CS`, `DS`, and `SP` with the same generated
+[`KERNEL_CS_START_ASM`](kernel/memory_constants.header#L6),
+[`KERNEL_DS_START_ASM`](kernel/memory_constants.header#L7), and
+[`KERNEL_SP_START_ASM`](kernel/memory_constants.header#L8) values used by
+syscall entry. It then installs the kernel boundary and passes the difference
+between the old and kernel `CS` to C. The complete
 [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L171)
 entry shows these steps:
 
@@ -2082,7 +2146,8 @@ void cpu_exception_interrupt(void) {
 }
 ```
 
-The saved `CS` distinguishes the two outcomes. If user code was interrupted,
+The temporary `CS` value distinguishes the two outcomes. If user code was
+interrupted,
 [`handle_cpu_exception()`](kernel/exception.picoc#L70) writes a message through
 descriptor 1 and [`exit_process()`](kernel/process/process.picoc#L451)
 terminates the current process with status
@@ -2105,10 +2170,35 @@ void handle_cpu_exception(int interrupted_kernel_cs_difference) {
 }
 ```
 
-The dispatcher writes the selected process boundary before `RTI`. The
-system-call entry, the userspace branch of the timer interrupt, and the CPU
-exception entry temporarily write `0` while moving from the process stack to
-the kernel stack, then activate the kernel boundary.
+The dispatcher is not involved in exception entry and the fault-time
+activation is never copied to its PCB. For a userspace fault,
+[`exit_process(status)`](kernel/process/process.picoc#L451) reaches
+[`terminate_process(process, status)`](kernel/process/process.picoc#L304), which
+stores the exception status in
+[`Process.exit_status`](kernel/process/process.header#L60), changes
+[`Process.state`](kernel/process/process.header#L33) to `ZOMBIE`, and removes
+the PCB immediately when no parent must collect it. It then calls
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55). The scheduler
+chooses a different runnable process, and
+[`dispatcher_jump_to_process(process, stack_boundary)`](kernel/dispatcher.picoc#L21)
+restores that process's saved `SP`, boundary, general registers, segments, and
+PC through `RTI`, exactly as described for a switched syscall in
+[Section 2.5](#25-handling-system-calls-and-returning-to-userspace). The PC on
+the faulting process's old stack is abandoned. If no process remains,
+[`exit_process(status)`](kernel/process/process.picoc#L451) shuts down; a kernel
+fault goes directly to [`shutdown()`](kernel/kernel.picoc#L15). Consequently,
+CPU exceptions never return to the interrupted context in the current
+implementation.
+
+The system-call entry, the userspace branch of the timer interrupt, and the
+CPU-exception entry temporarily write `0` while moving from the process stack
+to the kernel stack, then activate the kernel boundary. Only syscall and timer
+entry preserve a resumable process frame; exception entry does not. Process
+heap exhaustion follows the syscall path through selector 18, so its complete
+context is initially saved as described in
+[Section 2.5](#25-handling-system-calls-and-returning-to-userspace), but
+[`handle_process_heap_full_exception()`](kernel/exception.picoc#L82)
+terminates it instead of returning.
 
 ### 2.9.2 Supported exceptions and allocation errors
 [\[↑ TOC\]](#contents)
@@ -2160,11 +2250,11 @@ that file.
 [`kernel/syscall.picoc`](kernel/syscall.picoc) contains the C handler reached
 after the system-call interrupt has installed the kernel context. Its table row
 summarizes the selector-dependent behavior whose individual targets appear in
-the [system-call groups](#251-system-call-groups).
+the [system-call groups](#252-system-call-groups).
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Returns the selected operation's result for immediate calls. Calls that switch processes leave through the saved interrupt frame, exit, shutdown, and reboot do not return normally | Selects one of 38 kernel operations and may change process, scheduler, memory, descriptor, or host-filesystem state | The kernel functions in [System-call groups](#251-system-call-groups) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) after userspace executes `INT 0` |
+| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Returns the selected operation's result for immediate calls. Calls that switch processes leave through the saved interrupt frame, exit, shutdown, and reboot do not return normally | Selects one of 38 kernel operations and may change process, scheduler, memory, descriptor, or host-filesystem state | The kernel functions in [System-call groups](#252-system-call-groups) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) after userspace executes `INT 0` |
 
 #### 2.9.3.3 Interrupt-controller configuration
 [\[↑ TOC\]](#contents)
@@ -5082,7 +5172,7 @@ reporting.
 The table lists all 18 programs, links each source at its entry point, and
 identifies the main library calls behind its behavior. These calls come from
 the [15 libraries](#81-library-overview-and-dependencies), which expose the
-[38 kernel syscalls](#251-system-call-groups) where a kernel service is needed.
+[38 kernel syscalls](#252-system-call-groups) where a kernel service is needed.
 Shared command helpers are explained below the table.
 
 | Binary (source link) | Behavior | Library functions |
