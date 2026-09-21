@@ -3562,9 +3562,14 @@ struct wait_queue {
 The remaining links live in each queued PCB: [`wait_next`](kernel/process/process.header#L51) selects the next
 waiter and [`waiting_queue_ptr`](kernel/process/process.header#L48) points back to the owning queue.
 
-The queue does not allocate list nodes. A blocked PCB supplies
-[`waiting_queue_ptr`](kernel/process/process.header#L48) and [`wait_next`](kernel/process/process.header#L51), so one process can be present in at most
-one queue. Queue locations include:
+The queue does not allocate list nodes. The PCB itself is the list node, using
+its single [`waiting_queue_ptr`](kernel/process/process.header#L48) and single
+[`wait_next`](kernel/process/process.header#L51) field. These fields are reused
+for every kind of wait queue, not used for several queues at the same time. A
+process has only one active blocking operation because it cannot execute a
+second operation while the first has blocked it. It can therefore be present in
+at most one queue. For [`waitpid()`](library/sys/wait/wait.picoc#L14), that one
+operation waits for one exact child. Queue locations include:
 
 - [`process->waiters`](kernel/process/process.header#L46), embedded in a PCB for exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14)
 - [`terminal.input_waiters`](kernel/filesystem/terminal.header#L14), embedded in the global terminal
@@ -3630,8 +3635,11 @@ sequenceDiagram
 ## 6.3 Exact-child waiting and return-status delivery
 [\[↑ TOC\]](#contents)
 
-The public API waits for one exact child and has no options argument.
-[`waitpid()`](library/sys/wait/wait.picoc#L14) creates two local objects in the
+The public API waits for one exact child and has no options argument. This is
+one instance of the single active blocking operation described in
+[Section 6.1, Wait-queue structure and intrusive PCB links](#61-wait-queue-structure-and-intrusive-pcb-links).
+When [`waitpid()`](library/sys/wait/wait.picoc#L14) blocks, the parent cannot
+start another wait or any other operation until it is woken. It creates two local objects in the
 parent's userspace stack frame. They are the integer
 [`status`](library/sys/wait/wait.picoc#L15) and the
 [`request`](library/sys/wait/wait.picoc#L16) structure, whose type is

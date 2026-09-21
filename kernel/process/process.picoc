@@ -396,7 +396,7 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
 void enqueue_current_process_on_wait_queue(struct wait_queue *queue) {
     struct Process *process = current_process();
 
-    // wait_next is shared by all wait queues
+    // Reuses the single wait_next field for this process's one active wait queue
     process->wait_next = NULL;
     process->waiting_queue_ptr = queue;
     if (queue->tail == NULL) {
