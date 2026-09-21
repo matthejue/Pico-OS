@@ -383,7 +383,10 @@ lectures follow.
    - [4.7 Process list, PCB metadata, and lifecycle function reference](#47-process-list-pcb-metadata-and-lifecycle-function-reference)
    - [4.8 Process-loader and run-setup function reference](#48-process-loader-and-run-setup-function-reference)
 1. [Scheduling and context switching](#5-scheduling-and-context-switching)
-   - [5.1 Round-robin process selection](#51-round-robin-process-selection)
+   - [5.1 Scheduler implementation](#51-scheduler-implementation)
+      - [5.1.1 Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
+      - [5.1.2 Scheduling example, no-runnable case, and ready-queue tradeoff](#512-scheduling-example-no-runnable-case-and-ready-queue-tradeoff)
+      - [5.1.3 Scheduler function reference](#513-scheduler-function-reference)
    - [5.2 Saved process activation](#52-saved-process-activation)
    - [5.3 Saving the current process and selecting the next process](#53-saving-the-current-process-and-selecting-the-next-process)
    - [5.4 Restoring the selected process and returning with `RTI`](#54-restoring-the-selected-process-and-returning-with-rti)
@@ -449,7 +452,6 @@ lectures follow.
    - [14.1 Library, OS, and shell test categories](#141-library-os-and-shell-test-categories)
    - [14.2 Execution modes and normal test runs](#142-execution-modes-and-normal-test-runs)
    - [14.3 Fast shared-session test execution and state reset](#143-fast-shared-session-test-execution-and-state-reset)
-   - [14.4 Covered kernel and userspace behavior](#144-covered-kernel-and-userspace-behavior)
 1. [Use in operating-systems and real-time operating-systems lectures](#15-use-in-operating-systems-and-real-time-operating-systems-lectures)
    - [15.1 Operating-systems topics](#151-operating-systems-topics)
       - [15.1.1 Inspecting PicoOS execution in the RETI-Emulator](#1511-inspecting-picoos-execution-in-the-reti-emulator)
@@ -2838,7 +2840,7 @@ explains the separate unlinking required if the PCB is also in a wait queue.
 The scheduler scans this same list. There is no separate ready queue. Blocking
 queues use a different intrusive link inside each PCB, so
 [`next`](kernel/process/process.header#L53) remains available for process-table
-order. [Section 5.1, Round-robin process selection](#51-round-robin-process-selection)
+order. [Section 5.1.1, Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
 explains how the scheduler traverses this list.
 
 ## 4.2 Process control block fields
@@ -3316,21 +3318,149 @@ from the operations that make the represented process eligible for scheduling.
 # 5. Scheduling and context switching
 [\[↑ TOC\]](#contents)
 
-After a process blocks, yields, or exhausts its timer interval, the scheduler chooses a runnable
-[`Process`](kernel/process/process.header#L31) PCB. Selection and context switching are separate:
-the scheduler chooses the PCB, while the dispatcher saves the current
-activation and restores the selected one.
+The scheduler and dispatcher have separate responsibilities. The scheduler decides which runnable
+process should execute next by examining the process table and the state stored in each process's
+[`struct Process`](kernel/process/process.header#L31) PCB. The dispatcher performs the context
+switch: it saves the outgoing process's register state, asks the scheduler for the next process,
+makes that process current, restores its register state, and transfers execution to it.
 
-## 5.1 Round-robin process selection
+After a process blocks, yields, or exhausts its timer interval, the scheduler therefore chooses a
+process, represented by its PCB; it does not choose a PCB as though the PCB were the process.
+PicoOS uses integer constants rather than a `ProcessState` enum:
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13) makes a process runnable, and the
+currently selected process remains runnable while its PCB is still
+[`PROCESS_STATE_RUNNING`](kernel/process/process.header#L14).
+[`PROCESS_STATE_NEW`](kernel/process/process.header#L12),
+[`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15),
+[`PROCESS_STATE_STOPPED`](kernel/process/process.header#L16), and
+[`PROCESS_STATE_ZOMBIE`](kernel/process/process.header#L17) are not runnable.
+The scheduler scans the linked process table, tests each PCB's
+[`state`](kernel/process/process.header#L33), and returns the PCB that represents the next runnable
+process. The dispatcher uses that returned PCB to perform the switch described in
+[Section 5.3, Saving the current process and selecting the next process](#53-saving-the-current-process-and-selecting-the-next-process)
+and [Section 5.4, Restoring the selected process and returning with `RTI`](#54-restoring-the-selected-process-and-returning-with-rti).
+
+## 5.1 Scheduler implementation
 [\[↑ TOC\]](#contents)
 
-There is no scheduler object or ready queue.
-[`scheduler_next_process()`](kernel/scheduler.picoc#L12) reads the process list and active PCB. It
-begins after the current PCB, wraps once, and returns the first `READY` or still-current `RUNNING`
-PCB. Other states remain in the list but are skipped. The complete function below shows the two
-scans that preserve round-robin order without maintaining a separate ready queue.
+The scheduler implementation uses the process list directly. The following subsections explain its
+Lazy Round Robin policy, show its edge cases and tradeoff against a ready queue, and document the
+two scheduler functions separately.
+
+### 5.1.1 Preemptive Cyclic Process Selection (Lazy Round Robin)
+[\[↑ TOC\]](#contents)
+
+PicoOS uses a cyclic traversal of the complete process list rather than a dedicated ready queue.
+The traditional name *process table* is doing a little imaginative work here: PicoOS's "table" is
+actually a singly linked list of PCBs, not an array. [Section 4.1, Global process list and current
+process](#41-global-process-list-and-current-process) describes that representation. Here *Lazy
+Round Robin* names the deliberate tradeoff: PicoOS does not maintain the runnable PCBs in textbook
+FIFO ready-queue order. Instead, when it must select a process, it discovers the next runnable PCB
+by scanning states in the existing process list.
+
+[`scheduler_next_process()`](kernel/scheduler.picoc#L12) does not restart at the beginning of the
+list after each scheduling decision. It obtains the current PCB through
+[`current_process()`](kernel/process/process.picoc#L62), follows that PCB's
+[`next`](kernel/process/process.header#L53) link, and starts the search with the following process.
+Only when there is no current process or the current PCB is the last entry does it start at
+[`first_process()`](kernel/process/process.picoc#L28). The first loop scans from that starting PCB to
+the end. If it finds nothing runnable, the second loop starts again at
+[`first_process()`](kernel/process/process.picoc#L28) and stops when it reaches the original start,
+so every PCB is examined at most once per call. A current process near the end can therefore be
+followed by a runnable process near the beginning. Because each ordinary search advances from the
+current PCB, processes near [`process_list_head`](kernel/process/process.picoc#L16) are not
+systematically preferred.
+
+For each PCB, [`scheduler_can_run()`](kernel/scheduler.picoc#L4) accepts
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13) or
+[`PROCESS_STATE_RUNNING`](kernel/process/process.header#L14). It skips
+[`PROCESS_STATE_NEW`](kernel/process/process.header#L12),
+[`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15),
+[`PROCESS_STATE_STOPPED`](kernel/process/process.header#L16), and
+[`PROCESS_STATE_ZOMBIE`](kernel/process/process.header#L17). Sleeping and waiting processes use the
+`BLOCKED` state, so the scan may pass several such PCBs before it finds a process that can execute.
+
+This produces fair cyclic turns for processes that remain runnable: the scan cannot pass a runnable
+PCB and select a later one, and the next decision continues after the process that just ran. It is
+not textbook Round Robin across state changes, however. A conventional ready queue contains only
+runnable processes and normally supplies its head directly; when a blocked process becomes ready,
+it is appended at the tail. PicoOS leaves that process at its fixed position in the general process
+list, so a newly unblocked process can be encountered before another process that has been ready
+longer. That difference affects strict FIFO ready order. It also means that PicoOS considers every
+PCB it passes, including `BLOCKED` PCBs for sleeping or waiting processes and `STOPPED`, `NEW`, or
+`ZOMBIE` PCBs, whereas a conventional ready queue contains only runnable processes.
+
+Preemption is also slightly looser than a textbook per-process quantum. The timer configured by
+[`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34) requests a switch
+every 5,000 emulated instructions by default.
+[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74) dispatches immediately
+after a userspace interruption, while a kernel interruption is deferred until syscall return. The
+dispatcher does not restart the timer in
+[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), so a process selected after a
+voluntary switch may receive only the remainder of the current timer interval rather than a fresh
+full quantum.
+
+### 5.1.2 Scheduling example, no-runnable case, and ready-queue tradeoff
+[\[↑ TOC\]](#contents)
+
+The example below shows the linked-list order, each process state, and `P3` as the current process.
+It makes both the cyclic order and the extra traversal caused by non-runnable PCBs visible.
+
+```mermaid
+flowchart LR
+    P1["P1<br/>READY"] --> P2["P2<br/>BLOCKED"]
+    P2 --> P3["P3<br/>RUNNING<br/>current"]
+    P3 --> P4["P4<br/>STOPPED"]
+    P4 --> P5["P5<br/>READY"]
+```
+
+When `P3` yields or its timer interval expires, the dispatcher changes it to `READY`. The scheduler
+starts at `P4`, skips that stopped process, and selects `P5`. After `P5` runs, the next search starts
+at the beginning because `P5` is the last PCB; it finds `P1`, demonstrating the wrap-around. If a
+textbook Round Robin ready queue contained `P5` followed by `P1` before `P3` was requeued, it would
+append `P3` after `P1` and take `P5` directly, without examining `P4`. PicoOS obtains that order by
+inspecting the complete process list instead.
+
+If one complete scan finds no `READY` or `RUNNING` PCB,
+[`scheduler_next_process()`](kernel/scheduler.picoc#L12) returns `NULL`; the scheduler itself does
+not begin another scan. This state is legal when all existing processes are blocked, stopped, new,
+or zombies; PicoOS does not require one process to remain runnable. There is no idle or fallback
+process.
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) handles the case by repeatedly
+calling the scheduler while the process list remains nonempty. A UART or DMA interrupt can make a
+blocked process ready during that wait. If no event can make any process runnable, the dispatcher
+keeps scanning indefinitely. If the process list is empty, the loop ends and the dispatcher
+returns. By contrast, preemption and [`yield()`](library/schedule/schedule.picoc#L4) do not normally
+reach the no-runnable case because
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) first changes the outgoing
+`RUNNING` process to `READY`.
+
+Using the process list directly keeps the implementation small: state transitions do not also have
+to insert, remove, or reorder PCBs in a ready queue. The tradeoff is that a scheduling decision may
+traverse the complete process list, including non-runnable PCBs, before finding an eligible process.
+A conventional Round Robin ready queue would examine only runnable processes and take its head
+directly. PicoOS's finite process memory limits the number of resident processes, but the scheduler
+enforces no small fixed process count, so the source code does not guarantee that the traversal is
+always short.
+
+### 5.1.3 Scheduler function reference
+[\[↑ TOC\]](#contents)
+
+The policy and edge cases above are implemented by two functions in
+[`kernel/scheduler.picoc`](kernel/scheduler.picoc). The complete code below shows that
+[`scheduler_can_run()`](kernel/scheduler.picoc#L4) checks whether one process can run, while
+[`scheduler_next_process()`](kernel/scheduler.picoc#L12) chooses the starting point and performs the
+two-part scan with wrap-around.
 
 ```c
+bool scheduler_can_run(struct Process *process) {
+    return process != NULL &&
+           (process->state == PROCESS_STATE_READY ||
+            // A still-current RUNNING process may be the only runnable process
+            // when scheduler_next_process() wraps around to it
+            process->state == PROCESS_STATE_RUNNING);
+}
+
 struct Process *scheduler_next_process(void) {
     struct Process *start;
     struct Process *candidate;
@@ -3363,17 +3493,32 @@ struct Process *scheduler_next_process(void) {
 }
 ```
 
-Including `RUNNING` permits the current process to be selected again when it is the only runnable
-one.
+The table summarizes each function's return value, effects, calls, and callers. Dispatcher functions
+remain separate in [Section 5.5, Dispatcher function reference](#55-dispatcher-function-reference).
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`scheduler_can_run(process)`](kernel/scheduler.picoc#L4) | `true` for a non-`NULL` PCB whose state is `READY` or `RUNNING`; otherwise `false` | Reads the candidate PCB's [`state`](kernel/process/process.header#L33) | — | **Kernel functions:** [`scheduler_next_process()`](kernel/scheduler.picoc#L12) |
+| [`scheduler_next_process(void)`](kernel/scheduler.picoc#L12) | PCB representing the first runnable process found during one cyclic scan, or `NULL` when the process list is empty or no process can run | Reads [`process_list_head`](kernel/process/process.picoc#L16), [`active_process`](kernel/process/process.picoc#L18), and PCB [`next`](kernel/process/process.header#L53) and [`state`](kernel/process/process.header#L33) fields; does not change process state | [`first_process()`](kernel/process/process.picoc#L28), [`current_process()`](kernel/process/process.picoc#L62), [`scheduler_can_run()`](kernel/scheduler.picoc#L4) | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
 
 ## 5.2 Saved process activation
 [\[↑ TOC\]](#contents)
 
-Selecting a PCB is not enough to resume it: the dispatcher also needs the CPU
-state from the point where that process stopped. Each PCB therefore embeds a
-[`struct ActivationRecord`](kernel/process/process.header#L21). Its fixed field
-order is used directly by assembly, and the following table explains who
-initializes and later uses each value:
+The scheduler's PCB result identifies a process, but resuming it also requires the register state
+from the point where it stopped. Each PCB therefore embeds an
+[`activation`](kernel/process/process.header#L40) field of type
+[`struct ActivationRecord`](kernel/process/process.header#L21). This activation is not a separate
+global context structure: it belongs to that process's PCB and preserves the values the dispatcher
+will restore later.
+
+For an outgoing process, [`current_process()`](kernel/process/process.picoc#L62) reads the global
+[`active_process`](kernel/process/process.picoc#L18) PCB pointer. The dispatcher follows that PCB
+pointer to its embedded activation and saves the outgoing register state there. For an incoming
+process, the scheduler returns its PCB pointer, which the dispatcher passes through
+[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) to
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21); the latter reads the selected PCB's
+activation by fixed offsets. The field order is therefore part of the assembly interface, and the
+following definition and table show the values that must remain available.
 
 ```c
 struct ActivationRecord {
@@ -3390,26 +3535,58 @@ struct ActivationRecord {
 | Attribute | Meaning | Used by |
 | --- | --- | --- |
 | [`in1`](kernel/process/process.header#L22), [`in2`](kernel/process/process.header#L23), [`acc`](kernel/process/process.header#L24) | General argument/result registers at the suspension point | First initialized by [`create_process()`](kernel/process/process.picoc#L89), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`sp`](kernel/process/process.header#L25) | Free cell immediately below the saved return PC on the process stack | First initialized by [`create_process()`](kernel/process/process.picoc#L89), rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
+| [`sp`](kernel/process/process.header#L25) | Stack position immediately below the saved return PC; the return PC remains at `sp + 1` | First initialized by [`create_process()`](kernel/process/process.picoc#L89), rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`baf`](kernel/process/process.header#L26) | Base address of the interrupted PicoC function frame | First initialized by [`create_process()`](kernel/process/process.picoc#L89), rebuilt by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L89), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L89), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 
-These are the RETI registers required to resume a process.
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) fills the
-record from an interrupt frame, and
-[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) reads it by fixed
-PCB offsets to restore the registers. The record is embedded in the PCB, it is
-neither a pointer to a stack frame nor a separate allocation.
+These are the RETI registers required to resume a process. The saved program counter is the one
+exception: it stays on that process's own interrupt stack at
+[`activation.sp`](kernel/process/process.header#L25) + 1 rather than being
+copied into the activation. The fixed PCB offsets and the stack/heap boundary update protect this
+representation while another process is activated. In particular,
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) keeps the selected PCB pointer in
+`BAF` while loading the activation, restores `SP` before enabling the selected process's boundary,
+and only then replaces `BAF` with its saved process value.
 
 ## 5.3 Saving the current process and selecting the next process
 [\[↑ TOC\]](#contents)
 
-Immediate timer preemption, deferred timer requests,
-[`yield()`](library/schedule/schedule.picoc#L4), terminal blocking, queues, and
-[`waitpid()`](library/sys/wait/wait.picoc#L14) eventually pass a saved frame to
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71). The complete function below shows
-how it preserves the caller’s registers and leaves an already blocked or stopped state intact:
+This is the first part of the dispatcher/context-switch path. Its responsibility is to preserve a
+resumable outgoing process and start dispatching another process; the scheduler's responsibility is
+limited to selecting which runnable process comes next.
+
+The resumable entry paths all provide the saved frame described in
+[Section 2.3, Saved interrupt stack frame](#23-saved-interrupt-stack-frame):
+
+- Userspace timer preemption calls
+  [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) immediately after saving the
+  interrupted process's registers.
+- The [`yield()`](library/schedule/schedule.picoc#L4) system call switches unconditionally.
+  [`sleep()`](library/unistd/blocking.picoc#L9) also switches after placing the process on its wait
+  queue, while [`waitpid()`](library/sys/wait/wait.picoc#L14) does so only when the requested child
+  has not stopped or exited.
+- A terminal [`read()`](library/unistd/io.picoc#L6) switches when input is unavailable after marking
+  the reader `BLOCKED`, or when a background read stops the process with `SIGTTIN`. A DMA-backed
+  [`load()`](library/unistd/process.picoc#L17) switches after queuing the caller for DMA completion.
+- A timer expiry observed while kernel code is running, or deferred termination requested for the
+  running process, sets [`reschedule_requested`](kernel/dispatcher.picoc#L8). Every normally
+  returning syscall calls
+  [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), but it enters the context
+  switch only when that flag is set.
+
+Every syscall initially saves `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and `DS` on the process stack; RETI
+interrupt entry has already saved the program counter. It then installs the kernel segments and
+stack before calling [`handle_syscall()`](kernel/syscall.picoc#L16). This common entry does not mean
+that every syscall switches processes. Ordinary syscalls restore their caller directly;
+switching/blocking syscalls save the activation, exit and heap-exhaustion syscalls abandon the
+outgoing frame, and a pending deferred request switches at syscall return.
+[Section 2.5, Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace)
+shows the complete syscall entry and both return paths.
+
+The complete save function below shows how the dispatcher locates the outgoing PCB through
+[`current_process()`](kernel/process/process.picoc#L62), copies the frame into that PCB's activation,
+and preserves a state that blocking or signal code has already changed.
 
 ```c
 void dispatcher_switch_from_context(int *caller_context) {
@@ -3432,27 +3609,40 @@ void dispatcher_switch_from_context(int *caller_context) {
 }
 ```
 
-Blocking code has already changed the PCB to `BLOCKED`, so that state remains. Timer preemption or
-[`yield()`](library/schedule/schedule.picoc#L4) reaches the dispatcher from `RUNNING`, which becomes
-`READY`. [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) records timer expiry or
-a deferred signal-driven switch without switching inside the kernel, and
-[`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14) sends the syscall's saved
-frame through this same path at return. Selecting a process for dispatch clears the request, even if
-it is the same process again.
+Before a blocking switch, the process's PCB
+[`state`](kernel/process/process.header#L33) has already been set to
+[`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15). The process still has to leave the
+CPU, so the dispatcher saves its context and continues with another process. The conditional above
+changes only `RUNNING` to `READY`; a process already marked `BLOCKED` remains blocked. The
+corresponding condition later makes it runnable again, for example when a waited-for process exits
+and wakes its waiters. [Section 6.2, Blocking with `sleep()` and waking with `wakeup()`](#62-blocking-with-sleep-and-waking-with-wakeup)
+and [Section 6.3, Exact-child waiting and return-status delivery](#63-exact-child-waiting-and-return-status-delivery)
+describe those wakeups.
 
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) schedules and calls
-[`prepare_process_termination()`](kernel/signal.picoc#L126) before running a PCB. Deferred
-termination can remove that PCB, requiring another pass. If processes exist but none is runnable,
-the loop repeatedly scans in kernel context until an interrupt makes one ready. If the process list
-is empty, [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) returns.
+Timer preemption or [`yield()`](library/schedule/schedule.picoc#L4) instead reaches the dispatcher
+with the outgoing process still `RUNNING`, so it becomes `READY`.
+[`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) records a deferred timer or
+termination request without switching inside the kernel, and
+[`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14) sends the syscall's saved
+frame through the same save path at return. Selecting a process for dispatch clears the request,
+even when the same process is selected again.
+
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) now asks
+[`scheduler_next_process()`](kernel/scheduler.picoc#L12) to select a process and calls
+[`prepare_process_termination()`](kernel/signal.picoc#L126) before dispatching it. Deferred
+termination can remove the selected process, requiring another scheduler pass. The no-runnable,
+interrupt-wakeup, and empty-list cases are explained with the selection loop in
+[Section 5.1.2, Scheduling example, no-runnable case, and ready-queue tradeoff](#512-scheduling-example-no-runnable-case-and-ready-queue-tradeoff).
 
 ## 5.4 Restoring the selected process and returning with `RTI`
 [\[↑ TOC\]](#contents)
 
-[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) updates old/new states and the
-global active pointer, then enters [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21).
-The complete restoration code below shows why this last step must be naked: it installs another
-process’s stack and finishes with `RTI`, without a normal function return.
+This is the second part of the dispatcher/context-switch path. After the scheduler has selected a
+process, [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) updates the old and new PCB
+states, makes the selected PCB the global current-process reference, and enters
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21). The complete restoration code below
+shows why this last step must be naked: it installs another process's stack and finishes with `RTI`
+instead of returning through a C call frame.
 
 ```c
 __attribute__((naked))
@@ -3474,7 +3664,7 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN BAF ACC 10");
     asm("LOADIN BAF BAF 12");
 
-    // Returns to the restored process context
+    // Restores the saved program counter from the selected process's restored stack and resumes there
     asm("RTI");
 }
 ```
@@ -3482,54 +3672,75 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
 The fixed offsets are why [`activation`](kernel/process/process.header#L40) must remain at its
 defined PCB position. The helper restores `SP` before installing the process boundary, so an
 interrupt cannot compare the still-active kernel stack with the selected process's heap boundary.
-It then restores the remaining activation and leaves kernel code through `RTI`. The table below
-connects the scheduler and dispatcher functions to their state changes and direct calls.
+It then restores `CS`, `DS`, `IN1`, `IN2`, `ACC`, and `BAF` from the selected PCB's activation. At
+this point the selected register context, including its stack pointer, is active, but the saved
+program counter is still at `SP + 1` on that process's own stack. Restoring `SP` therefore makes the
+selected process's saved interrupt frame active again. In the RETI emulator, `RTI` loads `PC` from
+memory at `SP + 1`, increments `SP`, and completes the instruction's normal PC advance. Hardware
+interrupt entry stores one instruction before the interrupted PC, software interrupt entry stores
+the `INT` instruction's PC, and a new process starts with `CS - 1`; the final advance consequently
+resumes an interrupted process at its interrupted instruction, resumes a syscall after `INT`, or
+starts a new process at its first instruction.
 
-| Kernel function | Return value / status | Effects | Calls | Called by |
-| --- | --- | --- | --- | --- |
-| [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71) | Returns only if scheduling finds an empty process list, otherwise leaves through `RTI` | Copies the saved frame into PCB activation and may change `RUNNING` to `READY` | [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Library functions:** [`yield()`](library/schedule/schedule.picoc#L4)<br>**Hardware interrupts:** Timer via [`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L91)<br>**System calls:** selector 15 via [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**Kernel functions:** [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L411), [`start_dma_uart_receive()`](kernel/dma.picoc#L18) |
-|  |  |  |  |  |
-| [`scheduler_next_process(void)`](kernel/scheduler.picoc#L12) | Runnable PCB, or `NULL` when none is runnable | Reads process-list and active-PCB globals | [`first_process()`](kernel/process/process.picoc#L28), [`current_process()`](kernel/process/process.picoc#L62), [`scheduler_can_run()`](kernel/scheduler.picoc#L4) | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`scheduler_can_run()`](kernel/scheduler.picoc#L4) |
-| [`dispatcher_request_reschedule(void)`](kernel/dispatcher.picoc#L10) | Returns no value | Sets [`reschedule_requested`](kernel/dispatcher.picoc#L8) after timer expiry or a terminating signal for the running process | — | **Hardware interrupts:** Timer via [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) and [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**Kernel functions:** [`send_signal_to_process()`](kernel/signal.picoc#L75) |
-| [`dispatcher_reschedule_if_requested(caller_context)`](kernel/dispatcher.picoc#L14) | Returns if no request is pending, or dispatch finds an empty process list | Dispatches from the syscall frame when a deferred request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **System calls:** return through [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143) |
-| [`dispatcher_start_next_process(void)`](kernel/dispatcher.picoc#L55) | Leaves through `RTI` for a runnable PCB, spins while existing PCBs cannot run, returns for an empty list | Schedules, consumes deferred signal actions, and retries when a selected PCB has a pending termination signal | [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`first_process()`](kernel/process/process.picoc#L28), [`prepare_process_termination()`](kernel/signal.picoc#L126), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) | **Kernel functions:** [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`exit_process()`](kernel/process/process.picoc#L451), [`main()`](kernel/kernel.picoc#L31) |
-| [`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43) | Does not return normally | Updates states, clears the reschedule request, and sets the active PCB | [`current_process()`](kernel/process/process.picoc#L62), [`set_current_process()`](kernel/process/process.picoc#L66), [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), [`process_stack_boundary()`](kernel/exception.picoc#L18) | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
-| [`dispatcher_jump_to_process(process, stack_boundary)`](kernel/dispatcher.picoc#L21) | Leaves through `RTI` | Writes the stack boundary to periphery register 10 and restores activation | [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2) | **Kernel functions:** [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
-
-The sequence diagram follows an immediate switch from process A to a runnable process B through
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71),
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), and
-[`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43). The selection loop matters:
-[`prepare_process_termination()`](kernel/signal.picoc#L126) can reject the scheduler’s candidate
-before any registers are restored. Deferred timer requests enter this same path at
-[Section 2.5, Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace).
+The sequence diagram groups all entries without crowding the selection and restoration steps. A
+resumable switch arrives with a timer or syscall frame: immediate userspace timer preemption,
+[`yield()`](library/schedule/schedule.picoc#L4), blocking
+[`sleep()`](library/unistd/blocking.picoc#L9), a waiting
+[`waitpid()`](library/sys/wait/wait.picoc#L14), a blocking or background terminal read, a successful
+DMA load wait, or a deferred timer or termination request consumed at syscall return. Kernel
+startup, normal exit, heap-exhaustion termination, and a userspace CPU exception have no outgoing
+process to resume, so they enter at
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) without saving an activation. In
+either case, [`prepare_process_termination()`](kernel/signal.picoc#L126) can reject the scheduler's
+selected process before any registers are restored.
 
 ```mermaid
 sequenceDiagram
-    participant A as Process A
-    participant I as Interrupt/syscall handler
+    participant C as Switch cause
+    participant A as Outgoing process/frame
     participant D as Dispatcher
     participant S as Scheduler
     participant G as Signal handling
     participant B as Process B
 
-    A->>I: Timer preemption or switching syscall, save interrupt frame
-    I->>D: dispatcher_switch_from_context(frame)
-    D->>D: Save A activation, RUNNING becomes READY
-    D->>D: dispatcher_start_next_process()
+    alt Resumable timer, switching/blocking syscall, or deferred request
+        C->>A: Save interrupt frame on A's stack
+        A->>D: dispatcher_switch_from_context(frame)
+        D->>D: Save frame in A's PCB activation
+        D->>D: Change RUNNING to READY and preserve BLOCKED/STOPPED
+    else Startup or termination has no saved activation
+        C->>D: dispatcher_start_next_process()
+    end
     loop Until a runnable candidate survives signal preparation
         D->>S: scheduler_next_process()
-        S-->>D: Candidate PCB, or NULL
-        opt Candidate exists
-            D->>G: prepare_process_termination(candidate)
+        S-->>D: Selected process's PCB, or NULL
+        opt A process was selected
+            D->>G: prepare_process_termination(process)
             G-->>D: true to run, false after termination handling
         end
     end
     D->>D: dispatcher_switch_to_process(B)
     D->>D: Set active PCB and RUNNING, clear reschedule request
     D->>D: dispatcher_jump_to_process(B, boundary)
-    D-->>B: Restore boundary/registers, RTI to PC on B stack
+    D-->>B: Restore activation and let RTI restore PC from B's stack
 ```
+
+## 5.5 Dispatcher function reference
+[\[↑ TOC\]](#contents)
+
+The preceding save and restore subsections show the two assembly-sensitive functions in full. This
+separate table covers every function implemented in
+[`kernel/dispatcher.picoc`](kernel/dispatcher.picoc) and states how each one contributes to
+rescheduling, process selection, context preservation, or execution transfer.
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71) | Returns only if the process list becomes empty; otherwise the dispatch path leaves through `RTI` | Copies `caller_context` into the current PCB's activation and changes only `RUNNING` to `READY` | [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Library functions:** [`yield()`](library/schedule/schedule.picoc#L4), blocking [`sleep()`](library/unistd/blocking.picoc#L9), waiting [`waitpid()`](library/sys/wait/wait.picoc#L14), blocking terminal [`read()`](library/unistd/io.picoc#L6), and DMA-backed [`load()`](library/unistd/process.picoc#L17), all through syscalls<br>**Hardware interrupts:** userspace timer via [`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L91)<br>**Kernel functions:** [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L411), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), and selector 15 in [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`dispatcher_request_reschedule(void)`](kernel/dispatcher.picoc#L10) | Returns no value | Sets [`reschedule_requested`](kernel/dispatcher.picoc#L8) after timer expiry or a terminating signal for the running process | — | **Hardware interrupts:** timer through [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) and [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**Kernel functions:** [`send_signal_to_process()`](kernel/signal.picoc#L75) |
+| [`dispatcher_reschedule_if_requested(caller_context)`](kernel/dispatcher.picoc#L14) | Returns when no request is pending; otherwise returns only if dispatch finds an empty process list | Sends the saved syscall frame into the dispatcher when a deferred request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **System-call return:** every normally returning syscall through [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143) |
+| [`dispatcher_start_next_process(void)`](kernel/dispatcher.picoc#L55) | Leaves through `RTI` for a runnable process, waits while existing processes cannot run, or returns for an empty process list | Repeatedly requests a scheduler choice, consumes deferred termination for a selected process, and starts dispatch | [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`first_process()`](kernel/process/process.picoc#L28), [`prepare_process_termination()`](kernel/signal.picoc#L126), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) | **Kernel functions:** [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`exit_process()`](kernel/process/process.picoc#L451), [`main()`](kernel/kernel.picoc#L31) |
+| [`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43) | Does not return normally | Changes an old `RUNNING` process to `READY`, clears the reschedule request, updates [`active_process`](kernel/process/process.picoc#L18), marks the selected process `RUNNING`, and begins restoration | [`current_process()`](kernel/process/process.picoc#L62), [`set_current_process()`](kernel/process/process.picoc#L66), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
+| [`dispatcher_jump_to_process(process, stack_boundary)`](kernel/dispatcher.picoc#L21) | Leaves through `RTI`; it has no normal C return | Installs the selected process's `SP` and stack boundary, restores the other activation registers, then restores `PC` from the process stack | [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2) | **Kernel functions:** [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
 
 # 6. Blocking, wait queues, signals, and mutexes
 [\[↑ TOC\]](#contents)
@@ -5618,18 +5829,6 @@ the fast runner budgets 60 seconds per shared case. Passing `--direct` to a
 system runner selects `picoc_compiler --direct-source-link`, which compiles
 from PicoC sources instead of reusing staged `.reti_blocks`/`.st` artifacts.
 
-## 14.4 Covered kernel and userspace behavior
-[\[↑ TOC\]](#contents)
-
-The OS scenarios cover process loading and initial arguments, environment
-inheritance, process states, round-robin/timer switches, first-fit process
-memory, wait queues, mutexes, signals and parent-death signals, shared memory,
-descriptor inheritance and duplication, host files/directories, redirection,
-terminal blocking/editing, and process exceptions. Running both normal
-and fast modes can also reveal state left behind between successive scenarios.
-The [fixture directories](test/) hold the concrete scenarios, these tests do
-not establish full POSIX compatibility or real-time deadline guarantees.
-
 # 15. Use in operating-systems and real-time operating-systems lectures
 [\[↑ TOC\]](#contents)
 
@@ -6024,8 +6223,8 @@ retain the removed implementation-specific points.
   [`FILE_DESCRIPTOR_COUNT`](kernel/filesystem/file_descriptor.header#L6), with
   copied descriptor state rather than shared open-file descriptions, as
   described in [Section 7.1, Per-process file-descriptor table](#71-per-process-file-descriptor-table)
-- linked-list round-robin scanning rather than a separate ready queue, as
-  described in [Section 5.1, Round-robin process selection](#51-round-robin-process-selection)
+- cyclic process selection (Lazy Round Robin) rather than ready-queue rotation (Round Robin), as described in
+  [Section 5.1.1, Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
 - non-preemptive kernel execution and deferred rescheduling, as explained in
   [Section 2.6.2, Kernel non-preemption and deferred rescheduling](#262-kernel-non-preemption-and-deferred-rescheduling)
 - fixed/default process heap and stack sizing with no dynamic stack growth, as

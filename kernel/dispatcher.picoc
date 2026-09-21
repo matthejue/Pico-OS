@@ -36,7 +36,7 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("LOADIN BAF ACC 10");
     asm("LOADIN BAF BAF 12");
 
-    // Returns to the restored process context
+    // Restores the saved program counter from the selected process's restored stack and resumes there
     asm("RTI");
 }
 
