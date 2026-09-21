@@ -1,0 +1,6 @@
+#pragma once
+
+#define REBOOT_CMD_RESTART 0
+#define REBOOT_CMD_POWER_OFF 1
+
+int reboot(int command);

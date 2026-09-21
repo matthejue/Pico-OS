@@ -8,7 +8,7 @@ routines, process creation and termination, scheduling and dispatching, wait
 queues, signals, memory allocation, shared memory, file descriptors, and a
 minimal userspace.
 
-The current userspace contains **14 distinct libraries**, including the startup
+The current userspace contains **15 distinct libraries**, including the startup
 library in [`library/`](library/), and **18 user applications** in
 [`user/`](user/), including the [shell](user/shell.picoc). The kernel exposes
 **38 implemented syscalls**, [the syscall overview](#251-system-call-groups)
@@ -408,7 +408,7 @@ lectures follow.
 1. [Userspace libraries](#8-userspace-libraries)
    - [8.1 Library overview and dependencies](#81-library-overview-and-dependencies)
    - [8.2 Process, descriptor, waiting, and scheduling wrappers](#82-process-descriptor-waiting-and-scheduling-wrappers)
-   - [8.3 Signals, process control, shared memory, and mutexes](#83-signals-process-control-shared-memory-and-mutexes)
+   - [8.3 System control, signals, shared memory, and mutexes](#83-system-control-signals-shared-memory-and-mutexes)
    - [8.4 Directory streams and directory creation](#84-directory-streams-and-directory-creation)
    - [8.5 Process heap, environment, strings, and exit](#85-process-heap-environment-strings-and-exit)
    - [8.6 Standard I/O, formatting, and scanning](#86-standard-io-formatting-and-scanning)
@@ -4130,7 +4130,7 @@ although PicoOS implements only the behavior documented here.
 ## 8.1 Library overview and dependencies
 [\[↑ TOC\]](#contents)
 
-The directory table groups all **14 libraries** by their facilities, the directory-stream and
+The directory table groups all **15 libraries** by their facilities, the directory-stream and
 directory-creation row represents two distinct libraries. The repository also contains **12 library
 test classes**, each a top-level PicoC program in [`test`](test/), covering strings, environment,
 allocation, formatting, and scanning. Their standalone execution is described in the
@@ -4145,6 +4145,7 @@ allocation, formatting, and scanning. Their standalone execution is described in
 | [`library/mutex`](library/mutex/) | Atomic test-and-set mutex with wait queue |
 | [`library/signal`](library/signal/) | Signal delivery through [`kill()`](library/signal/signal.picoc#L14) |
 | [`library/sys/prctl`](library/sys/prctl/) | Parent-death signal |
+| [`library/sys/reboot`](library/sys/reboot/) | System restart and power-off through [`reboot()`](library/sys/reboot/reboot.picoc#L5) |
 | [`library/sys/mman`](library/sys/mman/) | Named shared memory |
 | [`library/dirent`](library/dirent/) and [`library/sys/stat`](library/sys/stat/) | Directory streams and creation |
 | [`library/stdlib`](library/stdlib/) | Userspace heap, environment, conversion, and exit |
@@ -4198,15 +4199,16 @@ used by most of these wrappers. It is an implementation helper, not an additiona
 the [`number`](library/unistd/process.picoc#L7) already identifies the real syscall and
 [`argument`](library/unistd/process.picoc#L7) becomes `IN1`.
 
-## 8.3 Signals, process control, shared memory, and mutexes
+## 8.3 System control, signals, shared memory, and mutexes
 [\[↑ TOC\]](#contents)
 
-The table connects signal and shared-memory wrappers to kernel operations. The mutex functions
-combine an atomic userspace instruction with the blocking and wakeup syscalls described under
+The table connects system-control, signal, and shared-memory wrappers to kernel operations. The
+mutex functions combine an atomic userspace instruction with the blocking and wakeup syscalls described under
 [Mutex locking with test-and-set and wait queues](#66-mutex-locking-with-test-and-set-and-wait-queues).
 
 | Library function | Return value / status and purpose | Syscalls |
 | --- | --- | --- |
+| [`reboot(command)`](library/sys/reboot/reboot.picoc#L5) | Does not return for [`REBOOT_CMD_RESTART`](library/sys/reboot/reboot.header#L3) or [`REBOOT_CMD_POWER_OFF`](library/sys/reboot/reboot.header#L4), returns `-1` for any other command | 1 for restart, 0 for power-off, no request |
 | [`kill(pid, signal_number)`](library/signal/signal.picoc#L14) | 0 or `-1`, signal 0 only probes existence | 11, [`KillRequest`](common/syscall.header#L67) |
 | [`prctl(option, argument)`](library/sys/prctl/prctl.picoc#L14) | 0 or `-1`, supports [`PR_SET_PDEATHSIG`](common/prctl.header#L3) | 12, [`PrctlRequest`](common/syscall.header#L72) |
 | [`shm_open(name, size)`](library/sys/mman/mman.picoc#L15) | Existing/new shared-memory ID or `-1` | 19, [`ShmOpenRequest`](common/syscall.header#L79) |
@@ -4224,6 +4226,11 @@ self-directed [`SIGINT`](common/signal.header#L4) or [`SIGKILL`](common/signal.h
 [`pending_termination_signal`](kernel/process/process.header#L63) and can return from the syscall
 before termination is applied. At the next scheduling pass, including a deferred timer request at
 syscall return, the dispatcher consumes that value and does not restore the process again.
+
+[`reboot()`](library/sys/reboot/reboot.picoc#L5) keeps the two system-control selectors behind one
+public interface. It validates the command before calling
+[`invoke_syscall()`](library/unistd/process.picoc#L7); both supported commands transfer control to
+the kernel and do not normally return.
 
 [`struct mutex`](library/mutex/mutex.header#L6) contains a one-cell Boolean and a complete
 [`struct wait_queue`](common/wait_queue.header#L5). It is normal userspace data, not a kernel
@@ -4563,8 +4570,8 @@ initialization or shutdown effects.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`shutdown(void)`](kernel/kernel.picoc#L15) | Does not return | Stops execution in the current instruction, allocated objects remain because the machine stops | — | **System calls:** shutdown selector through [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**CPU exceptions:** via [`handle_cpu_exception()`](kernel/exception.picoc#L70)<br>**Kernel functions:** [`panic_kernel_heap_full()`](kernel/exception.picoc#L89), [`exit_process()`](kernel/process/process.picoc#L451) |
-| [`reboot(void)`](kernel/kernel.picoc#L19) | Does not return | Disables hardware interrupts and stack protection, then jumps to the EPROM bootloader | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System calls:** reboot selector through [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`shutdown(void)`](kernel/kernel.picoc#L15) | Does not return | Stops execution in the current instruction, allocated objects remain because the machine stops | — | **Library functions:** [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) through syscall 0<br>**System calls:** shutdown selector through [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**CPU exceptions:** via [`handle_cpu_exception()`](kernel/exception.picoc#L70)<br>**Kernel functions:** [`panic_kernel_heap_full()`](kernel/exception.picoc#L89), [`exit_process()`](kernel/process/process.picoc#L451) |
+| [`reboot(void)`](kernel/kernel.picoc#L19) | Does not return | Disables hardware interrupts and stack protection, then jumps to the EPROM bootloader | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Library functions:** [`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5) through syscall 1<br>**System calls:** reboot selector through [`handle_syscall()`](kernel/syscall.picoc#L16) |
 |  |  |  |  |  |
 | [`main(void)`](kernel/kernel.picoc#L31) | Returns `0` only if dispatch does not take control | Initializes kernel heaps, terminal, process table, shared-memory list, DMA, and interrupt registers, loads and makes PID 1 ready | [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), [`initialize_process_table()`](kernel/process/process.picoc#L21), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9), [`initialize_shared_memory()`](kernel/shared_memory.picoc#L9), [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`load_process()`](kernel/process/process_loader.picoc#L305), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Bootloader functions:** [`start_loaded_kernel()`](boot/bootloader.picoc#L21) |
 
@@ -4721,9 +4728,11 @@ otherwise uses the same public libraries and syscalls as every other process.
 Init blocks on [`waitpid()`](library/sys/wait/wait.picoc#L14) for
 [`shell_pid`](system/init.picoc#L101), not on an arbitrary child notification. Entering the shell
 built-in `exit` therefore ends one shell process, init collects it and loads a new shell.
-[`poweroff.bin`](user/poweroff.picoc#L12) invokes the kernel shutdown syscall and halts PicoOS,
-while [`reboot.bin`](user/reboot.picoc#L12) asks the kernel to disable active hardware state and
-jump back to the EPROM bootloader. Since [`waitpid()`](library/sys/wait/wait.picoc#L14) also reports
+[`poweroff.bin`](user/poweroff.picoc#L12) calls
+[`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) to halt PicoOS, while
+[`reboot.bin`](user/reboot.picoc#L12) calls
+[`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5) to disable active hardware state
+and jump back to the EPROM bootloader. Since [`waitpid()`](library/sys/wait/wait.picoc#L14) also reports
 a stopped child, explicitly stopping the shell itself can make init begin a new session, normal
 foreground job control targets the shell's children instead.
 
@@ -5072,7 +5081,7 @@ reporting.
 
 The table lists all 18 programs, links each source at its entry point, and
 identifies the main library calls behind its behavior. These calls come from
-the [14 libraries](#81-library-overview-and-dependencies), which expose the
+the [15 libraries](#81-library-overview-and-dependencies), which expose the
 [38 kernel syscalls](#251-system-call-groups) where a kernel service is needed.
 Shared command helpers are explained below the table.
 
@@ -5093,8 +5102,8 @@ Shared command helpers are explained below the table.
 | [`rm.bin`](user/rm.picoc#L11) | Removes every supplied file and continues after errors | [`unlink()`](library/unistd/file_removal.picoc#L4) |
 | [`rmdir.bin`](user/rmdir.picoc#L11) | Removes every supplied empty directory and continues after errors | [`rmdir()`](library/unistd/file_removal.picoc#L8) |
 | [`kill.bin`](user/kill.picoc#L69) | Sends [`SIGKILL`](common/signal.header#L5) by default, a named/numbered signal, or signal 0 as a PID probe | [`kill()`](library/signal/signal.picoc#L14), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
-| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | [`invoke_syscall()`](library/unistd/process.picoc#L7) with shutdown selector 0 |
-| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | [`invoke_syscall()`](library/unistd/process.picoc#L7) with reboot selector 1 |
+| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) |
+| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | [`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5) |
 | [`uname.bin`](user/uname.picoc#L15) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54) |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
@@ -5153,9 +5162,11 @@ operands after an individual error.
 [`SIGTTIN`](common/signal.header#L9) by name without a leading `-`, or by number. Signal 0 checks
 existence without delivery. It yields after success so the target can be
 selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1427): the former
-invokes syscall 0 and halts the OS, whereas the latter lets init start a new
-shell. [`reboot.bin`](user/reboot.picoc) invokes syscall 1, which performs a full bootloader and
-kernel startup without ending the emulator process.
+uses [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5), which invokes syscall 0
+and halts the OS, whereas the latter lets init start a new shell.
+[`reboot.bin`](user/reboot.picoc) uses
+[`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5), which invokes syscall 1 and
+performs a full bootloader and kernel startup without ending the emulator process.
 [`uname.bin`](user/uname.picoc) prints `PicoOS-` followed by the release version installed from
 [`config/os-release.txt`](config/os-release.txt).
 

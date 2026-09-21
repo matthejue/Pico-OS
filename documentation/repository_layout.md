@@ -16,7 +16,7 @@ and its test and documentation material.
 | [`config/`](../config/) | Build, run, test, emulator, environment, and release-version configuration files. [`config/config.header`](../config/config.header) contains PicoOS-wide compile-time configuration. |
 | [`interrupt_service_routines/`](../interrupt_service_routines/) | Interrupt-vector-table and operating-system interrupt-service-routine sources. |
 | [`kernel/`](../kernel/) | Kernel source and headers: startup, dispatching, scheduling, processes, memory, system calls, interrupts, devices, and host filesystem support. Its [`filesystem/`](../kernel/filesystem/) and [`process/`](../kernel/process/) subdirectories group those subsystems. |
-| [`library/`](../library/) | Userspace PicoC libraries. Each subdirectory implements a library area such as standard I/O, strings, process and file operations, allocation, signals, mutexes, and startup code. |
+| [`library/`](../library/) | Userspace PicoC libraries. Each subdirectory implements a library area such as standard I/O, strings, process, system-control and file operations, allocation, signals, mutexes, and startup code. |
 | [`system/`](../system/) | Privileged system userspace programs. [`init.picoc`](../system/init.picoc) is the first process started by the kernel, [`fast_os_test_launcher.picoc`](../system/fast_os_test_launcher.picoc) is built only for the fast test workflow. |
 | [`user/`](../user/) | Normal userspace command sources, including the shell and commands such as `cat`, `ls`, `mkdir`, and `ps`. |
 | [`test/`](../test/) | Standalone library tests and OS/shell test fixtures. Scenario subdirectories normally contain PicoC programs, `input.txt`, and `expected_output.txt`, [`test/README.md`](../test/README.md) describes the test layout. |

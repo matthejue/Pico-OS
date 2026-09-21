@@ -1,0 +1,13 @@
+#include "reboot.header"
+#include "../../unistd/unistd.header"
+#include "../../../common/syscall.header"
+
+int reboot(int command) {
+    if (command == REBOOT_CMD_RESTART) {
+        return invoke_syscall(SYSCALL_REBOOT, 0);
+    }
+    if (command == REBOOT_CMD_POWER_OFF) {
+        return invoke_syscall(SYSCALL_SHUTDOWN, 0);
+    }
+    return -1;
+}

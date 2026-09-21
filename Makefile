@@ -72,6 +72,9 @@ USER_RUNTIME_DEPENDENCIES := \
 	library/signal/signal.header \
 	library/sys/prctl/prctl.picoc \
 	library/sys/prctl/prctl.header \
+	library/sys/reboot/libreboot.picoc \
+	library/sys/reboot/reboot.picoc \
+	library/sys/reboot/reboot.header \
 	library/sys/stat/stat.picoc \
 	library/sys/stat/stat.header \
 	library/dirent/libdirent.picoc \
