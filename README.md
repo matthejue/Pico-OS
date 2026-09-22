@@ -2729,38 +2729,50 @@ int main(int argc, char **argv) {
 }
 ```
 
-The sequence diagram follows the same operations through the kernel and then continues through
-unlink and process cleanup to show the deferred destruction rule.
+The first sequence follows only creation and mapping. It shows the main idea:
+the kernel keeps one shared-memory entry, while each successful mapping adds a
+process-owned attachment and returns the same data address.
 
 ```mermaid
 sequenceDiagram
     participant A as Process A
-    participant K as Shared-memory entry list
-    participant KH as Kernel heap
-    participant PM as Process-image/shared-memory heap
     participant B as Process B
+    participant K as Shared-memory subsystem
+    participant M as Shared data region
 
-    A->>K: shm_open("shared-value", 1), syscall 19
-    K->>KH: kmalloc entry and copied name
-    K->>PM: pmalloc shared cells
-    K-->>A: Numeric ID
-    A->>K: mmap(id), syscall 20
-    K->>KH: kmalloc attachment linked from A PCB
-    K-->>A: Same absolute address with references = 1
+    A->>K: shm_open("shared-value", 1)
+    K->>M: Create the shared region
+    K-->>A: New numeric ID
+    A->>K: mmap(id)
+    K-->>A: Shared address (one attachment)
     B->>K: shm_open("shared-value", 1)
-    K-->>B: Existing ID
+    K-->>B: The existing ID
     B->>K: mmap(id)
-    K->>KH: kmalloc attachment linked from B PCB
-    K-->>B: Same absolute address with references = 2
-    A->>K: shm_unlink("shared-value"), syscall 21
-    K->>KH: Free name and mark unlink requested
-    Note over K,PM: Entry and cells remain while references exist
-    A->>K: Process removal
-    K->>KH: Free A attachment and leave references = 1
-    B->>K: Process removal
-    K->>KH: Free B attachment and leave references = 0
-    K->>PM: pfree shared cells
-    K->>KH: kfree entry
+    K-->>B: The same address (two attachments)
+    Note over A,B: Both processes access the same cells
+```
+
+The launcher then waits for the worker, so the worker's process removal
+releases one attachment before the launcher unlinks the name. The second
+sequence starts at that cleanup and shows why unlinking does not destroy the
+region while the launcher's attachment still exists.
+
+```mermaid
+sequenceDiagram
+    participant A as Launcher process
+    participant B as Worker process
+    participant K as Shared-memory subsystem
+    participant M as Shared data region
+
+    B->>K: Exit and remove process
+    K->>K: Release B attachment and set count to 1
+    A->>K: shm_unlink("shared-value"), syscall 20
+    K->>K: Remove the name and mark unlink requested
+    Note over K,M: A's attachment keeps the region alive
+    A->>K: Exit and remove process
+    K->>K: Release A attachment and set count to 0
+    K->>M: Free the shared region
+    K->>K: Free the entry
 ```
 
 The function table below identifies which kernel operations implement the lookup, attachment, and
@@ -3093,56 +3105,79 @@ process, as described in
 ### 4.5.1 Executable transfer with polling or DMA
 [\[↑ TOC\]](#contents)
 
-Loading and starting are deliberately separate operations. The sequence below
-follows a successful userspace [`load()`](library/unistd/process.picoc#L17)
-through [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) until
-the kernel returns the new PID. It distinguishes DMA from the 1 KiB fallback,
-and `ESC` is the host-request delimiter. Boot-time loading instead uses the
-continuous transfer in [Section 10.1, Loading the kernel from the EPROM bootloader](#101-loading-the-kernel-from-the-eprom-bootloader).
+Loading and starting are deliberately separate operations. Every successful
+userspace [`load()`](library/unistd/process.picoc#L17) first reads and validates
+the binary header, reserves the complete process image, and stores the partial
+load in the caller's PCB. The following sequence shows only that common setup;
+the two payload-transfer modes are shown separately afterward. Boot-time
+loading instead uses the continuous transfer in
+[Section 10.1, Loading the kernel from the EPROM bootloader](#101-loading-the-kernel-from-the-eprom-bootloader).
 
 ```mermaid
 sequenceDiagram
-    participant C as Calling process
+    participant C as load() wrapper
     participant K as Kernel loader
-    participant H as UART host service
-    participant M as Process-image/shared-memory heap
-    participant D as DMA / dispatcher
-    participant P as Process list
+    participant H as RETI-Emulator host service
+    participant M as Process-image memory
 
-    C->>K: load(path): begin executable load
-    K->>H: ESC file-size path ESC /
-    H-->>K: File byte count
-    K->>H: ESC read-range 0 20 path ESC /
-    H-->>K: Byte count + five header words
-    K->>K: Resolve heap/stack defaults
-    K->>M: pmalloc(complete image, heap, and stack region)
-    K->>K: Save pending_load in caller PCB
-    alt DMA enabled
-        K->>H: Request entire encoded payload at byte offset 20
-        H-->>K: Payload byte count
-        K->>D: Queue caller, start DMA, save activation, dispatch
-        H-->>D: Payload bytes through UART
-        D->>M: Copy encoded words into reserved image
-        D->>D: Completion ISR wakes caller
-        D-->>C: Resume later with internal continue result
-        C->>K: Continue executable load and check DMA completion
-    else Polling fallback
-        K-->>C: Internal continue result after setup
-        loop Until all encoded words have arrived
-            C->>K: Continue executable load
-            K->>H: Request next payload range, at most 1 KiB
-            H-->>K: Byte count + payload bytes
-            K->>M: Copy chunk at base_address + progress
-            opt More payload remains
-                K-->>C: Internal continue result
-            end
-        end
-    end
-    K->>P: create_process allocates PCB, paths, descriptors and appends NEW
-    K-->>C: Return new PID
+    C->>K: Begin load(path)
+    K->>H: Request file size and five-word header
+    H-->>K: Size and header
+    K->>K: Validate layout and resolve heap/stack defaults
+    K->>M: Reserve the complete process image
+    K->>K: Save pending_load in the caller's PCB
 ```
 
-The diagram ends with a complete image and a PCB whose state is
+Without DMA, [`load()`](library/unistd/process.picoc#L17) re-enters the kernel
+for each bounded payload chunk. The next sequence shows how those short
+syscalls fill the reserved image and eventually create the PCB.
+
+```mermaid
+sequenceDiagram
+    participant C as load() wrapper
+    participant K as Kernel loader
+    participant H as RETI-Emulator host service
+    participant M as Reserved process image
+
+    loop While more than one chunk remains
+        C->>K: Continue load
+        K->>H: Request the next range, at most 1 KiB
+        H-->>K: Payload bytes
+        K->>M: Copy the chunk and update progress
+        K-->>C: Return continue status
+    end
+    C->>K: Continue load for the final chunk
+    K->>H: Request the final range
+    H-->>K: Final payload bytes
+    K->>M: Copy the final chunk
+    K->>K: Create the NEW process
+    K-->>C: Return the new PID
+```
+
+With DMA, the loader requests the whole payload once and blocks the caller
+while the device copies it. The completion interrupt wakes the caller, whose
+next continuation syscall verifies the transfer and creates the PCB.
+
+```mermaid
+sequenceDiagram
+    participant C as load() wrapper
+    participant K as Kernel loader and dispatcher
+    participant H as RETI-Emulator host service
+    participant D as DMA device
+    participant M as Reserved process image
+
+    K->>H: Request the complete payload
+    K->>D: Start transfer, block caller, and dispatch
+    H-->>D: Send payload through UART
+    D->>M: Copy words directly into the image
+    D->>K: Raise the completion interrupt
+    K-->>C: Wake and later resume with continue status
+    C->>K: Continue load
+    K->>K: Verify completion and create the NEW process
+    K-->>C: Return the new PID
+```
+
+Both transfer modes end with a complete image and a PCB whose state is
 [`NEW`](kernel/process/process.header#L12).
 [Section 4.5.2, Changing a completed image from `NEW` to `READY`](#452-changing-a-completed-image-from-new-to-ready) continues
 from the returned PID with the separate run setup.
@@ -3725,47 +3760,47 @@ the `INT` instruction's PC, and a new process starts with `CS - 1`; the final ad
 resumes an interrupted process at its interrupted instruction, resumes a syscall after `INT`, or
 starts a new process at its first instruction.
 
-The sequence diagram groups all entries without crowding the selection and restoration steps. A
-resumable switch arrives with a timer or syscall frame: immediate userspace timer preemption,
-[`yield()`](library/schedule/schedule.picoc#L4), blocking
-[`sleep()`](library/unistd/blocking.picoc#L9), a waiting
-[`waitpid()`](library/sys/wait/wait.picoc#L14), a blocking or background terminal read, a successful
-DMA load wait, or a deferred timer or termination request consumed at syscall return. Kernel
-startup, normal exit, heap-exhaustion termination, and a userspace CPU exception have no outgoing
-process to resume, so they enter at
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) without saving an activation. In
-either case, [`prepare_process_termination()`](kernel/signal.picoc#L126) can reject the scheduler's
-selected process before any registers are restored.
+A resumable switch arrives with a timer or syscall frame: immediate userspace
+timer preemption, [`yield()`](library/schedule/schedule.picoc#L4), a blocking
+operation, a DMA load wait, or a deferred request consumed at syscall return.
+The following sequence shows this common context-switch case. Its main point is
+that the dispatcher saves one activation before selecting and restoring the
+next one.
 
 ```mermaid
 sequenceDiagram
-    participant C as Switch cause
-    participant A as Outgoing process/frame
+    participant A as Outgoing process
     participant D as Dispatcher
     participant S as Scheduler
-    participant G as Signal handling
-    participant B as Process B
+    participant B as Selected process
 
-    alt Resumable timer, switching/blocking syscall, or deferred request
-        C->>A: Save interrupt frame on A's stack
-        A->>D: dispatcher_switch_from_context(frame)
-        D->>D: Save frame in A's PCB activation
-        D->>D: Change RUNNING to READY and preserve BLOCKED/STOPPED
-    else Startup or termination has no saved activation
-        C->>D: dispatcher_start_next_process()
-    end
-    loop Until a runnable candidate survives signal preparation
-        D->>S: scheduler_next_process()
-        S-->>D: Selected process's PCB, or NULL
-        opt A process was selected
-            D->>G: prepare_process_termination(process)
-            G-->>D: true to run, false after termination handling
-        end
-    end
-    D->>D: dispatcher_switch_to_process(B)
-    D->>D: Set active PCB and RUNNING, clear reschedule request
-    D->>D: dispatcher_jump_to_process(B, boundary)
-    D-->>B: Restore activation and let RTI restore PC from B's stack
+    A->>D: Switch with a saved interrupt frame
+    D->>D: Copy the frame into A's PCB activation
+    D->>S: Select the next runnable process
+    S-->>D: B's PCB
+    D->>D: Make B current and mark it RUNNING
+    D-->>B: Restore B's activation and resume through RTI
+```
+
+Kernel startup and termination are different because there is no outgoing
+activation to preserve. Their shorter path begins directly with
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), as the next
+sequence shows. In both paths,
+[`prepare_process_termination()`](kernel/signal.picoc#L126) may reject a
+scheduler candidate and make the dispatcher select another one before restore.
+
+```mermaid
+sequenceDiagram
+    participant C as Startup or termination path
+    participant D as Dispatcher
+    participant S as Scheduler
+    participant B as Selected process
+
+    C->>D: Start the next process without saving context
+    D->>S: Select a runnable process
+    S-->>D: B's PCB
+    D->>D: Make B current and mark it RUNNING
+    D-->>B: Restore B's activation and resume through RTI
 ```
 
 ## 5.5 Dispatcher function reference
@@ -3977,43 +4012,52 @@ but records that the wait has ended, as described in
 [Section 6.1.1, Blocking with `sleep` and Waking with `wakeup`](#611-blocking-with-sleep-and-waking-with-wakeup). Once the
 parent is ready, the scheduler can select it. It resumes its suspended
 [`waitpid()`](library/sys/wait/wait.picoc#L14) call and returns its updated local
-[`status`](library/sys/wait/wait.picoc#L15) value. The sequence below shows both
-the immediate and blocked cases and identifies where each saved value resides.
+[`status`](library/sys/wait/wait.picoc#L15) value.
+
+The immediate cases do not put the parent on a wait queue. The following
+sequence shows the kernel either collecting an existing zombie or reporting an
+already stopped child before returning directly.
 
 ```mermaid
 sequenceDiagram
-    participant W as Waiting parent W
-    participant WS as W waitpid stack frame
-    participant WP as W PCB
+    participant W as Parent
     participant K as Kernel wait handling
-    participant TP as Target child T PCB
-    participant TQ as T.waiters queue
+    participant T as Target child
 
-    Note over WS: request.status points to local status
     W->>K: waitpid(T), syscall 7
-    K->>TP: Verify T exists and T.parent_pid equals W.pid
+    K->>T: Check state and parent PID
     alt T is already ZOMBIE
-        K->>WS: Copy T.exit_status
-        K->>TP: remove_process(T)
-        K-->>W: Return immediately
+        K->>T: Read exit status and remove T
+        K-->>W: Return the exit status
     else T is STOPPED
-        K->>WS: Store stopped status
-        K-->>W: Return immediately
-    else T is NEW, READY, RUNNING, or BLOCKED
-        K->>WP: waiting_status_ptr = request.status
-        K->>TQ: Enqueue W on T.waiters
-        K->>WP: W becomes BLOCKED and its activation is saved
-        Note over K,TP: Later T stops or terminates
-        K->>TQ: Find W through T.waiters
-        K->>WS: Write status through W.waiting_status_ptr
-        K->>WP: Clear waiting_status_ptr
-        K->>TQ: Wake and unlink W
-        K->>WP: W becomes READY, or stays STOPPED with wait satisfied
-        opt T terminated and its parent collected the status
-            K->>TP: remove_process(T)
-        end
-        WP-->>W: Dispatcher eventually resumes waitpid
+        K->>T: Read the stop signal
+        K-->>W: Return the stopped status
     end
+```
+
+An active child requires a later event to finish the call. The second sequence
+shows the essential asynchronous flow: the kernel retains a pointer to the
+parent's stack-local status, blocks the parent on the child's queue, and writes
+the result before recording that the wait has completed. An ordinary blocked
+parent becomes ready immediately; a stopped parent can resume after
+[`SIGCONT`](common/signal.header#L6).
+
+```mermaid
+sequenceDiagram
+    participant W as Waiting parent
+    participant K as Kernel wait handling
+    participant T as Active child
+
+    W->>K: waitpid(T), syscall 7
+    K->>W: Save status pointer in PCB and mark BLOCKED
+    K->>T: Enqueue W on T.waiters
+    Note over W,K: W's suspended stack keeps status alive
+    T->>K: Stop or terminate later
+    K->>W: Write status, unlink waiter, and record completion
+    opt T terminated while W was waiting
+        K->>T: Remove the collected child
+    end
+    K-->>W: Dispatcher later resumes waitpid
 ```
 
 The local status variable remains valid because the parent's userspace stack
@@ -5524,45 +5568,21 @@ int main(void) {
 ```
 
 The helper [`read_environment()`](system/init.picoc#L19) is explained under
-[Section 11.2, Initial environment configuration](#112-initial-environment-configuration). The sequence below connects the startup loop to
-kernel loading: [`load_process()`](kernel/process/process_loader.picoc#L305) loads init during boot,
-whereas the userspace [`load()`](library/unistd/process.picoc#L17) wrapper invokes
-[`load_process_chunk()`](kernel/process/process_loader.picoc#L292) for each shell. The latter uses
-bounded UART ranges, or DMA when enabled, as described under
+[Section 11.2, Initial environment configuration](#112-initial-environment-configuration).
+The complete code above expresses init's policy directly: after configuration,
+each loop iteration loads one shell, makes it ready, and waits for that exact
+child before starting another session. The userspace
+[`load()`](library/unistd/process.picoc#L17) wrapper invokes
+[`load_process_chunk()`](kernel/process/process_loader.picoc#L292); its separate
+polling and DMA flows are shown in
 [Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
 
-```mermaid
-sequenceDiagram
-    participant K as Kernel
-    participant Init as PID 1 / init
-    participant F as Kernel file/process services
-    participant H as RETI-Emulator host service
-    participant S as Shell child
-
-    K->>F: load_process("system/init.bin", loading_bar_enabled)
-    F->>H: ESC load /system/init.bin ESC /
-    H-->>F: Header and encoded init program
-    F->>F: Create PID 1 with working directory /
-    K->>Init: Build initial stack, make READY, and dispatch
-    Init->>F: open/read ./config/environment.txt
-    F->>H: ESC file-size path ESC / and ESC read-range ... ESC /
-    H-->>F: Environment file contents
-    F-->>Init: Return data through read wrapper
-    Init->>Init: Parse NAME=value entries with setenv()
-    loop One shell session after another
-        Init->>F: load("./user/shell.bin")
-        F->>H: file-size and read-range for five-word header
-        loop Image transfer via chunked reads or DMA completion
-            F->>H: read-range for image bytes
-            H-->>F: Shell image data
-        end
-        F-->>Init: NEW child PID
-        Init->>F: run(pid, NULL, NULL)
-        F->>S: Copy environment/descriptors and make READY
-        Init->>F: waitpid(pid)
-        F-->>Init: Resume when that shell exits or stops
-    end
-```
+Kernel boot uses the distinct [`load_process()`](kernel/process/process_loader.picoc#L305)
+operation to load init before any userspace process exists. That continuous
+boot-time transfer and the later init session loop are separate flows, so they
+are documented in
+[Section 10.3, Loading init and entering normal execution](#103-loading-init-and-entering-normal-execution)
+and by the source above instead of being combined into one sequence diagram.
 
 The kernel creates init's PCB before any current process exists. Therefore
 [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) resolves the relative
@@ -5709,48 +5729,55 @@ another name is searched through colon-separated `PATH` entries.
 
 The configured `PATH=/user` uses the PicoOS root, so commands remain discoverable after `cd`
 and from nested shells. A relative entry supplied by the user is resolved from the shell's current
-[`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths. The
-sequence below follows a successful command without a pipeline through
-[`eval()`](user/shell.picoc#L1400), [`load_from_path()`](user/shell.picoc#L1206), and
-[`run_process()`](user/shell.picoc#L1054). It shows that redirection changes the shell’s descriptors
-before [`run()`](library/unistd/process.picoc#L31), so the child inherits those values.
+[`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths.
+
+Built-ins execute directly in the shell and are listed in
+[Section 12.5, Shell built-in commands](#125-shell-built-in-commands). The
+following sequence instead shows one successful foreground external command
+through [`eval()`](user/shell.picoc#L1224),
+[`load_from_path()`](user/shell.picoc#L1186), and
+[`run_process()`](user/shell.picoc#L1034). Image transfer is one overview step
+here because
+[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
+documents its two flows.
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant M as Shell main loop
-    participant E as eval and parsing helpers
-    participant K as PicoOS kernel
-    participant H as RETI-Emulator host services
+    participant S as Shell
+    participant K as Kernel
     participant C as Child process
 
-    U->>M: Type bytes and Enter
-    M->>M: read_line edits and terminates, remember_shell_command stores history
-    M->>E: eval(command)
-    E->>E: Validate quotes and select built-in or external path
-    alt shell built-in
-        E->>E: Call the required library function in this shell process
-    else external command
-        E->>E: Parse background and redirection markers, name, and arguments
-        E->>K: load(direct path or PATH candidate)
-        K->>H: file-size and read-range, chunked or DMA image transfer
-        H-->>K: Program image or failure
-        K-->>E: NEW child PID
-        E->>K: Save/redirect standard descriptors, if requested
-        E->>E: Expand argument variables
-        E->>K: run(pid, arguments, current environment)
-        K->>C: Copy initial stack/descriptors and make READY
-        E->>K: Restore shell standard descriptors
-        alt foreground
-            E->>K: set_foreground_process(pid)
-            E->>K: waitpid(pid)
-            K-->>E: Exit or stopped status
-            E->>K: set_foreground_process(0)
-            E->>E: Store status in $?
-        else background
-            E->>E: Store PID in $!
-        end
-    end
+    U->>S: Submit command
+    S->>S: Validate and parse command
+    S->>K: Load executable
+    K-->>S: NEW child PID
+    S->>K: Apply redirection and run child
+    K->>C: Copy startup state and mark READY
+    S->>K: Restore descriptors, give child input, and wait
+    C->>K: Exit or stop
+    K-->>S: Resume with child status
+    S->>K: Restore shell input ownership
+    S->>S: Store status in $?
+```
+
+A background external command shares the load and run preparation but does not
+transfer terminal ownership or call [`waitpid()`](library/sys/wait/wait.picoc#L14).
+The next sequence begins after loading has returned the new PID and shows the
+shorter handoff that lets the shell accept another command.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Shell
+    participant K as Kernel
+    participant C as Background child
+
+    S->>K: run(pid, arguments, environment)
+    K->>C: Copy startup state and mark READY
+    K-->>S: Child started
+    S->>S: Restore descriptors and store PID in $!
+    S-->>U: Display the next prompt
 ```
 
 Argument handling is intentionally small. The kernel splits the final string on unquoted spaces and
