@@ -804,7 +804,7 @@ same startup path as every other system or user application.
 | EPROM bootloader | Its explicitly defined naked [`_start()`](boot/bootloader.picoc#L9), compiled as part of the bootloader without `-C` | [`boot_main()`](boot/bootloader.picoc#L41) |
 | SRAM kernel | Compiler-generated default `_start`, because the kernel is linked without `-C` | [`main()`](kernel/kernel.picoc#L31) |
 | Init process | [`libstart` `_start()`](library/start/start.picoc#L14), selected with `-C library/start/libstart.picoc` | [`main()`](system/init.picoc#L100) |
-| Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1631) |
+| Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1637) |
 | Other system and user applications | [`libstart` `_start()`](library/start/start.picoc#L14), selected by the common userspace link rule | The application's `main` |
 
 ### 1.1.5 Program sections, interrupt-vector entries, and linker placement
@@ -2899,7 +2899,7 @@ struct Process {
 | [`state`](kernel/process/process.header#L33) | [`NEW`](kernel/process/process.header#L12), [`READY`](kernel/process/process.header#L13), [`RUNNING`](kernel/process/process.header#L14), [`BLOCKED`](kernel/process/process.header#L15), [`STOPPED`](kernel/process/process.header#L16), or [`ZOMBIE`](kernel/process/process.header#L17) | First initialized by [`create_process()`](kernel/process/process.picoc#L89), changed by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), queue helpers, [`stop_process()`](kernel/signal.picoc#L37), [`continue_process()`](kernel/signal.picoc#L50), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), and [`terminate_process()`](kernel/process/process.picoc#L304) |
 | [`base_address`](kernel/process/process.header#L34), [`size`](kernel/process/process.header#L35) | Absolute start and total cell count of the [`pmalloc()`](kernel/pmalloc.picoc#L20) process image | First initialized by [`create_process()`](kernel/process/process.picoc#L89), released by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`heap_start`](kernel/process/process.header#L36), [`heap_size`](kernel/process/process.header#L37) | Process-relative userspace heap start and cell count from the binary header/defaults | First initialized by [`create_process()`](kernel/process/process.picoc#L89), read by [`process_heap_start()`](kernel/process/process.picoc#L439), [`process_heap_size()`](kernel/process/process.picoc#L445), and [`process_stack_boundary()`](kernel/exception.picoc#L18) |
-| [`binary_path`](kernel/process/process.header#L38) | PCB-owned executable path, also copied to [`argv[0]`](kernel/process/process_arguments.picoc#L140) | First initialized by [`create_process()`](kernel/process/process.picoc#L89), copied by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), printed by [`list_processes()`](kernel/process/process.picoc#L32), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`binary_path`](kernel/process/process.header#L38) | PCB-owned executable path without the leading `/`; it exists while the process is [`NEW`](kernel/process/process.header#L12), supplies the later [`argv[0]`](kernel/process/process_arguments.picoc#L184) copy, and remains the kernel's stable name for process listings | First initialized by [`create_process()`](kernel/process/process.picoc#L89), copied by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), printed by [`list_processes()`](kernel/process/process.picoc#L32), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`working_directory`](kernel/process/process.header#L39) | PCB-owned absolute PicoOS path, copied from the parent or initialized to `/` for PID 1 | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through copying, read by [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), replaced by [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context needed later by the dispatcher, [Section 5.2, Saved process activation](#52-saved-process-activation) explains its fields | First initialized by [`create_process()`](kernel/process/process.picoc#L89), later maintained by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183), and [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`file_descriptors`](kernel/process/process.header#L42) | Kernel-heap descriptor table and entry array owned by this PCB | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), inherited by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), destroyed by [`remove_process()`](kernel/process/process.picoc#L209) |
@@ -2917,6 +2917,17 @@ struct Process {
 The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers,
 there is no address translation or protection between processes.
+
+Three resource fields are explained where their behavior is used. The
+[`working_directory`](kernel/process/process.header#L39) lifecycle and relative-path resolution are
+in [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations),
+and the [`file_descriptors`](kernel/process/process.header#L42) ownership model is in
+[Section 7.1, Per-process file-descriptor table](#71-per-process-file-descriptor-table).
+[Section 4.3.2, Initial `argc`, `argv`, and `envp`](#432-initial-argc-argv-and-envp)
+explains the process-image copy used for `argv[0]`. The separate
+[`binary_path`](kernel/process/process.header#L38) is required before that copy exists and remains
+available to [`list_processes()`](kernel/process/process.picoc#L32) even if userspace later changes
+`argv[0]`; it is therefore neither an alias of `argv[0]` nor redundant storage.
 
 ## 4.3 Process image and initial userspace stack
 [\[↑ TOC\]](#contents)
@@ -2991,16 +3002,16 @@ directly into the high end of its image:
 | --- | --- |
 | 1 | Entry PC used by the first `RTI` |
 | 2 | [`argc`](kernel/process/process_arguments.picoc#L131) |
-| 3 | [`argv[]`](kernel/process/process_arguments.picoc#L140) pointers and terminating `NULL` |
+| 3 | [`argv[]`](kernel/process/process_arguments.picoc#L173) pointers and terminating `NULL` |
 | 4 | [`envp[]`](kernel/process/process_arguments.picoc#L141) pointers and terminating `NULL` |
 | 5 | Copied binary path, arguments, and environment strings |
 
-All pointers in the tables are absolute SRAM addresses. [`argv[0]`](kernel/process/process_arguments.picoc#L140) points to a
+All pointers in the tables are absolute SRAM addresses. [`argv[0]`](kernel/process/process_arguments.picoc#L184) points to a
 copy of [`binary_path`](kernel/process/process.header#L38), the supplied argument string supplies later entries,
 [`envp`](kernel/process/process_arguments.picoc#L141) begins immediately after [`argv[argc] == NULL`](kernel/process/process_arguments.picoc#L180). The entry cell contains
 [`activation.cs`](kernel/process/process.header#L27) - 1 because the first `RTI` advances to the real entry. The
 saved `SP` points to the free cell below it, while `BAF` is chosen so naked
-[`_start()`](library/start/start.picoc#L14) observes [`argc`](kernel/process/process_arguments.picoc#L131) and [`argv`](kernel/process/process_arguments.picoc#L140) in normal argument positions.
+[`_start()`](library/start/start.picoc#L14) observes [`argc`](kernel/process/process_arguments.picoc#L131) and [`argv`](kernel/process/process_arguments.picoc#L173) in normal argument positions.
 
 Arguments and the initial environment are process-image data, not persistent
 kernel allocations. Userspace [`libstart`](library/start/libstart.picoc) later clones the environment into
@@ -3192,7 +3203,9 @@ during PCB creation and is covered next in
 [\[↑ TOC\]](#contents)
 
 Parent-child metadata determines who may collect a termination status and what
-happens when either side terminates. The following subsections cover creation
+happens when either side terminates. *Reaping* is PicoOS's final collection of
+a terminated child's saved status followed by removal of its PCB and remaining
+resources. The following subsections cover creation
 of that relationship, status recording, parent collection, and final resource
 release. Detailed wait-queue and signal mechanics are in
 [Section 6, Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes).
@@ -3211,6 +3224,25 @@ of the parent's [`working_directory`](kernel/process/process.header#L39). PID 1
 is created without a current process, so its parent PID is 0 and its working
 directory starts as `/`. [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations)
 explains how that copied path is used and changed.
+
+Creation and [`run()`](library/unistd/process.picoc#L31) initialize child state at different times.
+The table distinguishes copied state from independently created state; there is no general
+`fork()`-style PCB or address-space copy.
+
+| Child state | Source and time | Relationship to parent afterward |
+| --- | --- | --- |
+| [`parent_pid`](kernel/process/process.header#L57) | Parent PID recorded by [`create_process()`](kernel/process/process.picoc#L89) | Identifies the parent until orphaning; not a shared object |
+| [`working_directory`](kernel/process/process.header#L39) | Kernel-heap string copied by [`create_process()`](kernel/process/process.picoc#L89) | Independent copy; a later [`chdir()`](library/unistd/working_directory.picoc#L4) changes only the calling process |
+| [`parent_death_signal`](kernel/process/process.header#L59) | Integer copied by [`create_process()`](kernel/process/process.picoc#L89) | Later [`prctl()`](library/sys/prctl/prctl.picoc#L14) changes only that process and what its future children inherit |
+| [`file_descriptors`](kernel/process/process.header#L42) | Fresh standard table at creation, replaced by a deep copy of the caller's current table when [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) handles [`run()`](library/unistd/process.picoc#L31) | Entry fields, offsets, and path strings are independent; changes after the copy do not propagate |
+| Initial environment | [`run()`](library/unistd/process.picoc#L31) uses the caller's current environment unless an explicit array is supplied; [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) copies the selected strings into the child image | [`libstart`](library/start/libstart.picoc) later copies them into the child's userspace heap |
+| Executable image, [`binary_path`](kernel/process/process.header#L38), PID, activation, queues, signal state, and shared-memory attachment list | Created or initialized for the child rather than inherited | Separate child-owned state; shared-memory attachments are not inherited |
+
+Because the working-directory copy occurs at process creation but descriptor and environment copies
+occur at [`run()`](library/unistd/process.picoc#L31), changes made between
+[`load()`](library/unistd/process.picoc#L17) and [`run()`](library/unistd/process.picoc#L31) affect
+the latter two but not the already copied directory. The complete directory lifecycle and path
+normalization are in [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations).
 
 When a parent terminates,
 [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) changes each
@@ -3294,7 +3326,7 @@ their own reference in
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`find_process_by_pid(pid)`](kernel/process/process.picoc#L162), [`list_processes(void)`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`, list function returns no value | Read/traverse the process list, the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) | **Library functions:** [`list_processes()`](library/unistd/process.picoc#L51)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) (for [`list_processes()`](kernel/process/process.picoc#L32)) |
+| [`find_process_by_pid(pid)`](kernel/process/process.picoc#L162), [`list_processes(void)`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`, list function returns no value | Read/traverse the process list, the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217)<br>**Host requests from `list_processes`:** regular-file descriptor 1 uses `write-at <offset> <path>`, optional append `file-size <path>`, then `write stdout`; a copied terminal-stderr entry uses `write stderr` then `write stdout`; terminal-stdout/null output needs none | **Library functions:** [`list_processes()`](library/unistd/process.picoc#L51)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) (for [`list_processes()`](kernel/process/process.picoc#L32)) |
 | [`terminate_process(process, status)`](kernel/process/process.picoc#L304), [`exit_process(status)`](kernel/process/process.picoc#L451), [`unload_process_by_pid(pid)`](kernel/process/process.picoc#L328) | Termination returns no value, [`exit_process()`](kernel/process/process.picoc#L451) does not return normally, unload returns `true` on removal, `false` for a missing or current PID | Store status, set the PCB state to [`ZOMBIE`](kernel/process/process.header#L17), wake waiters, and remove the PCB when permitted | [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`process_has_waiting_parent()`](kernel/process/process.picoc#L249), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261), [`remove_process()`](kernel/process/process.picoc#L209), [`terminate_process()`](kernel/process/process.picoc#L304), [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`shutdown()`](kernel/kernel.picoc#L15) | **Library functions:** [`unload()`](library/unistd/process.picoc#L47)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) (for [`unload_process_by_pid()`](kernel/process/process.picoc#L328))<br>**CPU exceptions:** via [`handle_cpu_exception()`](kernel/exception.picoc#L70) (for [`exit_process()`](kernel/process/process.picoc#L451)) |
 | [`process_heap_start(void)`](kernel/process/process.picoc#L439), [`process_heap_size(void)`](kernel/process/process.picoc#L445) | Return current process's absolute heap start or heap size | Read current PCB memory fields only | [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`remove_test_processes(void)`](kernel/process/process.picoc#L348) | Returns no value | Removes all PCBs except PID 1, PID 2, and the caller, resets the next PID to 3 only when the caller is PID 2 | [`remove_process()`](kernel/process/process.picoc#L209) | **Library functions:** [`reset_processes()`](library/unistd/process.picoc#L59)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
@@ -3319,10 +3351,10 @@ from the operations that make the represented process eligible for scheduling.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Returns a positive PID on completion, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L49) (-1) while work remains | Starts or advances the caller's load, DMA blocks for the full payload, polling receives at most 1 KiB per continuation, creates a [`NEW`](kernel/process/process.header#L12) PCB on completion | [`current_process()`](kernel/process/process.picoc#L62), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) | **Library functions:** [`load()`](library/unistd/process.picoc#L17)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Returns a positive PID on completion, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L49) (-1) while work remains | Starts or advances the caller's load, DMA blocks for the full payload, polling receives at most 1 KiB per continuation, creates a [`NEW`](kernel/process/process.header#L12) PCB on completion | [`current_process()`](kernel/process/process.picoc#L62), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227)<br>**Host requests:** `file-size <path>`, then one or more `read-range <offset> <count> <path>` requests | **Library functions:** [`load()`](library/unistd/process.picoc#L17)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`mark_process_ready_with_arguments(request)`](kernel/process/process_arguments.picoc#L241) | Returns `true` after run setup, `false` for a missing PID or a PCB that is not [`NEW`](kernel/process/process.header#L12) | Installs inherited descriptors, stores startup data, and changes [`NEW`](kernel/process/process.header#L12) to [`READY`](kernel/process/process.header#L13) | [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`current_process()`](kernel/process/process.picoc#L62), [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115), [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) | **Library functions:** [`run()`](library/unistd/process.picoc#L31)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 |  |  |  |  |  |
-| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | Returns PID, or 0 on failure | Resolves the boot-time path from PicoOS `/`, performs the continuous transfer, and creates a [`NEW`](kernel/process/process.header#L12) PCB | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`create_process()`](kernel/process/process.picoc#L89) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | Returns PID, or 0 on failure | Resolves the boot-time path from PicoOS `/`, performs the continuous transfer, and creates a [`NEW`](kernel/process/process.header#L12) PCB | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`create_process()`](kernel/process/process.picoc#L89)<br>**Host request:** `load <path>` | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 | [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) | Returns no value | Cancels an active DMA load if necessary, clears the caller's pending-load pointer and frees the partial image, copied path, and metadata | [`dma_transfer_status()`](common/dma.picoc#L21), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`pfree()`](kernel/pmalloc.picoc#L47), [`free_process_load()`](kernel/process/process_loader.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`store_process_arguments(process, arguments, environment)`](kernel/process/process_arguments.picoc#L125) | Returns no value | Writes initial stack/tables/strings into the image and sets activation [`sp`](kernel/process/process.header#L25)/[`baf`](kernel/process/process.header#L26) | [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`process_environment_count()`](kernel/process/process_arguments.picoc#L89), [`process_string_cell_count()`](kernel/process/process_arguments.picoc#L103), [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`copy_process_string()`](kernel/process/process_arguments.picoc#L113), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5), [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9) | **Kernel functions:** [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) |
 
@@ -3991,7 +4023,7 @@ remains a [`ZOMBIE`](kernel/process/process.header#L17) with
 in [Section 4.6.3, Parent collection and final removal](#463-parent-collection-and-final-removal).
 Invalid PIDs and non-children produce `-1`. Exact-child waiting matters to
 [`init`](system/init.picoc#L100) and the
-[`shell`](user/shell.picoc#L1631) because a state change in another child must
+[`shell`](user/shell.picoc#L1637) because a state change in another child must
 not complete the wrong wait.
 
 ### 6.1.3 Wait Queue Function Reference
@@ -4032,16 +4064,10 @@ amount of per-process signal state is embedded in each PCB:
 
 The subsystem also has the signed global
 [`foreground_process_target`](kernel/signal.picoc#L12) integer in kernel `.data`. It combines the
-terminal input owner and terminal-generated signal target without storing a PCB pointer. The
-following table defines every representation. Process lookup still validates that the represented
-process exists. This one signed value replaces the previous `foreground_process_id` and
-`terminal_input_process_id` globals.
-
-| Saved [`foreground_process_target`](kernel/signal.picoc#L12) value | Terminal input owner | `Ctrl+C`/`Ctrl+Z` target | When it is saved |
-| ---: | --- | --- | --- |
-| `0` | None registered | None | Static initialization before the [`shell`](user/shell.picoc#L1631) registers itself |
-| Negative process ID `-PID` | Process `PID` | None, the control byte is consumed without delivery | [`set_foreground_process(0)`](kernel/signal.picoc#L148) saves the negative current-process ID when the [`shell`](user/shell.picoc#L1631) takes the terminal |
-| Positive process ID `PID` | Process `PID` | Process `PID` | [`set_foreground_process(pid)`](kernel/signal.picoc#L148) saves the positive child-process ID when that child enters the foreground |
+terminal input owner and terminal-generated signal target without storing a PCB pointer. Its signed
+representation, control-character mappings, and the complete [`SIGTTIN`](common/signal.header#L9)
+pending-read behavior are documented in
+[Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals).
 
 Six signals are implemented. [`SIGINT`](common/signal.header#L4) and [`SIGKILL`](common/signal.header#L5) terminate, [`SIGSTOP`](common/signal.header#L7),
 [`SIGTSTP`](common/signal.header#L8), and [`SIGTTIN`](common/signal.header#L9) stop, and [`SIGCONT`](common/signal.header#L6) resumes a stopped process. Signal
@@ -4083,7 +4109,7 @@ A process that does not own terminal input cannot consume even already buffered
 input. [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135) saves the
 request in its PCB, sends [`SIGTTIN`](common/signal.header#L9), and dispatches
 without inserting it into the terminal wait queue. The
-[`shell`](user/shell.picoc#L1631) must give the process foreground ownership
+[`shell`](user/shell.picoc#L1637) must give the process foreground ownership
 before [`SIGCONT`](common/signal.header#L6) can resume that read.
 [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals)
 explains this terminal-specific state transition and the `fg`/`bg` behavior.
@@ -4130,7 +4156,7 @@ the status through the parent's saved
 and wakes the parent, changing an ordinary blocked parent to
 [`READY`](kernel/process/process.header#L13) so the scheduler can select it. The
 child is then removed immediately. This is the usual foreground `Ctrl-C` case
-because the [`shell`](user/shell.picoc#L1631) is waiting for that child; the
+because the [`shell`](user/shell.picoc#L1637) is waiting for that child; the
 parent later resumes, receives status 130, and restores its own terminal
 ownership.
 
@@ -4284,9 +4310,12 @@ descriptor state to kernel devices and host-backed files.
 ## 7.1 Per-process file-descriptor table
 [\[↑ TOC\]](#contents)
 
-Each PCB owns one table object and one eight-entry array, both allocated with
-[`kmalloc()`](kernel/kmalloc.picoc#L23). The declarations below show the table’s pointer and the
-fields of each entry:
+Each [`Process.file_descriptors`](kernel/process/process.header#L42) points to a
+[`FileDescriptorTable`](kernel/filesystem/file_descriptor.header#L21) wrapper, whose
+[`entries`](kernel/filesystem/file_descriptor.header#L22) pointer owns one fixed
+eight-element [`FileDescriptor`](kernel/filesystem/file_descriptor.header#L14) array. It is an
+array indexed directly by descriptor number, not a linked list. The declarations below show these
+two levels of kernel metadata:
 
 ```c
 struct FileDescriptor {
@@ -4301,25 +4330,89 @@ struct FileDescriptorTable {
 };
 ```
 
-The field table below explains the state stored in each
-[`FileDescriptor`](kernel/filesystem/file_descriptor.header#L14) and the array owned by
-[`FileDescriptorTable.entries`](kernel/filesystem/file_descriptor.header#L22). Valid descriptor
-numbers are 0–7, as defined by
-[`FILE_DESCRIPTOR_COUNT`](kernel/filesystem/file_descriptor.header#L6). A new table initializes 0 as
-read-only stdin, 1 as write-only stdout, and 2 as write-only stderr. All three store the special
-path `/device/terminal.dev`. Entries 3–7 begin free, although closing a standard descriptor allows a
-later open to reuse its number.
+[`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) uses
+[`kmalloc()`](kernel/kmalloc.picoc#L23) once for the wrapper and once for the complete array;
+individual entries are not separately allocated. It calls
+[`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24) for all eight entries,
+then initializes the three standard entries and allocates their path strings separately.
+[`create_process()`](kernel/process/process.picoc#L89) creates this state with every PCB. When a
+process is started by another process, [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99)
+creates another wrapper and array, deep-copies every entry and path, and
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) destroys the
+new process's initial table. PID 1 has no current parent during startup and keeps its initial table.
+[`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L143)
+frees one path; [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115)
+frees all remaining paths, the array, and the wrapper when the PCB is removed. The PCB owns all of
+these kernel-heap allocations.
+
+The wrapper gives the PCB one typed table object that owns the array. It is only partly analogous to
+the [`Heap`](common/heap.header#L11) wrapper explained in
+[Section 3.1, Heap block layout and allocation algorithm](#31-heap-block-layout-and-allocation-algorithm):
+[`Heap.first_block`](common/heap.header#L12) can change while the heap object stays stable, whereas
+[`FileDescriptorTable.entries`](kernel/filesystem/file_descriptor.header#L22) is never replaced or
+resized after construction. The current implementation therefore does not require this extra
+indirection for behavior; it provides a named table object that owns the array. The source records
+no stronger runtime reason for the wrapper.
+
+Valid descriptor numbers are 0–7, as defined by
+[`FILE_DESCRIPTOR_COUNT`](kernel/filesystem/file_descriptor.header#L6). The index table separates
+kernel-defined standard meanings from shell conventions.
+
+| Index | Initial or conventional use | Availability to [`open()`](library/fcntl/fcntl.picoc#L5) |
+| ---: | --- | --- |
+| 0 | [`STDIN_FILENO`](common/file.header#L5), initially terminal input | Reused if closed |
+| 1 | [`STDOUT_FILENO`](common/file.header#L6), initially terminal output | Reused if closed |
+| 2 | [`STDERR_FILENO`](common/file.header#L7), initially terminal error output | Reused if closed |
+| 3 | Free initially; the shell conventionally saves stdin here | Normal free slot, not reserved |
+| 4 | Free initially; shell-test output-save slot | Normal free slot, not reserved |
+| 5 | Free initially; the shell conventionally saves stdout here | Normal free slot, not reserved |
+| 6 | Free initially; the shell conventionally saves stderr here | Normal free slot, not reserved |
+| 7 | Free initially; shell-test error-output-save slot | Normal free slot, not reserved |
+
+[`free_file_descriptor()`](kernel/filesystem/filesystem.picoc#L27) always returns the lowest entry
+whose kind is free. With all three standard descriptors present, a process can therefore open five
+additional files or devices simultaneously. There are eight total slots, so closing standard
+descriptors can increase the number available for ordinary opens; no index is protected from reuse.
+If every entry is occupied, [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) returns
+`-1` without changing the table. The shell constants do not reserve their slots in the kernel, and
+[`dup2()`](library/unistd/io.picoc#L58) deliberately replaces any existing target.
+[Section 12.7, Input/output redirection](#127-inputoutput-redirection) explains how the shell manages those
+conventions.
+
+The field table below shows that a descriptor is not merely a path. Integer kind constants, access
+flags, and the current offset all participate in dispatch.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`FileDescriptor.kind`](kernel/filesystem/file_descriptor.header#L15) | Free, initial stdin/stdout/stderr, or explicitly opened file/device | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), called by [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), read by [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) and [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
-| [`FileDescriptor.flags`](kernel/filesystem/file_descriptor.header#L16) | Access mode plus create/truncate/append flags | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), set by [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), read by [`file_descriptor_can_read()`](kernel/filesystem/file_descriptor.picoc#L131) and [`file_descriptor_can_write()`](kernel/filesystem/file_descriptor.picoc#L137) |
-| [`FileDescriptor.offset`](kernel/filesystem/file_descriptor.header#L17) | Logical regular-file position, regular reads and successful writes advance it | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), changed by [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), and [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268) |
-| [`FileDescriptor.path`](kernel/filesystem/file_descriptor.header#L18) | Kernel-owned absolute path, an exact special path selects a kernel device | First initialized to `NULL` by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), standard paths assigned by [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), copied by [`copy_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L82) and freed by close/destruction |
+| [`FileDescriptor.kind`](kernel/filesystem/file_descriptor.header#L15) | Integer constant, not an enum: [`FILE_DESCRIPTOR_FREE`](kernel/filesystem/file_descriptor.header#L8) = 0, [`FILE_DESCRIPTOR_STDIN`](kernel/filesystem/file_descriptor.header#L9) = 1, [`FILE_DESCRIPTOR_STDOUT`](kernel/filesystem/file_descriptor.header#L10) = 2, [`FILE_DESCRIPTOR_STDERR`](kernel/filesystem/file_descriptor.header#L11) = 3, and [`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L12) = 4. The three standard kinds preserve stream identity; every explicit open, including a device path, uses `FILE_DESCRIPTOR_FILE`. | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), read by [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) and [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
+| [`FileDescriptor.flags`](kernel/filesystem/file_descriptor.header#L16) | Integer bit field containing the read/write mode and create, truncate, or append choices; it decides whether later reads and writes are allowed | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), set by [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), read by [`file_descriptor_can_read()`](kernel/filesystem/file_descriptor.picoc#L131) and [`file_descriptor_can_write()`](kernel/filesystem/file_descriptor.picoc#L137) |
+| [`FileDescriptor.offset`](kernel/filesystem/file_descriptor.header#L17) | Per-entry logical byte position, initialized to 0. Regular reads and successful writes advance it, append writes replace it with the resulting end position, and [`lseek()`](library/unistd/io.picoc#L66) can replace it. | First initialized by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), changed by [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), and [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268) |
+| [`FileDescriptor.path`](kernel/filesystem/file_descriptor.header#L18) | Kernel-owned normalized absolute PicoOS path, or `NULL` for a free entry. Exact terminal/null paths select device behavior before ordinary-file dispatch. | First initialized to `NULL` by [`initialize_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L24), standard paths assigned by [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), copied by [`copy_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L82), and freed by close/destruction |
 | [`FileDescriptorTable.entries`](kernel/filesystem/file_descriptor.header#L22) | Owned eight-entry array of descriptor state | First allocated by [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), copied by [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99), indexed by I/O, and freed by [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L115) |
 
+The case table makes the combined `kind`/`path` dispatch explicit. There is no pipe kind: the shell
+implements its pipeline with an ordinary temporary file.
+
+| Descriptor case | `kind` | `path` | Read/write behavior |
+| --- | --- | --- | --- |
+| Initial standard input | [`FILE_DESCRIPTOR_STDIN`](kernel/filesystem/file_descriptor.header#L9) | `/device/terminal.dev` | Read-only; consumes the global terminal ring and may block |
+| Initial standard output | [`FILE_DESCRIPTOR_STDOUT`](kernel/filesystem/file_descriptor.header#L10) | `/device/terminal.dev` | Write-only; sends ordinary UART output to emulator stdout |
+| Initial standard error | [`FILE_DESCRIPTOR_STDERR`](kernel/filesystem/file_descriptor.header#L11) | `/device/terminal.dev` | Write-only; selects emulator stderr for the bytes, then restores emulator stdout |
+| Opened regular file | [`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L12) | Normalized absolute path | Access flags gate I/O; `read-range` and `write-at` use the saved offset, while `file-size` supports existence checks, append, and `SEEK_END`, and `write` creates or truncates |
+| Explicitly opened terminal device | [`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L12) | `/device/terminal.dev` | Access flags gate I/O; reads use the terminal ring and writes use emulator stdout because the kind is not `FILE_DESCRIPTOR_STDERR` |
+| Explicitly opened null device | [`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L12) | `/device/null.dev` | Reads return 0; writes discard bytes and return the requested count |
+
+[`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) checks flags, then terminal and
+null paths, then requires `FILE` for a regular-file read.
+[`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) similarly checks flags and
+paths, but uses the `STDERR` kind to distinguish terminal error output from terminal stdout. Thus a
+descriptor copied from standard error retains stderr behavior even at another index, while opening
+`/device/terminal.dev` on descriptor 2 does not acquire stderr behavior merely because of that
+number. Unsupported or corrupted combinations that reach neither a device-path branch nor a
+`FILE` regular-file branch return `-1`.
+
 Descriptor inheritance deep-copies the table, entries, and paths. Offsets are copied by value and
-later diverge, PicoOS has no Unix-style shared open-file descriptions. The terminal itself remains a
+later diverge; PicoOS has no Unix-style shared open-file descriptions. The terminal itself remains a
 kernel singleton, only its special path is copied into each applicable descriptor.
 
 [`dup2()`](library/unistd/io.picoc#L58) copies scalar fields and the path into an independent entry.
@@ -4354,14 +4447,39 @@ struct Terminal {
 | [`Terminal.input_count`](kernel/filesystem/terminal.header#L13) | Distinguishes full from empty when indices match | First initialized by [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), read and changed by [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), and [`pop_terminal_byte()`](kernel/filesystem/terminal.picoc#L26) |
 | [`Terminal.input_waiters`](kernel/filesystem/terminal.header#L14) | Generic blocking queue containing the active foreground reader while it waits for input | First initialized by [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135) and [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) queue readers, completion/suspension remove them |
 
+[`main()`](kernel/kernel.picoc#L31) calls [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14)
+once during kernel startup, before the first process is loaded. The object, its 128-cell embedded
+[`input_buffer`](kernel/filesystem/terminal.header#L10), and its embedded queue therefore require no
+heap allocation and live until shutdown or reboot. Descriptors do not contain a terminal pointer;
+their exact `/device/terminal.dev` path makes the descriptor layer call
+[`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22). The queue contains PCB pointers through
+their intrusive [`wait_next`](kernel/process/process.header#L51) links, while the separate
+[`foreground_process_target`](kernel/signal.picoc#L12) identifies the process allowed to consume
+input.
+
 The PicoC compiler does not implement usable `extern` variable declarations, so other kernel files
 cannot declare [`terminal`](kernel/filesystem/terminal.picoc#L12) directly.
 [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22) provides the pointer to the single
-global instance instead. When the ring is full, a new byte discards the oldest. A read copies as
-many available bytes as possible and need not fill the requested count.
+global instance instead. [`input_count`](kernel/filesystem/terminal.header#L13) = 0 means empty and
+`input_count` = [`TERMINAL_INPUT_BUFFER_CAPACITY`](kernel/filesystem/terminal.header#L7) (128) means
+full. In either state, [`input_head`](kernel/filesystem/terminal.header#L11) can equal
+[`input_tail`](kernel/filesystem/terminal.header#L12), so the count is what distinguishes them and
+also avoids sacrificing one array element. Head and tail advance modulo 128. When full,
+[`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49)
+advances the head and decrements the count first, discarding the oldest byte, then writes the new
+byte at the tail; the ring remains full. A read copies as many available bytes as possible and need
+not fill the requested count.
 
 Callers retrieve this pointer once and pass it to terminal helpers. This avoids extra
 [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22) calls when one helper invokes another.
+
+There is one insertion path in PicoOS. The RETI emulator delivers an interactive, scripted, or test
+input byte through the UART receive register and raises the UART hardware interrupt;
+[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L195) enters
+[`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214), which reads the low eight bits,
+acknowledges the device, handles terminal signal characters, and otherwise calls
+[`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49). That helper updates tail and count,
+and the handler then tries to complete the pending read owned by the selected input process.
 
 The descriptor layer reaches this object through the virtual device paths described below. They skip
 host-file requests, unlike ordinary paths.
@@ -4381,6 +4499,18 @@ later UART ISR resolves the current input owner, copies bytes into that process'
 the result in [`process->activation.in2`](kernel/process/process.header#L23), clears its pending
 state, and wakes it.
 
+The saved [`pending_terminal_read_buffer`](kernel/process/process.header#L65) is the absolute pointer
+to the caller's actual userspace destination, not a kernel copy; the process image and stack remain
+allocated while the PCB is blocked. [`pending_terminal_read_count`](kernel/process/process.header#L66)
+stores the requested capacity, and [`waiting_queue_ptr`](kernel/process/process.header#L48) plus
+[`wait_next`](kernel/process/process.header#L51) are the kernel queue bookkeeping. When input arrives,
+[`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183) copies directly from the
+global ring to that destination, puts the byte count in the saved syscall return register
+[`activation.in2`](kernel/process/process.header#L23), clears the pending fields, removes the PCB
+from the queue, and changes it from [`BLOCKED`](kernel/process/process.header#L15) to
+[`READY`](kernel/process/process.header#L13). The dispatcher later restores the activation, so the
+original [`read()`](library/unistd/io.picoc#L6) returns without being issued again.
+
 The shell changes [`foreground_process_target`](kernel/signal.picoc#L12) between its own negative
 process ID and one foreground child's positive process ID. [`terminal_input_owner_id()`](kernel/signal.picoc#L166)
 returns the represented process ID without the sign. Because there is only one input owner, at most
@@ -4396,7 +4526,9 @@ foreground process: its request is stored in the PCB before dispatch, and
 [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) calls
 [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183) to make that specific
 reader ready. Background reads instead stop with [`SIGTTIN`](common/signal.header#L9), as explained
-under [Section 12.6, Foreground processes, background processes, and job-control signals](#126-foreground-processes-background-processes-and-job-control-signals).
+in [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals);
+[Section 12.6, Foreground processes, background processes, and job-control signals](#126-foreground-processes-background-processes-and-job-control-signals)
+shows how the shell selects and resumes the job.
 
 ```mermaid
 sequenceDiagram
@@ -4427,11 +4559,14 @@ sequenceDiagram
 Only one process owns terminal input, and a positive
 [`foreground_process_target`](kernel/signal.picoc#L12) also makes that process the target of terminal-generated
 signals. A negative process ID keeps the same process as input owner while suppressing those
-signals. The following cases show how the signed value changes as the shell transfers the terminal.
+signals. General fixed signal actions and reported statuses are defined in
+[Section 6.2, Process Signals](#62-process-signals); this section traces the terminal-specific
+sources and pending-read behavior. The following cases show how the signed value changes as the
+shell transfers the terminal.
 
 | Situation | Saved [`foreground_process_target`](kernel/signal.picoc#L12) value | Ordinary input | `Ctrl+C`/`Ctrl+Z` |
 | --- | ---: | --- | --- |
-| Before shell registration | `0` | No registered owner; [`terminal_input_process()`](kernel/signal.picoc#L178) falls back to the current PCB | Consumed without signal delivery |
+| Before shell registration | `0` | No process passes the ownership check; bytes are buffered, while [`terminal_input_process()`](kernel/signal.picoc#L178) uses the current PCB only as a possible pending-read completion target | Consumed without signal delivery |
 | Shell prompt, including while background work runs | Negative shell process ID | Delivered to the shell | Consumed without signal delivery, so the shell is not terminated or stopped |
 | Foreground child runs or resumes through `fg` | Positive child process ID | Delivered to the child | Delivered to the child as [`SIGINT`](common/signal.header#L4) or [`SIGTSTP`](common/signal.header#L8) |
 
@@ -4440,6 +4575,17 @@ consumes them before ring-buffer insertion. For a positive
 [`foreground_process_target`](kernel/signal.picoc#L12), byte 3 sends [`SIGINT`](common/signal.header#L4) and byte 26 sends
 [`SIGTSTP`](common/signal.header#L8) to the represented process. A value of 0 or a negative process
 ID has no signal target, so the handler consumes either control byte without delivering a signal.
+The same happens if a positive saved PID no longer resolves to a process. The control-byte table
+distinguishes that kernel handling from `Ctrl+D`, whose EOF convention is implemented only by
+[`cat.bin`](user/cat.picoc).
+
+| Input byte | Detection and action | Buffered? |
+| ---: | --- | --- |
+| 3 (`Ctrl+C`) | [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) passes it to [`handle_terminal_signal_character()`](kernel/signal.picoc#L192), which sends [`SIGINT`](common/signal.header#L4) to a valid positive foreground target | No; always consumed |
+| 26 (`Ctrl+Z`) | The same path sends [`SIGTSTP`](common/signal.header#L8) | No; always consumed |
+| 4 (`Ctrl+D`) | Not special to the kernel; follows the ordinary byte path into the ring | Yes; stored as ordinary value 4, subject to the normal full-ring replacement rule |
+| Any other byte | [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49) stores it and [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L183) may deliver it | Yes, unless an already pending read consumes it immediately after insertion |
+
 The shell saves a positive child-process ID before foreground waiting and restores its own negative
 process ID afterward, so background work does not receive prompt-time terminal signals.
 
@@ -4458,6 +4604,29 @@ A background [`SIGCONT`](common/signal.header#L6) leaves any pending terminal re
 [`SIGTSTP`](common/signal.header#L8). This resume path briefly masks UART delivery around its ring check
 and queue insertion to prevent a lost wakeup.
 
+The background read is suspended, not failed or aborted. Before sending
+[`SIGTTIN`](common/signal.header#L9), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135)
+saves the destination and count but does not put the process on
+[`Terminal.input_waiters`](kernel/filesystem/terminal.header#L14). `bg` sends
+[`SIGCONT`](common/signal.header#L6), but [`continue_process()`](kernel/signal.picoc#L50) sees that the
+process still lacks input ownership and leaves it [`STOPPED`](kernel/process/process.header#L16).
+`fg` first makes the process the positive foreground target and then sends `SIGCONT`.
+[`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) can then copy already buffered
+bytes and make the process ready, or enqueue it and leave it blocked until the next byte arrives.
+In either case the saved system call eventually returns its byte count; the application does not
+retry the read.
+
+`Ctrl+D` is therefore not a kernel EOF marker. When [`cat.bin`](user/cat.picoc) has no path argument,
+it uses [`lseek()`](library/unistd/io.picoc#L66) to distinguish seekable redirected input from
+terminal-style input. [`edit_standard_input()`](user/cat.picoc#L49) reads one terminal byte at a
+time and stops when the received value is 4. It consumes that byte, does not write it, flushes any
+partially collected line to stdout, and returns from `cat`; the kernel never converts it into a
+zero-length [`read()`](library/unistd/io.picoc#L6). Thus `cat.bin > file.txt` finishes because the
+application recognizes the buffered `Ctrl+D`, writes any remaining characters through its
+redirected descriptor 1, and exits. Completed writes have already reached the host file, and final
+process removal destroys the child's descriptor table. A regular-file input instead reaches EOF
+when `read-range` returns zero bytes.
+
 The terminal-specific kernel functions below select the owner and translate
 control bytes into signals. Their effects are kept here because they govern
 terminal state rather than general signal validation.
@@ -4469,24 +4638,39 @@ terminal state rather than general signal validation.
 | [`continue_process(process)`](kernel/signal.picoc#L50) | Returns no value | Resumes ordinary stops, a pending terminal read additionally requires input ownership | [`process_has_terminal_input()`](kernel/signal.picoc#L173), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L85) | **Kernel functions:** [`send_signal_to_process()`](kernel/signal.picoc#L75) |
 | [`terminal_input_owner_id(void)`](kernel/signal.picoc#L166) | `0` for a saved 0, otherwise the positive process ID represented by the saved positive or negative value | Reads [`foreground_process_target`](kernel/signal.picoc#L12) and removes its sign to identify the input owner | — | **Kernel functions:** [`process_has_terminal_input()`](kernel/signal.picoc#L173), [`terminal_input_process()`](kernel/signal.picoc#L178) |
 | [`process_has_terminal_input(process)`](kernel/signal.picoc#L173) | `true` only for the PCB whose process ID matches the represented input owner | Checks terminal-input ownership regardless of whether [`foreground_process_target`](kernel/signal.picoc#L12) contains a positive or negative process ID | [`terminal_input_owner_id()`](kernel/signal.picoc#L166) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`continue_process()`](kernel/signal.picoc#L50) |
-| [`terminal_input_process(void)`](kernel/signal.picoc#L178) | Input-owning PCB, or current PCB when 0 is saved or the represented process cannot be used | Resolves the input owner from the magnitude of [`foreground_process_target`](kernel/signal.picoc#L12) | [`terminal_input_owner_id()`](kernel/signal.picoc#L166), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`current_process()`](kernel/process/process.picoc#L62) | **Kernel functions:** [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) |
+| [`terminal_input_process(void)`](kernel/signal.picoc#L178) | Represented input-owner PCB, or current PCB when 0 is saved or the represented process cannot be used | Selects the PCB whose pending read the UART handler may try to complete; the fallback does not itself grant read ownership | [`terminal_input_owner_id()`](kernel/signal.picoc#L166), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`current_process()`](kernel/process/process.picoc#L62) | **Kernel functions:** [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) |
 | [`handle_terminal_signal_character(value)`](kernel/signal.picoc#L192) | `true` when it consumed `Ctrl+C`/`Ctrl+Z`, otherwise `false` | Sends the mapped signal when [`foreground_process_target`](kernel/signal.picoc#L12) contains a positive process ID; a saved 0 or negative process ID suppresses delivery while still consuming the byte | [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`send_signal_to_process()`](kernel/signal.picoc#L75) | **Kernel functions:** [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L214) |
 
 ## 7.5 Virtual terminal and null-device paths
 [\[↑ TOC\]](#contents)
 
-The two special paths in the table below name kernel-provided devices. Other paths, including other
-names under `/device`, use normal host-file I/O. The release tree has matching marker files in
-[`binary/device/`](binary/device/) so the paths are visible to users, those files hold no device
-data and are not the device implementations.
-[`device_paths_match()`](kernel/filesystem/device.picoc#L3) compares the complete normalized path
-with the special device paths, so a relative runtime-tree marker path does not automatically select
-the device.
+The two special paths in the table below are filesystem-visible names for kernel-provided I/O
+behavior, not ordinary PicoOS files backed by persistent data blocks. Unlike a conventional device
+inode, the host filesystem stores no device type for them. Instead,
+[`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) normalizes the requested name and
+[`device_paths_match()`](kernel/filesystem/device.picoc#L3) compares the complete string with
+[`TERMINAL_DEVICE_PATH`](kernel/filesystem/device.header#L6) and
+[`NULL_DEVICE_PATH`](kernel/filesystem/device.header#L5). Exact matches skip host existence,
+creation, and truncation requests; later reads, writes, and seeks special-case the saved path.
+Other names under `/device` use ordinary host-file I/O.
+
+The release tree has descriptive marker files in [`binary/device/`](binary/device/) so directory
+listings expose the names. Their text is not the device state and cannot be read through the matching
+PicoOS path because descriptor dispatch selects the device first. Removing or changing a marker's
+host contents does not implement or store terminal/null I/O.
 
 | Device path | Role | Used by |
 | --- | --- | --- |
 | `/device/terminal.dev` | The terminal device. It is the initial path for standard input, output, and error, reads use the global terminal input ring and may block, writes go to UART output, and seeking fails. | [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268) |
 | `/device/null.dev` | The null device. Reads return EOF immediately, writes report success after discarding their bytes, and seeking fails. | [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268) |
+
+For `echo.bin test > /device/terminal.dev`, the shell opens the terminal path as a `FILE`-kind
+descriptor and copies it onto stdout. [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217)
+recognizes the path and sends the bytes as ordinary UART terminal output, so `test` appears in the
+terminal; no `write` or `write-at` host request touches the marker file. For
+`command > /device/null.dev`, the same function recognizes the null path, advances the descriptor's
+logical offset, and returns the requested count without sending the bytes over UART. No persistent
+null-device contents are created.
 
 ## 7.6 File-descriptor creation, inheritance, duplication, and cleanup
 [\[↑ TOC\]](#contents)
@@ -4534,12 +4718,19 @@ performs I/O. The flag table explains how [`OpenRequest.flags`](common/file.head
 creation behavior. Those choices remain in
 [`FileDescriptor.flags`](kernel/filesystem/file_descriptor.header#L16) and govern later I/O.
 
-| Flag | Meaning in [`OpenRequest.flags`](common/file.header#L28) |
-| --- | --- |
-| [`O_RDONLY`](common/file.header#L9), [`O_WRONLY`](common/file.header#L10), [`O_RDWR`](common/file.header#L11) | Two-bit access mode checked by later read/write calls |
-| [`O_CREAT`](common/file.header#L13) | Allows a missing path to be created |
-| [`O_TRUNC`](common/file.header#L14) | With writable access, sends `<ESC>write path<ESC>/` during open to create/empty the file |
-| [`O_APPEND`](common/file.header#L15) | Makes each regular-file write request the current file size and use it as its write offset |
+| Flag | Value | Meaning in [`OpenRequest.flags`](common/file.header#L28) |
+| --- | ---: | --- |
+| [`O_RDONLY`](common/file.header#L9) | 0 | Permit reads |
+| [`O_WRONLY`](common/file.header#L10) | 1 | Permit writes |
+| [`O_RDWR`](common/file.header#L11) | 2 | Permit reads and writes; [`O_ACCMODE`](common/file.header#L12) = 3 extracts these two access bits |
+| [`O_CREAT`](common/file.header#L13) | 64 | Allow a missing regular path to be created |
+| [`O_TRUNC`](common/file.header#L14) | 512 | With writable access, create/empty the regular host file during open |
+| [`O_APPEND`](common/file.header#L15) | 1024 | Resolve the current file size before every write and use it as that write's offset |
+
+The kernel validates only the access value masked by
+[`O_ACCMODE`](common/file.header#L12). It stores other flag bits unchanged, but only
+[`O_CREAT`](common/file.header#L13), [`O_TRUNC`](common/file.header#L14), and
+[`O_APPEND`](common/file.header#L15) have implemented behavior.
 
 [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) normalizes a path against the
 current PCB’s working directory, selects the lowest free descriptor, allocates an absolute path
@@ -4547,6 +4738,20 @@ copy, and fills that entry. [`O_TRUNC`](common/file.header#L14) with a writable 
 to create/truncate immediately. Without [`O_TRUNC`](common/file.header#L14), a missing file is
 created only with [`O_CREAT`](common/file.header#L13). The `/device/terminal.dev` and
 `/device/null.dev` paths bypass these host-file operations and open their kernel devices directly.
+
+The mode table gives the exact host-request order. Every successful descriptor starts at offset 0;
+`literal-output` appears between output selection and data only when a write buffer contains
+`<ESC>`.
+
+| Operation or mode | Descriptor flags/state | Offset handling | PicoOS functions | RETI emulator host requests and result |
+| --- | --- | --- | --- | --- |
+| Open existing without truncation | Any valid access mode, no `O_TRUNC` | Initializes 0 | [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`file_exists()`](kernel/filesystem/filesystem.picoc#L18) | `file-size <path>` verifies that the regular file is readable by the host service; the contents are unchanged |
+| Create missing file | `O_CREAT` with any valid access mode | Initializes 0 | [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) | `file-size <path>` returns failure, then `write <path>`, `write stdout`; the emulator creates/truncates the path while selecting and restoring its output destination |
+| Truncate/overwrite open | Writable mode plus `O_TRUNC`, usually with `O_CREAT` | Initializes 0 | [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) | `write <path>`, `write stdout`; the file is created if needed and emptied immediately |
+| Read | Readable descriptor | Starts at saved offset; advances by returned bytes | [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90) | `read-range <offset> <count> <path>` returns a count and up to 1 KiB per syscall; zero bytes is EOF |
+| Ordinary overwrite/write | Writable regular descriptor without `O_APPEND` | Uses saved offset; advances by requested count | [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), [`write_uart_bytes()`](kernel/filesystem/filesystem.picoc#L195) | `write-at <offset> <path>`, optional `literal-output <count>`, data bytes, `write stdout`; existing bytes outside the written range remain |
+| Append write | Writable regular descriptor with `O_APPEND` | Ignores the prior offset for placement; saves file size plus requested count afterward | [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13) | `file-size <path>`, `write-at <size> <path>`, optional `literal-output <count>`, data bytes, `write stdout`; a missing file must first have been created by the open sequence |
+| Seek from end | Regular non-device descriptor | File size plus requested displacement becomes the new nonnegative offset | [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13) | `file-size <path>`; no data transfer |
 
 [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) validates the entry and read
 mode. A descriptor whose path is `/device/terminal.dev` reads from the kernel terminal and may
@@ -4559,8 +4764,13 @@ read. It does not need to yield between chunks because deferred timer requests a
 each syscall returns.
 
 [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) validates write mode. Stdout
-sends bytes directly. Stderr temporarily selects host stderr. A regular file sends
-`write-at <offset> <path>`, sends the requested bytes, restores stdout, and advances its offset.
+sends bytes directly with the emulator's default stdout destination. A standard-error-kind terminal
+descriptor sends `write stderr`, the bytes, and `write stdout`. A regular file sends
+`write-at <offset> <path>`, sends the requested bytes, then sends `write stdout` and advances its
+offset. The emulator therefore does maintain one global UART output destination, but PicoOS scopes
+each non-stdout write by selecting its destination immediately before the bytes and restoring stdout
+immediately afterward. The descriptor path and offset are sent again for every regular-file write;
+the emulator does not retain a per-descriptor file identity.
 For binary-safe [`write()`](library/unistd/io.picoc#L32),
 [`write_uart_bytes()`](kernel/filesystem/filesystem.picoc#L195) checks its buffer for `<ESC>` before
 transmission. If it finds one, it sends `literal-output <count>`, so the emulator treats exactly
@@ -4582,22 +4792,34 @@ the file, so seeking affects both reads and writes. With [`O_APPEND`](common/fil
 kernel requests the current file size immediately before every write and uses that as the offset,
 regardless of an earlier seek. An explicitly opened `/device/terminal.dev` writes directly to
 terminal stdout. Writes to `/device/null.dev` report success without sending their bytes anywhere.
-Seeking is rejected for both devices.
+Seeking is rejected for both devices. Successful terminal and null writes still advance their
+descriptor offset, although that offset cannot be sought or used to place device output.
 
 The `file-size` and `write-at` requests are separate, so concurrent modification of one host file by
 multiple PicoOS processes or host programs is unsupported: another writer could change the size
-between the two requests. The kernel function table below distinguishes descriptor validation,
-offset changes, and terminal blocking. Host creation and writing send commands without an
-acknowledgment, so their return values cannot report every host-side failure.
+between the two requests. Empty or overlong PicoOS paths make
+[`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) fail. A missing path or one
+rejected by the emulator makes the existence check fail; an open without `O_CREAT` then returns
+`-1`. Host read permissions and the sandbox's regular-file
+checks can also make `file-size` or `read-range` return `-1`. With `O_CREAT`, however, a failed
+existence check is followed by an unacknowledged `write` request. `write` and `write-at` failures,
+including insufficient host permissions, only produce an emulator warning and switch its output to
+discard; [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) may still return a
+descriptor and an ordinary [`write()`](library/unistd/io.picoc#L32) may still report the requested
+count. Append is different because its preceding acknowledged `file-size` failure makes the kernel
+return `-1`. Invalid descriptor numbers, free entries, forbidden access modes, negative read counts,
+device seeks, and unsupported kind/path combinations are rejected in PicoOS with `-1`; null reads
+and regular-file end-of-file return 0. The kernel function table below distinguishes descriptor
+validation, offset changes, terminal blocking, and the host requests each function can trigger.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`open_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L39) | Descriptor, or `-1` for invalid path/mode, no free entry, or a missing file without create/truncate | Allocates a path and changes a free entry to a file or device | [`current_process()`](kernel/process/process.picoc#L62), [`free_file_descriptor()`](kernel/filesystem/filesystem.picoc#L27), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`copy_file_path()`](kernel/filesystem/file_descriptor.picoc#L6), [`is_device_path()`](kernel/filesystem/device.picoc#L20), [`kfree()`](kernel/kmalloc.picoc#L38), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`file_exists()`](kernel/filesystem/filesystem.picoc#L18) | **Library functions:** [`open()`](library/fcntl/fcntl.picoc#L5), [`fopen()`](library/stdio/stdio.picoc#L125)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`read_file_descriptor(request, caller_context)`](kernel/filesystem/filesystem.picoc#L150) | Count, `0` at EOF, or `-1` for an invalid request, unreadable descriptor, or failed host range request | Advances regular-file offset, or changes terminal queue/activation state | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`file_descriptor_can_read()`](kernel/filesystem/file_descriptor.picoc#L131), [`is_terminal_device_path()`](kernel/filesystem/device.picoc#L16), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`is_null_device_path()`](kernel/filesystem/device.picoc#L12), [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90) | **Library functions:** [`read()`](library/unistd/io.picoc#L6), [`fgetc()`](library/stdio/stdio.picoc#L178)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`write_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L217) | Count, or `-1` for an invalid/unwritable descriptor or failed append-size request | Routes UART output, applies the request's [`IoRequest.protect_uart_control`](common/file.header#L35) choice, and advances the regular-file offset | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`file_descriptor_can_write()`](kernel/filesystem/file_descriptor.picoc#L137), [`is_null_device_path()`](kernel/filesystem/device.picoc#L12), [`is_terminal_device_path()`](kernel/filesystem/device.picoc#L16), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13), [`uart_send_file_write_command()`](common/uart_protocol.picoc#L102), [`write_uart_bytes()`](kernel/filesystem/filesystem.picoc#L195) | **Library functions:** [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`fputc()`](library/stdio/stdio.picoc#L204), [`fputs()`](library/stdio/stdio.picoc#L229)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**Kernel functions:** [`write_process_exception_message()`](kernel/exception.picoc#L29), [`list_processes()`](kernel/process/process.picoc#L32) |
-| [`seek_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L268) | New offset, or `-1` for invalid descriptor/origin/device/negative result | Replaces a regular-file descriptor offset | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`is_device_path()`](kernel/filesystem/device.picoc#L20), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13) | **Library functions:** [`lseek()`](library/unistd/io.picoc#L66)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`open_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L39) | Descriptor, or `-1` for invalid path/mode, no free entry, or a missing file without create/truncate | Allocates a path and changes a free entry to a file or device | [`current_process()`](kernel/process/process.picoc#L62), [`free_file_descriptor()`](kernel/filesystem/filesystem.picoc#L27), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`copy_file_path()`](kernel/filesystem/file_descriptor.picoc#L6), [`is_device_path()`](kernel/filesystem/device.picoc#L20), [`kfree()`](kernel/kmalloc.picoc#L38), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`file_exists()`](kernel/filesystem/filesystem.picoc#L18)<br>**Host requests:** `file-size <path>` for existence; `write <path>` then `write stdout` for create/truncate | **Library functions:** [`open()`](library/fcntl/fcntl.picoc#L5), [`fopen()`](library/stdio/stdio.picoc#L125)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`read_file_descriptor(request, caller_context)`](kernel/filesystem/filesystem.picoc#L150) | Count, `0` at EOF, or `-1` for an invalid request, unreadable descriptor, or failed host range request | Advances regular-file offset, or changes terminal queue/activation state | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`file_descriptor_can_read()`](kernel/filesystem/file_descriptor.picoc#L131), [`is_terminal_device_path()`](kernel/filesystem/device.picoc#L16), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L135), [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`is_null_device_path()`](kernel/filesystem/device.picoc#L12), [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90)<br>**Host request:** `read-range <offset> <count> <path>` for a regular file | **Library functions:** [`read()`](library/unistd/io.picoc#L6), [`fgetc()`](library/stdio/stdio.picoc#L178)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`write_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L217) | Count, or `-1` for an invalid/unwritable descriptor or failed append-size request | Routes UART output, applies the request's [`IoRequest.protect_uart_control`](common/file.header#L35) choice, and advances the descriptor offset | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`file_descriptor_can_write()`](kernel/filesystem/file_descriptor.picoc#L137), [`is_null_device_path()`](kernel/filesystem/device.picoc#L12), [`is_terminal_device_path()`](kernel/filesystem/device.picoc#L16), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13), [`uart_send_file_write_command()`](common/uart_protocol.picoc#L102), [`write_uart_bytes()`](kernel/filesystem/filesystem.picoc#L195)<br>**Host requests:** optional `file-size <path>` for append; `write-at <offset> <path>` and `write stdout` for a regular file; `write stderr` and `write stdout` for terminal stderr; optional `literal-output <count>` | **Library functions:** [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`fputc()`](library/stdio/stdio.picoc#L204), [`fputs()`](library/stdio/stdio.picoc#L229)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**Kernel functions:** [`write_process_exception_message()`](kernel/exception.picoc#L29), [`list_processes()`](kernel/process/process.picoc#L32) |
+| [`seek_file_descriptor(request)`](kernel/filesystem/filesystem.picoc#L268) | New offset, or `-1` for invalid descriptor/origin/device/negative result | Replaces a regular-file descriptor offset | [`current_process()`](kernel/process/process.picoc#L62), [`file_descriptor_is_valid()`](kernel/filesystem/file_descriptor.picoc#L126), [`is_device_path()`](kernel/filesystem/device.picoc#L20), [`receive_file_size()`](kernel/filesystem/filesystem.picoc#L13)<br>**Host request:** `file-size <path>` for `SEEK_END` | **Library functions:** [`lseek()`](library/unistd/io.picoc#L66)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 |  |  |  |  |  |
-| [`write_uart_bytes(buffer, count, protect_uart_control)`](kernel/filesystem/filesystem.picoc#L195) | Returns no value | When protection is enabled, scans for `<ESC>` and starts a counted literal-output region if found, then sends exactly `count` bytes to the selected host destination | [`uart_send_literal_output_command()`](common/uart_protocol.picoc#L112), [`uart_print_character()`](common/uart_protocol.picoc#L21) | **Kernel functions:** [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
+| [`write_uart_bytes(buffer, count, protect_uart_control)`](kernel/filesystem/filesystem.picoc#L195) | Returns no value | When protection is enabled, scans for `<ESC>` and starts a counted literal-output region if found, then sends exactly `count` bytes to the selected host destination | [`uart_send_literal_output_command()`](common/uart_protocol.picoc#L112), [`uart_print_character()`](common/uart_protocol.picoc#L21)<br>**Host request:** optional `literal-output <count>` | **Kernel functions:** [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
 
 The sequence diagram follows one regular-file [`read()`](library/unistd/io.picoc#L6) through
 [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) and
@@ -4634,37 +4856,74 @@ sequenceDiagram
 ## 7.9 PicoOS paths, working directories, and host operations
 [\[↑ TOC\]](#contents)
 
-The emulator's startup directory is PicoOS `/`. The launchers start it inside
-[`binary/`](binary/) or the extracted release directory, so `/kernel`, `/boot`, `/system`,
-`/user`, `/config`, and `/device` refer to directories there. Host `/tmp` is not mounted, and
-root listings have no artificial `tmp` entry. A PicoOS path `/tmp` refers only to an ordinary
-`tmp` directory inside the runtime, if one has been created.
+The host directory in which the RETI emulator starts is PicoOS `/`. The repository and release
+launchers change into [`binary/`](binary/) or the extracted runtime directory before starting it, so
+`/kernel`, `/boot`, `/system`, `/user`, `/config`, and `/device` refer to entries below that directory.
+When the emulator initializes UART, its
+[`init_guest_filesystem()`](../RETI-Emulator/source/guest_filesystem.c#L113) opens and retains a handle
+for `.`; PicoOS [`chdir()`](library/unistd/working_directory.picoc#L4) never changes the emulator
+process's actual working directory. If the emulator is invoked directly from a different directory,
+that directory becomes the guest root. Host `/tmp` is not mounted: PicoOS `/tmp` means only a `tmp`
+entry created below the selected guest root.
 
-All UART filesystem commands use this boundary, including binary loading, reads, writes, directory
-listing, and moves. `..` stops at `/`. The emulator does not follow symlinks or Windows junctions
-and does not open hard-linked or special host files. The guest root cannot be removed or renamed
-through its PicoOS paths. Explicit emulator command-line inputs, such as boot assembly and debug metadata,
-still use host paths.
+The sandbox lets arbitrary student/user programs use host-backed files without giving PicoOS paths
+authority to read, create, overwrite, move, or delete arbitrary host files. PicoOS first normalizes
+paths lexically with [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), including
+clamping `..` at `/`. The emulator independently normalizes every request path with
+[`normalize_guest_path()`](../RETI-Emulator/source/guest_filesystem.c#L13), then performs operations
+relative to the retained root handle. On POSIX hosts,
+[`open_beneath()`](../RETI-Emulator/source/guest_filesystem.c#L120) pins each directory and refuses
+symbolic links; Linux additionally requests `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS`, and
+`RESOLVE_NO_XDEV`. Regular file opens reject special files and files with multiple hard links. The
+Windows implementation uses root-relative handles and rejects reparse points such as junctions.
 
-Every PCB owns a kernel-heap absolute PicoOS working-directory string. PID 1 starts at `/`.
-A child receives its own copy of the parent’s current string. Changing directory validates a normalized path with the host
-before freeing the old copy and installing the new one. It never changes the emulator process’s
-actual working directory.
+This boundary covers `load`, `read-range`, `file-size`, `write`, `write-at`, `is-directory`,
+`mkdir`, `ls`, `unlink`, `rmdir`, `move`, and `touch` because their emulator handlers all use the
+guest-filesystem API. Root mutation is rejected, and `cd ..` at PicoOS `/` normalizes back to `/`
+before `is-directory /` validates it. Explicit emulator command-line inputs, debug metadata,
+terminal logs, and emulator configuration are host-side features outside this guest-filesystem
+boundary, so the sandbox is specifically filesystem isolation for PicoOS host requests rather than
+complete isolation of the emulator process.
+
+Every PCB owns a kernel-heap absolute PicoOS working-directory string. PID 1 receives a copy of `/`
+from [`create_process()`](kernel/process/process.picoc#L89); each later child receives a separately
+allocated copy of the parent's value at creation. Relative filesystem operations read that string
+through [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92). A successful
+[`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163) allocates the normalized
+replacement first, frees the old string, and changes only the calling PCB; final
+[`remove_process()`](kernel/process/process.picoc#L209) frees it. The storage is kernel-heap metadata,
+not a userspace string or emulator working-directory setting.
 
 Path normalization starts at `/`, prepends the current PCB directory for a relative path when a
 process is running, removes repeated separators and `.`, resolves `..` without moving above root,
-and enforces [`PATH_MAX`](common/file.header#L21). The table below shows which functions only copy
-kernel state and which request host validation or file operations.
+and enforces [`PATH_MAX`](common/file.header#L21). The cases below all use the same
+[`append_path_segments()`](kernel/filesystem/host_filesystem.picoc#L37) logic before any host request.
+
+| Requested path | Base and normalization | Example result from current directory `/a/b` |
+| --- | --- | --- |
+| Relative child `dir` | Append to the PCB directory | `/a/b/dir` |
+| `.` or repeated separators | Ignore `.` and empty segments | `/a/b` |
+| `..` | Remove one existing result segment, but never remove root | `/a`; from `/`, still `/` |
+| `../dir` and longer combinations | Apply segments from left to right | `/a/dir` |
+| Absolute `/dir` | Ignore the PCB directory and start at root | `/dir` |
+| Empty or result at least [`PATH_MAX`](common/file.header#L21) cells | Reject before contacting the emulator | Operation returns failure |
+
+For [`chdir()`](library/unistd/working_directory.picoc#L4), the normalized candidate is sent in an
+`is-directory <path>` host request. Only a zero response causes
+[`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128) to replace the PCB
+string; a missing path, regular file, permission failure, or sandbox rejection returns `-1` and
+leaves the old directory intact. The table below shows which functions only copy kernel state and
+which request host validation or file operations.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
 | [`get_working_directory(request)`](kernel/filesystem/host_filesystem.picoc#L156) | `0` on success, `-1` when the stored directory is missing or the destination capacity is too small | Copies the PCB directory into the caller buffer | [`copy_working_directory()`](kernel/filesystem/host_filesystem.picoc#L135), [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`getcwd()`](library/unistd/working_directory.picoc#L11)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`change_working_directory(path)`](kernel/filesystem/host_filesystem.picoc#L163) | `0` on success, `-1` for an invalid path or host failure | Validates host directory and replaces current PCB string | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128), [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`chdir()`](library/unistd/working_directory.picoc#L4)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`make_host_directory(path)`](kernel/filesystem/host_filesystem.picoc#L177) | `0` on success, `-1` on invalid path or host failure | Normalizes and sends `mkdir`, no kernel table mutation | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7) | **Library functions:** [`mkdir()`](library/sys/stat/stat.picoc#L5)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`read_host_directory(request)`](kernel/filesystem/host_filesystem.picoc#L187) | Listing count, or `-1` for invalid request/host failure | Writes host listing into caller buffer | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`uart_receive_string()`](kernel/filesystem/host_filesystem.picoc#L10) | **Library functions:** [`readdir()`](library/dirent/dirent.picoc#L40)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`unlink_host_file(path)`](kernel/filesystem/host_filesystem.picoc#L208), [`remove_host_directory(path)`](kernel/filesystem/host_filesystem.picoc#L212) | `0` on success, `-1` on invalid path or host failure | Send bounded host unlink/rmdir requests | [`request_host_path_operation()`](kernel/filesystem/host_filesystem.picoc#L198) | **Library functions:** [`unlink()`](library/unistd/file_removal.picoc#L4), [`rmdir()`](library/unistd/file_removal.picoc#L8)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`move_host_path(request)`](kernel/filesystem/host_filesystem.picoc#L216) | `0` on success, `-1` on invalid path or host failure | Normalizes both paths and sends a two-path move request to the emulator | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_print_character()`](common/uart_protocol.picoc#L21), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`receive_word()`](common/uart_protocol.picoc#L7) | **Library functions:** [`move()`](library/unistd/file_removal.picoc#L12)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`touch_host_file(path)`](kernel/filesystem/host_filesystem.picoc#L234) | `0` on success, `-1` on invalid path or host failure | Sends a touch request to create a host file or update its timestamps | [`request_host_path_operation()`](kernel/filesystem/host_filesystem.picoc#L198) | **Library functions:** [`touch()`](library/unistd/file_removal.picoc#L20)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`change_working_directory(path)`](kernel/filesystem/host_filesystem.picoc#L163) | `0` on success, `-1` for an invalid path or host failure | Validates host directory and replaces current PCB string | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128), [`current_process()`](kernel/process/process.picoc#L62)<br>**Host request:** `is-directory <path>` | **Library functions:** [`chdir()`](library/unistd/working_directory.picoc#L4)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`make_host_directory(path)`](kernel/filesystem/host_filesystem.picoc#L177) | `0` on success, `-1` on invalid path or host failure | Normalizes and sends `mkdir`, no kernel table mutation | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7)<br>**Host request:** `mkdir <path>` | **Library functions:** [`mkdir()`](library/sys/stat/stat.picoc#L5)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`read_host_directory(request)`](kernel/filesystem/host_filesystem.picoc#L187) | Listing count, or `-1` for invalid request/host failure | Writes host listing into caller buffer | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`uart_receive_string()`](kernel/filesystem/host_filesystem.picoc#L10)<br>**Host request:** `ls <path>` | **Library functions:** [`opendir()`](library/dirent/dirent.picoc#L8)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`unlink_host_file(path)`](kernel/filesystem/host_filesystem.picoc#L208), [`remove_host_directory(path)`](kernel/filesystem/host_filesystem.picoc#L212) | `0` on success, `-1` on invalid path or host failure | Send bounded host unlink/rmdir requests | [`request_host_path_operation()`](kernel/filesystem/host_filesystem.picoc#L198)<br>**Host requests:** `unlink <path>` or `rmdir <path>` | **Library functions:** [`unlink()`](library/unistd/file_removal.picoc#L4), [`rmdir()`](library/unistd/file_removal.picoc#L8)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`move_host_path(request)`](kernel/filesystem/host_filesystem.picoc#L216) | `0` on success, `-1` on invalid path or host failure | Normalizes both paths and sends a two-path move request to the emulator | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_print_character()`](common/uart_protocol.picoc#L21), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`receive_word()`](common/uart_protocol.picoc#L7)<br>**Host request:** `move <old path>\n<new path>` | **Library functions:** [`move()`](library/unistd/file_removal.picoc#L12)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`touch_host_file(path)`](kernel/filesystem/host_filesystem.picoc#L234) | `0` on success, `-1` on invalid path or host failure | Sends a touch request to create a host file or update its timestamps | [`request_host_path_operation()`](kernel/filesystem/host_filesystem.picoc#L198)<br>**Host request:** `touch <path>` | **Library functions:** [`touch()`](library/unistd/file_removal.picoc#L20)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 |  |  |  |  |  |
 | [`build_process_path(path, result, capacity)`](kernel/filesystem/host_filesystem.picoc#L92) | `true` on a nonempty normalized path that fits, otherwise `false` | Writes an absolute PicoOS path, relative input starts from the current PCB directory, or from `/` before the first process exists | [`append_path_segments()`](kernel/filesystem/host_filesystem.picoc#L37), [`current_process()`](kernel/process/process.picoc#L62) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), [`load_process()`](kernel/process/process_loader.picoc#L305), [`make_host_directory()`](kernel/filesystem/host_filesystem.picoc#L177), [`move_host_path()`](kernel/filesystem/host_filesystem.picoc#L216), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_host_directory()`](kernel/filesystem/host_filesystem.picoc#L187), [`request_host_path_operation()`](kernel/filesystem/host_filesystem.picoc#L198) |
 | [`system_relative_path(path)`](kernel/filesystem/host_filesystem.picoc#L121) | Pointer to the input path or the text after its leading `/` | Removes the leading `/` for program names and loading labels | — | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`list_processes()`](kernel/process/process.picoc#L32), [`load_process()`](kernel/process/process_loader.picoc#L305) |
@@ -4752,32 +5011,32 @@ The table maps process, descriptor, and scheduling wrappers to their syscall sel
 initialization and status inspection operate directly on userspace data and therefore need no
 syscall.
 
-| Library function | Return value / status and purpose | Syscalls |
+| Library function | Return value / status and purpose | Syscalls / host requests |
 | --- | --- | --- |
-| [`load(path)`](library/unistd/process.picoc#L17) | PID, or 0, repeats bounded syscall 2 transfers and creates a `NEW` process | 2, [`LoadProcessRequest`](common/syscall.header#L51) |
+| [`load(path)`](library/unistd/process.picoc#L17) | PID, or 0, repeats bounded syscall 2 transfers and creates a `NEW` process | 2, [`LoadProcessRequest`](common/syscall.header#L51)<br>**Host requests:** `file-size <path>`, then one or more `read-range <offset> <count> <path>` requests |
 | [`run(pid, arguments, environment)`](library/unistd/process.picoc#L31) | Whether a `NEW` process was initialized and made `READY`, `NULL` environment means current [`environ`](library/stdlib/env.picoc#L4) | 3, [`RunProcessRequest`](common/syscall.header#L56) |
 | [`unload(pid)`](library/unistd/process.picoc#L47) | Whether a non-current target was terminated/removed | 5, PID directly |
-| [`list_processes(void)`](library/unistd/process.picoc#L51) | Prints all known PIDs and binary paths | 4, no request |
+| [`list_processes(void)`](library/unistd/process.picoc#L51) | Prints all known PIDs and binary paths | 4, no request structure<br>**Host requests:** when descriptor 1 is a regular file, `write-at <offset> <path>`, optional append `file-size <path>`, then `write stdout`; a copied terminal-stderr entry uses `write stderr` then `write stdout`; terminal-stdout/null output needs none |
 | [`getpid(void)`](library/unistd/process.picoc#L55) | Current PCB’s PID | 8, no request |
 | [`reset_processes(void)`](library/unistd/process.picoc#L59) | Test hook that removes non-system processes and resets related state | 9, no request |
 | [`set_foreground_process(pid)`](library/unistd/process.picoc#L63) | 0 or `-1`, a direct child PID saves that positive process ID to [`foreground_process_target`](kernel/signal.picoc#L12) for input and terminal-generated signals, PID 0 saves the caller's negative process ID for input without those signals | 10, PID directly |
-| [`read(file_descriptor, buffer, count)`](library/unistd/io.picoc#L6) | Number read or `-1`, repeats bounded regular-file chunks and may block on stdin | 24, [`IoRequest`](common/file.header#L31) |
-| [`write(file_descriptor, buffer, count)`](library/unistd/io.picoc#L32) | Number written or `-1`, protects arbitrary data from UART control parsing | 25, [`IoRequest`](common/file.header#L31) |
-| [`write_without_uart_escape_check(file_descriptor, buffer, count)`](library/unistd/io.picoc#L43) | Number written or `-1`, skips the UART `<ESC>` scan and requires a buffer known not to contain `<ESC>` | 25, [`IoRequest`](common/file.header#L31) |
+| [`read(file_descriptor, buffer, count)`](library/unistd/io.picoc#L6) | Number read or `-1`, repeats bounded regular-file chunks and may block on stdin | 24, [`IoRequest`](common/file.header#L31)<br>**Host request:** `read-range <offset> <count> <path>` for a regular-file descriptor |
+| [`write(file_descriptor, buffer, count)`](library/unistd/io.picoc#L32) | Number written or `-1`, protects arbitrary data from UART control parsing | 25, [`IoRequest`](common/file.header#L31)<br>**Host requests:** `write-at <offset> <path>` and `write stdout` for a regular file; `write stderr` and `write stdout` for terminal stderr; optional `file-size <path>` for append and `literal-output <count>` for data containing `<ESC>` |
+| [`write_without_uart_escape_check(file_descriptor, buffer, count)`](library/unistd/io.picoc#L43) | Number written or `-1`, skips the UART `<ESC>` scan and requires a buffer known not to contain `<ESC>` | 25, [`IoRequest`](common/file.header#L31)<br>**Host requests:** the same destination requests as [`write()`](library/unistd/io.picoc#L32), but never `literal-output` |
 | [`close(file_descriptor)`](library/unistd/io.picoc#L54) | 0 or `-1`, releases the descriptor entry's path/state | 26, descriptor directly |
 | [`dup2(old_file_descriptor, new_file_descriptor)`](library/unistd/io.picoc#L58) | New descriptor or `-1`, independently copies the entry | 28, [`Dup2Request`](common/file.header#L48) |
-| [`lseek(file_descriptor, offset, origin)`](library/unistd/io.picoc#L66) | New logical offset or `-1` | 27, [`SeekRequest`](common/file.header#L42) |
-| [`chdir(path)`](library/unistd/working_directory.picoc#L4) | 0 or `-1`, replaces current PCB working-directory string | 30, path pointer directly |
+| [`lseek(file_descriptor, offset, origin)`](library/unistd/io.picoc#L66) | New logical offset or `-1` | 27, [`SeekRequest`](common/file.header#L42)<br>**Host request:** `file-size <path>` only for `SEEK_END` |
+| [`chdir(path)`](library/unistd/working_directory.picoc#L4) | 0 or `-1`, replaces current PCB working-directory string | 30, path pointer directly<br>**Host request:** `is-directory <path>` |
 | [`getcwd(buffer, size)`](library/unistd/working_directory.picoc#L11) | Buffer or `NULL` | 31, [`GetCwdRequest`](common/syscall.header#L84) |
-| [`unlink(path)`](library/unistd/file_removal.picoc#L4) | Host status for removing a file | 34, path pointer directly |
-| [`rmdir(path)`](library/unistd/file_removal.picoc#L8) | Host status for removing an empty directory | 35, path pointer directly |
-| [`move(old_path, new_path)`](library/unistd/file_removal.picoc#L12) | Host status for moving or renaming a file or directory | 36, [`MoveRequest`](common/syscall.header#L95) |
-| [`touch(path)`](library/unistd/file_removal.picoc#L20) | Host status for creating a file or updating its timestamps | 37, path pointer directly |
+| [`unlink(path)`](library/unistd/file_removal.picoc#L4) | Host status for removing a file | 34, path pointer directly<br>**Host request:** `unlink <path>` |
+| [`rmdir(path)`](library/unistd/file_removal.picoc#L8) | Host status for removing an empty directory | 35, path pointer directly<br>**Host request:** `rmdir <path>` |
+| [`move(old_path, new_path)`](library/unistd/file_removal.picoc#L12) | Host status for moving or renaming a file or directory | 36, [`MoveRequest`](common/syscall.header#L95)<br>**Host request:** `move <old path>\n<new path>` |
+| [`touch(path)`](library/unistd/file_removal.picoc#L20) | Host status for creating a file or updating its timestamps | 37, path pointer directly<br>**Host request:** `touch <path>` |
 | [`wait_queue_init(wq)`](library/unistd/blocking.picoc#L4) | Initializes embedded [`wait_queue.head`](common/wait_queue.header#L6)/[`wait_queue.tail`](common/wait_queue.header#L7) locally | No syscall |
 | [`sleep(wq)`](library/unistd/blocking.picoc#L9) | Blocks caller on the intrusive queue | 13, queue pointer directly |
 | [`wakeup(wq)`](library/unistd/blocking.picoc#L19) | Wakes at most the FIFO head | 14, queue pointer directly |
-| [`open(path, flags)`](library/fcntl/fcntl.picoc#L5) | Lowest free descriptor or `-1` | 23, [`OpenRequest`](common/file.header#L26) |
-| [`creat(path)`](library/fcntl/fcntl.picoc#L13) | Equivalent to write/create/truncate open | Calls [`open()`](library/fcntl/fcntl.picoc#L5) and therefore syscall 23 |
+| [`open(path, flags)`](library/fcntl/fcntl.picoc#L5) | Lowest free descriptor or `-1` | 23, [`OpenRequest`](common/file.header#L26)<br>**Host requests:** `file-size <path>` for every nontruncating regular open; after failure with `O_CREAT`, or for `O_TRUNC`, `write <path>` then `write stdout` |
+| [`creat(path)`](library/fcntl/fcntl.picoc#L13) | Equivalent to write/create/truncate open | Calls [`open()`](library/fcntl/fcntl.picoc#L5) and therefore syscall 23<br>**Host requests:** `write <path>`, then `write stdout` for a regular path |
 | [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) | Exact child's exit/stopped status, or `-1` | 7, [`WaitPidRequest`](common/syscall.header#L62), may suspend its stack frame |
 | [`WIFSTOPPED(status)`](library/sys/wait/wait.picoc#L25) | Whether status represents [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), or [`SIGTTIN`](common/signal.header#L9) | No syscall |
 | [`yield(void)`](library/schedule/schedule.picoc#L4) | Voluntarily saves the current activation and schedules | 15, no request |
@@ -4867,12 +5126,12 @@ particular, the embedded entry is first populated when a record is read.
 The function table below shows that only opening needs a host listing request, subsequent reads
 parse the stored listing, and closing releases both allocations.
 
-| Library function | Return value / status and purpose | Syscalls |
+| Library function | Return value / status and purpose | Syscalls / host requests |
 | --- | --- | --- |
-| [`opendir(path)`](library/dirent/dirent.picoc#L8) | Stream pointer, or `NULL` for an invalid path/listing failure, allocates stream and buffer | 33, [`ReadDirectoryRequest`](common/syscall.header#L89), also uses [`malloc()`](library/stdlib/malloc.picoc#L35) |
+| [`opendir(path)`](library/dirent/dirent.picoc#L8) | Stream pointer, or `NULL` for an invalid path/listing failure, allocates stream and buffer | 33, [`ReadDirectoryRequest`](common/syscall.header#L89), also uses [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**Host request:** `ls <path>` |
 | [`readdir(directory)`](library/dirent/dirent.picoc#L40) | Pointer to the reused [`entry`](library/dirent/dirent.header#L18), or `NULL` at end/for a null stream | No syscall |
 | [`closedir(directory)`](library/dirent/dirent.picoc#L66) | `0` after freeing buffer/stream, `-1` for a null stream | No syscall |
-| [`mkdir(path)`](library/sys/stat/stat.picoc#L5) | `0` on success, `-1` on invalid path or host failure | 32, path pointer directly |
+| [`mkdir(path)`](library/sys/stat/stat.picoc#L5) | `0` on success, `-1` on invalid path or host failure | 32, path pointer directly<br>**Host request:** `mkdir <path>` |
 
 ## 8.5 Process heap, environment, strings, and exit
 [\[↑ TOC\]](#contents)
@@ -4931,16 +5190,18 @@ table shows how stream preparation and opening supply the descriptor used by lat
 | [`PicoFile.file_descriptor`](library/stdio/stdio.header#L4) | Entry number in the current process’s descriptor table | First initialized by [`prepare_standard_streams()`](library/stdio/stdio.picoc#L45) for standard streams and [`fopen()`](library/stdio/stdio.picoc#L125) for extra streams, used by [`fgetc()`](library/stdio/stdio.picoc#L178), [`fputc()`](library/stdio/stdio.picoc#L204), [`fputs()`](library/stdio/stdio.picoc#L229), and [`fclose()`](library/stdio/stdio.picoc#L155) |
 
 The function table connects stream selection, formatting, and scanning to the syscalls that
-eventually perform the I/O.
+eventually perform the I/O. Formatting and scanning rows reduce to the listed character/string
+operations and therefore use the same descriptor-dependent host requests rather than additional
+ones.
 
-| Library function | Return value / status and purpose | Syscalls |
+| Library function | Return value / status and purpose | Syscalls / host requests |
 | --- | --- | --- |
 | [`standard_input(void)`](library/stdio/stdio.picoc#L79), [`standard_output(void)`](library/stdio/stdio.picoc#L84), [`standard_error(void)`](library/stdio/stdio.picoc#L89) | Addresses of the three process-global stream objects | Syscall 22 only on lazy first preparation |
-| [`fopen(path, mode)`](library/stdio/stdio.picoc#L125) | One of five stream slots or `NULL`, supports `r`, `w`, `a`, and `+` | 23, [`OpenRequest`](common/file.header#L26) after mode-to-flag conversion |
+| [`fopen(path, mode)`](library/stdio/stdio.picoc#L125) | One of five stream slots or `NULL`, supports `r`, `w`, `a`, and `+` | 23, [`OpenRequest`](common/file.header#L26) after mode-to-flag conversion<br>**Host requests:** the `file-size` and, when required, `write`/`write stdout` sequence listed for [`open()`](library/fcntl/fcntl.picoc#L5) |
 | [`fclose(stream)`](library/stdio/stdio.picoc#L155) | `0` on close, or `-1` for an invalid stream/descriptor, releases an extra stream slot | 26, descriptor directly |
-| [`fgetc(stream)`](library/stdio/stdio.picoc#L178) | Read character or `-1` | 24 with [`IoRequest`](common/file.header#L31), standalone stdin may use test-only UART selector 38 |
-| [`fputc(character, stream)`](library/stdio/stdio.picoc#L204) | Written character or `-1` | 25 with [`IoRequest`](common/file.header#L31), standalone stdout may use direct UART syscall 29 |
-| [`fputs(text, stream)`](library/stdio/stdio.picoc#L229) | Written count or `-1` | 25 with [`IoRequest`](common/file.header#L31), or repeated syscall 29 in fallback mode |
+| [`fgetc(stream)`](library/stdio/stdio.picoc#L178) | Read character or `-1` | 24 with [`IoRequest`](common/file.header#L31), standalone stdin may use test-only UART selector 38<br>**Host request:** `read-range <offset> <count> <path>` for a regular-file stream |
+| [`fputc(character, stream)`](library/stdio/stdio.picoc#L204) | Written character or `-1` | 25 with [`IoRequest`](common/file.header#L31), standalone stdout may use direct UART syscall 29<br>**Host requests:** the descriptor-dependent `write-at`, `write stderr`, `write stdout`, append `file-size`, and optional `literal-output` requests listed for [`write()`](library/unistd/io.picoc#L32) |
+| [`fputs(text, stream)`](library/stdio/stdio.picoc#L229) | Written count or `-1` | 25 with [`IoRequest`](common/file.header#L31), or repeated syscall 29 in fallback mode<br>**Host requests:** the same descriptor-dependent requests as [`fputc()`](library/stdio/stdio.picoc#L204) |
 | [`fprintf(stream, format, ...)`](library/stdio/stdio.picoc#L346) | Written count or `-1` | Formatting is userspace, output reduces to [`fputc()`](library/stdio/stdio.picoc#L204)/[`fputs()`](library/stdio/stdio.picoc#L229) |
 | [`printf(format, ...)`](library/stdio/stdio.picoc#L354) | Written count or `-1` to [`stdout`](library/stdio/stdio.header#L10) | Same as [`fprintf()`](library/stdio/stdio.picoc#L346) |
 | [`scanf(format, ...)`](library/stdio/scanf.picoc#L112) | Number of assigned arguments | Input reduces to [`fgetc(stdin)`](library/stdio/stdio.picoc#L178) |
@@ -5029,8 +5290,9 @@ process image and kernel-side state, while a shared-memory attachment refers to
 a shared-memory list entry that owns the shared data region. Embedded activation records
 and wait queues are released with their PCB rather than separately. Solid
 arrows mean ownership or list linkage, dotted arrows mean a reference to shared
-state. A terminal descriptor selects the global terminal by its kind, it does
-not own the terminal or contain a terminal pointer.
+state. A terminal descriptor selects the global terminal through its exact device path; its kind
+additionally distinguishes standard error output. It does not own the terminal or contain a
+terminal pointer.
 
 ```mermaid
 flowchart TD
@@ -5043,7 +5305,7 @@ flowchart TD
     P1 --> S1["attachments<br/>kmalloc"]
     S1 -. references .-> SE["shared entry<br/>kmalloc"]
     SE --> SM["shared-memory data<br/>pmalloc"]
-    F1 -. "stdin/stdout/stderr kind selects device behavior" .-> T["global Terminal<br/>kernel .data"]
+    F1 -. "terminal-device path selects global terminal" .-> T["global Terminal<br/>kernel .data"]
 ```
 
 # 10. Bootloading and kernel startup
@@ -5064,7 +5326,7 @@ kernel image into SRAM, and hands control to it. Three functions in
 | Bootloader function | Return value / status | Effects | Calls |
 | --- | --- | --- | --- |
 | [`_start(void)`](boot/bootloader.picoc#L9) | Does not return | Establishes EPROM `CS`/`DS` and a temporary stack at the top of SRAM | Jumps to [`boot_main()`](boot/bootloader.picoc#L41) |
-| [`boot_main(void)`](boot/bootloader.picoc#L41) | Jumps into the kernel on success, halts on a missing or undersized image | Requests `kernel/kernel.bin`, consumes the five header words, and copies the payload to SRAM | [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21) |
+| [`boot_main(void)`](boot/bootloader.picoc#L41) | Jumps into the kernel on success, halts on a missing or undersized image | Requests `kernel/kernel.bin`, consumes the five header words, and copies the payload to SRAM | [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21)<br>**Host request:** `load kernel/kernel.bin` |
 | [`start_loaded_kernel(void)`](boot/bootloader.picoc#L21) | Does not return | Adds the SRAM base to the header's code/data/stack offsets, replaces the boot stack, and installs kernel `CS`, `DS`, `SP`, and `BAF` | Jumps to the generated kernel entry, which calls [`main()`](kernel/kernel.picoc#L31) |
 
 The bootloader has no dynamic memory and no process structures. Its locals and
@@ -5185,7 +5447,7 @@ policy and the shell’s command handling.
 | --- | --- |
 | Kernel [`main()`](kernel/kernel.picoc#L31) | Initialize global structures and devices, load PID 1, construct its first activation, and dispatch |
 | [`Init`](system/init.picoc#L100) | Read configuration, establish environment policy, load/run a shell, and restart it after a session |
-| [`Shell`](user/shell.picoc#L1631) | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
+| [`Shell`](user/shell.picoc#L1637) | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
 
 ## 11.2 Initial environment configuration
 [\[↑ TOC\]](#contents)
@@ -5332,7 +5594,7 @@ Init and [`fast_os_test_launcher`](system/fast_os_test_launcher.picoc) live unde
 [\[↑ TOC\]](#contents)
 
 The shell is init's interactive child and turns terminal input into userspace process operations.
-[`shell.picoc`](user/shell.picoc#L1631) is one of the **18 user applications** in [`user`](user/):
+[`shell.picoc`](user/shell.picoc#L1637) is one of the **18 user applications** in [`user`](user/):
 the shell plus 17 standalone commands, listed under
 [Section 13, User applications and commands](#13-user-applications-and-commands). It builds on
 the descriptor, signal, process, and library interfaces described above, then
@@ -5362,10 +5624,10 @@ command editing and pipelines:
 | [`command_history_start`](user/shell.picoc#L47), [`command_history_count`](user/shell.picoc#L48) | History ring indices/count |
 | [`shell_input_index`](user/shell.picoc#L49), [`shell_input_count`](user/shell.picoc#L50) | Next retained input byte and number of valid bytes in [`shell_input_buffer`](user/shell.picoc#L46) |
 
-The active command buffer is an 80-cell local array in [`main()`](user/shell.picoc#L1631)'s
+The active command buffer is an 80-cell local array in [`main()`](user/shell.picoc#L1637)'s
 userspace stack. Redirection temporarily reserves descriptors 3–7 for saved stdin, fast-test output,
 saved stdout, saved stderr, and fast-test error output, all descriptor state itself remains in the
-shell PCB's kernel-heap table. [`main()`](user/shell.picoc#L1631) initializes the environment and
+shell PCB's kernel-heap table. [`main()`](user/shell.picoc#L1637) initializes the environment and
 directory snapshots, the status and history counters have zero initializers in the image, and
 command helpers fill the scratch buffers, [`shell_reset()`](user/shell.picoc#L252) resets the
 test-specific state between cases.
@@ -5378,8 +5640,8 @@ saves its negative process ID to [`foreground_process_target`](kernel/signal.pic
 read commands without becoming a `Ctrl+C` or `Ctrl+Z` target. It then
 configures [`prctl(PR_SET_PDEATHSIG, SIGKILL)`](library/sys/prctl/prctl.picoc#L14), clones its
 environment, and records its current directory. It
-then repeatedly calls [`read_line()`](user/shell.picoc#L290), stores nonempty commands in history,
-and sends them to [`eval()`](user/shell.picoc#L1394). [`read_line()`](user/shell.picoc#L290) returns
+then repeatedly calls [`read_line()`](user/shell.picoc#L291), stores nonempty commands in history,
+and sends them to [`eval()`](user/shell.picoc#L1400). [`read_line()`](user/shell.picoc#L291) returns
 `-1` at EOF, so redirected stdin ends the shell normally. Therefore, `shell.bin < commands.txt`
 reads and executes the newline-separated commands in `commands.txt` without requiring typed terminal
 input. The function table below links the main loop’s operations to their library calls and local
@@ -5388,14 +5650,14 @@ effects.
 | Shell function | Return value / status | Library functions |
 | --- | --- | --- |
 | [`read_shell_character(character)`](user/shell.picoc#L272) | 1 after returning one byte, 0 at EOF, or the negative [`read()`](library/unistd/io.picoc#L6) error | Refills [`shell_input_buffer`](user/shell.picoc#L46) with one [`read()`](library/unistd/io.picoc#L6) and returns retained bytes one at a time across command lines |
-| [`read_line(buffer, capacity)`](user/shell.picoc#L290) | Command length, or `-1` at EOF | Calls [`read_shell_character()`](user/shell.picoc#L272), batches consecutive printable echoes through [`flush_shell_line_echo()`](user/shell.picoc#L244), flushes them before editing controls, edits the stack buffer, and updates history-navigation state |
+| [`read_line(buffer, capacity)`](user/shell.picoc#L291) | Command length, or `-1` at EOF | Calls [`read_shell_character()`](user/shell.picoc#L272), batches consecutive printable echoes through [`flush_shell_line_echo()`](user/shell.picoc#L244), flushes them before editing controls, edits the stack buffer, and updates history-navigation state |
 | [`remember_shell_command(command)`](user/shell.picoc#L151) | No value | [`strcmp()`](library/string/string.picoc#L34) and [`strcpy()`](library/string/string.picoc#L4), mutates the global eight-entry history ring and skips consecutive duplicates |
-| [`expand_variables(arguments, result, capacity)`](user/shell.picoc#L484) | Expanded buffer (truncated to capacity minus one), or `NULL` for a null input | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing, expansion also occurs inside single quotes |
-| [`load_from_path(name)`](user/shell.picoc#L1202) | Loaded PID, or 0 | Reads `PATH` with [`getenv()`](library/stdlib/env.picoc#L115), builds candidates, and calls [`load()`](library/unistd/process.picoc#L17) in order |
-| [`run_process(pid, arguments, background, stdin_path, stdout_path, append_stdout, stderr_path, append_stderr)`](user/shell.picoc#L1050) | `true` when [`run()`](library/unistd/process.picoc#L31) succeeds, otherwise `false` | [`run()`](library/unistd/process.picoc#L31), [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`set_foreground_process()`](library/unistd/process.picoc#L63), and [`waitpid()`](library/sys/wait/wait.picoc#L14), changes `$?`/`$!` state |
-| [`continue_background_process(foreground)`](user/shell.picoc#L1143) | `true` when the tracked process was continued, otherwise `false` | [`kill()`](library/signal/signal.picoc#L14) and, for `fg`, [`set_foreground_process()`](library/unistd/process.picoc#L63) and [`waitpid()`](library/sys/wait/wait.picoc#L14) |
-| [`eval(command)`](user/shell.picoc#L1394) | `false` only for `exit`, otherwise `true` | Selects a built-in or external execution path |
-| [`main(argc, argv)`](user/shell.picoc#L1631) | Shell exit status | [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`set_foreground_process()`](library/unistd/process.picoc#L63), [`clone_environment()`](library/stdlib/env.picoc#L205), [`getcwd()`](library/unistd/working_directory.picoc#L11), [`lseek()`](library/unistd/io.picoc#L66), and [`unsetenv()`](library/stdlib/env.picoc#L157), initializes signal/reset state and owns the interactive or redirected-input execution path |
+| [`expand_variables(arguments, result, capacity)`](user/shell.picoc#L486) | Expanded buffer (truncated to capacity minus one), or `NULL` for a null input | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing, expansion also occurs inside single quotes |
+| [`load_from_path(name)`](user/shell.picoc#L1206) | Loaded PID, or 0 | Reads `PATH` with [`getenv()`](library/stdlib/env.picoc#L115), builds candidates, and calls [`load()`](library/unistd/process.picoc#L17) in order |
+| [`run_process(pid, arguments, background, stdin_path, stdout_path, append_stdout, stderr_path, append_stderr)`](user/shell.picoc#L1054) | `true` when [`run()`](library/unistd/process.picoc#L31) succeeds, otherwise `false` | [`run()`](library/unistd/process.picoc#L31), [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`set_foreground_process()`](library/unistd/process.picoc#L63), and [`waitpid()`](library/sys/wait/wait.picoc#L14), changes `$?`/`$!` state |
+| [`continue_background_process(foreground)`](user/shell.picoc#L1147) | `true` when the tracked process was continued, otherwise `false` | [`kill()`](library/signal/signal.picoc#L14) and, for `fg`, [`set_foreground_process()`](library/unistd/process.picoc#L63) and [`waitpid()`](library/sys/wait/wait.picoc#L14) |
+| [`eval(command)`](user/shell.picoc#L1400) | `false` only for `exit`, otherwise `true` | Selects a built-in or external execution path |
+| [`main(argc, argv)`](user/shell.picoc#L1637) | Shell exit status | [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`set_foreground_process()`](library/unistd/process.picoc#L63), [`clone_environment()`](library/stdlib/env.picoc#L205), [`getcwd()`](library/unistd/working_directory.picoc#L11), [`lseek()`](library/unistd/io.picoc#L66), and [`unsetenv()`](library/stdlib/env.picoc#L157), initializes signal/reset state and owns the interactive or redirected-input execution path |
 
 ## 12.3 Interactive line editing and command history
 [\[↑ TOC\]](#contents)
@@ -5423,7 +5685,7 @@ available for the next command. The read blocks when the global terminal ring is
 buffer and its stack frame remain intact while the PCB waits on
 [`Terminal.input_waiters`](kernel/filesystem/terminal.header#L14), the UART ISR writes the character
 and the dispatcher later resumes [`shell.bin`](user/shell.picoc).
-[`read_line()`](user/shell.picoc#L290) passes consecutive printable bytes to
+[`read_line()`](user/shell.picoc#L291) passes consecutive printable bytes to
 [`flush_shell_line_echo()`](user/shell.picoc#L244) in one call and flushes them before applying an
 editing control. [`shell_write_character()`](user/shell.picoc#L54),
 [`erase_shell_line_suffix()`](user/shell.picoc#L129), and
@@ -5439,7 +5701,7 @@ accumulated.
 The parser validates balanced single and double quotes and recognizes one unquoted `|` before
 selecting a built-in or external command. For external commands and the `run` built-in, it removes a
 trailing `&`, extracts final whitespace-preceded `<`, `>`, `>>`, `2>`, and `2>>` redirections, and
-separates the command/PID from its raw arguments. [`run_process()`](user/shell.picoc#L1050) expands
+separates the command/PID from its raw arguments. [`run_process()`](user/shell.picoc#L1054) expands
 `$NAME`, `$?`, and `$!` in those arguments, `export` expands its assignment separately. Expansion
 preserves quote characters, including single quotes, and truncates at the output buffer limit.
 Command names and redirection paths are not expanded. A command containing `/` is loaded directly,
@@ -5449,8 +5711,8 @@ The configured `PATH=/user` uses the PicoOS root, so commands remain discoverabl
 and from nested shells. A relative entry supplied by the user is resolved from the shell's current
 [`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths. The
 sequence below follows a successful command without a pipeline through
-[`eval()`](user/shell.picoc#L1394), [`load_from_path()`](user/shell.picoc#L1202), and
-[`run_process()`](user/shell.picoc#L1050). It shows that redirection changes the shell’s descriptors
+[`eval()`](user/shell.picoc#L1400), [`load_from_path()`](user/shell.picoc#L1206), and
+[`run_process()`](user/shell.picoc#L1054). It shows that redirection changes the shell’s descriptors
 before [`run()`](library/unistd/process.picoc#L31), so the child inherits those values.
 
 ```mermaid
@@ -5505,8 +5767,8 @@ operations they use.
 
 | Built-in | Behavior | Library functions |
 | --- | --- | --- |
-| `exit` | Accepts no argument and returns false from [`eval()`](user/shell.picoc#L1394), ending this shell session | No immediate syscall, [`libstart`](library/start/libstart.picoc) later calls [`exit(main_result)`](library/stdlib/exit.picoc#L3) |
-| `eval COMMAND` | Recursively evaluates the remaining text in the same shell state | Re-enters [`eval()`](user/shell.picoc#L1394), resulting command calls apply normally |
+| `exit` | Accepts no argument and returns false from [`eval()`](user/shell.picoc#L1400), ending this shell session | No immediate syscall, [`libstart`](library/start/libstart.picoc) later calls [`exit(main_result)`](library/stdlib/exit.picoc#L3) |
+| `eval COMMAND` | Recursively evaluates the remaining text in the same shell state | Re-enters [`eval()`](user/shell.picoc#L1400), resulting command calls apply normally |
 | `run-shell-tests MANIFEST` | Runs scripted shell test directories and resets shell state between them | [`open`](library/fcntl/fcntl.picoc#L5), [`read`](library/unistd/io.picoc#L6), [`lseek`](library/unistd/io.picoc#L66), [`close`](library/unistd/io.picoc#L54), [`dup2`](library/unistd/io.picoc#L58), [`chdir`](library/unistd/working_directory.picoc#L4), [`reset_processes`](library/unistd/process.picoc#L59), environment clone/restore helpers |
 | `export NAME=value` | Expands the complete assignment and stores/replaces the variable | [`getenv`](library/stdlib/env.picoc#L115) during expansion and [`setenv(..., true)`](library/stdlib/env.picoc#L126) |
 | `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | [`chdir()`](library/unistd/working_directory.picoc#L4) / syscall 30 |
@@ -5537,10 +5799,10 @@ stopped status is recorded as the current `$!` target so `fg` or `bg` can contin
 A trailing `&` starts the child without waiting and stores the PID in `$!`. The shell tracks only
 one background/stopped PID rather than a job table. A background process that reads terminal stdin
 is stopped with [`SIGTTIN`](common/signal.header#L9), `fg` chooses that tracked process, transfers
-input ownership by saving its positive process ID, and then continues its pending read. New input
-never wakes or selects a stopped
-background process on its own. `bg` alone cannot continue any stopped process that has a pending
-terminal read. A successful external background start preserves `$?`, a successful `run PID &`
+input ownership by saving its positive process ID, and then continues its pending read. The retained
+buffer pointer, queue changes, and exact `fg`/`bg` resume behavior are traced in
+[Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals).
+A successful external background start preserves `$?`, a successful `run PID &`
 built-in sets it to 0. At shell startup, `PR_SET_PDEATHSIG=SIGKILL` is installed on the shell and
 inherited by children, so children receive [`SIGKILL`](common/signal.header#L5) when their direct
 parent terminates, with termination propagating to further descendants that retain this setting.
@@ -5550,32 +5812,51 @@ parent terminates, with termination propagating to further descendants that reta
 
 The shell implements redirection by rearranging its descriptors before
 [`run()`](library/unistd/process.picoc#L31) copies them into the child, then
-restoring its own descriptors. The cases below show how this works for stdin,
-stdout, and stderr.
+restoring its own descriptors. [`dup2(old_file_descriptor, new_file_descriptor)`](library/unistd/io.picoc#L58)
+does not create a shared alias in PicoOS. [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L160)
+first deep-copies the source path, frees the previous target path, and copies `kind`, flags, and
+offset by value; the source remains unchanged and both entries then evolve independently. If the
+numbers are equal it simply returns that number. This replacement operation is what lets the same
+mechanism install regular files for redirection and for the shell's file-backed pipeline.
 
-For `COMMAND < PATH`, the shell saves stdin in private descriptor 3, closes descriptor 0, and opens
-the path read-only into that lowest free slot. It starts the child with the resulting descriptor
-table and then restores its own stdin. For example, `cat.bin < input.txt` uses cat's ordinary
-no-argument stdin path, cat contains no redirection parser. `shell.bin < commands.txt` likewise uses
-its normal line reader and exits when that input reaches EOF.
+The table shows the shell's actual descriptor choreography. Indices 3, 5, and 6 are shell
+conventions, not kernel reservations; normal [`open()`](library/fcntl/fcntl.picoc#L5) calls can use
+them. The shell begins with these private slots free and temporary output opens normally receive
+the lowest free index 3.
 
-For `COMMAND > PATH`, the shell opens with `O_WRONLY | O_CREAT | O_TRUNC`, for `>>`, it uses
-`O_WRONLY | O_CREAT | O_APPEND`. It saves stdout in private descriptor 5, copies the opened file
-onto descriptor 1, starts the child, and restores its own stdout. Since
-[`run()`](library/unistd/process.picoc#L31) deep-copies the descriptor table, the child's descriptor
-1 retains the file path after the shell restores itself.
+| Shell form | Opens/creates | Copies and replacements before [`run()`](library/unistd/process.picoc#L31) | Child endpoints and shell cleanup |
+| --- | --- | --- | --- |
+| `COMMAND` | None | None | Child receives deep copies of the shell's current 0/1/2 entries |
+| `COMMAND < IN` | Close 0 after saving it, then [`open(IN, O_RDONLY)`](library/fcntl/fcntl.picoc#L5) must return 0 | [`dup2(0, 3)`](library/unistd/io.picoc#L58) saves terminal/current stdin | Child reads `IN` on 0 and also inherits saved stdin on 3; shell later calls [`dup2(3, 0)`](library/unistd/io.picoc#L58), then closes 3 |
+| `COMMAND > OUT` | [`open(OUT, O_WRONLY \| O_CREAT \| O_TRUNC)`](library/fcntl/fcntl.picoc#L5), normally temporary 3 | [`dup2(1, 5)`](library/unistd/io.picoc#L58) saves stdout; [`dup2(temporary, 1)`](library/unistd/io.picoc#L58) installs `OUT`; close temporary | Child writes `OUT` on 1 and inherits saved stdout on 5; shell restores 5 to 1 and closes 5 |
+| `COMMAND >> OUT` | Same, with `O_APPEND` instead of `O_TRUNC` | Same stdout operations | Same descriptors; each child write appends using a `file-size` request |
+| `COMMAND 2> ERR` / `2>> ERR` | Open with the corresponding truncate/append flags | [`dup2(2, 6)`](library/unistd/io.picoc#L58) saves stderr; [`dup2(temporary, 2)`](library/unistd/io.picoc#L58) installs `ERR`; close temporary | Child writes `ERR` on 2 and inherits saved stderr on 6; shell restores 6 to 2 and closes 6 |
+| `COMMAND < IN > OUT 2> ERR` | Perform stdout, stderr, then stdin setup; append variants may replace either `>` | Combines the operations above, using saved slots 3, 5, and 6 | Child receives all redirected 0/1/2 endpoints and the saved standard-stream copies; shell restores and closes every used saved slot after [`run()`](library/unistd/process.picoc#L31) |
+| `LEFT \| RIGHT` | Create `.picoos-pipe-PID.tmp` through `LEFT > temporary`, then open it through `RIGHT < temporary` | Uses the same stdout save slot 5 for `LEFT` and stdin save slot 3 for `RIGHT`; no pipe descriptor kind exists | `LEFT` writes the host-backed file and exits before `RIGHT` reads it; each command's shell descriptors are restored, then the shell unlinks the temporary path |
 
-For `COMMAND 2> PATH`, the shell performs the same operation for stderr with private descriptor 6
-and opens the destination with truncation. `2>>` instead opens it for appending. Thus normal stdout
-stays visible while diagnostics can be inspected separately, accumulated across commands, or sent to
-`/device/null.dev`.
+In a combined redirection, the operators must appear in the shown input, stdout, stderr order.
+[`strip_command_redirections()`](user/shell.picoc#L946) removes them in reverse order, and each
+individual [`strip_redirection()`](user/shell.picoc#L870) accepts only a current command suffix.
 
-The two paths under `/device` are exceptions to ordinary host-file redirection.
-`/device/terminal.dev` connects output to UART, while `/device/null.dev` accepts and discards it.
-The kernel does not truncate or write either marker file when the normalized path is exactly one of
-those two special paths. The sequence below follows [`redirect_output()`](user/shell.picoc#L1019),
+The descriptor used only to open an output path is closed before
+[`run()`](library/unistd/process.picoc#L31), after its contents have been copied onto descriptor 1
+or 2. Saved descriptors must remain open until [`run()`](library/unistd/process.picoc#L31) makes the child
+copy, so the child also inherits independent copies of them; they disappear when that child is
+removed. The shell immediately restores and closes its own saved entries after
+[`run()`](library/unistd/process.picoc#L31) returns,
+before waiting for a foreground child. Consequently the next command starts with normal standard
+streams. No shell cleanup changes a RETI-emulator-wide stdout setting: each kernel file/error write
+selects the emulator destination for that write and restores stdout itself, as explained in
+[Section 7.8, Opening, reading, writing, and seeking](#78-opening-reading-writing-and-seeking).
+
+`cat.bin < input.txt` uses [`cat.bin`](user/cat.picoc)'s ordinary no-argument stdin path; the
+application contains no redirection parser. `shell.bin < commands.txt` similarly uses its normal
+line reader and exits when regular-file input reaches EOF. `/device/terminal.dev` and
+`/device/null.dev` can be redirection targets with the special behavior explained in
+[Section 7.5, Virtual terminal and null-device paths](#75-virtual-terminal-and-null-device-paths).
+The sequence below follows [`redirect_output()`](user/shell.picoc#L1023),
 [`run()`](library/unistd/process.picoc#L31), and
-[`restore_standard_descriptors()`](user/shell.picoc#L982) for stdout. The write branch explains why
+[`restore_standard_descriptors()`](user/shell.picoc#L986) for stdout. The write branch explains why
 append needs a size request while ordinary output uses its saved offset.
 
 ```mermaid
@@ -5617,7 +5898,7 @@ streaming kernel pipe, which determines both the execution order and the
 limitations described here.
 
 One `LEFT | RIGHT` operator is supported. For two foreground external commands,
-[`run_pipeline()`](user/shell.picoc#L779) runs `LEFT` to completion with stdout redirected to a
+[`run_pipeline()`](user/shell.picoc#L782) runs `LEFT` to completion with stdout redirected to a
 hidden `.picoos-pipe-PID.tmp` file, then runs `RIGHT` with that file as stdin and removes it. This
 supports finite commands such as `cat.bin file.txt | sed.bin "5aNEW" > file2.txt`, but it is
 sequential rather than streaming and does not support longer pipelines. Combining `&` with a
@@ -5626,7 +5907,7 @@ use this temporary-file mechanism. Arbitrary descriptor syntax and a general `du
 not implemented.
 
 The command example below uses [`echo.bin`](user/echo.picoc#L20) to create input,
-[`cat.bin`](user/cat.picoc#L103) and [`sed.bin`](user/sed.picoc#L66) to pass it through a
+[`cat.bin`](user/cat.picoc#L104) and [`sed.bin`](user/sed.picoc#L67) to pass it through a
 two-command pipeline, and [`rm.bin`](user/rm.picoc#L11) to remove the files afterward. Enter the
 lines at the PicoOS prompt in a writable working directory, the final display is `first`,
 `INSERTED`, and `second` on separate lines. The intermediate pipeline file is removed by the shell.
@@ -5652,12 +5933,12 @@ Together with the **12 library test classes**, these are the categories describe
 shell snapshots its initial environment and directory, closes private descriptors, resets non-system
 processes/PIDs, redirects test output as required, evaluates each input line, and restores state.
 This is why test-reset helpers appear in the userspace/kernel ABI even though they are not normal
-interactive facilities. [`run_shell_test_manifest()`](user/shell.picoc#L1360) calls
-[`run_shell_test()`](user/shell.picoc#L1266) for each listed scenario, and
+interactive facilities. [`run_shell_test_manifest()`](user/shell.picoc#L1366) calls
+[`run_shell_test()`](user/shell.picoc#L1271) for each listed scenario, and
 [`shell_reset()`](user/shell.picoc#L252) restores processes, descriptors 3–7, environment,
 directory, `$?`, and `$!` between cases. The [fast runner](run_os_tests_fast.py) sends raw editing
 input through UART and uses separate sessions for nested interactive shells and direct terminal
-output, those scenarios cannot be represented by calls to [`eval()`](user/shell.picoc#L1394) alone.
+output, those scenarios cannot be represented by calls to [`eval()`](user/shell.picoc#L1400) alone.
 
 # 13. User applications and commands
 [\[↑ TOC\]](#contents)
@@ -5682,14 +5963,14 @@ Shared command helpers are explained below the table.
 
 | Binary (source link) | Behavior | Library functions |
 | --- | --- | --- |
-| [`shell.bin`](user/shell.picoc#L1631) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11), see [Section 12, Shell](#12-shell) for the other calls |
+| [`shell.bin`](user/shell.picoc#L1637) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11), see [Section 12, Shell](#12-shell) for the other calls |
 | [`echo.bin`](user/echo.picoc#L20) | Prints [`argv[1..]`](user/echo.picoc#L20) separated by spaces, converts `\n` inside an argument, and adds a newline | [`printf()`](library/stdio/stdio.picoc#L354) |
 | [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | [`printf()`](library/stdio/stdio.picoc#L354), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
-| [`cat.bin`](user/cat.picoc#L103) | Copies named files or stdin to stdout, terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
+| [`cat.bin`](user/cat.picoc#L104) | Copies named files or stdin to stdout, terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
 | [`touch.bin`](user/touch.picoc#L11) | Creates each named file or updates its timestamps while preserving contents | [`touch()`](library/unistd/file_removal.picoc#L20) |
 | [`cp.bin`](user/cp.picoc#L16) | Copies one file to another in 64-cell chunks | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
 | [`mv.bin`](user/mv.picoc#L11) | Moves or renames one file or directory | [`move()`](library/unistd/file_removal.picoc#L12) |
-| [`sed.bin`](user/sed.picoc#L66) | Reads stdin and inserts, changes, or appends text at selected lines | [`lseek()`](library/unistd/io.picoc#L66), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`malloc()`](library/stdlib/malloc.picoc#L35), [`free()`](library/stdlib/malloc.picoc#L49), [`unsetenv()`](library/stdlib/env.picoc#L157) |
+| [`sed.bin`](user/sed.picoc#L67) | Reads stdin and inserts, changes, or appends text at selected lines | [`lseek()`](library/unistd/io.picoc#L66), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`malloc()`](library/stdlib/malloc.picoc#L35), [`free()`](library/stdlib/malloc.picoc#L49), [`unsetenv()`](library/stdlib/env.picoc#L157) |
 | [`ps.bin`](user/ps.picoc#L11) | Prints every process PID and canonical system-relative binary path | [`list_processes()`](library/unistd/process.picoc#L51) |
 | [`ls.bin`](user/ls.picoc#L13) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | [`opendir()`](library/dirent/dirent.picoc#L8), [`readdir()`](library/dirent/dirent.picoc#L40), [`closedir()`](library/dirent/dirent.picoc#L66) |
 | [`mkdir.bin`](user/mkdir.picoc#L12) | Creates every supplied directory and reports individual failures | [`mkdir()`](library/sys/stat/stat.picoc#L5) |
@@ -5707,8 +5988,8 @@ and calls, neither helper keeps persistent state.
 
 | Kernel function (shared helper) | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`command_write(file_descriptor, text)`](common/user_command.picoc#L4) | No return value, the write result is ignored | Counts the text and writes it to the selected descriptor, such as stdout or stderr, the call creates an [`IoRequest`](common/file.header#L31) inside the library | [`write()`](library/unistd/io.picoc#L32) | **User applications:** [`cat_usage()`](user/cat.picoc#L21), [`count_usage()`](user/count.picoc#L12), [`cp_usage()`](user/cp.picoc#L11), [`edit_standard_input()`](user/cat.picoc#L48), [`kill_write_usage()`](user/kill.picoc#L58), [`ls_usage()`](user/ls.picoc#L7), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`mkdir_usage()`](user/mkdir.picoc#L7), [`mv_usage()`](user/mv.picoc#L6), [`poweroff_usage()`](user/poweroff.picoc#L7), [`print_path_error()`](user/cat.picoc#L13), [`ps_usage()`](user/ps.picoc#L6), [`pwd_usage()`](user/pwd.picoc#L6), [`reboot_usage()`](user/reboot.picoc#L7), [`rm_usage()`](user/rm.picoc#L6), [`rmdir_usage()`](user/rmdir.picoc#L6), [`sed_usage()`](user/sed.picoc#L61), [`shell_usage()`](user/shell.picoc#L75), [`touch_usage()`](user/touch.picoc#L6), [`uname_usage()`](user/uname.picoc#L10), [`write_replacement()`](user/sed.picoc#L56) |
-| [`command_is_help(argument)`](common/user_command.picoc#L13) | `true` for exactly `-h` or `--help`, `false` otherwise | Reads the argument without changing it | None | **User applications:** [`eval()`](user/shell.picoc#L1394), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/poweroff.picoc#L12), [`main()`](user/ps.picoc#L11), [`main()`](user/reboot.picoc#L12), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L103), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L66), [`main()`](user/shell.picoc#L1631) |
+| [`command_write(file_descriptor, text)`](common/user_command.picoc#L4) | No return value, the write result is ignored | Counts the text and writes it to the selected descriptor, such as stdout or stderr, the call creates an [`IoRequest`](common/file.header#L31) inside the library | [`write()`](library/unistd/io.picoc#L32)<br>**Host requests:** descriptor-dependent `file-size`, `write-at`, `write stderr`, `write stdout`, and optional `literal-output` requests described in [Section 7.8, Opening, reading, writing, and seeking](#78-opening-reading-writing-and-seeking) | **User applications:** [`cat_usage()`](user/cat.picoc#L21), [`count_usage()`](user/count.picoc#L12), [`cp_usage()`](user/cp.picoc#L11), [`edit_standard_input()`](user/cat.picoc#L49), [`kill_write_usage()`](user/kill.picoc#L58), [`ls_usage()`](user/ls.picoc#L7), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L104), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L67), [`mkdir_usage()`](user/mkdir.picoc#L7), [`mv_usage()`](user/mv.picoc#L6), [`poweroff_usage()`](user/poweroff.picoc#L7), [`print_path_error()`](user/cat.picoc#L13), [`ps_usage()`](user/ps.picoc#L6), [`pwd_usage()`](user/pwd.picoc#L6), [`reboot_usage()`](user/reboot.picoc#L7), [`rm_usage()`](user/rm.picoc#L6), [`rmdir_usage()`](user/rmdir.picoc#L6), [`sed_usage()`](user/sed.picoc#L62), [`shell_usage()`](user/shell.picoc#L75), [`touch_usage()`](user/touch.picoc#L6), [`uname_usage()`](user/uname.picoc#L10), [`write_replacement()`](user/sed.picoc#L57) |
+| [`command_is_help(argument)`](common/user_command.picoc#L13) | `true` for exactly `-h` or `--help`, `false` otherwise | Reads the argument without changing it | None | **User applications:** [`eval()`](user/shell.picoc#L1400), [`main()`](user/kill.picoc#L69), [`main()`](user/mkdir.picoc#L12), [`main()`](user/pwd.picoc#L11), [`main()`](user/rm.picoc#L11), [`main()`](user/rmdir.picoc#L11), [`main()`](user/cp.picoc#L16), [`main()`](user/ls.picoc#L13), [`main()`](user/mv.picoc#L11), [`main()`](user/poweroff.picoc#L12), [`main()`](user/ps.picoc#L11), [`main()`](user/reboot.picoc#L12), [`main()`](user/touch.picoc#L11), [`main()`](user/uname.picoc#L15), [`main()`](user/cat.picoc#L104), [`main()`](user/count.picoc#L20), [`main()`](user/sed.picoc#L67), [`main()`](user/shell.picoc#L1637) |
 
 Every user program except [`echo.bin`](user/echo.picoc) uses [`command_is_help()`](common/user_command.picoc#L13) for a sole help
 argument. [`echo.bin`](user/echo.picoc) keeps `-h` and `--help` as ordinary text to print.
@@ -5756,7 +6037,7 @@ operands after an individual error.
 [`kill.bin`](user/kill.picoc) accepts [`SIGINT`](common/signal.header#L4), [`SIGKILL`](common/signal.header#L5), [`SIGCONT`](common/signal.header#L6), [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), and
 [`SIGTTIN`](common/signal.header#L9) by name without a leading `-`, or by number. Signal 0 checks
 existence without delivery. It yields after success so the target can be
-selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1427): the former
+selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1433): the former
 uses [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5), which invokes syscall 0
 and halts the OS, whereas the latter lets init start a new shell.
 [`reboot.bin`](user/reboot.picoc) uses
@@ -5801,7 +6082,7 @@ errors but does not check write results, and [`sed.bin`](user/sed.picoc) does no
 writes or fully validate expressions. [`echo.bin`](user/echo.picoc) also ignores output failures.
 A zero exit status therefore does not guarantee that all output was written.
 For the status transfer from a child to the shell, see
-[`run_process()`](user/shell.picoc#L1050) and
+[`run_process()`](user/shell.picoc#L1054) and
 [Section 6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid).
 
 # 14. Test system
@@ -5937,8 +6218,8 @@ flowchart TD
 The fast runner scans `input.txt` for cases that require an independent boot:
 an exact [`shell.bin`](user/shell.picoc) command, a command ending in `/shell.bin`, or a line
 containing `/device/terminal.dev`. It identifies raw UART cases through
-line-editing escape sequences. Those cases still traverse UART and [`read_line()`](user/shell.picoc#L290)
-at the end of the shared boot instead of going through [`eval()`](user/shell.picoc#L1394) directly.
+line-editing escape sequences. Those cases still traverse UART and [`read_line()`](user/shell.picoc#L291)
+at the end of the shared boot instead of going through [`eval()`](user/shell.picoc#L1400) directly.
 
 Library tests instead read input/expected-output metadata, compile one program,
 apply a five-second emulator timeout, and compare output with trailing
