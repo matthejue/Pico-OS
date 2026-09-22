@@ -1,0 +1,2 @@
+echo.bin hello world
+poweroff.bin

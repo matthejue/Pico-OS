@@ -18,7 +18,7 @@ bool standard_streams_use_file_descriptors = false;
 
 void send_byte_over_uart(int value) {
     asm("LOADIN BAF IN1 3");
-    asm("LOADI ACC 29"); // SYSCALL_SEND_BYTE_OVER_UART
+    asm("LOADI ACC 28"); // SYSCALL_SEND_BYTE_OVER_UART
     asm("INT 0");
 }
 

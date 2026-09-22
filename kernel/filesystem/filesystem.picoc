@@ -27,7 +27,7 @@ bool file_exists(char *path) {
 int free_file_descriptor(struct FileDescriptorTable *table) {
     int index = 0;
 
-    while (index < FILE_DESCRIPTOR_COUNT) {
+    while (index < FILE_DESCRIPTOR_OPEN_COUNT) {
         if (table->entries[index].kind == FILE_DESCRIPTOR_FREE) {
             return index;
         }

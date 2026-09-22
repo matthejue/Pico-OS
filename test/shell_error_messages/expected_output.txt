@@ -5,7 +5,6 @@ error: could not start process
 error: unload requires a process ID
 error: could not unload process
 error: export requires an assignment
-error: run-shell-tests requires a manifest path
 error: fg does not accept arguments
 error: bg does not accept arguments
 error: exit does not accept arguments

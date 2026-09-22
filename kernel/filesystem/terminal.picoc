@@ -48,9 +48,8 @@ int copy_terminal_bytes(
 
 void enqueue_terminal_byte(struct Terminal *terminal, int value) {
     if (terminal->input_count == TERMINAL_INPUT_BUFFER_CAPACITY) {
-        terminal->input_head =
-            (terminal->input_head + 1) % TERMINAL_INPUT_BUFFER_CAPACITY;
-        terminal->input_count = terminal->input_count - 1;
+        // Drops new interrupt input rather than overwriting unread bytes
+        return;
     }
 
     terminal->input_buffer[terminal->input_tail] = value;

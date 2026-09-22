@@ -5,7 +5,6 @@ run 999
 unload
 unload 999
 export
-run-shell-tests
 fg extra
 bg extra
 exit extra

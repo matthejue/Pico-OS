@@ -18,11 +18,9 @@
 #define SHELL_CTRL_U 21
 #define SHELL_CTRL_W 23
 #define SHELL_EXECUTABLE_PATH_CAPACITY 160
-#define SHELL_SAVED_STDIN_FILENO 3
-#define SHELL_SAVED_STDOUT_FILENO 5
-#define SHELL_SAVED_STDERR_FILENO 6
-#define SHELL_TEST_SAVED_STDOUT_FILENO 4
-#define SHELL_TEST_SAVED_STDERR_FILENO 7
+#define SHELL_SAVED_STDIN_FILENO 5
+#define SHELL_SAVED_STDOUT_FILENO 6
+#define SHELL_SAVED_STDERR_FILENO 7
 #define SHELL_PRIVATE_FILE_DESCRIPTOR_START 3
 #define SHELL_FILE_DESCRIPTOR_COUNT 8
 // 10 characters are needed for 2147483647, plus one character for the terminating '\0'
@@ -30,8 +28,6 @@
 
 int last_command_exit_status = 0;
 int last_background_process_id = 0;
-char **initial_shell_environment = NULL;
-char initial_shell_working_directory[PATH_MAX];
 char shell_executable_path[PATH_MAX];
 char shell_pipe_left_command[SHELL_PIPE_COMMAND_CAPACITY];
 char shell_pipe_right_command[SHELL_PIPE_COMMAND_CAPACITY];
@@ -247,22 +243,6 @@ void flush_shell_line_echo(char *buffer, int start, int count) {
         buffer + start,
         count
     );
-}
-
-bool shell_reset(void) {
-    int file_descriptor = SHELL_PRIVATE_FILE_DESCRIPTOR_START;
-
-    set_foreground_process(0);
-    reset_processes();
-    while (file_descriptor < SHELL_FILE_DESCRIPTOR_COUNT) {
-        close(file_descriptor);
-        file_descriptor = file_descriptor + 1;
-    }
-    last_command_exit_status = 0;
-    last_background_process_id = 0;
-    return initial_shell_environment != NULL &&
-        restore_environment(initial_shell_environment) == 0 &&
-        chdir(initial_shell_working_directory) == 0;
 }
 
 bool is_line_whitespace(char value) {
@@ -1241,162 +1221,6 @@ int load_from_path(char *name) {
     }
 }
 
-char *read_shell_test_file(char *path, int *size) {
-    char *contents;
-    int file_descriptor = open(path, O_RDONLY);
-
-    if (file_descriptor < 0) {
-        return NULL;
-    }
-    *size = lseek(file_descriptor, 0, SEEK_END);
-    if (*size < 0 || lseek(file_descriptor, 0, SEEK_SET) < 0) {
-        close(file_descriptor);
-        return NULL;
-    }
-
-    contents = (char *)malloc(*size + 1);
-    if (contents == NULL ||
-        (*size > 0 &&
-         read(file_descriptor, contents, *size) != *size)) {
-        close(file_descriptor);
-        free(contents);
-        return NULL;
-    }
-    close(file_descriptor);
-    contents[*size] = '\0';
-    return contents;
-}
-
-// AI used: GitHub Copilot through GitHub Education
-bool run_shell_test(char *test_directory) {
-    char capture_path[SHELL_EXECUTABLE_PATH_CAPACITY];
-    char input_path[SHELL_EXECUTABLE_PATH_CAPACITY];
-    char *input;
-    int input_size;
-    int index = 0;
-    int line_start;
-    int output_file_descriptor;
-    bool evaluating = true;
-    bool passed = true;
-
-    build_executable_path(test_directory, "input.txt", input_path);
-    build_executable_path(
-        test_directory,
-        ".fast_shell_output.txt",
-        capture_path
-    );
-
-    if (!shell_reset()) {
-        return false;
-    }
-    unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
-    input = read_shell_test_file(input_path, &input_size);
-    if (input == NULL) {
-        shell_reset();
-        return false;
-    }
-
-    output_file_descriptor = open(
-        capture_path,
-        O_WRONLY | O_CREAT | O_TRUNC | O_APPEND
-    );
-    if (output_file_descriptor < 0 ||
-        dup2(STDOUT_FILENO, SHELL_TEST_SAVED_STDOUT_FILENO) < 0 ||
-        dup2(STDERR_FILENO, SHELL_TEST_SAVED_STDERR_FILENO) < 0) {
-        if (output_file_descriptor >= 0) {
-            close(output_file_descriptor);
-        }
-        close(SHELL_TEST_SAVED_STDOUT_FILENO);
-        close(SHELL_TEST_SAVED_STDERR_FILENO);
-        free(input);
-        shell_reset();
-        return false;
-    }
-    if (dup2(output_file_descriptor, STDOUT_FILENO) < 0 ||
-        dup2(output_file_descriptor, STDERR_FILENO) < 0) {
-        dup2(SHELL_TEST_SAVED_STDOUT_FILENO, STDOUT_FILENO);
-        dup2(SHELL_TEST_SAVED_STDERR_FILENO, STDERR_FILENO);
-        close(output_file_descriptor);
-        close(SHELL_TEST_SAVED_STDOUT_FILENO);
-        close(SHELL_TEST_SAVED_STDERR_FILENO);
-        free(input);
-        shell_reset();
-        return false;
-    }
-    close(output_file_descriptor);
-
-    while (index < input_size && evaluating) {
-        line_start = index;
-        while (index < input_size &&
-               input[index] != '\n' &&
-               input[index] != '\r') {
-            index = index + 1;
-        }
-        input[index] = '\0';
-        if (index > line_start) {
-            if (strcmp(input + line_start, "poweroff.bin") == 0) {
-                evaluating = false;
-            } else {
-                evaluating = eval(input + line_start);
-            }
-        }
-        index = index + 1;
-        while (index < input_size &&
-               (input[index] == '\n' || input[index] == '\r')) {
-            index = index + 1;
-        }
-    }
-
-    if (dup2(SHELL_TEST_SAVED_STDOUT_FILENO, STDOUT_FILENO) < 0) {
-        passed = false;
-    }
-    if (dup2(SHELL_TEST_SAVED_STDERR_FILENO, STDERR_FILENO) < 0) {
-        passed = false;
-    }
-    close(SHELL_TEST_SAVED_STDOUT_FILENO);
-    close(SHELL_TEST_SAVED_STDERR_FILENO);
-    free(input);
-    if (!shell_reset()) {
-        passed = false;
-    }
-    return passed;
-}
-
-// AI used: GitHub Copilot through GitHub Education
-bool run_shell_test_manifest(char *path) {
-    char *manifest;
-    int index = 0;
-    int manifest_size;
-    int test_start;
-    bool passed = true;
-
-    manifest = read_shell_test_file(path, &manifest_size);
-    if (manifest == NULL) {
-        return false;
-    }
-    while (index < manifest_size) {
-        test_start = index;
-        while (index < manifest_size &&
-               manifest[index] != '\n' &&
-               manifest[index] != '\r') {
-            index = index + 1;
-        }
-        manifest[index] = '\0';
-        if (index > test_start &&
-            !run_shell_test(manifest + test_start)) {
-            passed = false;
-        }
-        index = index + 1;
-        while (index < manifest_size &&
-               (manifest[index] == '\n' ||
-                manifest[index] == '\r')) {
-            index = index + 1;
-        }
-    }
-    free(manifest);
-    return passed;
-}
-
 bool eval(char *command) {
     char *raw_arguments;
     char *stderr_path;
@@ -1444,19 +1268,6 @@ bool eval(char *command) {
             return true;
         }
         return eval(raw_arguments);
-    } else if (command_matches(command, "run-shell-tests")) {
-        raw_arguments = command_operand(command, "run-shell-tests");
-        if (raw_arguments == NULL) {
-            shell_write_error_string(
-                "error: run-shell-tests requires a manifest path\n"
-            );
-            last_command_exit_status = 1;
-        } else if (!run_shell_test_manifest(raw_arguments)) {
-            shell_write_error_string("error: shell tests failed\n");
-            last_command_exit_status = 1;
-        } else {
-            last_command_exit_status = 0;
-        }
     } else if (command_matches(command, "export")) {
         raw_arguments = command_operand(command, "export");
         if (raw_arguments == NULL) {
@@ -1637,6 +1448,7 @@ bool eval(char *command) {
 int main(int argc, char **argv) {
     char command[SHELL_COMMAND_BUFFER_CAPACITY];
     int command_length;
+    int file_descriptor = SHELL_PRIVATE_FILE_DESCRIPTOR_START;
 
     if (argc == 2 && command_is_help(argv[1])) {
         shell_usage(STDOUT_FILENO);
@@ -1646,21 +1458,16 @@ int main(int argc, char **argv) {
         shell_usage(STDERR_FILENO);
         return 1;
     }
+    while (file_descriptor < SHELL_FILE_DESCRIPTOR_COUNT) {
+        close(file_descriptor);
+        file_descriptor = file_descriptor + 1;
+    }
     if (lseek(STDIN_FILENO, 0, SEEK_CUR) >= 0) {
         unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
     }
     set_foreground_process(0);
     if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
         shell_write_error_string("error: could not configure shell signals\n");
-        return 1;
-    }
-    initial_shell_environment = clone_environment();
-    if (initial_shell_environment == NULL) {
-        shell_write_error_string("error: could not save shell environment\n");
-        return 1;
-    }
-    if (getcwd(initial_shell_working_directory, PATH_MAX) == NULL) {
-        shell_write_error_string("error: could not save working directory\n");
         return 1;
     }
     while (true) {

@@ -4,6 +4,7 @@
 #include "../../common/stddef.header"
 
 #define FILE_DESCRIPTOR_COUNT 8
+#define FILE_DESCRIPTOR_OPEN_COUNT 5
 
 #define FILE_DESCRIPTOR_FREE 0
 #define FILE_DESCRIPTOR_STDIN 1

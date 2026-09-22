@@ -17,7 +17,7 @@ and its test and documentation material.
 | [`interrupt_service_routines/`](../interrupt_service_routines/) | Interrupt-vector-table and operating-system interrupt-service-routine sources. |
 | [`kernel/`](../kernel/) | Kernel source and headers: startup, dispatching, scheduling, processes, memory, system calls, interrupts, devices, and host filesystem support. Its [`filesystem/`](../kernel/filesystem/) and [`process/`](../kernel/process/) subdirectories group those subsystems. |
 | [`library/`](../library/) | Userspace PicoC libraries. Each subdirectory implements a library area such as standard I/O, strings, process, system-control and file operations, allocation, signals, mutexes, and startup code. |
-| [`system/`](../system/) | Privileged system userspace programs. [`init.picoc`](../system/init.picoc) is the first process started by the kernel, [`fast_os_test_launcher.picoc`](../system/fast_os_test_launcher.picoc) is built only for the fast test workflow. |
+| [`system/`](../system/) | Privileged system userspace programs. [`init.picoc`](../system/init.picoc) is the first process started by the kernel. |
 | [`user/`](../user/) | Normal userspace command sources, including the shell and commands such as `cat`, `ls`, `mkdir`, and `ps`. |
 | [`test/`](../test/) | Standalone library tests and OS/shell test fixtures. Scenario subdirectories normally contain PicoC programs, `input.txt`, and `expected_output.txt`, [`test/README.md`](../test/README.md) describes the test layout. |
 | [`documentation/`](.) | Additional technical documentation, diagrams, and supporting material for PicoOS. |
@@ -44,7 +44,6 @@ column, the other scripts support local development and testing.
 | [`run.sh`](../run.sh) | Compiles one supplied PicoC source with the configured run options and starts it in an isolated emulator instance. | No |
 | [`run_lib_test_case.sh`](../run_lib_test_case.sh) | Compiles and runs one standalone library test, checks its output, and cleans its temporary emulator peripheral directory. | No |
 | [`run_os_tests.py`](../run_os_tests.py) | Builds, stages, boots, drives, and checks OS feature and shell test scenarios. | No |
-| [`run_os_tests_fast.py`](../run_os_tests_fast.py) | Runs compatible OS and shell scenarios with shared PicoOS boots to reduce test time. | No |
 | [`run_reti_emulator_isolated.sh`](../run_reti_emulator_isolated.sh) | Starts `reti_emulator` with a new temporary peripheral directory so runs do not share host-device state. | No |
 | [`run_sys_tests.sh`](../run_sys_tests.sh) | Runs the shell-based system-test workflow, optionally limiting it to failed tests or using direct compilation. | No |
 | [`select_test_jobs.sh`](../select_test_jobs.sh) | Selects or validates the parallel-job count for system tests. | No |

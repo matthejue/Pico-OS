@@ -24,6 +24,7 @@ SHELL_PROMPT = "PicoOS> "
 PRINT_LOCK = threading.Lock()
 TEMPORARY_ROOT = Path("/tmp")
 BINARY_TEST_ROOT = Path("binary/test")
+BOOT_TEST_DIRECTORY = Path("test/boot")
 RUNTIME_BOOT_ARGUMENTS = (
     "-n",
     "5",
@@ -67,9 +68,9 @@ def parse_args():
     )
     parser.add_argument(
         "--kind",
-        choices=("all", "os", "shell"),
+        choices=("all", "os", "shell", "boot"),
         default="all",
-        help="Select all OS tests, OS feature tests, or shell tests.",
+        help="Select all tests, OS feature tests, shell tests, or the boot test.",
     )
     parser.add_argument(
         "--run",
@@ -131,10 +132,20 @@ def selected_test_dirs(pattern, kind="all"):
     if pattern and pattern != "all":
         candidates = [path for path in candidates if pattern in path.name]
     if kind == "os":
-        candidates = [path for path in candidates if is_os_feature_test(path)]
+        candidates = [
+            path
+            for path in candidates
+            if path != BOOT_TEST_DIRECTORY and is_os_feature_test(path)
+        ]
     elif kind == "shell":
         candidates = [
-            path for path in candidates if not is_os_feature_test(path)
+            path
+            for path in candidates
+            if path != BOOT_TEST_DIRECTORY and not is_os_feature_test(path)
+        ]
+    elif kind == "boot":
+        candidates = [
+            path for path in candidates if path == BOOT_TEST_DIRECTORY
         ]
     return sorted(candidates)
 
@@ -176,7 +187,6 @@ def stage_test_directories(test_dirs):
                 "*.reti",
                 "output.txt",
                 "raw_output.txt",
-                ".fast_shell_output.txt",
             ),
         )
 
@@ -775,7 +785,7 @@ def run_matching_tests(args, extra_cpl_args, extra_emu_args):
     paths = [path for path in paths if validate_test_dir(path)]
 
     if not paths:
-        print("No matching OS tests found.", file=sys.stderr)
+        print(f"No matching {args.kind} tests found.", file=sys.stderr)
         return 1
 
     test_jobs = args.jobs

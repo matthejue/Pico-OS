@@ -43,8 +43,7 @@ each merged `.reti` from `.picoc` inputs and does not read `.reti_blocks` or
 `.st` files. Ready test directories run concurrently with `TEST_JOBS` workers.
 
 Assembly and OS emulator processes both use private temporary peripheral
-directories. Fast OS tests still intentionally use one shared boot per group,
-but that boot also has its own temporary directory.
+directories. Each OS, shell, or boot scenario starts a separate PicoOS boot.
 
 ## Invalidation
 

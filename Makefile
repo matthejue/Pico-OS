@@ -116,9 +116,8 @@ endef
 
 .PHONY: help code-index readme-pdf FORCE ci-build ci-artifacts release-tree release-archive rebuild-release verify-release-tree test-runtime-tree system-binaries user-binaries
 .PHONY: run run_send_keypresses run-os
-.PHONY: test test-fast test-lib test-all test_not_passed
-.PHONY: test-sys test-sys-fast
-.PHONY: test-os test-os-fast test-shell test-shell-fast
+.PHONY: test test-lib test-all test_not_passed
+.PHONY: test-sys test-os test-shell test-boot
 .PHONY: bootload bootload-dma bootload-notui bootload-debug run-kernel firmware eprom kernel isrs system user device devices shell.bin shell.reti cat.bin cat.reti cp.bin cp.reti echo.bin echo.reti kill.bin kill.reti ls.bin ls.reti mkdir.bin mkdir.reti mv.bin mv.reti poweroff.bin poweroff.reti ps.bin ps.reti pwd.bin pwd.reti reboot.bin reboot.reti rm.bin rm.reti rmdir.bin rmdir.reti sed.bin sed.reti touch.bin touch.reti uname.bin uname.reti clean-firmware rebuild-firmware
 .PHONY: clean clean-binary
 
@@ -134,17 +133,14 @@ help:
 	@echo "  make run                        Run configured program using RUN_PATH"
 	@echo "  make run_send_keypresses        Run configured program and send keypresses"
 	@echo "  make run-os                     Run configured OS test using OS_RUN_PATH"
-	@echo "  make test                       Run library, OS feature, and shell tests normally"
-	@echo "  make test-fast                  Run library tests, then fast OS feature and shell test groups"
+	@echo "  make test                       Run library, OS feature, shell, and boot tests"
 	@echo "  make test-lib                   Run library tests using TEST_PATTERN"
 	@echo "  make test-all                   Alias for make test"
 	@echo "  make test_not_passed            Run library paths from ./config/not_passed_tests.txt"
-	@echo "  make test-sys                   Run OS feature and shell tests normally"
-	@echo "  make test-sys-fast              Run OS feature and shell tests with shared boots per group"
-	@echo "  make test-os                    Run OS feature tests normally"
-	@echo "  make test-os-fast               Run OS feature tests with one OS boot"
-	@echo "  make test-shell                 Run shell tests normally"
-	@echo "  make test-shell-fast            Run shell tests with shared OS boots"
+	@echo "  make test-sys                   Run OS feature and shell tests"
+	@echo "  make test-os                    Run OS feature tests"
+	@echo "  make test-shell                 Run shell tests"
+	@echo "  make test-boot                  Run one hello-world command through the full boot path"
 	@echo "  make firmware                   Build bootloader and kernel artifacts"
 	@echo "  make release-tree               Build and clean the complete release tree in binary"
 	@echo "  make release-archive            Build and archive the verified release tree"
@@ -288,25 +284,10 @@ test: release-tree
 	$(MAKE) test-lib TEST_JOBS="$$test_jobs" || status=$$?; \
 	echo "===== System tests (make test-sys) ====="; \
 	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys TEST_JOBS="$$test_jobs" || status=$$?; \
-	exit "$$status"
-
-test-fast: release-tree
-	@test_jobs="$$(./select_test_jobs.sh)" || exit $$?; \
-	summary_file=$$(mktemp); \
-	status=0; \
-	print_summary() { \
-		echo; \
-		./heading_subheadings.py heading "Final test summary" "$${COLUMNS:-120}" "="; \
-		cat "$$summary_file"; \
-		rm -f "$$summary_file"; \
-	}; \
-	trap print_summary EXIT; \
-	echo "===== Library tests (make test-lib) ====="; \
+	echo "===== Boot test (make test-boot) ====="; \
 	TEST_SUMMARY_FILE="$$summary_file" \
-	TEST_SUMMARY_HEADING="Library tests (make test-lib)" \
-	$(MAKE) test-lib TEST_JOBS="$$test_jobs" || status=$$?; \
-	echo "===== System tests (make test-sys-fast) ====="; \
-	TEST_SUMMARY_FILE="$$summary_file" $(MAKE) test-sys-fast TEST_JOBS="$$test_jobs" || status=$$?; \
+	TEST_SUMMARY_HEADING="Boot test (make test-boot)" \
+	$(MAKE) test-boot TEST_JOBS=1 || status=$$?; \
 	exit "$$status"
 
 test-lib: config/isrs.reti
@@ -351,38 +332,14 @@ test-shell: test-runtime-tree
 	rm -rf binary/test; \
 	exit "$$status"
 
-test-sys-fast:
-	@test_jobs="$$(./select_test_jobs.sh)" || exit $$?; \
-	start=$$SECONDS; status=0; \
-	TEST_SUMMARY_HEADING="OS feature tests (make test-os-fast)" \
-	$(MAKE) test-os-fast TEST_JOBS="$$test_jobs" || status=$$?; \
-	TEST_SUMMARY_HEADING="Shell tests (make test-shell-fast)" \
-	$(MAKE) test-shell-fast TEST_JOBS="$$test_jobs" || status=$$?; \
-	duration=$$(($$SECONDS - $$start)); \
-	printf 'make test-sys-fast completed in %02d:%02d\n' \
-		"$$((duration / 60))" "$$((duration % 60))"; \
-	exit "$$status"
-
-test-os-fast: test-runtime-tree
+test-boot: test-runtime-tree
 	@start=$$SECONDS; \
 	./export_environment_vars_for_makefile.sh; \
-	$(MAKE) binary/system/fast_os_test_launcher.bin; \
-	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind os "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
+	./run_os_tests.py $(TEST_BUILD_OPTION) --jobs 1 --kind boot "$${COLUMNS:-120}" "boot" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
 	status=$$?; duration=$$(($$SECONDS - $$start)); \
-	printf 'make test-os-fast completed in %02d:%02d\n' \
+	printf 'make test-boot completed in %02d:%02d\n' \
 		"$$((duration / 60))" "$$((duration % 60))"; \
-	rm -f binary/system/fast_os_test_launcher.bin; rm -rf binary/test; \
-	exit "$$status"
-
-test-shell-fast: test-runtime-tree
-	@start=$$SECONDS; \
-	./export_environment_vars_for_makefile.sh; \
-	$(MAKE) binary/system/fast_os_test_launcher.bin; \
-	./run_os_tests_fast.py $(TEST_BUILD_OPTION) --kind shell "$${COLUMNS:-120}" "$(OS_TEST_PATTERN)" "$(OS_TEST_CPL_OPTS) $(EXTRA_CPL_ARGS) -C $(USER_STARTUP_SOURCE)" "$(OS_TEST_EMU_OPTS) -O $(EXTRA_EMU_ARGS) $(DMA_EMU_OPTION)"; \
-	status=$$?; duration=$$(($$SECONDS - $$start)); \
-	printf 'make test-shell-fast completed in %02d:%02d\n' \
-		"$$((duration / 60))" "$$((duration % 60))"; \
-	rm -f binary/system/fast_os_test_launcher.bin; rm -rf binary/test; \
+	rm -rf binary/test; \
 	exit "$$status"
 
 
@@ -398,7 +355,7 @@ kernel: binary/kernel/kernel.bin
 
 isrs: config/isrs.reti
 
-SYSTEM_PROGRAM_SOURCES := $(filter-out system/fast_os_test_launcher.picoc,$(wildcard system/*.picoc))
+SYSTEM_PROGRAM_SOURCES := $(wildcard system/*.picoc)
 SYSTEM_PROGRAM_BINARIES := $(patsubst system/%.picoc,$(BINARY_DIR)/system/%.bin,$(SYSTEM_PROGRAM_SOURCES))
 USER_PROGRAM_SOURCES := $(wildcard user/*.picoc)
 USER_PROGRAM_BINARIES := $(patsubst user/%.picoc,$(BINARY_DIR)/user/%.bin,$(USER_PROGRAM_SOURCES))
