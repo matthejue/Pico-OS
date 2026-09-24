@@ -1,1 +1,0 @@
-/home/areo/Documents/Studium/PicoC-Compiler/doc/reti_sections_low_level_picoc.md

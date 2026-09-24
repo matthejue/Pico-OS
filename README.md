@@ -6009,7 +6009,7 @@ descendants that retain this setting.
 ## 12.7 Input/output redirection
 [\[↑ TOC\]](#contents)
 
-PicoOS has no general-purpose [`fork()`](documentation/detailed_limitations.md),
+PicoOS has no general-purpose `fork()`,
 paging, virtual memory, or copy-on-write. Paging is not inherently required to
 implement a `fork()` operation, but PicoOS does not provide any operation that
 clones a running process. Its shell therefore cannot use the conventional
@@ -6980,8 +6980,7 @@ more extensively.
 
 The lecture examples and tests above should be read with these limits in
 mind. The list links each main limitation to the implementation or its fuller
-explanation. [Detailed limitations moved from this overview](documentation/detailed_limitations.md)
-retain the removed implementation-specific points.
+explanation.
 
 - one physical address space with no MMU, hardware memory isolation, or virtual
   memory, as described in [Section 3, Memory management and shared memory](#3-memory-management-and-shared-memory)
