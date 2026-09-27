@@ -461,9 +461,9 @@ lectures follow.
    - [12.3 Interactive line editing and command history](#123-interactive-line-editing-and-command-history)
    - [12.4 Command parsing, expansion, and execution](#124-command-parsing-expansion-and-execution)
    - [12.5 Shell built-in commands](#125-shell-built-in-commands)
-   - [12.6 Foreground processes, background processes, and job-control signals](#126-foreground-processes-background-processes-and-job-control-signals)
-   - [12.7 Input/output redirection](#127-inputoutput-redirection)
-   - [12.8 Sequential file-backed pipelines](#128-sequential-file-backed-pipelines)
+      - [12.5.1 Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals)
+   - [12.6 Input/output redirection](#126-inputoutput-redirection)
+   - [12.7 Sequential file-backed pipelines](#127-sequential-file-backed-pipelines)
 1. [User applications and commands](#13-user-applications-and-commands)
    - [13.1 Available applications and their library use](#131-available-applications-and-their-library-use)
    - [13.2 Command behavior and supported options](#132-command-behavior-and-supported-options)
@@ -4424,7 +4424,7 @@ discards inherited nonstandard entries before accepting commands. The shell
 then closes every temporary copy itself, so its save slots are free before
 each redirection. The target's own [`open()`](library/fcntl/fcntl.picoc#L5)
 can use only 0–4 and therefore cannot collide with slots 5–7.
-[Section 12.7, Input/output redirection](#127-inputoutput-redirection) explains
+[Section 12.6, Input/output redirection](#126-inputoutput-redirection) explains
 the complete sequence.
 
 The field table below shows that a descriptor is not merely a path. Integer kind constants, access
@@ -4594,7 +4594,7 @@ foreground process: its request is stored in the PCB before dispatch, and
 [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) to make that specific
 reader ready. Background reads instead stop with [`SIGTTIN`](common/signal.header#L9), as explained
 in [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals).
-[Section 12.6, Foreground processes, background processes, and job-control signals](#126-foreground-processes-background-processes-and-job-control-signals)
+[Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals)
 shows how the shell selects and resumes the job.
 
 ```mermaid
@@ -6293,6 +6293,7 @@ command editing and pipelines:
 | [`shell_pipe_left_command`](user/shell.picoc#L32), [`shell_pipe_right_command`](user/shell.picoc#L33), [`shell_pipe_path`](user/shell.picoc#L34) | Embedded command and temporary-path storage for one two-command pipeline |
 | [`command_history`](user/shell.picoc#L36) | Embedded ring containing at most eight recent commands, only consecutive duplicates are suppressed |
 | [`command_history_draft`](user/shell.picoc#L39) | Current unfinished line preserved while navigating history |
+| [`shell_line_erase_sequence`](user/shell.picoc#L41) | Embedded scratch array holding one batched terminal erase sequence |
 | [`shell_input_buffer`](user/shell.picoc#L42) | Up to 128 input bytes retained across command lines so one [`read()`](library/unistd/io.picoc#L6) can drain the kernel terminal ring |
 | [`command_history_start`](user/shell.picoc#L43), [`command_history_count`](user/shell.picoc#L44) | History ring indices/count |
 | [`shell_input_index`](user/shell.picoc#L45), [`shell_input_count`](user/shell.picoc#L46) | Next retained input byte and number of valid bytes in [`shell_input_buffer`](user/shell.picoc#L42) |
@@ -6305,7 +6306,36 @@ never allocates 5–7 for [`open()`](library/fcntl/fcntl.picoc#L5), and
 [`run()`](library/unistd/process.picoc#L31) never copies them to a child. All
 descriptor state itself remains in the shell PCB's kernel-heap table. The status,
 history, and input counters have zero initializers in the shell image, and
-command helpers fill the scratch buffers.
+command helpers fill the scratch buffers. In particular,
+[`shell_input_buffer`](user/shell.picoc#L42) is the array itself, not a global pointer to another allocation:
+
+```mermaid
+flowchart LR
+    subgraph UI["shell process image"]
+        subgraph DATA[".data: storage exists for the shell's lifetime"]
+            IB["shell_input_buffer[128]<br/>bytes stored inline"]
+            IX["shell_input_index"]
+            CT["shell_input_count"]
+            HS["history and pipeline arrays<br/>also stored inline"]
+        end
+        subgraph STACK["main() stack frame"]
+            CMD["command[80]<br/>current editable line"]
+        end
+    end
+    subgraph KH["kernel heap"]
+        PCB["shell Process"] --> FDT["FileDescriptorTable"]
+        FDT --> ENTRIES["entries → 8-descriptor array"]
+    end
+    IX -->|"next byte"| IB
+    CT -->|"valid prefix length"| IB
+    IB -->|"read_line copies one byte at a time"| CMD
+```
+
+This separates three often-confused stores: terminal bytes first wait in the kernel's global
+[`Terminal.input_buffer`](kernel/filesystem/terminal.header#L10), one [`read()`](library/unistd/io.picoc#L6) copies available bytes
+into the shell image's global [`shell_input_buffer`](user/shell.picoc#L42), and
+[`read_line()`](user/shell.picoc#L271) builds the current command in
+the stack-local [`command`](user/shell.picoc#L1449) array. None of those arrays is allocated on the userspace heap.
 
 ## 12.2 Shell startup and command loop
 [\[↑ TOC\]](#contents)
@@ -6325,12 +6355,50 @@ calls [`read_line()`](user/shell.picoc#L271), stores nonempty commands in histor
 and sends them to [`eval()`](user/shell.picoc#L1224). [`read_line()`](user/shell.picoc#L271) returns
 `-1` at EOF, so redirected stdin ends the shell normally. Therefore, `shell.bin < commands.txt`
 reads and executes the newline-separated commands in `commands.txt` without requiring typed terminal
-input. The function table below links the main loop’s operations to their library calls and local
-effects.
+input.
+
+For example, suppose one terminal read returns two already typed lines. The first
+[`read_line()`](user/shell.picoc#L271)
+stops at the first newline. The second line stays in the persistent read-ahead array and the next
+prompt consumes it without another syscall:
+
+```text
+read() result                         after read_line() returns "pwd"
+shell_input_buffer                    shell_input_buffer
+┌───┬───┬───┬────┬───┬───┬────┐      ┌───┬───┬───┬────┬───┬───┬────┐
+│ p │ w │ d │ \n │ l │ s │ \n │      │ p │ w │ d │ \n │ l │ s │ \n │
+└───┴───┴───┴────┴───┴───┴────┘      └───┴───┴───┴────┴───┴───┴────┘
+  index = 0, count = 7                    index = 4, count = 7
+                                              └──── next command ────┘
+```
+
+The complete helper is short enough to show the boundary between buffered and unbuffered input:
+
+```c
+int read_shell_character(char *character) {
+    if (shell_input_index >= shell_input_count) {
+        shell_input_count = read(
+            STDIN_FILENO,
+            shell_input_buffer,
+            SHELL_INPUT_BUFFER_CAPACITY
+        );
+        shell_input_index = 0;
+        if (shell_input_count <= 0) {
+            return shell_input_count;
+        }
+    }
+
+    *character = shell_input_buffer[shell_input_index];
+    shell_input_index = shell_input_index + 1;
+    return 1;
+}
+```
+
+The function table below links the main loop’s operations to their library calls and local effects.
 
 | Shell function | Return value / status | Library functions |
 | --- | --- | --- |
-| [`read_shell_character(character)`](user/shell.picoc#L252) | 1 after returning one byte, 0 at EOF, or the negative [`read()`](library/unistd/io.picoc#L6) error | Refills [`shell_input_buffer`](user/shell.picoc#L46) with one [`read()`](library/unistd/io.picoc#L6) and returns retained bytes one at a time across command lines |
+| [`read_shell_character(character)`](user/shell.picoc#L252) | 1 after returning one byte, 0 at EOF, or the negative [`read()`](library/unistd/io.picoc#L6) error | Refills [`shell_input_buffer`](user/shell.picoc#L42) with one [`read()`](library/unistd/io.picoc#L6) and returns retained bytes one at a time across command lines |
 | [`read_line(buffer, capacity)`](user/shell.picoc#L271) | Command length, or `-1` at EOF | Calls [`read_shell_character()`](user/shell.picoc#L252), batches consecutive printable echoes through [`flush_shell_line_echo()`](user/shell.picoc#L240), flushes them before editing controls, edits the stack buffer, and updates history-navigation state |
 | [`remember_shell_command(command)`](user/shell.picoc#L147) | No value | [`strcmp()`](library/string/string.picoc#L34) and [`strcpy()`](library/string/string.picoc#L4), mutates the global eight-entry history ring and skips consecutive duplicates |
 | [`expand_variables(arguments, result, capacity)`](user/shell.picoc#L466) | Expanded buffer (truncated to capacity minus one), or `NULL` for a null input | Uses [`getenv()`](library/stdlib/env.picoc#L115) and the `$?`/`$!` globals while preserving quotes for argument parsing, expansion also occurs inside single quotes |
@@ -6343,21 +6411,54 @@ effects.
 ## 12.3 Interactive line editing and command history
 [\[↑ TOC\]](#contents)
 
-The terminal ISR and descriptor layer deliver bytes, the shell interprets them as the editing
-operations listed in the table below. The 80-cell line buffer holds at most 79 characters plus the
-terminator:
+The terminal ISR and descriptor layer deliver bytes, then
+[`read_line()`](user/shell.picoc#L271) decides how each editing or navigation byte is handled. The helper column is
+included because history navigation and screen erasure are delegated to different functions. No
+separate control-key dispatcher exists. The 80-cell line buffer holds at most 79 characters plus
+the terminator:
 
-| Input | Shell behavior |
-| --- | --- |
-| Line feed or carriage return | Echo one newline and finish the command |
-| Backspace (8) or Delete (127) | Remove one buffered character and erase it visually |
-| `Ctrl+U` | Erase the complete current line |
-| `Ctrl+W` | Erase trailing whitespace and the previous word |
-| Up arrow | Move toward older entries in the eight-command history ring |
-| Down arrow | Move toward newer entries and finally restore the draft |
-| Left/right arrows | Consume the escape sequence but do not move the cursor |
-| Tab | Append one space if room remains in the 80-cell buffer |
-| Printable byte | Append it if space remains in the 80-cell buffer |
+| Input | Shell behavior | Implementation |
+| --- | --- | --- |
+| Line feed or carriage return | Echo one newline and finish the command | [`read_line()`](user/shell.picoc#L271) calls [`shell_write_character()`](user/shell.picoc#L50) and ends its loop |
+| Backspace (8) or Delete (127) | Remove one buffered character and erase it visually | [`read_line()`](user/shell.picoc#L271) calls [`erase_shell_line_suffix()`](user/shell.picoc#L125) with `length - 1` |
+| `Ctrl+U` (21) | Erase the complete current line | [`read_line()`](user/shell.picoc#L271) calls [`erase_shell_line_suffix()`](user/shell.picoc#L125) with retained length 0 |
+| `Ctrl+V` (22) | Ignore the byte because PicoOS has no literal-next-character mode | It matches no [`read_line()`](user/shell.picoc#L271) branch and is below the printable range, so it is not appended |
+| `Ctrl+W` (23) | Erase trailing whitespace and the previous word | [`read_line()`](user/shell.picoc#L271) finds the retained prefix, then calls [`erase_shell_line_suffix()`](user/shell.picoc#L125) |
+| Up arrow (`ESC [ A` or `ESC O A`) | Move toward older entries in the eight-command history ring | [`read_line()`](user/shell.picoc#L271) decodes the sequence, then calls [`navigate_command_history(..., 1)`](user/shell.picoc#L194) |
+| Down arrow (`ESC [ B` or `ESC O B`) | Move toward newer entries and finally restore the draft | [`read_line()`](user/shell.picoc#L271) calls [`navigate_command_history(..., -1)`](user/shell.picoc#L194) |
+| Left/right arrows (`ESC [ C/D` or `ESC O C/D`) | Consume the escape sequence but do not move the cursor | [`read_line()`](user/shell.picoc#L271) sets [`process_character`](user/shell.picoc#L281) to `false` without changing the line |
+| Tab | Append one space if room remains | [`read_line()`](user/shell.picoc#L271) converts it to a space, then calls [`append_shell_line_character()`](user/shell.picoc#L227) |
+| Printable byte | Append it if room remains | [`read_line()`](user/shell.picoc#L271) calls [`append_shell_line_character()`](user/shell.picoc#L227) |
+
+The two decisive parts of the dispatcher make the distinction concrete:
+
+```c
+if (character == 'A') {
+    length = navigate_command_history(
+        buffer, length, capacity, &history_position, 1
+    );
+    process_character = false;
+} else if (character == 'B') {
+    length = navigate_command_history(
+        buffer, length, capacity, &history_position, -1
+    );
+    process_character = false;
+}
+
+/* ... inside the ordinary-character branch ... */
+if (character == SHELL_CTRL_U) {
+    length = erase_shell_line_suffix(length, 0);
+} else if (character == SHELL_CTRL_W) {
+    /* scan backward over whitespace and the preceding word */
+    length = erase_shell_line_suffix(length, retained_length);
+}
+```
+
+`Ctrl+C` and `Ctrl+Z` follow a different path: the UART interrupt handler passes them to
+[`handle_terminal_signal_character()`](kernel/signal.picoc#L192), which consumes them before they
+enter either terminal input buffer. They control the foreground process as described in
+[Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals), not the
+editable line.
 
 [`read_shell_character()`](user/shell.picoc#L252) refills the shell's 128-byte input buffer with one
 [`read()`](library/unistd/io.picoc#L6). If several typed bytes have accumulated in the kernel ring,
@@ -6387,6 +6488,26 @@ separates the command/PID from its raw arguments. [`run_process()`](user/shell.p
 preserves quote characters, including single quotes, and truncates at the output buffer limit.
 Command names and redirection paths are not expanded. A command containing `/` is loaded directly,
 another name is searched through colon-separated `PATH` entries.
+
+For a concrete trace, assume `NAME=Ada` and the preceding status `$?` is 0. The same 80-cell
+command array is edited in place. Returned argument and redirection pointers refer into that array.
+
+| Stage | Result | What changed |
+| --- | --- | --- |
+| Input | `echo.bin "hello $NAME ($?)" > result.txt &` | Nothing yet |
+| [`strip_background_operator()`](user/shell.picoc#L804) | `echo.bin "hello $NAME ($?)"` and [`background`](user/shell.picoc#L1236) set to `true` | Removed only the trailing `&` and adjacent whitespace |
+| [`strip_command_redirections()`](user/shell.picoc#L926) | Command prefix `echo.bin "hello $NAME ($?)"`<br>[`stdout_path`](user/shell.picoc#L1228) points at `result.txt` | Parsed the final `>` suffix and terminated the command before it. The path is not expanded |
+| [`command_arguments()`](user/shell.picoc#L400) | Name `echo.bin`<br>Raw arguments `"hello $NAME ($?)"` | Replaced the separator after the name with `\0` and returned a pointer to the remainder |
+| [`load_from_path()`](user/shell.picoc#L1186) | Loaded `/user/echo.bin`, returning a [`NEW`](kernel/process/process.header#L12) PID | Used `PATH`. This step does **not** copy descriptors |
+| [`expand_variables()`](user/shell.picoc#L466) | `"hello Ada (0)"` | Replaced `$NAME` and `$?`, deliberately retaining quote bytes |
+| [`run()`](library/unistd/process.picoc#L31) | Child [`argv[1]`](kernel/process/process_arguments.picoc#L200) is `hello Ada (0)` | Kernel run setup removed matching quotes while building `argv`, inherited the temporarily redirected descriptors, and made the child [`READY`](kernel/process/process.header#L13) |
+
+The quote behavior is intentionally smaller than a conventional shell grammar. Expansion scans raw
+argument characters without tracking quote state, so `echo.bin '$NAME'` also becomes one argument
+containing `Ada`. Single quotes do **not** suppress expansion. Quotes only keep whitespace inside one
+argument and are removed later by
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125). There is no general
+backslash escape pass.
 
 The configured `PATH=/user` uses the PicoOS root, so commands remain discoverable after `cd`
 and from nested shells. A relative entry supplied by the user is resolved from the shell's current
@@ -6453,15 +6574,15 @@ Built-ins execute inside the shell process. This is essential for operations suc
 [`environ`](library/stdlib/env.picoc#L4). The table lists all **9 built-ins** and the library
 operations they use.
 
-| Built-in | Behavior | Library functions |
+| Built-in | Behavior | Library functions / host requests |
 | --- | --- | --- |
 | `exit` | Accepts no argument and returns false from [`eval()`](user/shell.picoc#L1224), ending this shell session | No immediate syscall, [`libstart`](library/start/libstart.picoc) later calls [`exit(main_result)`](library/stdlib/exit.picoc#L3) |
 | `eval COMMAND` | Recursively evaluates the remaining text in the same shell state | Re-enters [`eval()`](user/shell.picoc#L1224), resulting command calls apply normally |
 | `export NAME=value` | Expands the complete assignment and stores/replaces the variable | [`getenv`](library/stdlib/env.picoc#L115) during expansion and [`setenv(..., true)`](library/stdlib/env.picoc#L126) |
-| `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | [`chdir()`](library/unistd/working_directory.picoc#L4) / syscall 29 |
-| `load PATH` | Loads a binary but leaves its PCB in `NEW` | [`load()`](library/unistd/process.picoc#L17) / syscall 2 |
-| `run PID [ARGUMENTS]` | Starts a previously loaded PCB, supports `&`, `<`, `>`, `>>`, `2>`, and `2>>` | [`run()`](library/unistd/process.picoc#L31), and possibly [`open`](library/fcntl/fcntl.picoc#L5)/[`dup2`](library/unistd/io.picoc#L58)/[`close`](library/unistd/io.picoc#L54), [`set_foreground_process`](library/unistd/process.picoc#L59), [`waitpid`](library/sys/wait/wait.picoc#L14) |
-| `unload PID` | Terminates/removes the selected non-current process | [`unload()`](library/unistd/process.picoc#L47) / syscall 5 |
+| `cd DIRECTORY` | Changes this shell PCB's working-directory string after host validation | [`chdir()`](library/unistd/working_directory.picoc#L4)<br>**Host request:** `is-directory <absolute-path>` |
+| `load PATH` | Loads a binary but leaves its PCB in [`NEW`](kernel/process/process.header#L12) | [`load()`](library/unistd/process.picoc#L17)<br>**Host requests:** `file-size <path>`, then `read-range <offset> <count> <path>` for the header and executable payload |
+| `run PID [ARGUMENTS]` | Starts a previously loaded PCB, supports `&`, `<`, `>`, `>>`, `2>`, and `2>>` | [`run()`](library/unistd/process.picoc#L31), and possibly [`open()`](library/fcntl/fcntl.picoc#L5)/[`dup2()`](library/unistd/io.picoc#L58)/[`close()`](library/unistd/io.picoc#L54), [`set_foreground_process()`](library/unistd/process.picoc#L59), [`waitpid()`](library/sys/wait/wait.picoc#L14)<br>**Host requests when opening redirections:** `file-size <path>` for input/append existence checks, or `write <path>` followed by `write stdout` to create/truncate output |
+| `unload PID` | Terminates/removes the selected non-current process | [`unload()`](library/unistd/process.picoc#L47) |
 | `fg` | Makes the most recently tracked PID foreground, sends [`SIGCONT`](common/signal.header#L6), and waits | [`set_foreground_process`](library/unistd/process.picoc#L59), [`kill`](library/signal/signal.picoc#L14), [`waitpid`](library/sys/wait/wait.picoc#L14) |
 | `bg` | Sends [`SIGCONT`](common/signal.header#L6) to the most recently tracked PID without waiting | [`kill()`](library/signal/signal.picoc#L14) |
 
@@ -6471,7 +6592,7 @@ The built-ins report missing required operands. `exit`, `fg`, and `bg` reject ex
 assignment syntax and is treated as an external command, `unset` is not implemented even though the
 library provides [`unsetenv()`](library/stdlib/env.picoc#L157).
 
-## 12.6 Foreground processes, background processes, and job-control signals
+### 12.5.1 Foreground processes, background processes, and job-control signals
 [\[↑ TOC\]](#contents)
 
 For a foreground child, the shell gives the child's PID to
@@ -6482,6 +6603,64 @@ ID and restore input without making itself a signal target, and stores the retur
 `Ctrl+C` becomes
 [`SIGINT`](common/signal.header#L4), `Ctrl+Z` becomes [`SIGTSTP`](common/signal.header#L8). A
 stopped status is recorded as the current `$!` target so `fg` or `bg` can continue it.
+
+This [`run_process()`](user/shell.picoc#L1034) excerpt shows the actual order. Descriptor
+restoration happens first. Foreground ownership is set only after [`run()`](library/unistd/process.picoc#L31) has succeeded, and is
+restored after the exact-child wait returns:
+
+```c
+started = run(pid, expand_variables(
+                       arguments,
+                       expanded_arguments,
+                       SHELL_COMMAND_BUFFER_CAPACITY),
+              NULL);
+restore_standard_descriptors(
+    stdin_redirected, stdout_redirected, stderr_redirected
+);
+
+if (!started) {
+    shell_write_error_string("error: could not start process\n");
+} else if (background) {
+    last_background_process_id = pid;
+} else {
+    set_foreground_process(pid);
+    last_command_exit_status = waitpid(pid);
+    set_foreground_process(0);
+    /* report status and remember a stopped pid */
+}
+```
+
+The value passed during assignment is the newly loaded or selected child PID, not the shell PID and
+not a process-group ID. The apparent reset argument `0` is a command to the kernel rather than the
+value retained in the global. The complete kernel function is only 17 lines:
+
+```c
+int set_foreground_process(int pid) {
+    struct Process *process;
+
+    if (pid == 0) {
+        foreground_process_target = -current_process()->pid;
+        return 0;
+    }
+
+    process = find_process_by_pid(pid);
+    if (process == NULL ||
+        process->parent_pid != current_process()->pid) {
+        return -1;
+    }
+
+    foreground_process_target = pid;
+    return 0;
+}
+```
+
+Thus the global holds a **positive child PID** while that child owns input and receives terminal
+signals, then a **negative shell PID** while the prompt owns input but terminal signal generation is
+suppressed. It is initialized to literal 0 only before any owner is registered during kernel
+startup. The `fg` path uses the same set–wait–reset sequence around
+[`SIGCONT`](common/signal.header#L6) in
+[`continue_background_process(true)`](user/shell.picoc#L1127). `bg` never changes the foreground
+target and never waits.
 
 A trailing `&` starts the child without waiting and stores the PID in `$!`. The
 shell tracks only one background or stopped PID rather than a job table. A
@@ -6500,6 +6679,14 @@ the file after the shell prints another prompt. The same applies to redirected
 stdin and stderr. A background process whose stdin still names the terminal is
 stopped with [`SIGTTIN`](common/signal.header#L9) when it tries to read, a
 process with file-redirected stdin can read without terminal ownership.
+
+Several background processes may coexist even though `$!` remembers only one. Every successful
+[`run()`](library/unistd/process.picoc#L31) allocates and installs a different child descriptor table before returning, so restoring the
+shell cannot affect any earlier child and starting a later child cannot overwrite an earlier one's
+redirection. When a background child terminates without a waiting parent, it becomes a zombie and
+retains its own table until it is collected, unloaded, or orphan cleanup removes it. Final removal
+destroys that child table. Neither termination nor later removal restores or changes the shell
+table. The shell does not issue an automatic [`waitpid()`](library/sys/wait/wait.picoc#L14) for background completion.
 
 The general library route for obtaining the eventual status is the exact-child
 [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) call. The shell exposes no
@@ -6524,18 +6711,22 @@ inherited by children, so children receive [`SIGKILL`](common/signal.header#L5)
 when their direct parent terminates, with termination propagating to further
 descendants that retain this setting.
 
-## 12.7 Input/output redirection
+## 12.6 Input/output redirection
 [\[↑ TOC\]](#contents)
 
-PicoOS has no general-purpose `fork()`,
-paging, virtual memory, or copy-on-write. Paging is not inherently required to
-implement a `fork()` operation, but PicoOS does not provide any operation that
-clones a running process. Its shell therefore cannot use the conventional
-`fork()`, change descriptors in the child, then `exec()` sequence. Instead it
-temporarily rearranges its own descriptors before
-[`run()`](library/unistd/process.picoc#L31) copies them into the child, then
-restores its original descriptors as soon as [`run()`](library/unistd/process.picoc#L31)
-returns.
+A conventional Unix shell commonly calls `fork()`, applies redirections to the child process's
+inherited descriptor state, and then calls `exec()` to replace that child's image. The parent
+shell's descriptor table is never redirected, so it needs no save-and-restore operation.
+
+PicoOS has no paging, virtual memory, copy-on-write, `fork()`-style process clone, or `exec()` image
+replacement. Paging is not logically required for `fork()`. A kernel could copy a complete process
+image. The repository therefore does **not** support the stronger claim that lack of paging is the stated
+cause of this shell design. What the source establishes is the immediate architectural reason: the
+available API is split into [`load()`](library/unistd/process.picoc#L17), which creates a separate
+[`NEW`](kernel/process/process.header#L12) image and PCB, and [`run()`](library/unistd/process.picoc#L31), which copies selected state from
+the caller and makes that image [`READY`](kernel/process/process.header#L13). There is no child context in which the shell can execute
+redirection code before startup. The PicoOS shell must therefore rearrange its own descriptors,
+call [`run()`](library/unistd/process.picoc#L31) so the kernel copies that snapshot, and immediately restore itself.
 
 [`dup2(old_file_descriptor, new_file_descriptor)`](library/unistd/io.picoc#L58)
 does not create a shared alias in PicoOS. [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L163)
@@ -6554,6 +6745,102 @@ temporarily saved too, but only when `<` is used. The kernel's
 opening a redirection target can consume 5–7. When 0–4 are occupied, another
 open returns `-1`, and [`run_process()`](user/shell.picoc#L1034) reports the
 corresponding redirection error without starting the process.
+
+The following verified trace uses `COMMAND > OUT`. `T-in`, `T-out`, and `T-err` are the terminal
+endpoints. `OUT` is the normalized target path. Each cell is a complete descriptor entry
+(`kind`, flags, offset, and its own path allocation), not a pointer to a shared Unix open-file
+description.
+
+| Descriptor | 1. Initial shell | 2. After opening `OUT` as 3, then saving 1 as 6 | 3. After installing 3 as 1 and closing 3 | 4. Child after run setup | 5. Shell after restoring 6 as 1 and closing 6 |
+| ---: | --- | --- | --- | --- | --- |
+| 0 | `T-in` | `T-in` | `T-in` | independent `T-in` copy | `T-in` |
+| 1 | `T-out` | `T-out` | `OUT` | independent `OUT` copy | `T-out` |
+| 2 | `T-err` | `T-err` | `T-err` | independent `T-err` copy | `T-err` |
+| 3 | free | `OUT` opened here | free | free | free |
+| 4 | free | free | free | free | free |
+| 5 | free | free | free | free because inheritance never examines it | free |
+| 6 | free | saved `T-out` copy | saved `T-out` copy | free because inheritance never examines it | free |
+| 7 | free | free | free | free because inheritance never examines it | free |
+
+The arrows below show the operations that produce those snapshots. The target is opened before the
+original stdout is saved. If that open fails, the shell table has not yet changed. PicoOS [`dup2()`](library/unistd/io.picoc#L58)
+deep-copies an entry in the arrow direction.
+
+```mermaid
+flowchart TB
+    subgraph SAVE["2. shell saves its stdout"]
+        S3["fd 3: OUT (open happened first)"]
+        S1["fd 1: T-out"] -->|"dup2(1, 6)"| S6["fd 6: saved T-out"]
+    end
+
+    subgraph REDIRECT["3. shell installs OUT"]
+        O3["fd 3: OUT from open()"] -->|"dup2(3, 1)"| O1["fd 1: OUT"]
+        O3 -->|"close(3)"| OF["fd 3: free"]
+    end
+
+    subgraph RUN["4. run(): shell and child tables are different allocations"]
+        direction LR
+        subgraph ST["shell table"]
+            ST0["0: T-in"]
+            ST1["1: OUT"]
+            ST2["2: T-err"]
+            ST34["3–4: free (or opened FILE entries)"]
+            ST57["5: free · 6: saved T-out · 7: free"]
+        end
+        subgraph CT["new child table"]
+            CT0["0: T-in copy"]
+            CT1["1: OUT copy"]
+            CT2["2: T-err copy"]
+            CT34["3–4: FILE copies or free"]
+            CT57["5–7: free"]
+        end
+        ST0 -->|"always copied"| CT0
+        ST1 -->|"always copied"| CT1
+        ST2 -->|"always copied"| CT2
+        ST34 -->|"copy only FILE entries"| CT34
+        ST57 -. "not examined" .-> CT57
+    end
+
+    subgraph RESTORE["5. shell restores itself while the child remains unchanged"]
+        R6["shell fd 6: saved T-out"] -->|"dup2(6, 1)"| R1["shell fd 1: T-out"]
+        R6 -->|"close(6)"| RF["shell fd 6: free"]
+        C1["child fd 1: OUT"] --> KEEP["continues to name OUT"]
+    end
+
+    SAVE --> REDIRECT --> RUN --> RESTORE
+```
+
+The inheritance itself happens in
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), during the
+[`run()`](library/unistd/process.picoc#L31) syscall. It does not happen during
+[`load()`](library/unistd/process.picoc#L17) or on the child's first scheduled instruction:
+
+```c
+bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
+    struct Process *process;
+    struct FileDescriptorTable *file_descriptors;
+
+    /* Earlier: find process and require PROCESS_STATE_NEW. */
+    if (current_process() != NULL) {
+        file_descriptors = inherit_file_descriptors(
+            current_process()->file_descriptors
+        );
+        destroy_file_descriptor_table(process->file_descriptors);
+        process->file_descriptors = file_descriptors;
+    }
+
+    store_process_arguments(process, request->arguments, request->environment);
+    process->state = PROCESS_STATE_READY;
+    return true;
+}
+```
+
+[`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99) examines exactly slots
+0–4. It always copies 0–2, copies 3–4 only when their kind is
+[`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L13), and never
+examines 5–7. The shell-only backups therefore cannot leak into the child.
+[Section 7.1, Per-process file-descriptor table](#71-per-process-file-descriptor-table) visualizes the same
+general rule independently of this shell example.
 
 The table shows the complete descriptor choreography. The shell also closes
 3–7 once in [`main()`](user/shell.picoc#L1448), so a nested shell starts command
@@ -6603,18 +6890,10 @@ Its prompts and command output then follow the redirected streams.
 
 For `program > file.txt`, [`run_process()`](user/shell.picoc#L1034) calls
 [`redirect_output()`](user/shell.picoc#L1003) with stdout, reserved slot 6, and
-`append_stdout == false`. The following actual source chooses `O_TRUNC`, opens
-the target, saves descriptor 1, installs the file on descriptor 1, and closes
-the temporary ordinary slot:
+`append_stdout == false`. These are the conceptually important lines. Error
+branches also show how partial setup is rolled back:
 
 ```c
-int flags = O_WRONLY | O_CREAT;
-
-if (append) {
-    flags = flags | O_APPEND;
-} else {
-    flags = flags | O_TRUNC;
-}
 opened_file_descriptor = open(path, flags);
 if (opened_file_descriptor < 0) {
     return false;
@@ -6632,58 +6911,18 @@ close(opened_file_descriptor);
 return true;
 ```
 
-For `program >> file.txt`, the same actual call site passes the parsed
-[`append_stdout`](user/shell.picoc#L1040) value:
-
-```c
-if (!redirect_output(
-        STDOUT_FILENO,
-        SHELL_SAVED_STDOUT_FILENO,
-        stdout_path,
-        append_stdout
-    )) {
-    shell_write_error_string("error: could not redirect stdout\n");
-    return false;
-}
-```
-
-Here `>>` makes `append_stdout` true, so the first branch in the preceding
-[`redirect_output()`](user/shell.picoc#L1003) excerpt selects
+For `program >> file.txt`, [`append_stdout`](user/shell.picoc#L1040) is true, so the
+[`redirect_output()`](user/shell.picoc#L1003) branch selects
 [`O_APPEND`](common/file.header#L15). Each later write asks for the current file
 size before writing, `>` instead selects [`O_TRUNC`](common/file.header#L14).
-
-For `program 2> str_err_file.txt`, this actual
-[`run_process()`](user/shell.picoc#L1034) block uses stderr and reserved slot 7:
-
-```c
-if (stderr_path != NULL) {
-    if (!redirect_output(
-            STDERR_FILENO,
-            SHELL_SAVED_STDERR_FILENO,
-            stderr_path,
-            append_stderr
-        )) {
-        restore_standard_descriptors(
-            false,
-            stdout_redirected,
-            false
-        );
-        shell_write_error_string("error: could not redirect stderr\n");
-        return false;
-    }
-    stderr_redirected = true;
-}
-```
-
-For `2>`, `append_stderr` is false and the shared output helper selects
-`O_TRUNC`, `2>>` sets it true and selects `O_APPEND`. The helper copies the
-opened target onto descriptor 2 in the same way it copies a stdout target onto
-descriptor 1.
+Stderr uses the same helper with target 2 and save slot 7. `2>` selects
+[`O_TRUNC`](common/file.header#L14), while `2>>` selects
+[`O_APPEND`](common/file.header#L15).
 
 For `program < input.txt`, [`redirect_standard_input()`](user/shell.picoc#L985)
 saves stdin in reserved slot 5, frees slot 0, and requires the lowest-free
 allocation rule to return the input file on slot 0. This is the actual input
-redirection code:
+redirection function:
 
 ```c
 if (dup2(STDIN_FILENO, SHELL_SAVED_STDIN_FILENO) < 0) {
@@ -6701,63 +6940,15 @@ if (file_descriptor != STDIN_FILENO) {
 return true;
 ```
 
-After any setup, [`run_process()`](user/shell.picoc#L1034) calls
-[`run()`](library/unistd/process.picoc#L31) while 0–2 still contain the
-redirected entries, then executes the following restoration immediately. The
-inheritance occurs inside [`run()`](library/unistd/process.picoc#L31), before
-the kernel marks the new process ready, so restoration cannot change the
-child's independent table:
-
-```c
-started = run(pid, expand_variables(
-                       arguments,
-                       expanded_arguments,
-                       SHELL_COMMAND_BUFFER_CAPACITY),
-              NULL);
-
-restore_standard_descriptors(
-    stdin_redirected,
-    stdout_redirected,
-    stderr_redirected
-);
-```
-
-At that exact syscall, [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-copies redirected 0–2 plus opened-file descriptors in 3–4 into a new child
-table and leaves 5–7 free, then marks the process ready. The following sequence
-gives an overview of stdout redirection across process
-startup. It follows [`redirect_output()`](user/shell.picoc#L1003),
-[`run()`](library/unistd/process.picoc#L31), and
-[`restore_standard_descriptors()`](user/shell.picoc#L966), showing that the
-child keeps the redirected descriptor after the shell restores its own stdout.
-
-```mermaid
-sequenceDiagram
-    participant S as Shell
-    participant K as Kernel descriptor/process code
-    participant H as RETI-Emulator host file
-    participant C as Child
-
-    S->>K: Open the output path
-    K-->>S: Temporary descriptor
-    S->>K: Save stdout in reserved slot 6
-    S->>K: Replace stdout with the file and close the temporary slot
-    S->>K: run(child)
-    K->>C: Copy redirected stdout and leave slots 5–7 free
-    S->>K: Restore stdout from slot 6 and close it
-    C->>K: write(1, bytes, count)
-    K->>H: Write bytes to the redirected host file
-```
-
 This also explains background redirection. [`run()`](library/unistd/process.picoc#L31)
 finishes the independent descriptor-table copy before returning, so the shell
 can restore its own 0–2 immediately while `command > file &` continues with
 the child's copied descriptor 1. The background status, `$?`, `$!`, and zombie
-behavior are described in [Section 12.6, Foreground and background execution](#126-foreground-processes-background-processes-and-job-control-signals).
+behavior is described in [Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals).
 Redirections can be combined, including
 `sed.bin "5iNEW" < input.txt > output.txt 2> str_err_file.txt`.
 
-## 12.8 Sequential file-backed pipelines
+## 12.7 Sequential file-backed pipelines
 [\[↑ TOC\]](#contents)
 
 Redirection also provides the storage used by the shell's single pipeline
@@ -6797,8 +6988,43 @@ evaluating = eval(shell_pipe_right_command);
 unlink(shell_pipe_path);
 ```
 
+For `LEFT | RIGHT > OUT`, the rewrite and both complete descriptor snapshots are:
+
+```mermaid
+flowchart TB
+    I["input: LEFT | RIGHT > OUT"]
+    W["rewrite<br/>LEFT > TMP<br/>RIGHT < TMP > OUT<br/>TMP = .picoos-pipe-&lt;shell-pid&gt;.tmp"]
+
+    subgraph PRODUCER["producer: eval(LEFT > TMP)"]
+        P0["shell before setup<br/>0 T-in · 1 T-out · 2 T-err<br/>3 free · 4 free · 5 free · 6 free · 7 free"]
+        P1["open(TMP) → 3<br/>1 → 6: dup2(1,6)<br/>3 → 1: dup2(3,1)<br/>close(3)<br/><b>shell:</b> 0 T-in · 1 TMP · 2 T-err · 3 free · 4 free · 5 free · 6 T-out · 7 free"]
+        PC["run() copies child table<br/><b>producer:</b> 0 T-in · 1 TMP · 2 T-err<br/>3 free · 4 free · 5 free · 6 free · 7 free"]
+        PR["shell immediately restores<br/>6 → 1: dup2(6,1)<br/>close(6)<br/><b>shell:</b> 0 T-in · 1 T-out · 2 T-err<br/>3–7 free"]
+        PW["waitpid(producer)<br/>TMP now contains the complete output"]
+        P0 --> P1 --> PC --> PR --> PW
+    end
+
+    subgraph CONSUMER["consumer: eval(RIGHT < TMP > OUT)"]
+        C1["stdout first<br/>open(OUT) → 3<br/>1 → 6<br/>3 → 1<br/>close(3)<br/>stdin next<br/>0 → 5<br/>close(0)<br/>open(TMP) → 0<br/><b>shell:</b> 0 TMP · 1 OUT · 2 T-err · 3 free · 4 free · 5 T-in · 6 T-out · 7 free"]
+        CC["run() copies child table<br/><b>consumer:</b> 0 TMP · 1 OUT · 2 T-err<br/>3 free · 4 free · 5 free · 6 free · 7 free"]
+        CR["shell immediately restores<br/>5 → 0<br/>close(5)<br/>6 → 1<br/>close(6)<br/><b>shell:</b> 0 T-in · 1 T-out · 2 T-err · 3–7 free"]
+        CW["waitpid(consumer)"]
+        CU["unlink(TMP)"]
+        C1 --> CC --> CR --> CW --> CU
+    end
+
+    I --> W --> P0
+    PW --> C1
+```
+
+The producer's [`waitpid()`](library/sys/wait/wait.picoc#L14) is the sequencing barrier. Consumer setup does not begin until the
+producer has finished. The producer and consumer never inherit save slots 5–7.
+Each inherits only its final standard endpoints. The shell restores itself immediately after each
+[`run()`](library/unistd/process.picoc#L31), before either foreground wait.
+
 The first [`eval()`](user/shell.picoc#L1224) opens the path with
-`O_CREAT | O_TRUNC`, which creates or empties the host-backed file, starts the
+[`O_CREAT`](common/file.header#L13) plus [`O_TRUNC`](common/file.header#L14),
+which creates or empties the host-backed file, starts the
 producer, and waits for it because the generated left command has no `&`.
 After the producer exits, the second [`eval()`](user/shell.picoc#L1224) opens
 the same path read-only as consumer stdin and waits for the consumer. Only
@@ -6818,37 +7044,27 @@ consumer reads can fail. `LEFT & | RIGHT` has no producer/consumer completion
 coordination and can expose an empty or partial file. Combining `&` with `|` is
 therefore unsupported even though the small parser may accept it.
 
-A conventional kernel pipe would be faster for larger transfers because it
-would avoid UART host-filesystem requests and allow producer and consumer to
-run concurrently. Its bounded in-memory ring would also provide backpressure:
-a reader would block while the ring is empty, and a writer would block while
-it is full, so neither side needs the complete intermediate result in storage.
-The tradeoff is substantially more PicoOS machinery than the current shell
-rewrite. A real implementation would require at least a shared pipe object and
-buffer, read- and write-wait queues, reference counts for inherited endpoints,
-EOF and last-reader/last-writer rules, descriptor kinds that refer to shared
-objects rather than copied paths, `pipe()` creation through the syscall and
-library ABIs, pipe-specific read/write/close dispatch, and cleanup integrated
-with [`run()`](library/unistd/process.picoc#L31), process removal, and blocked
-process termination. It would also need a shell launch scheme that makes both
-children ready before waiting for either one. In repository terms this is a
-new subsystem touching roughly ten existing common, kernel, library, process,
-and shell source/header files plus a pipe implementation and its tests, not a
-small replacement of [`Terminal.input_buffer`](kernel/filesystem/terminal.header#L10).
+A conventional pipe instead gives the producer and consumer two endpoints of
+one bounded kernel buffer and normally runs both processes concurrently. Reads
+block while that buffer is empty, writes block while it is full, closing the
+last writer produces EOF, and backpressure prevents the producer from having
+to materialize its entire output first. PicoOS instead performs host I/O,
+stores the whole producer result, and starts the consumer only afterward. It
+therefore cannot support unbounded or interactive streaming pipelines.
 
-The terminal ring offers reusable ideas—modulo head/tail movement, a count, and
-the existing intrusive [`wait_queue`](common/wait_queue.header#L5)—but it is not
-a pipe implementation that can simply be reused. It has one global buffer, one
-reader queue, terminal ownership rules, and an interrupt-context producer that
-drops new bytes on full. A pipe needs separately allocated instances, two
-endpoint roles, potentially several readers and writers, reference-counted
-lifetime, and process-context writers that can safely block on a full buffer.
-Generalizing the small ring-copy operations is reasonable, but most pipe
-architecture would still be new. PicoOS intentionally keeps the file-backed
-solution because it reuses its existing path, descriptor, redirection,
-host-filesystem, and blocking process infrastructure with very little kernel
-code. The cost is host I/O, whole-result storage, sequential execution, no
-backpressure, and no support for unbounded or interactive streaming pipelines.
+The repository records the implementation choice, but no comment or design
+document states the historical reason it was chosen. The defensible
+architectural comparison is that the existing file-backed version reuses
+path-based [`open()`](library/fcntl/fcntl.picoc#L5), the redirection helpers,
+exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14), and
+[`unlink()`](library/unistd/file_removal.picoc#L4)
+without adding a pipe descriptor kind or a `pipe()` syscall. A conventional
+implementation would need shared endpoint state rather than PicoOS's current
+deep-copied descriptor paths, plus a pipe buffer, read/write wait queues,
+endpoint lifetime/EOF rules, and a launch sequence that starts both children
+before waiting. Reuse and lower implementation cost are therefore visible
+consequences of the design, but should not be presented as a documented author
+rationale.
 
 The command example below uses [`echo.bin`](user/echo.picoc#L20) to create input,
 [`cat.bin`](user/cat.picoc#L104) and [`sed.bin`](user/sed.picoc#L67) to pass it through a
@@ -6985,7 +7201,7 @@ PicoOS> rm.bin demo.txt edited.txt
 
 The example omits process-created messages. The shell waits for the producer
 to finish before starting the consumer, as explained under
-[Section 12.8, Sequential file-backed pipelines](#128-sequential-file-backed-pipelines).
+[Section 12.7, Sequential file-backed pipelines](#127-sequential-file-backed-pipelines).
 
 ## 13.3 Command errors and exit statuses
 [\[↑ TOC\]](#contents)
