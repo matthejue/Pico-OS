@@ -412,13 +412,33 @@ lectures follow.
    - [7.8 Opening, reading, writing, and seeking](#78-opening-reading-writing-and-seeking)
    - [7.9 PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations)
 1. [Userspace libraries](#8-userspace-libraries)
-   - [8.1 Library overview and dependencies](#81-library-overview-and-dependencies)
-   - [8.2 Process, descriptor, waiting, and scheduling wrappers](#82-process-descriptor-waiting-and-scheduling-wrappers)
-   - [8.3 System control, signals, shared memory, and mutexes](#83-system-control-signals-shared-memory-and-mutexes)
-   - [8.4 Directory streams and directory creation](#84-directory-streams-and-directory-creation)
-   - [8.5 Process heap, environment, strings, and exit](#85-process-heap-environment-strings-and-exit)
-   - [8.6 Standard I/O, formatting, and scanning](#86-standard-io-formatting-and-scanning)
-   - [8.7 Library organization, scope, and limitations](#87-library-organization-scope-and-limitations)
+   - [8.1 From a library call to the kernel: waitpid](#81-from-a-library-call-to-the-kernel-waitpid)
+      - [8.1.1 Header, implementation, and linking](#811-header-implementation-and-linking)
+      - [8.1.2 Packing arguments and executing the syscall](#812-packing-arguments-and-executing-the-syscall)
+      - [8.1.3 Interrupt entry, waiting, and return](#813-interrupt-entry-waiting-and-return)
+   - [8.2 Library overview and dependencies](#82-library-overview-and-dependencies)
+      - [8.2.1 unistd: processes, descriptors, paths, and wait queues](#821-unistd-processes-descriptors-paths-and-wait-queues)
+         - [8.2.1.1 Process operations in `process.picoc`](#8211-process-operations-in-processpicoc)
+         - [8.2.1.2 Descriptor operations in `io.picoc`](#8212-descriptor-operations-in-iopicoc)
+         - [8.2.1.3 Working-directory operations in `working_directory.picoc`](#8213-working-directory-operations-in-working_directorypicoc)
+         - [8.2.1.4 Path operations in `file_removal.picoc`](#8214-path-operations-in-file_removalpicoc)
+         - [8.2.1.5 Wait-queue operations in `blocking.picoc`](#8215-wait-queue-operations-in-blockingpicoc)
+      - [8.2.2 fcntl: opening and creating files](#822-fcntl-opening-and-creating-files)
+      - [8.2.3 sys/wait: waiting for children](#823-syswait-waiting-for-children)
+      - [8.2.4 mutex: locking and waking contenders](#824-mutex-locking-and-waking-contenders)
+      - [8.2.5 sys/mman: named shared memory](#825-sysmman-named-shared-memory)
+      - [8.2.6 dirent: directory streams](#826-dirent-directory-streams)
+      - [8.2.7 stdlib: process heap, environment, conversion, and exit](#827-stdlib-process-heap-environment-conversion-and-exit)
+         - [8.2.7.1 Heap operations in `malloc.picoc`](#8271-heap-operations-in-mallocpicoc)
+         - [8.2.7.2 Decimal conversion in `atoi.picoc`](#8272-decimal-conversion-in-atoipicoc)
+         - [8.2.7.3 Environment operations in `env.picoc`](#8273-environment-operations-in-envpicoc)
+         - [8.2.7.4 Process exit in `exit.picoc`](#8274-process-exit-in-exitpicoc)
+      - [8.2.8 string: copying, comparison, and length](#828-string-copying-comparison-and-length)
+      - [8.2.9 stdio: streams, formatting, and scanning](#829-stdio-streams-formatting-and-scanning)
+         - [8.2.9.1 Streams and output in `stdio.picoc`](#8291-streams-and-output-in-stdiopicoc)
+         - [8.2.9.2 Scanning in `scanf.picoc`](#8292-scanning-in-scanfpicoc)
+      - [8.2.10 start: entering and leaving a user program](#8210-start-entering-and-leaving-a-user-program)
+      - [8.2.11 Single-function libraries](#8211-single-function-libraries)
 1. [Kernel storage, ownership, and object lifetimes](#9-kernel-storage-ownership-and-object-lifetimes)
    - [9.1 Storage regions, allocation sources, and lifetimes](#91-storage-regions-allocation-sources-and-lifetimes)
    - [9.2 Ownership and reference relationships](#92-ownership-and-reference-relationships)
@@ -1392,9 +1412,30 @@ return PC remains at [`activation.sp`](kernel/process/process.header#L25) + 1 fo
 ## 2.4 System-call ABI
 [\[↑ TOC\]](#contents)
 
-Userspace and the kernel share one compact calling convention. The register
-rules below define the interrupt boundary, the request structures then show
-how wrappers carry calls that need more than one argument.
+A library function requests a kernel service by its syscall selector and arguments, rather than
+calling a kernel function at a hardcoded address. The installed kernel's syscall interrupt service
+routine receives that request, and [`handle_syscall()`](kernel/syscall.picoc#L16) selects the kernel
+function that implements it. The library is linked into the user program. The kernel resolves its
+own internal function locations when it is built.
+
+This arrangement lets kernel functions move between OS versions without changing the calling
+library code. Compatibility still requires the same syscall selectors, register convention, request
+layouts, and meaning of arguments and results. Those rules form the system-call ABI documented
+below. A change to that ABI can require updated libraries or programs. Using a syscall alone is not
+a promise of compatibility with every future PicoOS version.
+
+Standardized library interfaces solve a related problem at the source-code level: an application
+using the same supported functions and behavior can be compiled for different operating systems,
+with each system's library implementing its own kernel calls. The
+[POSIX scope](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap01.html) explicitly targets
+source portability and excludes binary portability. It does not standardize PicoOS's syscall
+selectors or RETI register convention. PicoOS provides a small set of POSIX-like functions, with some
+different signatures and behavior, so familiar names alone do not establish POSIX conformance.
+[`8.1 From a library call to the kernel: waitpid`](#81-from-a-library-call-to-the-kernel-waitpid)
+shows one complete library implementation using this interface.
+
+The following register rules describe the syscall boundary. The request structures then show how
+functions pass several values through its single argument register.
 
 ### 2.4.1 Syscall selectors and register convention
 [\[↑ TOC\]](#contents)
@@ -5247,134 +5288,376 @@ sequenceDiagram
 # 8. Userspace libraries
 [\[↑ TOC\]](#contents)
 
-Public interfaces live under [`library`](library/), structures and constants
-shared with the kernel live under [`common`](common/), kernel-private
-structures remain under [`kernel`](kernel/). The complete syscall ABI and its
-request structures are documented under [Section 2.4, System-call ABI](#24-system-call-abi), while
-this chapter organizes the public wrappers and pure userspace facilities. The
-interfaces that follow POSIX conventions cover process, wait, and signal
-operations, descriptor and directory I/O, standard streams, and shared memory.
-Calls such as
-[`open()`](library/fcntl/fcntl.picoc#L5),
-[`waitpid()`](library/sys/wait/wait.picoc#L14), and
-[`mmap()`](library/sys/mman/mman.picoc#L23) resemble their Unix counterparts,
-although PicoOS implements only the behavior documented here.
+Libraries are collections of reusable functions that user programs call to read files, start
+processes, manage memory, or perform other common tasks. PicoOS supplies them so each program can
+use these operations without implementing them again. Some functions work entirely inside the
+program. Others ask the kernel to do work through a system call.
 
-## 8.1 Library overview and dependencies
+For kernel services, a library function sends a syscall selector and arguments instead of requiring
+the program to know or hardcode where a kernel function is located. Kernel functions can move
+between OS versions without changing that library code, provided the syscall interface remains
+compatible. [`2.4 System-call ABI`](#24-system-call-abi) explains this boundary and its compatibility
+requirements. Standardized library interfaces can also let application source code work on different
+operating systems, with a suitable implementation of the library on each system. They do not by
+themselves make compiled libraries or executables portable. PicoOS uses familiar names such as
+[`open()`](library/fcntl/fcntl.picoc#L5) and [`waitpid()`](library/sys/wait/wait.picoc#L14), but
+implements only the parameters and behavior documented here.
+
+The following walkthrough follows one call from a user program into the kernel. The library
+reference then groups the available functions by the library that provides them.
+
+## 8.1 From a library call to the kernel: waitpid
 [\[↑ TOC\]](#contents)
 
-The directory table groups all **15 libraries** by their facilities, the directory-stream and
-directory-creation row represents two distinct libraries. The repository also contains **12 library
-test classes**, each a top-level PicoC program in [`test`](test/), covering strings, environment,
-allocation, formatting, and scanning. Their standalone execution is described in the
-[Section 14, Test system](#14-test-system).
+[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) waits for the calling process's child selected by
+[`pid`](library/sys/wait/wait.picoc#L14) and returns its exit or stopped status. It provides a
+concrete example of how declarations, linked library code, request structures, and the syscall
+handler fit together.
 
-| Directory | Main facilities |
+### 8.1.1 Header, implementation, and linking
+[\[↑ TOC\]](#contents)
+
+A header tells the compiler how a program may call a function. The implementation supplies the
+code that runs. PicoOS uses `.header` files for declarations and `.picoc` files for PicoC source,
+rather than the conventional C suffixes `.h` and `.c`. The wait library consists of these files:
+
+| File | Role |
 | --- | --- |
-| [`library/unistd`](library/unistd/) | Binary-safe [`write()`](library/unistd/io.picoc#L32), explicit no-scan [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), read/close/descriptor duplication/lseek, directories, process load/run/unload, PID, sleep/wakeup |
-| [`library/fcntl`](library/fcntl/) | Open/create and descriptor flags |
-| [`library/sys/wait`](library/sys/wait/) | Exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14) and stopped-status test |
-| [`library/schedule`](library/schedule/) | Voluntary [`yield()`](library/schedule/schedule.picoc#L4) |
-| [`library/mutex`](library/mutex/) | Atomic test-and-set mutex with wait queue |
-| [`library/signal`](library/signal/) | Signal delivery through [`kill()`](library/signal/signal.picoc#L14) |
-| [`library/sys/prctl`](library/sys/prctl/) | Parent-death signal |
-| [`library/sys/reboot`](library/sys/reboot/) | System restart and power-off through [`reboot()`](library/sys/reboot/reboot.picoc#L5) |
-| [`library/sys/mman`](library/sys/mman/) | Named shared memory |
-| [`library/dirent`](library/dirent/) and [`library/sys/stat`](library/sys/stat/) | Directory streams and creation |
-| [`library/stdlib`](library/stdlib/) | Userspace heap, environment, conversion, and exit |
-| [`library/string`](library/string/) | Basic memory/string functions |
-| [`library/stdio`](library/stdio/) | Descriptor-backed streams and small format/scan subset |
-| [`library/start`](library/start/) | Heap/environment initialization and application [`main`](library/start/start.picoc#L4) |
+| [`wait.header`](library/sys/wait/wait.header) | Declares `int waitpid(int pid);` and `bool WIFSTOPPED(int status);` for callers |
+| [`wait.picoc`](library/sys/wait/wait.picoc) | Defines both functions and the assembly helper [`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) |
+| [`libwait.picoc`](library/sys/wait/libwait.picoc) | The compilation unit, containing `#include "wait.picoc"` |
+| [`common/syscall.header`](common/syscall.header) | Defines [`SYSCALL_WAITPID`](common/syscall.header#L13) and the shared [`WaitPidRequest`](common/syscall.header#L61) structure used by the library and kernel |
 
-Low-level wrappers package request structures and invoke `INT 0`. Pure userspace string,
-environment, formatting, and heap code does not call the kernel until it needs I/O or a process
-service.
+For example, the [`shell`](user/shell.picoc) includes the header below and calls
+[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) after starting a foreground child. These are
+excerpts from that program:
 
-## 8.2 Process, descriptor, waiting, and scheduling wrappers
+```c
+#include "../library/sys/wait/wait.header"
+
+last_command_exit_status = waitpid(pid);
+```
+
+Including the header does not copy the function's implementation into the program. The compiler
+also compiles [`libwait.picoc`](library/sys/wait/libwait.picoc). With `-c`, it produces
+`libwait.reti_blocks` containing RETI code blocks and `libwait.st` containing symbols. When linking,
+the compiler resolves the program's call to the definition in those library blocks and places the
+library code in the program image. This is an ordinary call to code linked into the user program.
+The later syscall crosses into the separately built kernel. The shell's build supplies this wait
+library together with its other runtime libraries.
+
+Other libraries use the same pattern: an umbrella source such as
+[`libstdio.picoc`](library/stdio/libstdio.picoc) includes its implementation parts, and
+`// dependencies:` comments name additional `.reti_blocks` units needed during linking, as in
+[`libfcntl.picoc`](library/fcntl/libfcntl.picoc). Header inclusion and linking are separate steps.
+[`1.1.2 Separate compilation, reusable artifacts, and linking`](#112-separate-compilation-reusable-artifacts-and-linking)
+shows the compiler commands. `-C` selects the startup source as explained in
+[`1.1.4 Selecting a startup function with -C / --startup-source`](#114-selecting-a-startup-function-with--c---startup-source).
+
+### 8.1.2 Packing arguments and executing the syscall
 [\[↑ TOC\]](#contents)
 
-The table maps process, descriptor, and scheduling wrappers to their syscall selectors. Queue
-initialization and status inspection operate directly on userspace data and therefore need no
-syscall.
+The wrapper must pass both the child's PID and somewhere to store its status. It uses exactly the
+[`WaitPidRequest`](common/syscall.header#L61) declared in the syscall interface, not a separate
+library-only request type. Its definition is:
 
-| Library function | Return value / status and purpose | Syscalls / host requests |
+```c
+struct WaitPidRequest {
+    int pid;
+    int *status;
+};
+```
+
+The local object is named [`request`](library/sys/wait/wait.picoc#L16), not `waitreq`. Its
+[`pid`](common/syscall.header#L62) field receives the function argument and its
+[`status`](common/syscall.header#L63) field receives the address of a local integer. The following
+complete helper and wrapper from [`wait.picoc`](library/sys/wait/wait.picoc) show how that object
+reaches the kernel:
+
+```c
+int invoke_waitpid_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF IN2 0");
+    return result;
+}
+
+int waitpid(int pid) {
+    int status = 0;
+    struct WaitPidRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
+    }
+    return status;
+}
+```
+
+Each `asm("...");` embeds a RETI instruction written as a quoted string in the PicoC source.
+`LOADIN BAF ACC 3` loads the helper's first argument,
+[`SYSCALL_WAITPID`](common/syscall.header#L13), into `ACC`.
+`LOADIN BAF IN1 4` loads its second argument, the absolute address of the request, into `IN1`.
+`INT 0` invokes the syscall interrupt service routine. After this process resumes,
+`STOREIN BAF IN2 0` copies the syscall result from `IN2` to the helper's local result slot.
+These stack offsets follow
+[`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup).
+
+The syscall result tells the wrapper whether the wait completed. The child's status is returned
+separately through [`WaitPidRequest.status`](common/syscall.header#L63). The wrapper retries if the
+helper returns zero, then returns the stored status. This one-argument form has no options or
+POSIX-style output parameter. The same request type and its fields are documented in
+[`2.4.2 Process, wait, signal, and memory request structures`](#242-process-wait-signal-and-memory-request-structures).
+
+### 8.1.3 Interrupt entry, waiting, and return
+[\[↑ TOC\]](#contents)
+
+Execution after `INT 0` first enters
+[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104) in
+[`interrupt_service_routines/os_isrs.picoc`](interrupt_service_routines/os_isrs.picoc). It saves the
+process registers, selects the kernel's code, data, and stack, and passes the saved selector,
+argument, and caller context to [`handle_syscall()`](kernel/syscall.picoc#L16). The syscall dispatch
+file is [`kernel/syscall.picoc`](kernel/syscall.picoc). Its branch for
+[`SYSCALL_WAITPID`](common/syscall.header#L13) casts the integer
+argument back to the shared request pointer and calls the process code:
+
+```c
+} else if (syscall_number == SYSCALL_WAITPID) {
+        return wait_for_process_by_pid(
+            (struct WaitPidRequest *)argument,
+            caller_context
+        );
+    }
+```
+
+[`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) finds the child and checks that it
+belongs to the caller. It writes `-1` for an invalid child, collects an already terminated child's
+status, or reports the status when the child's
+[`Process.state`](kernel/process/process.header#L33) is
+[`PROCESS_STATE_STOPPED`](kernel/process/process.header#L16). Otherwise, it saves the status destination
+in [`Process.waiting_status_ptr`](kernel/process/process.header#L44) and calls
+[`sleep_on_wait_queue()`](kernel/process/process.picoc#L390), which enqueues the caller on the
+child's wait queue and calls
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) to run another process.
+
+An immediate return goes through
+[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L143) and, after any deferred
+rescheduling, [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158).
+A caller whose [`Process.state`](kernel/process/process.header#L33) was set to
+[`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15) resumes later through the dispatcher
+after the child wakes it. The saved syscall
+result is already set to 1 by the interrupt entry. In either case, `RTI` resumes the user program
+after `INT 0`, so the assembly helper can return to the wrapper. The complete entry and return
+mechanism belongs in
+[`2.5 Handling system calls and returning to userspace`](#25-handling-system-calls-and-returning-to-userspace).
+The child-wait behavior is explained in
+[`6.1.2 Child Waiting with waitpid`](#612-child-waiting-with-waitpid).
+
+The kernel retains the pointer to the status cell when waiting blocks, not the request object
+itself. The suspended caller's stack keeps both locals alive. PicoOS trusts these absolute pointers
+in its single physical address space. The ownership rules are in
+[`2.4.4 Request-pointer ownership and lifetime`](#244-request-pointer-ownership-and-lifetime).
+
+## 8.2 Library overview and dependencies
+[\[↑ TOC\]](#contents)
+
+PicoOS provides **15 libraries** under [`library/`](library/). The table below identifies each
+library and the code it uses. Shared declarations live in [`common/`](common/). Kernel-private
+structures remain in [`kernel/`](kernel/). A dependency on another library means that its code must
+also be linked into the user program, not that a syscall links the two libraries at runtime.
+
+| Library | Main facilities | Library or common code used |
 | --- | --- | --- |
-| [`load(path)`](library/unistd/process.picoc#L17) | PID, or 0, repeats bounded syscall 2 transfers and creates a `NEW` process | 2, [`LoadProcessRequest`](common/syscall.header#L50)<br>**Host requests:** `file-size <path>`, then one or more `read-range <offset> <count> <path>` requests |
-| [`run(pid, arguments, environment)`](library/unistd/process.picoc#L31) | Whether a `NEW` process was initialized and made `READY`, `NULL` environment means current [`environ`](library/stdlib/env.picoc#L4) | 3, [`RunProcessRequest`](common/syscall.header#L55) |
-| [`unload(pid)`](library/unistd/process.picoc#L47) | Whether a non-current target was terminated/removed | 5, PID directly |
-| [`list_processes(void)`](library/unistd/process.picoc#L51) | Prints all known PIDs and binary paths | 4, no request structure<br>**Host requests:** when descriptor 1 is a regular file, `write-at <offset> <path>`, optional append `file-size <path>`, then `write stdout`, a copied terminal-stderr entry uses `write stderr` then `write stdout`, terminal-stdout/null output needs none |
-| [`getpid(void)`](library/unistd/process.picoc#L55) | Current PCB’s PID | 8, no request |
-| [`set_foreground_process(pid)`](library/unistd/process.picoc#L59) | 0 or `-1`, a direct child PID saves that positive process ID to [`foreground_process_target`](kernel/signal.picoc#L12) for input and terminal-generated signals, PID 0 saves the caller's negative process ID for input without those signals | 9, PID directly |
-| [`read(file_descriptor, buffer, count)`](library/unistd/io.picoc#L6) | Number read or `-1`, repeats bounded regular-file chunks and may block on stdin | 23, [`IoRequest`](common/file.header#L31)<br>**Host request:** `read-range <offset> <count> <path>` for a regular-file descriptor |
-| [`write(file_descriptor, buffer, count)`](library/unistd/io.picoc#L32) | Number written or `-1`, protects arbitrary data from UART control parsing | 24, [`IoRequest`](common/file.header#L31)<br>**Host requests:** `write-at <offset> <path>` and `write stdout` for a regular file, `write stderr` and `write stdout` for terminal stderr, optional `file-size <path>` for append and `literal-output <count>` for data containing `<ESC>` |
-| [`write_without_uart_escape_check(file_descriptor, buffer, count)`](library/unistd/io.picoc#L43) | Number written or `-1`, skips the UART `<ESC>` scan and requires a buffer known not to contain `<ESC>` | 24, [`IoRequest`](common/file.header#L31)<br>**Host requests:** the same destination requests as [`write()`](library/unistd/io.picoc#L32), but never `literal-output` |
-| [`close(file_descriptor)`](library/unistd/io.picoc#L54) | 0 or `-1`, releases the descriptor entry's path/state | 25, descriptor directly |
-| [`dup2(old_file_descriptor, new_file_descriptor)`](library/unistd/io.picoc#L58) | New descriptor or `-1`, independently copies the entry. Later inheritance depends on the target slot and copied descriptor kind | 27, [`Dup2Request`](common/file.header#L48) |
-| [`lseek(file_descriptor, offset, origin)`](library/unistd/io.picoc#L66) | New logical offset or `-1` | 26, [`SeekRequest`](common/file.header#L42)<br>**Host request:** `file-size <path>` only for `SEEK_END` |
-| [`chdir(path)`](library/unistd/working_directory.picoc#L4) | 0 or `-1`, replaces current PCB working-directory string | 29, path pointer directly<br>**Host request:** `is-directory <path>` |
-| [`getcwd(buffer, size)`](library/unistd/working_directory.picoc#L11) | Buffer or `NULL` | 30, [`GetCwdRequest`](common/syscall.header#L83) |
-| [`unlink(path)`](library/unistd/file_removal.picoc#L4) | Host status for removing a file | 33, path pointer directly<br>**Host request:** `unlink <path>` |
-| [`rmdir(path)`](library/unistd/file_removal.picoc#L8) | Host status for removing an empty directory | 34, path pointer directly<br>**Host request:** `rmdir <path>` |
-| [`move(old_path, new_path)`](library/unistd/file_removal.picoc#L12) | Host status for moving or renaming a file or directory | 35, [`MoveRequest`](common/syscall.header#L94)<br>**Host request:** `move <old path>\n<new path>` |
-| [`touch(path)`](library/unistd/file_removal.picoc#L20) | Host status for creating a file or updating its timestamps | 36, path pointer directly<br>**Host request:** `touch <path>` |
-| [`wait_queue_init(wq)`](library/unistd/blocking.picoc#L4) | Initializes embedded [`wait_queue.head`](common/wait_queue.header#L6)/[`wait_queue.tail`](common/wait_queue.header#L7) locally | No syscall |
-| [`sleep(wq)`](library/unistd/blocking.picoc#L9) | Blocks caller on the intrusive queue | 12, queue pointer directly |
-| [`wakeup(wq)`](library/unistd/blocking.picoc#L19) | Wakes at most the FIFO head | 13, queue pointer directly |
-| [`open(path, flags)`](library/fcntl/fcntl.picoc#L5) | Lowest free descriptor or `-1` | 22, [`OpenRequest`](common/file.header#L26)<br>**Host requests:** `file-size <path>` for every nontruncating regular open. After failure with `O_CREAT`, or for `O_TRUNC`, the requests are `write <path>` then `write stdout` |
-| [`creat(path)`](library/fcntl/fcntl.picoc#L13) | Equivalent to write/create/truncate open | Calls [`open()`](library/fcntl/fcntl.picoc#L5) and therefore syscall 22<br>**Host requests:** `write <path>`, then `write stdout` for a regular path |
-| [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) | Exact child's exit/stopped status, or `-1` | 7, [`WaitPidRequest`](common/syscall.header#L61), may suspend its stack frame |
+| [`unistd`](library/unistd/) | Processes, descriptors, paths, and wait queues | [`stdlib`](library/stdlib/) for environment access |
+| [`fcntl`](library/fcntl/) | Opening and creating files | [`unistd`](library/unistd/) syscall helper |
+| [`sys/wait`](library/sys/wait/) | Child waiting and stopped-status inspection | Own syscall helper |
+| [`mutex`](library/mutex/) | Atomic lock with a wait queue | [`unistd`](library/unistd/) queue functions |
+| [`sys/mman`](library/sys/mman/) | Named shared memory | Own syscall helper |
+| [`dirent`](library/dirent/) | Directory streams | [`unistd`](library/unistd/) and [`stdlib`](library/stdlib/) |
+| [`stdlib`](library/stdlib/) | Process heap, environment, conversion, and exit | [`common/heap.picoc`](common/heap.picoc) included in its compilation unit |
+| [`string`](library/string/) | String copying, comparison, and length | [`common/string.picoc`](common/string.picoc) included in its compilation unit |
+| [`stdio`](library/stdio/) | Streams, formatting, and scanning | [`common/decimal.picoc`](common/decimal.picoc) included in its compilation unit and its own syscall helper |
+| [`start`](library/start/) | Program entry and runtime initialization | [`stdlib`](library/stdlib/) |
+| [`schedule`](library/schedule/) | Voluntary scheduling | Direct inline syscall |
+| [`signal`](library/signal/) | Sending signals | Own syscall helper |
+| [`sys/prctl`](library/sys/prctl/) | Parent-death signal setup | Own syscall helper |
+| [`sys/reboot`](library/sys/reboot/) | Restart and power-off | [`unistd`](library/unistd/) syscall helper |
+| [`sys/stat`](library/sys/stat/) | Directory creation | [`unistd`](library/unistd/) syscall helper |
+
+The function tables name each syscall and every host request that an operation can issue,
+including requests made later by kernel code. A request body such as `file-size <path>` means the
+complete UART escape sequence `<ESC>file-size <path><ESC>/`: `<ESC>` is byte 27, placeholders stand
+for actual arguments, and `\n` in a move request is one newline byte. Paths are normalized PicoOS
+paths, resolved inside the emulator's configured filesystem root. These are emulator **host
+requests**, not additional syscalls or shell commands. Their framing and responses are defined in
+[`1.2.2 UART host-service protocol`](#122-uart-host-service-protocol).
+
+Requests listed in a row are conditional on the descriptor, flags, input, or failure described
+there. Ordinary terminal output needs no destination request, null-device output needs none,
+and redirected output can reach a host file even when the library function does not explicitly
+open one. The output routing is explained once in
+[`7.8 Opening, reading, writing, and seeking`](#78-opening-reading-writing-and-seeking).
+The tables describe the function's own operation and its callees. An unrelated program selected
+by the scheduler can issue its own requests independently.
+
+### 8.2.1 unistd: processes, descriptors, paths, and wait queues
+[\[↑ TOC\]](#contents)
+
+The [`unistd`](library/unistd/) library supplies the basic operations on processes, open
+descriptors, paths, and wait queues. Its implementation is divided by topic into the source files
+below. Each table follows one source file so the relationship between the public functions and the
+implementation remains clear.
+
+#### 8.2.1.1 Process operations in `process.picoc`
+[\[↑ TOC\]](#contents)
+
+[`process.picoc`](library/unistd/process.picoc) contains the shared syscall helper and the process
+operations. These functions load process images, change a process from
+[`PROCESS_STATE_NEW`](kernel/process/process.header#L12) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13), terminate processes, or read and change
+process metadata.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`invoke_syscall(number, argument)`](library/unistd/process.picoc#L7) | Result returned by the selected syscall in `IN2`. Internal bridge used by `unistd` and libraries that depend on it | Forwards the supplied selector and argument. The wrapper rows in this section identify each concrete syscall and host request |
+| [`load(path)`](library/unistd/process.picoc#L17) | PID, or 0 on failure. Repeats bounded transfers and creates a process whose [`Process.state`](kernel/process/process.header#L33) is [`PROCESS_STATE_NEW`](kernel/process/process.header#L12) | [`SYSCALL_LOAD_PROCESS`](common/syscall.header#L8) with [`LoadProcessRequest`](common/syscall.header#L50)<br>**Host Requests:** `file-size <path>`, then one or more `read-range <offset> <count> <path>` requests |
+| [`run(pid, arguments, environment)`](library/unistd/process.picoc#L31) | Whether the process was initialized and its [`Process.state`](kernel/process/process.header#L33) was changed from [`PROCESS_STATE_NEW`](kernel/process/process.header#L12) to [`PROCESS_STATE_READY`](kernel/process/process.header#L13). A `NULL` environment selects the current [`environ`](library/stdlib/env.picoc#L4) | [`SYSCALL_RUN_PROCESS_WITH_ARGUMENTS`](common/syscall.header#L9) with [`RunProcessRequest`](common/syscall.header#L55) |
+| [`unload(pid)`](library/unistd/process.picoc#L47) | Whether a non-current target was terminated and removed | [`SYSCALL_UNLOAD_PROCESS`](common/syscall.header#L11) with the PID directly |
+| [`list_processes(void)`](library/unistd/process.picoc#L51) | Prints every known PID and binary path | [`SYSCALL_LIST_PROCESSES`](common/syscall.header#L10) with no request structure<br>**Host Requests through descriptor 1:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>No `literal-output` request |
+| [`getpid(void)`](library/unistd/process.picoc#L55) | PID stored in the current [`Process`](kernel/process/process.header#L31) | [`SYSCALL_GETPID`](common/syscall.header#L14) with no request structure |
+| [`set_foreground_process(pid)`](library/unistd/process.picoc#L59) | 0 or `-1`. A direct child PID stores that positive value in [`foreground_process_target`](kernel/signal.picoc#L12) for input and terminal-generated signals. PID 0 stores the caller's negative PID for input without those signals | [`SYSCALL_SET_FOREGROUND_PROCESS`](common/syscall.header#L15) with the PID directly |
+
+[`invoke_syscall(number, argument)`](library/unistd/process.picoc#L7), also declared in
+[`unistd.header`](library/unistd/unistd.header#L7), passes the chosen selector in `ACC` and the
+argument in `IN1`, just as the wait-library helper does in
+[`8.1.2 Packing arguments and executing the syscall`](#812-packing-arguments-and-executing-the-syscall).
+It has no fixed operation of its own. Selecting a supported syscall gives that syscall's effects,
+including the host requests listed for the wrappers that call it.
+
+#### 8.2.1.2 Descriptor operations in `io.picoc`
+[\[↑ TOC\]](#contents)
+
+[`io.picoc`](library/unistd/io.picoc) builds descriptor requests and repeats reads when the kernel
+returns a partial regular-file transfer. The destination descriptor and its flags determine which
+host requests a read, write, or seek can issue.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`read(file_descriptor, buffer, count)`](library/unistd/io.picoc#L6) | Number read or `-1`. Repeats bounded regular-file chunks and may wait for terminal input | [`SYSCALL_READ`](common/syscall.header#L32) with [`IoRequest`](common/file.header#L31)<br>**Host Request:** `read-range <offset> <count> <path>` for a regular-file descriptor |
+| [`write(file_descriptor, buffer, count)`](library/unistd/io.picoc#L32) | Number written or `-1`. Protects arbitrary data from UART control parsing | [`SYSCALL_WRITE`](common/syscall.header#L33) with [`IoRequest`](common/file.header#L31)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>`literal-output <count>` before output containing `<ESC>`, except for the null device |
+| [`write_without_uart_escape_check(file_descriptor, buffer, count)`](library/unistd/io.picoc#L43) | Number written or `-1`. Skips the UART `<ESC>` scan and therefore requires a buffer known not to contain `<ESC>` | [`SYSCALL_WRITE`](common/syscall.header#L33) with [`IoRequest`](common/file.header#L31)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>No `literal-output` request |
+| [`close(file_descriptor)`](library/unistd/io.picoc#L54) | 0 or `-1`. Releases the descriptor entry's path and state | [`SYSCALL_CLOSE`](common/syscall.header#L34) with the descriptor directly |
+| [`dup2(old_file_descriptor, new_file_descriptor)`](library/unistd/io.picoc#L58) | New descriptor or `-1`. Copies the entry independently. Later inheritance depends on the target slot and copied descriptor kind | [`SYSCALL_DUP2`](common/syscall.header#L36) with [`Dup2Request`](common/file.header#L48) |
+| [`lseek(file_descriptor, offset, origin)`](library/unistd/io.picoc#L66) | New logical offset or `-1` | [`SYSCALL_LSEEK`](common/syscall.header#L35) with [`SeekRequest`](common/file.header#L42)<br>**Host Request:** `file-size <path>` only for `SEEK_END` |
+
+#### 8.2.1.3 Working-directory operations in `working_directory.picoc`
+[\[↑ TOC\]](#contents)
+
+[`working_directory.picoc`](library/unistd/working_directory.picoc) reads or replaces the working
+directory stored in the calling process's [`Process.working_directory`](kernel/process/process.header#L39).
+Only changing the directory must verify a host directory.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`chdir(path)`](library/unistd/working_directory.picoc#L4) | 0 or `-1`. Replaces [`Process.working_directory`](kernel/process/process.header#L39) | [`SYSCALL_CHDIR`](common/syscall.header#L39) with the path pointer directly<br>**Host Request:** `is-directory <path>` |
+| [`getcwd(buffer, size)`](library/unistd/working_directory.picoc#L11) | The supplied buffer, or `NULL` on failure | [`SYSCALL_GETCWD`](common/syscall.header#L40) with [`GetCwdRequest`](common/syscall.header#L83) |
+
+#### 8.2.1.4 Path operations in `file_removal.picoc`
+[\[↑ TOC\]](#contents)
+
+[`file_removal.picoc`](library/unistd/file_removal.picoc) forwards removal, move, and touch
+operations to the host filesystem after the kernel normalizes their PicoOS paths.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`unlink(path)`](library/unistd/file_removal.picoc#L4) | Host status for removing a file | [`SYSCALL_UNLINK`](common/syscall.header#L43) with the path pointer directly<br>**Host Request:** `unlink <path>` |
+| [`rmdir(path)`](library/unistd/file_removal.picoc#L8) | Host status for removing an empty directory | [`SYSCALL_RMDIR`](common/syscall.header#L44) with the path pointer directly<br>**Host Request:** `rmdir <path>` |
+| [`move(old_path, new_path)`](library/unistd/file_removal.picoc#L12) | Host status for moving or renaming a file or directory | [`SYSCALL_MOVE`](common/syscall.header#L45) with [`MoveRequest`](common/syscall.header#L94)<br>**Host Request:** `move <old path>\n<new path>` |
+| [`touch(path)`](library/unistd/file_removal.picoc#L20) | Host status for creating a file or updating its timestamps | [`SYSCALL_TOUCH`](common/syscall.header#L46) with the path pointer directly<br>**Host Request:** `touch <path>` |
+
+#### 8.2.1.5 Wait-queue operations in `blocking.picoc`
+[\[↑ TOC\]](#contents)
+
+[`blocking.picoc`](library/unistd/blocking.picoc) initializes a userspace wait queue and lets a
+process wait on or wake that queue. Queue initialization changes the queue object directly and does
+not enter the kernel.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`wait_queue_init(wq)`](library/unistd/blocking.picoc#L4) | Initializes [`wait_queue.head`](common/wait_queue.header#L6) and [`wait_queue.tail`](common/wait_queue.header#L7) to `NULL` | No syscall |
+| [`sleep(wq)`](library/unistd/blocking.picoc#L9) | Sets the process's [`Process.state`](kernel/process/process.header#L33) to [`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15) and places it on the queue | [`SYSCALL_SLEEP`](common/syscall.header#L19) with the queue pointer directly |
+| [`wakeup(wq)`](library/unistd/blocking.picoc#L19) | Wakes at most the process at the FIFO head | [`SYSCALL_WAKEUP`](common/syscall.header#L20) with the queue pointer directly |
+
+### 8.2.2 fcntl: opening and creating files
+[\[↑ TOC\]](#contents)
+
+The descriptor operations above need an open descriptor. [`fcntl`](library/fcntl/) provides the
+two functions below for opening an existing path or creating or truncating a file. Device paths are
+handled inside PicoOS without host file requests.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`open(path, flags)`](library/fcntl/fcntl.picoc#L5) | Lowest free descriptor or `-1` | [`SYSCALL_OPEN`](common/syscall.header#L31) with [`OpenRequest`](common/file.header#L26)<br>**Host Requests:** `file-size <path>` for every nontruncating regular open. After failure with `O_CREAT`, or for `O_TRUNC`, the requests are `write <path>` then `write stdout` |
+| [`creat(path)`](library/fcntl/fcntl.picoc#L13) | Equivalent to an open for writing, creation, and truncation | Calls [`open()`](library/fcntl/fcntl.picoc#L5), which uses [`SYSCALL_OPEN`](common/syscall.header#L31)<br>**Host Requests:** `write <path>`, then `write stdout` for a regular path |
+
+### 8.2.3 sys/wait: waiting for children
+[\[↑ TOC\]](#contents)
+
+The [`sys/wait`](library/sys/wait/) library contains two public functions, so it is not a
+single-function library. The walkthrough in
+[`8.1 From a library call to the kernel: waitpid`](#81-from-a-library-call-to-the-kernel-waitpid)
+explains the implementation. This table summarizes the caller-visible results.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) | Exact child's exit or stopped status, or `-1` | [`SYSCALL_WAITPID`](common/syscall.header#L13) with [`WaitPidRequest`](common/syscall.header#L61). Waiting may suspend its stack frame |
 | [`WIFSTOPPED(status)`](library/sys/wait/wait.picoc#L25) | Whether status represents [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), or [`SIGTTIN`](common/signal.header#L9) | No syscall |
-| [`yield(void)`](library/schedule/schedule.picoc#L4) | Voluntarily saves the current activation and schedules | 14, no request |
 
-[`invoke_syscall(number, argument)`](library/unistd/process.picoc#L7) is the common assembly bridge
-used by most of these wrappers. It is an implementation helper, not an additional kernel operation:
-the [`number`](library/unistd/process.picoc#L7) already identifies the real syscall and
-[`argument`](library/unistd/process.picoc#L7) becomes `IN1`.
-
-## 8.3 System control, signals, shared memory, and mutexes
+### 8.2.4 mutex: locking and waking contenders
 [\[↑ TOC\]](#contents)
 
-The table connects system-control, signal, and shared-memory wrappers to kernel operations. The
-mutex functions combine an atomic userspace instruction with the blocking and wakeup syscalls described under
-[Section 6.3, Mutex Locking with Test-and-Set and Wait Queues](#63-mutex-locking-with-test-and-set-and-wait-queues).
+The [`mutex`](library/mutex/) library combines the RETI `TSL` instruction with the queue
+operations in [`unistd`](library/unistd/). Its functions below acquire a lock or block on its wait
+queue instead of repeatedly checking the lock.
 
-| Library function | Return value / status and purpose | Syscalls |
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
 | --- | --- | --- |
-| [`reboot(command)`](library/sys/reboot/reboot.picoc#L5) | Does not return for [`REBOOT_CMD_RESTART`](library/sys/reboot/reboot.header#L3) or [`REBOOT_CMD_POWER_OFF`](library/sys/reboot/reboot.header#L4), returns `-1` for any other command | 1 for restart, 0 for power-off, no request |
-| [`kill(pid, signal_number)`](library/signal/signal.picoc#L14) | 0 or `-1`, signal 0 only probes existence | 10, [`KillRequest`](common/syscall.header#L66) |
-| [`prctl(option, argument)`](library/sys/prctl/prctl.picoc#L14) | 0 or `-1`, supports [`PR_SET_PDEATHSIG`](common/prctl.header#L3) | 11, [`PrctlRequest`](common/syscall.header#L71) |
-| [`shm_open(name, size)`](library/sys/mman/mman.picoc#L15) | Existing/new shared-memory ID or `-1` | 18, [`ShmOpenRequest`](common/syscall.header#L78) |
-| [`mmap(shared_memory_id)`](library/sys/mman/mman.picoc#L23) | Shared absolute address or `NULL`, creates a PCB attachment | 19, ID directly |
-| [`shm_unlink(name)`](library/sys/mman/mman.picoc#L27) | 0 or `-1`, removes name and requests deferred destruction | 20, name pointer directly |
 | [`testset(lock_addr)`](library/mutex/mutex.picoc#L3) | Atomically writes 1 and returns the old lock value | No syscall, one RETI `TSL` instruction |
 | [`mutex_init(m)`](library/mutex/mutex.picoc#L12) | Clears lock and initializes embedded wait queue | No syscall |
-| [`mutex_lock(m)`](library/mutex/mutex.picoc#L18) | Acquires lock, contenders block instead of spinning | Uses [`testset()`](library/mutex/mutex.picoc#L3) and syscall 12 through [`sleep()`](library/unistd/blocking.picoc#L9) |
-| [`mutex_unlock(m)`](library/mutex/mutex.picoc#L25) | Clears lock and wakes one contender | Uses syscall 13 through [`wakeup()`](library/unistd/blocking.picoc#L19) |
+| [`mutex_lock(m)`](library/mutex/mutex.picoc#L18) | Acquires the lock. Contenders wait instead of spinning | Uses [`testset()`](library/mutex/mutex.picoc#L3), then [`SYSCALL_SLEEP`](common/syscall.header#L19) through [`sleep()`](library/unistd/blocking.picoc#L9) when the lock is held |
+| [`mutex_unlock(m)`](library/mutex/mutex.picoc#L25) | Clears the lock and wakes one contender | Uses [`SYSCALL_WAKEUP`](common/syscall.header#L20) through [`wakeup()`](library/unistd/blocking.picoc#L19) |
 
-[`kill()`](library/signal/signal.picoc#L14) builds [`KillRequest`](common/syscall.header#L66) as a
-local in the caller's userspace stack and passes its address synchronously to syscall 10. The kernel
-validates the signal and PID during that call and does not retain the request pointer. A
-self-directed [`SIGINT`](common/signal.header#L4) or [`SIGKILL`](common/signal.header#L5) stores
-[`pending_termination_signal`](kernel/process/process.header#L63) and can return from the syscall
-before termination is applied. At the next scheduling pass, including a deferred timer request at
-syscall return, the dispatcher consumes that value and does not restore the process again.
+[`struct mutex`](library/mutex/mutex.header#L6) contains a Boolean lock and an embedded
+[`struct wait_queue`](common/wait_queue.header#L5). It is userspace data. Placing it in shared
+memory lets participating processes use the same lock and queue, although the queue links
+kernel-owned [`Process`](kernel/process/process.header#L31) structures. See
+[`6.3 Mutex Locking with Test-and-Set and Wait Queues`](#63-mutex-locking-with-test-and-set-and-wait-queues)
+for the acquisition and wakeup sequence.
 
-[`reboot()`](library/sys/reboot/reboot.picoc#L5) keeps the two system-control selectors behind one
-public interface. It validates the command before calling
-[`invoke_syscall()`](library/unistd/process.picoc#L7), both supported commands transfer control to
-the kernel and do not normally return.
-
-[`struct mutex`](library/mutex/mutex.header#L6) contains a one-cell Boolean and a complete
-[`struct wait_queue`](common/wait_queue.header#L5). It is normal userspace data, not a kernel
-allocation. Placing it in a shared memory region lets all participating processes see both the lock
-cell and the queue object, the queue still links kernel-owned PCBs.
-
-## 8.4 Directory streams and directory creation
+### 8.2.5 sys/mman: named shared memory
 [\[↑ TOC\]](#contents)
 
-The declarations below show why a directory stream needs no kernel descriptor:
+The [`sys/mman`](library/sys/mman/) functions below let processes share storage by name.
+Opening obtains an ID, mapping attaches the storage to the caller, and unlinking removes its name.
+[`3.6 Shared-memory entries and mappings`](#36-shared-memory-entries-and-mappings) explains when the
+storage can finally be freed.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`shm_open(name, size)`](library/sys/mman/mman.picoc#L15) | Existing or new shared-memory ID, or `-1` | [`SYSCALL_SHM_OPEN`](common/syscall.header#L26) with [`ShmOpenRequest`](common/syscall.header#L78) |
+| [`mmap(shared_memory_id)`](library/sys/mman/mman.picoc#L23) | Shared absolute address or `NULL`. Creates a [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) for the calling process | [`SYSCALL_MMAP`](common/syscall.header#L27) with the ID directly |
+| [`shm_unlink(name)`](library/sys/mman/mman.picoc#L27) | 0 or `-1`. Removes the name and requests deferred destruction | [`SYSCALL_SHM_UNLINK`](common/syscall.header#L28) with the name pointer directly |
+
+### 8.2.6 dirent: directory streams
+[\[↑ TOC\]](#contents)
+
+The [`dirent`](library/dirent/) library obtains a directory listing once and parses it in the
+user program. The declarations below show why a directory stream needs no kernel descriptor.
 [`DirectoryStream`](library/dirent/dirent.header#L14) owns a listing buffer and reuses one embedded
-[`dirent`](library/dirent/dirent.header#L9) for each parsed result.
+[`dirent`](library/dirent/dirent.header#L9) for each result.
 
 ```c
 struct dirent {
@@ -5395,9 +5678,11 @@ struct DirectoryStream {
 [`length`](library/dirent/dirent.header#L16) is the returned host listing length,
 [`offset`](library/dirent/dirent.header#L17) is the next record, and embedded
 [`entry`](library/dirent/dirent.header#L18) is overwritten by every
-[`readdir()`](library/dirent/dirent.picoc#L40) call. Neither object is stored in the PCB or kernel
-descriptor table. The field table identifies who first fills each value and who consumes it, in
-particular, the embedded entry is first populated when a record is read.
+[`readdir()`](library/dirent/dirent.picoc#L40) call. Neither object is stored in a
+[`Process`](kernel/process/process.header#L31) or
+[`FileDescriptorTable`](kernel/filesystem/file_descriptor.header#L22). The field table identifies
+who first fills each value and who consumes it. In particular, the embedded entry is first
+populated when a record is read.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
@@ -5408,51 +5693,118 @@ particular, the embedded entry is first populated when a record is read.
 | [`dirent.d_type`](library/dirent/dirent.header#L10) | Directory or regular-file type | First initialized by [`readdir()`](library/dirent/dirent.picoc#L40) from the record’s leading character |
 | [`dirent.d_name`](library/dirent/dirent.header#L11) | Terminated name, limited to 127 characters | First initialized by [`readdir()`](library/dirent/dirent.picoc#L40), long names are truncated |
 
-The function table below shows that only opening needs a host listing request, subsequent reads
-parse the stored listing, and closing releases both allocations.
+Only opening requests a listing. Reading parses the stored listing and closing frees it, as the
+function table shows. Opening also allocates memory, so allocation failure can issue the diagnostic
+output requests described under
+[`8.2.7 stdlib: process heap, environment, conversion, and exit`](#827-stdlib-process-heap-environment-conversion-and-exit).
 
-| Library function | Return value / status and purpose | Syscalls / host requests |
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
 | --- | --- | --- |
-| [`opendir(path)`](library/dirent/dirent.picoc#L8) | Stream pointer, or `NULL` for an invalid path/listing failure, allocates stream and buffer | 32, [`ReadDirectoryRequest`](common/syscall.header#L88), also uses [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**Host request:** `ls <path>` |
+| [`opendir(path)`](library/dirent/dirent.picoc#L8) | Stream pointer, or `NULL` for a null path or listing failure. Allocates the stream and buffer. Allocation failure terminates the process in PicoOS | [`SYSCALL_READ_DIRECTORY`](common/syscall.header#L42) with [`ReadDirectoryRequest`](common/syscall.header#L88)<br>[`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through [`malloc()`](library/stdlib/malloc.picoc#L35) on allocation failure<br>**Host Requests:** `ls <path>`<br>For the heap-full message, `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
 | [`readdir(directory)`](library/dirent/dirent.picoc#L40) | Pointer to the reused [`entry`](library/dirent/dirent.header#L18), or `NULL` at end/for a null stream | No syscall |
 | [`closedir(directory)`](library/dirent/dirent.picoc#L66) | `0` after freeing buffer/stream, `-1` for a null stream | No syscall |
-| [`mkdir(path)`](library/sys/stat/stat.picoc#L5) | `0` on success, `-1` on invalid path or host failure | 31, path pointer directly<br>**Host request:** `mkdir <path>` |
 
-## 8.5 Process heap, environment, strings, and exit
+### 8.2.7 stdlib: process heap, environment, conversion, and exit
 [\[↑ TOC\]](#contents)
 
-Beyond syscall wrappers, each linked process contains its own global
-[`Heap`](common/heap.header#L11) descriptor,
-[`process_heap`](library/stdlib/malloc.picoc#L6), and [`environ`](library/stdlib/env.picoc#L4) in
-that process's `.data`, these are not shared kernel globals. Environment arrays and `NAME=value`
-strings are allocated inside the process heap. The table below separates these local operations from
-heap setup and termination, which need kernel services.
+Each program linked with [`stdlib`](library/stdlib/) has its own
+[`process_heap`](library/stdlib/malloc.picoc#L6) descriptor and
+[`environ`](library/stdlib/env.picoc#L4) pointer in its data section. Environment arrays and strings
+are allocated in that process's heap. The implementation separates allocation, conversion,
+environment handling, and process exit into four source files.
 
-| Library function | Return value / status and purpose | Syscalls |
+#### 8.2.7.1 Heap operations in `malloc.picoc`
+[\[↑ TOC\]](#contents)
+
+A failed positive allocation is an important exception:
+[`malloc()`](library/stdlib/malloc.picoc#L35) or [`realloc()`](library/stdlib/malloc.picoc#L42) calls
+[`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8), which invokes
+[`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25).
+[`handle_syscall()`](kernel/syscall.picoc#L16) then calls
+[`handle_process_heap_full_exception()`](kernel/exception.picoc#L82), which calls
+[`write_process_exception_message()`](kernel/exception.picoc#L29) and
+[`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) before terminating the process.
+The message goes through descriptor 1, so redirection can trigger host requests even for an
+allocation or environment operation. This fixed message contains no escape byte and requests no
+`literal-output` protection. The table includes that failure path wherever allocation can occur.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
 | --- | --- | --- |
-| [`init_process_heap(void)`](library/stdlib/malloc.picoc#L18) | Initializes [`process_heap`](library/stdlib/malloc.picoc#L6) over the PCB-described region | Syscalls 15 and 16 obtain absolute heap start and size |
-| [`malloc(size)`](library/stdlib/malloc.picoc#L35) | First-fit allocation from [`process_heap`](library/stdlib/malloc.picoc#L6) | Pure userspace unless positive allocation fails, then syscall 17 terminates the process |
-| [`realloc(ptr, size)`](library/stdlib/malloc.picoc#L42) | Resize/move using the shared heap implementation | Same failure policy as [`malloc()`](library/stdlib/malloc.picoc#L35) |
+| [`require_process_heap_allocation(memory, size)`](library/stdlib/malloc.picoc#L8) | Returns `memory`. A `NULL` result for a positive size terminates the process | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) only for a failed positive allocation<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`init_process_heap(void)`](library/stdlib/malloc.picoc#L18) | Initializes [`process_heap`](library/stdlib/malloc.picoc#L6) over the region recorded in the current [`Process`](kernel/process/process.header#L31) | [`SYSCALL_PROCESS_HEAP_START`](common/syscall.header#L23) and [`SYSCALL_PROCESS_HEAP_SIZE`](common/syscall.header#L24) |
+| [`malloc(size)`](library/stdlib/malloc.picoc#L35) | Pointer to a first-fit allocation. Returns `NULL` for a nonpositive size. A failed positive allocation terminates the process | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) only on failure<br>**Host Requests:** The heap-full diagnostic requests listed above |
+| [`realloc(ptr, size)`](library/stdlib/malloc.picoc#L42) | Resized or moved pointer. Size 0 frees the block and returns `NULL`. A failed positive allocation terminates the process | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) only on failure<br>**Host Requests:** The heap-full diagnostic requests listed above |
 | [`free(ptr)`](library/stdlib/malloc.picoc#L49) | Releases and coalesces a process-heap block | No syscall |
+
+#### 8.2.7.2 Decimal conversion in `atoi.picoc`
+[\[↑ TOC\]](#contents)
+
+[`atoi.picoc`](library/stdlib/atoi.picoc) converts text by reading the supplied string directly. It
+does not allocate memory or enter the kernel.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
 | [`atoi(text)`](library/stdlib/atoi.picoc#L4) | Converts optional sign and decimal characters | No syscall |
+
+#### 8.2.7.3 Environment operations in `env.picoc`
+[\[↑ TOC\]](#contents)
+
+[`env.picoc`](library/stdlib/env.picoc) reads and modifies the process-global
+[`environ`](library/stdlib/env.picoc#L4) array. Functions that create or enlarge strings use
+[`malloc()`](library/stdlib/malloc.picoc#L35) or [`realloc()`](library/stdlib/malloc.picoc#L42), so
+their allocation-failure path can print the heap-full diagnostic described in
+[`8.2.7.1 Heap operations in malloc.picoc`](#8271-heap-operations-in-mallocpicoc).
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
 | [`getenv(name)`](library/stdlib/env.picoc#L115) | Pointer to value within matching `NAME=value` string, or `NULL` | No syscall |
 | [`current_environment(void)`](library/stdlib/env.picoc#L6) | Current process-global [`environ`](library/stdlib/env.picoc#L4) pointer | No syscall |
-| [`setenv(name, value, overwrite)`](library/stdlib/env.picoc#L126) | Allocates/replaces one owned environment string | No syscall |
-| [`unsetenv(name)`](library/stdlib/env.picoc#L157) | Frees one string and compacts pointer array | No syscall |
-| [`putenv(variable)`](library/stdlib/env.picoc#L174) | Copies and stores one `NAME=value` entry | No syscall |
-| [`clearenv(void)`](library/stdlib/env.picoc#L194) | Frees all strings but retains an empty array | No syscall |
-| [`clone_environment(void)`](library/stdlib/env.picoc#L205) | Deep process-heap copy of the current environment, currently exposed for applications but not used by PicoOS programs | No syscall |
+| [`copy_environment_variable(variable)`](library/stdlib/env.picoc#L20) | Pointer to an allocated copy. A failed positive allocation terminates the process | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through [`malloc()`](library/stdlib/malloc.picoc#L35) only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`store_environment_variable(variable, name_length)`](library/stdlib/env.picoc#L67) | 0 after replacing or adding an entry. A failed positive reallocation terminates the process | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through [`realloc()`](library/stdlib/malloc.picoc#L42) only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`initialize_environment(environment)`](library/stdlib/env.picoc#L97) | Creates [`environ`](library/stdlib/env.picoc#L4) and copies the initial strings. Used internally during process startup | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through allocation helpers only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`setenv(name, value, overwrite)`](library/stdlib/env.picoc#L126) | 0 on success or when overwrite is disabled for an existing name. Allocates or replaces one owned string | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through allocation helpers only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`unsetenv(name)`](library/stdlib/env.picoc#L157) | 0. Frees a matching string and compacts the pointer array | No syscall |
+| [`putenv(variable)`](library/stdlib/env.picoc#L174) | 0 after copying and storing `NAME=value`, or `-1` when `=` is missing | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through allocation helpers only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`clearenv(void)`](library/stdlib/env.picoc#L194) | 0. Frees all strings but retains an empty array | No syscall |
+| [`clone_environment(void)`](library/stdlib/env.picoc#L205) | Deep process-heap copy of the current environment. Exposed to applications but not used by PicoOS programs | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through allocation helpers only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
 | [`destroy_environment(environment)`](library/stdlib/env.picoc#L230) | Frees a cloned array and its strings | No syscall |
-| [`restore_environment(environment)`](library/stdlib/env.picoc#L243) | Clears and recreates current [`environ`](library/stdlib/env.picoc#L4) from a clone | No syscall |
-| [`exit(status)`](library/stdlib/exit.picoc#L3) | Terminates current process and does not normally return | Syscall 6, status directly |
-| [`strcpy(destination, source)`](library/string/string.picoc#L4), [`strcat(destination, source)`](library/string/string.picoc#L16) | Copy/append terminated strings | No syscall |
-| [`strcmp(left, right)`](library/string/string.picoc#L34), [`strncmp(left, right, count)`](library/string/string.picoc#L44), [`strlen(string)`](library/string/string.picoc#L60) | Compare strings or count cells before `NUL` | No syscall |
+| [`restore_environment(environment)`](library/stdlib/env.picoc#L243) | 0 after recreating current [`environ`](library/stdlib/env.picoc#L4), or `-1` for an invalid entry | [`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) through allocation helpers only on failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
 
-## 8.6 Standard I/O, formatting, and scanning
+[`initialize_environment(environment)`](library/stdlib/env.picoc#L97) is declared internally by
+[`start.picoc`](library/start/start.picoc#L5), not in the public
+[`stdlib.header`](library/stdlib/stdlib.header).
+
+#### 8.2.7.4 Process exit in `exit.picoc`
 [\[↑ TOC\]](#contents)
 
-The declaration below shows that a [`PicoFile`](library/stdio/stdio.header#L3) stores only a
-descriptor number. The function table then traces these stream operations to the descriptor ABI.
+[`exit.picoc`](library/stdlib/exit.picoc) contains the terminating operation used both directly and
+when the application entry function returns.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`exit(status)`](library/stdlib/exit.picoc#L3) | Terminates the current process and does not normally return | [`SYSCALL_EXIT`](common/syscall.header#L12) with the status directly |
+
+### 8.2.8 string: copying, comparison, and length
+[\[↑ TOC\]](#contents)
+
+The [`string`](library/string/) functions below work entirely on memory supplied by their
+caller. They neither allocate memory nor invoke syscalls. Lengths and sizes use RETI cells.
+Callers must provide enough space for a copied string and its terminator.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`strcpy(destination, source)`](library/string/string.picoc#L4) | Copies a terminated string and returns the destination | No syscall |
+| [`strcat(destination, source)`](library/string/string.picoc#L16) | Appends a terminated string and returns the destination | No syscall |
+| [`strcmp(left, right)`](library/string/string.picoc#L34) | Difference between the first unequal cells, or 0 for equal strings | No syscall |
+| [`strncmp(left, right, count)`](library/string/string.picoc#L44) | Comparison limited to `count` cells. Returns a negative value, zero, or a positive value | No syscall |
+| [`strlen(string)`](library/string/string.picoc#L60) | Number of cells before the terminator | No syscall |
+
+### 8.2.9 stdio: streams, formatting, and scanning
+[\[↑ TOC\]](#contents)
+
+The [`stdio`](library/stdio/) library builds streams and formatted I/O on the descriptor
+interface. The declaration below shows that a [`PicoFile`](library/stdio/stdio.header#L3) stores
+only a descriptor number.
 
 ```c
 struct PicoFile {
@@ -5460,8 +5812,9 @@ struct PicoFile {
 };
 ```
 
-The process has three global standard stream objects, five global
-[`fopen`](library/stdio/stdio.picoc#L125) slots, a five-cell used/free array, and pointers used by
+The process has three global standard stream objects, five
+[`file_streams`](library/stdio/stdio.picoc#L12) slots, a five-cell
+[`file_stream_used`](library/stdio/stdio.picoc#L13) array, and pointers used by
 the [`stdin`](library/stdio/stdio.header#L9), [`stdout`](library/stdio/stdio.header#L10), and
 [`stderr`](library/stdio/stdio.header#L11) macros. A [`FILE`](library/stdio/stdio.header#L7)
 contains only a descriptor. There is no userspace buffer, EOF flag, error flag, or shared open-file
@@ -5474,55 +5827,95 @@ table shows how stream preparation and opening supply the descriptor used by lat
 | --- | --- | --- |
 | [`PicoFile.file_descriptor`](library/stdio/stdio.header#L4) | Entry number in the current process’s descriptor table | First initialized by [`prepare_standard_streams()`](library/stdio/stdio.picoc#L45) for standard streams and [`fopen()`](library/stdio/stdio.picoc#L125) for extra streams, used by [`fgetc()`](library/stdio/stdio.picoc#L178), [`fputc()`](library/stdio/stdio.picoc#L204), [`fputs()`](library/stdio/stdio.picoc#L229), and [`fclose()`](library/stdio/stdio.picoc#L155) |
 
-The function table connects stream selection, formatting, and scanning to the syscalls that
-eventually perform the I/O. Formatting and scanning rows reduce to the listed character/string
-operations and therefore use the same descriptor-dependent host requests rather than additional
-ones.
+The implementation separates stream and output operations from scanning. Each source file has its
+own table below, while the host requests still include requests caused by redirected standard
+streams.
 
-| Library function | Return value / status and purpose | Syscalls / host requests |
-| --- | --- | --- |
-| [`standard_input(void)`](library/stdio/stdio.picoc#L79), [`standard_output(void)`](library/stdio/stdio.picoc#L84), [`standard_error(void)`](library/stdio/stdio.picoc#L89) | Addresses of the three process-global stream objects | Syscall 21 only on lazy first preparation |
-| [`fopen(path, mode)`](library/stdio/stdio.picoc#L125) | One of five stream slots or `NULL`, supports `r`, `w`, `a`, and `+` | 22, [`OpenRequest`](common/file.header#L26) after mode-to-flag conversion<br>**Host requests:** the `file-size` and, when required, `write`/`write stdout` sequence listed for [`open()`](library/fcntl/fcntl.picoc#L5) |
-| [`fclose(stream)`](library/stdio/stdio.picoc#L155) | `0` on close, or `-1` for an invalid stream/descriptor, releases an extra stream slot | 25, descriptor directly |
-| [`fgetc(stream)`](library/stdio/stdio.picoc#L178) | Read character or `-1` | 23 with [`IoRequest`](common/file.header#L31), standalone stdin may use test-only UART selector 38<br>**Host request:** `read-range <offset> <count> <path>` for a regular-file stream |
-| [`fputc(character, stream)`](library/stdio/stdio.picoc#L204) | Written character or `-1` | 24 with [`IoRequest`](common/file.header#L31), standalone stdout may use direct UART syscall 28<br>**Host requests:** the descriptor-dependent `write-at`, `write stderr`, `write stdout`, append `file-size`, and optional `literal-output` requests listed for [`write()`](library/unistd/io.picoc#L32) |
-| [`fputs(text, stream)`](library/stdio/stdio.picoc#L229) | Written count or `-1` | 24 with [`IoRequest`](common/file.header#L31), or repeated syscall 28 in fallback mode<br>**Host requests:** the same descriptor-dependent requests as [`fputc()`](library/stdio/stdio.picoc#L204) |
-| [`fprintf(stream, format, ...)`](library/stdio/stdio.picoc#L346) | Written count or `-1` | Formatting is userspace, output reduces to [`fputc()`](library/stdio/stdio.picoc#L204)/[`fputs()`](library/stdio/stdio.picoc#L229) |
-| [`printf(format, ...)`](library/stdio/stdio.picoc#L354) | Written count or `-1` to [`stdout`](library/stdio/stdio.header#L10) | Same as [`fprintf()`](library/stdio/stdio.picoc#L346) |
-| [`scanf(format, ...)`](library/stdio/scanf.picoc#L112) | Number of assigned arguments | Input reduces to [`fgetc(stdin)`](library/stdio/stdio.picoc#L178) |
-
-The legacy UART fallbacks support standalone library and compiler tests linked with
-`isrs.reti` from [`isrs.picoc`](interrupt_service_routines/isrs.picoc), allowing those tests to use
-[`printf()`](library/stdio/stdio.picoc#L354) and [`scanf()`](library/stdio/scanf.picoc#L112) without
-linking and booting the complete PicoOS kernel. That small test interrupt service routine recognizes
-heap-start selector 15, heap-size selector 16, UART-output selector 28, and the test-only
-UART-input selector 38. PicoOS detects descriptor support through selector 21, then uses
-descriptor-backed standard I/O. Selector 38 belongs only to the standalone test interface and is
-outside the kernel's implemented selector range of 0–36.
-
-Formatting supports `%d`, `%c`, `%s`, and `%%`, scanning supports `%d`, `%c`, `%s`, literal
-characters, and whitespace matching.
-
-[Section 1.1.3, System V ABI stack frames and call cleanup](#113-system-v-abi-stack-frames-and-call-cleanup)
-gives the exact `BAF`-relative locations used by the variadic formatting
-functions.
-
-
-## 8.7 Library organization, scope, and limitations
+#### 8.2.9.1 Streams and output in `stdio.picoc`
 [\[↑ TOC\]](#contents)
 
-An umbrella unit such as [`libstdio.picoc`](library/stdio/libstdio.picoc) includes its
-implementation parts, while `// dependencies:` records the separately compiled `.reti_blocks` units
-needed at link time. The compiler links these libraries with the program and selects custom startup
-through `-C`. This connects ordinary-looking PicoC headers/calls to the compiler’s
-[Section 1.1.2, Separate compilation, reusable artifacts, and linking](#112-separate-compilation-reusable-artifacts-and-linking).
+[`stdio.picoc`](library/stdio/stdio.picoc) prepares standard streams, manages five additional stream
+slots, and performs descriptor-backed input and output. Formatting happens in userspace before the
+result is passed to the same output functions. Each function below may first call
+[`prepare_standard_streams()`](library/stdio/stdio.picoc#L45), which invokes
+[`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) once for the process.
 
-The libraries intentionally remain small: values and sizes use RETI cells, streams are unbuffered
-descriptor wrappers, only five extra [`FILE`](library/stdio/stdio.header#L7) slots exist,
-formatting/scanning support a few conversions, [`waitpid()`](library/sys/wait/wait.picoc#L14) has no
-options, and the POSIX-like names do not promise POSIX corner cases. The request-structure ABI keeps
-the interrupt interface compact and visible at the cost of trusting pointers in the single physical
-address space.
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`standard_input(void)`](library/stdio/stdio.picoc#L79) | Address of the process-global input stream | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) only on first stream preparation. No host request |
+| [`standard_output(void)`](library/stdio/stdio.picoc#L84) | Address of the process-global output stream | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) only on first stream preparation. No host request |
+| [`standard_error(void)`](library/stdio/stdio.picoc#L89) | Address of the process-global error stream | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) only on first stream preparation. No host request |
+| [`fopen(path, mode)`](library/stdio/stdio.picoc#L125) | One of five stream slots or `NULL`. Supports `r`, `w`, `a`, and `+` | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation<br>[`SYSCALL_OPEN`](common/syscall.header#L31) with [`OpenRequest`](common/file.header#L26)<br>**Host Requests:** `file-size <path>` for a nontruncating regular open<br>`write <path>`, then `write stdout` for truncation or creation after a failed existence check |
+| [`fclose(stream)`](library/stdio/stdio.picoc#L155) | 0 on close, or `-1` for an invalid stream or descriptor. Releases an additional stream slot | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation<br>[`SYSCALL_CLOSE`](common/syscall.header#L34) with the descriptor directly |
+| [`fgetc(stream)`](library/stdio/stdio.picoc#L178) | Read character or `-1` | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation<br>[`SYSCALL_READ`](common/syscall.header#L32) with [`IoRequest`](common/file.header#L31)<br>**Host Request:** `read-range <offset> <count> <path>` for a regular-file stream |
+| [`fputc(character, stream)`](library/stdio/stdio.picoc#L204) | Written character or `-1` | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation<br>[`SYSCALL_WRITE`](common/syscall.header#L33) with [`IoRequest`](common/file.header#L31)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>`literal-output <count>` before output containing `<ESC>`, except for the null device |
+| [`fputs(text, stream)`](library/stdio/stdio.picoc#L229) | Written count or `-1` | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation<br>[`SYSCALL_WRITE`](common/syscall.header#L33) with [`IoRequest`](common/file.header#L31)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>`literal-output <count>` before output containing `<ESC>`, except for the null device |
+| [`write_decimal(stream, value)`](library/stdio/stdio.picoc#L259) | Count written, or `-1` if writing a digit fails. Internal formatting helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation and [`SYSCALL_WRITE`](common/syscall.header#L33) through [`fputc()`](library/stdio/stdio.picoc#L204)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>No `literal-output` request because decimal output contains no `<ESC>` |
+| [`format_stream(stream, format, argument_base, first_argument)`](library/stdio/stdio.picoc#L277) | Formatted count, or `-1` if output fails. Internal formatting helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation and [`SYSCALL_WRITE`](common/syscall.header#L33) through [`fputc()`](library/stdio/stdio.picoc#L204) or [`fputs()`](library/stdio/stdio.picoc#L229)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>`literal-output <count>` before an output value containing `<ESC>`, except for the null device |
+| [`fprintf(stream, format, ...)`](library/stdio/stdio.picoc#L346) | Written count or `-1` | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation and [`SYSCALL_WRITE`](common/syscall.header#L33) through [`format_stream()`](library/stdio/stdio.picoc#L277)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` for regular files<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr<br>`literal-output <count>` before an output value containing `<ESC>`, except for the null device |
+| [`printf(format, ...)`](library/stdio/stdio.picoc#L354) | Written count or `-1` to [`stdout`](library/stdio/stdio.header#L10) | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first preparation and [`SYSCALL_WRITE`](common/syscall.header#L33) through [`format_stream()`](library/stdio/stdio.picoc#L277)<br>**Host Requests:** `write-at <offset> <path>`, then `write stdout` when descriptor 1 is a regular file<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` when descriptor 1 is a copied terminal-stderr entry<br>`literal-output <count>` before an output value containing `<ESC>`, except for the null device |
+
+Formatting supports `%d`, `%c`, `%s`, and `%%`.
+[`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup)
+gives the stack locations used for variadic arguments.
+
+#### 8.2.9.2 Scanning in `scanf.picoc`
+[\[↑ TOC\]](#contents)
+
+[`scanf.picoc`](library/stdio/scanf.picoc) parses `%d`, `%c`, `%s`, literal characters, and
+whitespace. It reads through [`fgetc()`](library/stdio/stdio.picoc#L178) and uses
+[`has_unread_input`](library/stdio/scanf.picoc#L4) with
+[`unread_input`](library/stdio/scanf.picoc#L5) as one-character pushback state.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`read_input(void)`](library/stdio/scanf.picoc#L16) | Returns the saved pushback character when present, otherwise reads one character from [`stdin`](library/stdio/stdio.header#L9). Internal scanning helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first stream preparation and [`SYSCALL_READ`](common/syscall.header#L32) through [`fgetc()`](library/stdio/stdio.picoc#L178) when no character is saved<br>**Host Request:** `read-range <offset> <count> <path>` when descriptor 0 is a regular file |
+| [`skip_whitespace(void)`](library/stdio/scanf.picoc#L30) | Consumes whitespace and saves the first following character. Internal scanning helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first stream preparation and [`SYSCALL_READ`](common/syscall.header#L32) through [`read_input()`](library/stdio/scanf.picoc#L16)<br>**Host Request:** `read-range <offset> <count> <path>` when descriptor 0 is a regular file |
+| [`read_decimal(target)`](library/stdio/scanf.picoc#L40) | Whether a signed decimal value was read into `target`. Internal scanning helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first stream preparation and [`SYSCALL_READ`](common/syscall.header#L32) through [`read_input()`](library/stdio/scanf.picoc#L16)<br>**Host Request:** `read-range <offset> <count> <path>` when descriptor 0 is a regular file |
+| [`read_string(target)`](library/stdio/scanf.picoc#L83) | Whether a nonempty, whitespace-delimited string was read into `target`. Internal scanning helper | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first stream preparation and [`SYSCALL_READ`](common/syscall.header#L32) through [`read_input()`](library/stdio/scanf.picoc#L16)<br>**Host Request:** `read-range <offset> <count> <path>` when descriptor 0 is a regular file |
+| [`scanf(format, ...)`](library/stdio/scanf.picoc#L112) | Number of assigned arguments | [`SYSCALL_FILE_DESCRIPTORS_AVAILABLE`](common/syscall.header#L30) on first stream preparation and [`SYSCALL_READ`](common/syscall.header#L32) through the scanning helpers above<br>**Host Request:** `read-range <offset> <count> <path>` when descriptor 0 is a regular file |
+
+### 8.2.10 start: entering and leaving a user program
+[\[↑ TOC\]](#contents)
+
+The [`start`](library/start/) library supplies the entry point selected with `-C` and a helper
+that prepares the process before calling its application entry function. It has no public header
+and contains two function definitions. The table shows their roles. The complete source and stack
+setup are in [`1.1.4.3 PicoOS libstart startup sequence`](#1143-picoos-libstart-startup-sequence).
+Calls made by the application's own entry function depend on that application.
+
+| Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- |
+| [`_start(argc, first_argument)`](library/start/start.picoc#L14) | Entry point without a generated stack frame. Calls [`start_process()`](library/start/start.picoc#L7) | Through [`start_process()`](library/start/start.picoc#L7), [`SYSCALL_PROCESS_HEAP_START`](common/syscall.header#L23), [`SYSCALL_PROCESS_HEAP_SIZE`](common/syscall.header#L24), and [`SYSCALL_EXIT`](common/syscall.header#L12)<br>[`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) on environment allocation failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+| [`start_process(argc, argv)`](library/start/start.picoc#L7) | Initializes the heap and environment, calls the application entry function, then exits with its status | [`SYSCALL_PROCESS_HEAP_START`](common/syscall.header#L23), [`SYSCALL_PROCESS_HEAP_SIZE`](common/syscall.header#L24), and [`SYSCALL_EXIT`](common/syscall.header#L12)<br>[`SYSCALL_PROCESS_HEAP_FULL`](common/syscall.header#L25) on environment allocation failure<br>**Host Requests for the heap-full message:** `write-at <offset> <path>`, then `write stdout` for a regular descriptor 1<br>Optional `file-size <path>` before append<br>`write stderr`, then `write stdout` for terminal stderr |
+
+### 8.2.11 Single-function libraries
+[\[↑ TOC\]](#contents)
+
+Five libraries each expose one public function: [`schedule`](library/schedule/),
+[`signal`](library/signal/), [`sys/prctl`](library/sys/prctl/), [`sys/reboot`](library/sys/reboot/),
+and [`sys/stat`](library/sys/stat/). Private assembly helpers in some implementations do not add
+public operations. This combined table identifies the library for each function.
+
+| Library | Library function | Return value / status and purpose | Syscalls / Host Requests |
+| --- | --- | --- | --- |
+| [`schedule`](library/schedule/) | [`yield(void)`](library/schedule/schedule.picoc#L4) | Voluntarily saves the current activation and schedules another runnable process | [`SYSCALL_YIELD`](common/syscall.header#L21) with no request structure |
+| [`signal`](library/signal/) | [`kill(pid, signal_number)`](library/signal/signal.picoc#L14) | 0 or `-1`. Signal 0 only probes existence | [`SYSCALL_KILL`](common/syscall.header#L16) with [`KillRequest`](common/syscall.header#L66) |
+| [`sys/prctl`](library/sys/prctl/) | [`prctl(option, argument)`](library/sys/prctl/prctl.picoc#L14) | 0 or `-1`. Supports [`PR_SET_PDEATHSIG`](common/prctl.header#L3) | [`SYSCALL_PRCTL`](common/syscall.header#L17) with [`PrctlRequest`](common/syscall.header#L71) |
+| [`sys/reboot`](library/sys/reboot/) | [`reboot(command)`](library/sys/reboot/reboot.picoc#L5) | Does not return for [`REBOOT_CMD_RESTART`](library/sys/reboot/reboot.header#L3) or [`REBOOT_CMD_POWER_OFF`](library/sys/reboot/reboot.header#L4). Returns `-1` for any other command | [`SYSCALL_REBOOT`](common/syscall.header#L6) for restart or [`SYSCALL_SHUTDOWN`](common/syscall.header#L5) for power-off<br>**Host Requests after firmware restart:** `load kernel/kernel.bin` from the bootloader, then `load /system/init.bin` from kernel startup<br>None for power-off |
+| [`sys/stat`](library/sys/stat/) | [`mkdir(path)`](library/sys/stat/stat.picoc#L5) | 0 on success, or `-1` for an invalid path or host failure | [`SYSCALL_MKDIR`](common/syscall.header#L41) with the path pointer directly<br>**Host Request:** `mkdir <path>` |
+
+The restart path in [`reboot()`](library/sys/reboot/reboot.picoc#L5) reaches
+[`reboot()`](kernel/kernel.picoc#L19) in the kernel, which jumps to EPROM address 0. With the PicoOS
+bootloader installed, [`boot_main()`](boot/bootloader.picoc#L41) requests the kernel image and the
+restarted kernel's [`main()`](kernel/kernel.picoc#L31) calls
+[`load_process()`](kernel/process/process_loader.picoc#L305) to load the initial process. These
+requests are consequences of restarting, not a separate UART restart command. See
+[`10. Bootloading and kernel startup`](#10-bootloading-and-kernel-startup) for the boot sequence.
+
+Signal requests are read synchronously. A self-directed terminating signal can return before the
+dispatcher applies termination. The actions and timing are explained in
+[`6.2 Process Signals`](#62-process-signals).
 
 # 9. Kernel storage, ownership, and object lifetimes
 [\[↑ TOC\]](#contents)
@@ -6468,7 +6861,7 @@ reporting.
 
 The table lists all 18 programs, links each source at its entry point, and
 identifies the main library calls behind its behavior. These calls come from
-the 15 libraries listed in [Section 8.1, Library overview and dependencies](#81-library-overview-and-dependencies).
+the 15 libraries listed in [`8.2 Library overview and dependencies`](#82-library-overview-and-dependencies).
 They use the 37 kernel syscalls listed in
 [Section 2.5.2, System-call groups](#252-system-call-groups) when a kernel service is needed.
 Shared command helpers are explained below the table.
@@ -7104,9 +7497,9 @@ explanation.
 - fixed/default process heap and stack sizing with no dynamic stack growth, as
   described in [Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack)
 - limited formatting and scanning, shell parsing, and standard-library subsets,
-  as described in [Section 8.6, Standard I/O, formatting, and scanning](#86-standard-io-formatting-and-scanning),
+  as described in [`8.2.9 stdio: streams, formatting, and scanning`](#829-stdio-streams-formatting-and-scanning),
   [Section 12.4, Command parsing, expansion, and execution](#124-command-parsing-expansion-and-execution), and
-  [Section 8.7, Library organization, scope, and limitations](#87-library-organization-scope-and-limitations)
+  [`8.2 Library overview and dependencies`](#82-library-overview-and-dependencies)
 - no implemented PicoOS-specific physical RETI CPU or hardware timer: the
   emulator's instruction-count timer provides reproducible preemption, not
   exact elapsed-time behavior, so programs that require exact timing, such as
