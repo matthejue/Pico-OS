@@ -444,41 +444,42 @@ lectures follow.
          - [9.2.9.2 Scanning in `scanf.picoc`](#9292-scanning-in-scanfpicoc)
       - [9.2.10 start: entering and leaving a user program](#9210-start-entering-and-leaving-a-user-program)
       - [9.2.11 Single-function libraries](#9211-single-function-libraries)
-1. [Bootloading and kernel startup](#10-bootloading-and-kernel-startup)
+1. [Complete startup: bootloader, kernel, init, shell, and user applications](#10-complete-startup-bootloader-kernel-init-shell-and-user-applications)
    - [10.1 Loading the kernel from the EPROM bootloader](#101-loading-the-kernel-from-the-eprom-bootloader)
-   - [10.2 Initializing kernel subsystems](#102-initializing-kernel-subsystems)
-      - [10.2.1 Kernel startup code](#1021-kernel-startup-code)
-   - [10.3 Loading init and entering normal execution](#103-loading-init-and-entering-normal-execution)
-1. [Init process](#11-init-process)
-   - [11.1 Init responsibilities](#111-init-responsibilities)
-   - [11.2 Initial environment configuration](#112-initial-environment-configuration)
-   - [11.3 Loading, starting, and waiting for the shell](#113-loading-starting-and-waiting-for-the-shell)
-      - [11.3.1 Complete init startup code](#1131-complete-init-startup-code)
-   - [11.4 Shell exit and restart policy](#114-shell-exit-and-restart-policy)
-1. [Shell](#12-shell)
-   - [12.1 Shell-owned state](#121-shell-owned-state)
-   - [12.2 Shell startup and command loop](#122-shell-startup-and-command-loop)
-   - [12.3 Interactive line editing and command history](#123-interactive-line-editing-and-command-history)
-   - [12.4 Command parsing, expansion, and execution](#124-command-parsing-expansion-and-execution)
-   - [12.5 Shell built-in commands](#125-shell-built-in-commands)
-      - [12.5.1 Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals)
-   - [12.6 Input/output redirection](#126-inputoutput-redirection)
-   - [12.7 Sequential file-backed pipelines](#127-sequential-file-backed-pipelines)
-1. [User applications and commands](#13-user-applications-and-commands)
-   - [13.1 Available applications and their library use](#131-available-applications-and-their-library-use)
-   - [13.2 Command behavior and supported options](#132-command-behavior-and-supported-options)
-   - [13.3 Command errors and exit statuses](#133-command-errors-and-exit-statuses)
-1. [Test system](#14-test-system)
-   - [14.1 Library, OS, shell, and boot test categories](#141-library-os-shell-and-boot-test-categories)
-   - [14.2 Test execution](#142-test-execution)
-1. [Use in operating-systems and real-time operating-systems lectures](#15-use-in-operating-systems-and-real-time-operating-systems-lectures)
-   - [15.1 Operating-systems topics](#151-operating-systems-topics)
-      - [15.1.1 Inspecting PicoOS execution in the RETI-Emulator](#1511-inspecting-picoos-execution-in-the-reti-emulator)
-      - [15.1.2 Exploring userspace heap allocation](#1512-exploring-userspace-heap-allocation)
-      - [15.1.3 Editing and executing symbolic RETI assembly](#1513-editing-and-executing-symbolic-reti-assembly)
-   - [15.2 Real-time operating-systems topics](#152-real-time-operating-systems-topics)
-1. [Use of AI in the project](#16-use-of-ai-in-the-project)
-1. [Limitations](#17-limitations)
+   - [10.2 Kernel startup](#102-kernel-startup)
+      - [10.2.1 Loading init and entering normal execution](#1021-loading-init-and-entering-normal-execution)
+   - [10.3 Init process](#103-init-process)
+      - [10.3.1 Init responsibilities](#1031-init-responsibilities)
+      - [10.3.2 Initial environment configuration](#1032-initial-environment-configuration)
+      - [10.3.3 Loading, starting, and waiting for the shell](#1033-loading-starting-and-waiting-for-the-shell)
+      - [10.3.4 Shell startup](#1034-shell-startup)
+      - [10.3.5 Loading user applications](#1035-loading-user-applications)
+      - [10.3.6 Shell exit and restart policy](#1036-shell-exit-and-restart-policy)
+      - [10.3.7 When init terminates](#1037-when-init-terminates)
+1. [Shell](#11-shell)
+   - [11.1 Shell-owned state](#111-shell-owned-state)
+   - [11.2 Shell startup and command loop](#112-shell-startup-and-command-loop)
+   - [11.3 Interactive line editing and command history](#113-interactive-line-editing-and-command-history)
+   - [11.4 Command parsing, expansion, and execution](#114-command-parsing-expansion-and-execution)
+   - [11.5 Shell built-in commands](#115-shell-built-in-commands)
+      - [11.5.1 Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals)
+   - [11.6 Input/output redirection](#116-inputoutput-redirection)
+   - [11.7 Sequential file-backed pipelines](#117-sequential-file-backed-pipelines)
+1. [User applications and commands](#12-user-applications-and-commands)
+   - [12.1 Available applications and their library use](#121-available-applications-and-their-library-use)
+   - [12.2 Command behavior and supported options](#122-command-behavior-and-supported-options)
+   - [12.3 Command errors and exit statuses](#123-command-errors-and-exit-statuses)
+1. [Test system](#13-test-system)
+   - [13.1 Library, OS, shell, and boot test categories](#131-library-os-shell-and-boot-test-categories)
+   - [13.2 Test execution](#132-test-execution)
+1. [Use in operating-systems and real-time operating-systems lectures](#14-use-in-operating-systems-and-real-time-operating-systems-lectures)
+   - [14.1 Operating-systems topics](#141-operating-systems-topics)
+      - [14.1.1 Inspecting PicoOS execution in the RETI-Emulator](#1411-inspecting-picoos-execution-in-the-reti-emulator)
+      - [14.1.2 Exploring userspace heap allocation](#1412-exploring-userspace-heap-allocation)
+      - [14.1.3 Editing and executing symbolic RETI assembly](#1413-editing-and-executing-symbolic-reti-assembly)
+   - [14.2 Real-time operating-systems topics](#142-real-time-operating-systems-topics)
+1. [Use of AI in the project](#15-use-of-ai-in-the-project)
+1. [Limitations](#16-limitations)
 - [Appendix: Inspecting `.bin` files with `hexyl`](#appendix-inspecting-bin-files-with-hexyl)
 
 # 1. Toolchain extensions for PicoOS
@@ -1282,7 +1283,7 @@ and enter normal or raw UART terminal mode. During continuous execution the
 terminal remains live and each delivered input byte can raise a UART hardware
 interrupt.
 
-The TUI follows live `CS` and `DS` as the bootloader installs the kernel and the
+The TUI follows live `CS` and `DS` as the bootloader loads the kernel and the
 dispatcher switches processes. Compiler `.debuginfo`, preprocessed source,
 labels, and `.sections` supply the source/section meaning that raw RETI words
 cannot contain themselves. The emulator can therefore show source frames and
@@ -1809,7 +1810,7 @@ The timer is mapped to vector 1 with priority 1 and activated with an interval
 of 5,000 instructions after init becomes ready. The interval counts emulated
 instructions rather than wall-clock time.
 [Section 2.6.3, Shell character delay for different timer intervals](#263-shell-character-delay-for-different-timer-intervals) explains why PicoOS
-uses this value. [Section 12.3, Interactive line editing and command history](#123-interactive-line-editing-and-command-history)
+uses this value. [Section 11.3, Interactive line editing and command history](#113-interactive-line-editing-and-command-history)
 separately reduces the time spent receiving and printing typed characters.
 
 ### 2.6.1 Timer interrupt path
@@ -2770,7 +2771,7 @@ internal kernel operations.
 | [`release_process_shared_memory(process)`](kernel/shared_memory.picoc#L172) | Returns no value | Walks one PCB's [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) list, frees every [`SharedMemoryAttachment`](kernel/shared_memory.header#L17), and decrements the referenced [`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12), destroys an unlinked [`SharedMemoryEntry`](kernel/shared_memory.header#L8) after its last attachment is released | [`kfree()`](kernel/kmalloc.picoc#L38), [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) | **Kernel functions:** [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`destroy_shared_memory_entry(entry)`](kernel/shared_memory.picoc#L69) | Returns no value | Removes one [`SharedMemoryEntry`](kernel/shared_memory.header#L8) from the kernel's linked list, frees its [`SharedMemoryEntry.address`](kernel/shared_memory.header#L11) data region with [`pfree()`](kernel/pmalloc.picoc#L47), and frees the [`SharedMemoryEntry`](kernel/shared_memory.header#L8) and its name with [`kfree()`](kernel/kmalloc.picoc#L38) | [`pfree()`](kernel/pmalloc.picoc#L47), [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) |
 
-Shared memory provides visibility, not mutual exclusion. [Section 15.2, Real-time operating-systems topics](#152-real-time-operating-systems-topics)
+Shared memory provides visibility, not mutual exclusion. [Section 14.2, Real-time operating-systems topics](#142-real-time-operating-systems-topics)
 shows how a shared [`mutex`](library/mutex/mutex.header#L6) protects data accessed by more than one
 process.
 
@@ -4424,7 +4425,7 @@ discards inherited nonstandard entries before accepting commands. The shell
 then closes every temporary copy itself, so its save slots are free before
 each redirection. The target's own [`open()`](library/fcntl/fcntl.picoc#L5)
 can use only 0–4 and therefore cannot collide with slots 5–7.
-[Section 12.6, Input/output redirection](#126-inputoutput-redirection) explains
+[Section 11.6, Input/output redirection](#116-inputoutput-redirection) explains
 the complete sequence.
 
 The field table below shows that a descriptor is not merely a path. Integer kind constants, access
@@ -4594,7 +4595,7 @@ foreground process: its request is stored in the PCB before dispatch, and
 [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) to make that specific
 reader ready. Background reads instead stop with [`SIGTTIN`](common/signal.header#L9), as explained
 in [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals).
-[Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals)
+[Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals)
 shows how the shell selects and resumes the job.
 
 ```mermaid
@@ -6001,74 +6002,244 @@ bootloader installed, [`boot_main()`](boot/bootloader.picoc#L41) requests the ke
 restarted kernel's [`main()`](kernel/kernel.picoc#L31) calls
 [`load_process()`](kernel/process/process_loader.picoc#L305) to load the initial process. These
 requests are consequences of restarting, not a separate UART restart command. See
-[`10. Bootloading and kernel startup`](#10-bootloading-and-kernel-startup) for the boot sequence.
+[Section 10, Complete startup: bootloader, kernel, init, shell, and user applications](#10-complete-startup-bootloader-kernel-init-shell-and-user-applications) for the boot sequence.
 
 Signal requests are read synchronously. A self-directed terminating signal can return before the
 dispatcher applies termination. The actions and timing are explained in
 [`6.2 Process Signals`](#62-process-signals).
 
-# 10. Bootloading and kernel startup
+# 10. Complete startup: bootloader, kernel, init, shell, and user applications
 [\[↑ TOC\]](#contents)
 
-The preceding chapters define the toolchain, kernel mechanisms, ownership
-rules, and userspace interfaces used during execution. This chapter begins the
-runtime sequence: the EPROM bootloader installs the kernel, the kernel creates
-init, and the first dispatch enters userspace.
+The preceding chapters explain the toolchain, the different parts of the kernel,
+and the libraries. This chapter follows the complete startup sequence: the
+bootloader loads the kernel, the kernel loads the init process, init loads the
+shell, and the shell loads user applications. Loading places a component in
+memory. A separate transfer of execution enters its startup function.
+
+The diagram combines this loading chain with a schematic memory layout. Its
+enclosing boxes show EPROM, kernel-reserved SRAM, and the
+process-image/shared-memory part of SRAM from left to right. The fixed kernel
+regions appear from lower to higher SRAM offsets. The process images are
+allocations inside the final dynamic region, so their exact addresses and order
+can change. EPROM holds the bootloader's code and constant data. SRAM holds its
+temporary stack and, after loading, the kernel and process images. The kernel
+binary comes from the emulator's host filesystem over UART, using DMA when
+enabled. It is not copied from EPROM. Solid arrows show loading and kernel
+initialization. Dotted arrows show the register setup and control transfer
+performed by
+[`start_loaded_kernel()`](boot/bootloader.picoc#L20). Later process entries use
+the dispatcher and `RTI`, as explained below.
+
+```mermaid
+%%{init: {"sequence": {"height": 90}}}%%
+sequenceDiagram
+    box rgb(232, 248, 248) EPROM
+        participant B as Bootloader<br/>.text and .data
+    end
+    box rgb(255, 248, 237) Kernel-reserved SRAM: offsets 0–48308
+        participant K as Kernel image<br/>0–41496<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40766
+        participant KH as Kernel heap<br/>41497–45592
+        participant KS as Kernel stack<br/>45593–48308
+    end
+    box rgb(239, 252, 242) Process-image and shared-memory heap: SRAM offsets 48309–262143, managed by pmalloc
+        participant I as Init image<br/>libstart startup
+        participant SH as Shell image<br/>libstart startup
+        participant A as Application A<br/>libstart startup
+        participant C as Application B<br/>libstart startup
+    end
+    B->>K: boot_main loads the kernel payload at SRAM offset 0
+    B-->>KS: start_loaded_kernel sets SP and BAF from stack_start
+    B-->>K: MOVE CS PC transfers control to kernel _start
+    K->>KS: main calls activate_kernel_stack_boundary
+    K->>KH: main calls init_kernel_heap, then heap_init_region
+    K->>I: load_process loads init
+    I->>SH: init loads the shell
+    SH->>A: shell loads application A
+    SH->>C: shell loads application B
+```
+
+These offsets match the current [`kernel/kernel.sections`](kernel/kernel.sections)
+and [`kernel/memory_constants.header`](kernel/memory_constants.header). They move
+when the linked image changes. The bootloader's temporary stack starts at SRAM
+offset `262143` and is abandoned before the kernel initializes that area for
+processes. [`start_loaded_kernel()`](boot/bootloader.picoc#L20) reads the linked
+`stack_start` value and sets both `SP` and `BAF` to offset `48308`. Kernel
+[`main()`](kernel/kernel.picoc#L31) then calls
+[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), which sets the
+stack boundary to the end of the kernel heap at offset `45592`, and
+[`init_kernel_heap()`](kernel/kmalloc.picoc#L17), which calls
+[`heap_init_region()`](common/heap.picoc#L49) for offsets `41497` through
+`45592`. The kernel stack grows toward that boundary.
+
+The separate process-image/shared-memory heap starts at offset `48309`, one cell
+above the initial kernel `SP`. Calling this latter region the *kernel heap*
+would confuse two distinct allocators:
+[`kmalloc()`](kernel/kmalloc.picoc#L23) manages the kernel heap before the stack,
+and [`pmalloc()`](kernel/pmalloc.picoc#L20) manages the region after it.
+
+Each init, shell, or application image is a separate allocation containing its
+`.text`, `.data`, local heap, and stack. Its PCB is in the kernel heap. The
+process blocks above illustrate the loading relationship, not fixed allocation
+addresses or sizes. Shared-memory data uses separate allocations from the same
+region. The complete map and the allocation ownership are explained in
+[Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes).
+
+The components use the following startup implementations. Although each entry
+is named `_start`, the bootloader, kernel, and userspace entries have different
+jobs. [`libstart`](library/start/libstart.picoc) is the library that supplies
+the userspace implementation, not the name of a function.
+
+| Component | Startup implementation | Execution path |
+| --- | --- | --- |
+| Bootloader | Custom naked [`_start(void)`](boot/bootloader.picoc#L9), defined in the bootloader itself | Sets the initial registers, then jumps to [`boot_main()`](boot/bootloader.picoc#L41) |
+| Kernel | Default PicoC compiler-generated [`_start`](kernel/kernel.reti#L7), linked without `-C` | Calls kernel [`main()`](kernel/kernel.picoc#L31) and halts if it returns |
+| Init process | [`libstart`](library/start/libstart.picoc), selected with `-C library/start/libstart.picoc` | [`_start()`](library/start/start.picoc#L14) → [`start_process()`](library/start/start.picoc#L7) → init [`main()`](system/init.picoc#L100) → [`exit()`](library/stdlib/exit.picoc#L3) if it returns |
+| Shell | The same [`libstart`](library/start/libstart.picoc) selection | [`_start()`](library/start/start.picoc#L14) → [`start_process()`](library/start/start.picoc#L7) → shell [`main()`](user/shell.picoc#L1448) → [`exit()`](library/stdlib/exit.picoc#L3) |
+| User applications | The same [`libstart`](library/start/libstart.picoc) selection | [`_start()`](library/start/start.picoc#L14) → [`start_process()`](library/start/start.picoc#L7) → the application's `main` → [`exit()`](library/stdlib/exit.picoc#L3) |
 
 ## 10.1 Loading the kernel from the EPROM bootloader
 [\[↑ TOC\]](#contents)
 
-The EPROM bootloader establishes the first execution context, transfers the
-kernel image into SRAM, and hands control to it. Three functions in
-[`boot/bootloader.picoc`](boot/bootloader.picoc) divide those responsibilities:
+The bootloader stays in EPROM while it loads the kernel into SRAM. Its custom
+naked [`_start()`](boot/bootloader.picoc#L9) sets `CS` to the EPROM base, `DS` to
+its EPROM `.data`, and `SP`/`BAF` to the top of SRAM. It then jumps to
+[`boot_main()`](boot/bootloader.picoc#L41). This is bootloader-specific startup
+code, with no compiler-generated call to a `main` function and no userspace
+[`libstart`](library/start/libstart.picoc).
 
-| Bootloader function | Return value / status | Effects | Calls |
-| --- | --- | --- | --- |
-| [`_start(void)`](boot/bootloader.picoc#L9) | Does not return | Establishes EPROM `CS`/`DS` and a temporary stack at the top of SRAM | Jumps to [`boot_main()`](boot/bootloader.picoc#L41) |
-| [`boot_main(void)`](boot/bootloader.picoc#L41) | Jumps into the kernel on success, halts on a missing or undersized image | Requests `kernel/kernel.bin`, consumes the five header words, and copies the payload to SRAM | [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21)<br>**Host request:** `load kernel/kernel.bin` |
-| [`start_loaded_kernel(void)`](boot/bootloader.picoc#L21) | Does not return | Adds the SRAM base to the header's code/data/stack offsets, replaces the boot stack, and installs kernel `CS`, `DS`, `SP`, and `BAF` | Jumps to the generated kernel entry, which calls [`main()`](kernel/kernel.picoc#L31) |
+The table summarizes the three functions whose complete implementations follow.
 
-The bootloader has no dynamic memory and no process structures. Its locals and
-call frames use the temporary SRAM stack. The loaded kernel image contains its
-interrupt table, code, and initialized globals. The sequence below follows the
-UART request and the final jump from EPROM into that SRAM image.
+<!-- TODO: Consider removing this function table once the prose and source examples are sufficient. -->
 
-```mermaid
-sequenceDiagram
-    participant CPU
-    participant EPROM as EPROM bootloader
-    participant UART
-    participant Host as RETI-Emulator host service
-    participant SRAM
-    participant Kernel
+| Bootloader function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`_start(void)`](boot/bootloader.picoc#L9) | Does not return | Establishes EPROM `CS`/`DS` and a temporary stack at the top of SRAM | Jumps to [`boot_main()`](boot/bootloader.picoc#L41) | **Machine entry:** PC 0 at boot. Kernel [`reboot()`](kernel/kernel.picoc#L19) |
+| [`boot_main(void)`](boot/bootloader.picoc#L41) | Jumps into the kernel on success, halts on a missing or undersized image | Requests `kernel/kernel.bin`, consumes the five header words, and copies the payload to SRAM | [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21)<br>**Host request:** `load kernel/kernel.bin` | **Bootloader functions:** [`_start()`](boot/bootloader.picoc#L9) |
+| [`start_loaded_kernel(void)`](boot/bootloader.picoc#L21) | Does not return | Adds the SRAM base to the header's code/data/stack offsets, replaces the boot stack, and sets kernel `CS`, `DS`, `SP`, and `BAF` | Jumps to the generated kernel [`_start`](kernel/kernel.reti#L7), which calls [`main()`](kernel/kernel.picoc#L31) | **Bootloader functions:** [`boot_main()`](boot/bootloader.picoc#L41) |
 
-    CPU->>EPROM: Enter _start
-    EPROM->>EPROM: Set EPROM segments and temporary SRAM stack
-    EPROM->>UART: Request kernel/kernel.bin
-    UART->>Host: Forward load request
-    Host-->>UART: Count, five header words, payload
-    UART-->>EPROM: Receive header and payload bytes
-    EPROM->>EPROM: Check the DMA active register
-    EPROM->>SRAM: Copy payload through DMA or one word at a time
-    EPROM->>CPU: Install kernel CS, DS, SP, and BAF
-    CPU->>Kernel: Jump to generated kernel _start
+The initial entry establishes the segments and temporary stack before any
+ordinary PicoC call frames are needed:
+
+```c
+__attribute__((naked))
+void _start(void) {
+    asm("LOADI CS 0"); // Sets CS to the EPROM base
+    asm(EPROM_STACK_START_ASM); // LOADI32 SP eprom_stack_start
+    asm("MOVE SP BAF"); // BAF = eprom_stack_start
+    asm(EPROM_DS_START_ASM); // LOADI32 DS eprom_ds_start
+    asm("ADD DS CS"); // DS = CS + eprom_ds_start
+    asm("LOADI32 ACC boot_main"); // ACC = boot_main in EPROM
+    asm("ADD ACC CS"); // ACC = CS + boot_main
+    asm("MOVE ACC PC"); // JUMP to boot_main in EPROM
+}
 ```
 
-## 10.2 Initializing kernel subsystems
+Next, [`boot_main()`](boot/bootloader.picoc#L41) requests
+[`kernel/kernel.bin`](binary/kernel/kernel.bin), checks the returned word count,
+reads the five-word header, and loads only the payload at
+[`SRAM_BASE`](kernel/memory_constants.header#L1). The header describes placement.
+it is not part of the image copied into SRAM. The payload begins with the
+kernel's five `.ivt` entries, followed by `.text` and `.data`.
+[`receive_words_to_sram()`](common/sram_loader.picoc#L6) selects DMA or polling.
+Once loading is complete, an explicit jump enters the final bootloader function:
+
+```c
+void boot_main(void) {
+    int code_start;
+    int data_start;
+    int stack_start;
+    int word_count;
+    int payload_word_count;
+
+    uart_send_host_request("load ", "kernel/kernel.bin");
+
+    word_count = receive_word();
+    if (word_count == -1) {
+        uart_print_string("error: could not load kernel\n");
+        asm("JUMP 0");
+    }
+    if (word_count < 5) {
+        uart_print_string("error: invalid kernel image\n");
+        asm("JUMP 0");
+    }
+    code_start = receive_word();
+    data_start = receive_word();
+    receive_word(); // Discards heap_start because the kernel uses memory_constants.header
+    receive_word(); // Discards heap_size because the kernel uses memory_constants.header
+    stack_start = receive_word();
+    if (stack_start == -1) {
+        stack_start = SRAM_MAX_ADDRESS;
+    }
+
+    payload_word_count = word_count - 5;
+    uart_print_loading_bar_label(
+        loading_bar_enabled,
+        "load ",
+        "kernel/kernel.bin"
+    );
+    receive_words_to_sram(
+        SRAM_BASE,
+        payload_word_count,
+        loading_bar_enabled
+    );
+    asm("LOADI32 ACC start_loaded_kernel"); // ACC = start_loaded_kernel
+    asm("ADD ACC CS"); // ACC = CS + start_loaded_kernel in EPROM
+    asm("MOVE ACC PC"); // JUMP to start_loaded_kernel in EPROM
+}
+```
+
+[`start_loaded_kernel()`](boot/bootloader.picoc#L21) still executes in EPROM.
+The existing boot frame gives it the header offsets. It adds the SRAM base to
+those offsets, replaces `CS`, `DS`, `SP`, and `BAF`, and writes `CS` into `PC`:
+
+```c
+__attribute__((naked))
+void start_loaded_kernel(void) {
+    // BAF points behind the kernel metadata
+    asm("LOADIN BAF ACC 0"); // ACC = code_start
+    asm("LOADIN BAF IN1 -1"); // IN1 = data_start
+    asm("LOADIN BAF IN2 -2"); // IN2 = stack_start
+
+    asm("LOADI32 CS -2147483648"); // -2^31, SRAM base
+    asm("MOVE CS DS"); // DS = SRAM base
+    asm("MOVE CS SP"); // SP = SRAM base
+
+    asm("ADD CS ACC"); // CS = SRAM base + code_start
+
+    asm("ADD DS IN1"); // DS = SRAM base + data_start
+
+    asm("ADD SP IN2"); // SP = SRAM base + stack_start
+    asm("MOVE SP BAF"); // BAF = SP
+
+    asm("MOVE CS PC"); // JUMP to CS
+}
+```
+
+Thus `MOVE CS PC` transfers execution to SRAM base plus the header's code offset,
+currently `0x80000005`. This is the first instruction of the kernel's generated
+[`_start`](kernel/kernel.reti#L7), not kernel [`main()`](kernel/kernel.picoc#L31).
+It is a jump with no return address into the bootloader. Changing `CS` and `DS`
+does not itself transfer execution. The final write to `PC` does.
+
+## 10.2 Kernel startup
 [\[↑ TOC\]](#contents)
 
-The generated kernel entry calls
-[`int main(void)`](kernel/kernel.picoc#L31). Kernel initialization is deliberately
-ordered around allocation and ownership. The calls below establish the globals
-whose storage and references are described in
-[Section 8.3, Kernel global variables and process-list roots](#83-kernel-global-variables-and-process-list-roots):
+The kernel uses the default startup implementation shown in
+[Section 1.1.4.1, Default compiler-generated `_start`](#1141-default-compiler-generated-_start).
+That entry calls kernel [`main()`](kernel/kernel.picoc#L31). Its instructions
+and any executable global-initializer code belong to `.text`. Global storage
+and constants belong to `.data`. Neither the entry nor
+[`main()`](kernel/kernel.picoc#L31) runs from `.data`. The linked
+[`kernel/kernel.reti`](kernel/kernel.reti#L7) shows the generated call to
+[`main()`](kernel/kernel.picoc#L31) at the beginning of `.text`, after `.ivt`.
 
-### 10.2.1 Kernel startup code
-[\[↑ TOC\]](#contents)
+<!-- Presentation generation: Reproduce the default compiler-generated _start source from 1.1.4.1 here, directly before kernel main. Show the main call and exit operation again on these slides. Do not require navigation back to earlier slides. -->
 
-The complete kernel entry below shows the dependencies between initialization
-steps: heap setup precedes allocation, and init must be ready before the timer
-and dispatcher start:
+The complete [`main()`](kernel/kernel.picoc#L31) below sets up memory allocation,
+terminal and process state, DMA when enabled, and interrupt handling. It then
+loads init and starts scheduling. Allocation must be available before creating
+processes, and interrupt handling must be configured before enabling the timer.
 
 ```c
 int main(void) {
@@ -6097,59 +6268,128 @@ int main(void) {
 }
 ```
 
-[`init_request`](kernel/kernel.picoc#L33) is a kernel-stack object, not a
-persistent process-table entry.
+The heap descriptors, process-list pointers, terminal state, and other kernel
+globals reside in kernel `.data`. The regions they manage are shown in the
+startup diagram and explained in
+[Section 8.3, Kernel global variables and process-list roots](#83-kernel-global-variables-and-process-list-roots).
+The local [`init_request`](kernel/kernel.picoc#L33) lives on
+the kernel stack. It only supplies arguments to
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241),
+which builds init's initial stack and sets
+[`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13).
+
+### 10.2.1 Loading init and entering normal execution
+[\[↑ TOC\]](#contents)
+
+The final part of [`main()`](kernel/kernel.picoc#L31), shown above, calls
+[`load_process("system/init.bin", loading_bar_enabled)`](kernel/process/process_loader.picoc#L305).
+It allocates the complete image through [`pmalloc()`](kernel/pmalloc.picoc#L20),
+loads the payload, and creates the first PCB with PID 1. Its
+[`Process.base_address`](kernel/process/process.header#L34),
+[`Process.heap_start`](kernel/process/process.header#L36), and
+[`Process.heap_size`](kernel/process/process.header#L37) describe the image.
+Its [`Process.activation`](kernel/process/process.header#L40) stores the initial
+code, data, and stack registers. Init initially has no parent,
+starts in `/`, and receives its executable path as its first argument with an
+empty environment.
+
+After loading, init's [`Process.state`](kernel/process/process.header#L33) is
+[`PROCESS_STATE_NEW`](kernel/process/process.header#L12).
 [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-consumes it to build init's process stack and change its PCB from [`NEW`](kernel/process/process.header#L12) to
-[`READY`](kernel/process/process.header#L13).
+constructs its argument and environment layout, stores an entry PC of `CS - 1`,
+and sets [`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13). After enabling the
+timer, [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55)
+selects init, [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43)
+sets its [`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_RUNNING`](kernel/process/process.header#L14), and
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21)
+restores its registers and executes `RTI`. `RTI` restores the saved PC and
+advances it by one, so execution begins at init's
+[`libstart _start()`](library/start/start.picoc#L14). This is the transition
+from kernel startup to the first userspace process, not a direct call of
+init's [`main()`](system/init.picoc#L100).
 
-The order in the code matters: the kernel heap must exist before PCB and
-descriptor allocation, and interrupt mappings must exist before the timer is
-activated. [`load_process()`](kernel/process/process_loader.picoc#L305) creates
-init's image and PCB, run setup supplies its initial arguments and environment
-before the dispatcher can enter it.
+There is no ordinary infinite loop in kernel [`main()`](kernel/kernel.picoc#L31).
+A successful dispatch leaves it through `RTI`. Interrupts and syscalls later
+enter kernel code as needed. If processes exist but none is runnable, the
+dispatcher waits in kernel context. If loading or preparing init fails,
+[`main()`](kernel/kernel.picoc#L31) returns `0` and the generated
+[`_start`](kernel/kernel.reti#L35) halts with `JUMP 0`.
 
-## 10.3 Loading init and entering normal execution
+The kernel also provides these complete machine-control functions.
+[`shutdown()`](kernel/kernel.picoc#L15) executes `JUMP 0`, which stops the emulator.
+It does not first release allocated objects.
+[`reboot()`](kernel/kernel.picoc#L19) disables device interrupts, clears the
+timer interval and stack boundary, and writes `0` to `PC` to enter the EPROM
+bootloader again. The next startup reloads the kernel and initializes its state.
+
+```c
+void shutdown(void) {
+    asm("JUMP 0");
+}
+
+void reboot(void) {
+    int device = 0;
+
+    while (device < INTERRUPT_DEVICE_COUNT) {
+        interrupt_controller_disable_device(device);
+        device = device + 1;
+    }
+    periphery_write_register(INTERRUPT_CONTROLLER_TIMER_INTERVAL_REGISTER, 0);
+    periphery_write_register(STACK_HEAP_BOUNDARY_REGISTER, 0);
+    asm("LOADI PC 0");
+}
+```
+
+Userspace requests these actions through
+[`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) or
+[`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5).
+[`handle_syscall()`](kernel/syscall.picoc#L16) selects the corresponding kernel
+function. Kernel exceptions and allocation failure can also call
+[`shutdown()`](kernel/kernel.picoc#L15).
+[`exit_process()`](kernel/process/process.picoc#L430) calls it when termination
+leaves no process to dispatch. The signal-path limitation is described in
+[Section 10.3.7, When init terminates](#1037-when-init-terminates).
+
+## 10.3 Init process
 [\[↑ TOC\]](#contents)
 
-There is no ordinary infinite loop in [`main()`](kernel/kernel.picoc#L31). A successful dispatch leaves
-the kernel through `RTI`. If all existing processes are blocked, the
-dispatcher waits in kernel context until an interrupt makes one runnable. The
-following table connects the entry and machine-control functions to their
-initialization or shutdown effects.
+The dispatch above enters init's copy of
+[`libstart _start()`](library/start/start.picoc#L14). It calls
+[`start_process(argc, argv)`](library/start/start.picoc#L7), which initializes
+init's local heap and environment, then calls init's
+[`main()`](system/init.picoc#L100). If that returns, the same wrapper passes
+its return value to [`exit()`](library/stdlib/exit.picoc#L3). The complete
+startup source is already shown in
+[Section 1.1.4.3, PicoOS `libstart` startup sequence](#1143-picoos-libstart-startup-sequence).
 
-| Kernel function | Return value / status | Effects | Calls | Called by |
-| --- | --- | --- | --- | --- |
-| [`shutdown(void)`](kernel/kernel.picoc#L15) | Does not return | Stops execution in the current instruction, allocated objects remain because the machine stops | — | **Library functions:** [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) through syscall 0<br>**System calls:** shutdown selector through [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**CPU exceptions:** via [`handle_cpu_exception()`](kernel/exception.picoc#L70)<br>**Kernel functions:** [`panic_kernel_heap_full()`](kernel/exception.picoc#L89), [`exit_process()`](kernel/process/process.picoc#L430) |
-| [`reboot(void)`](kernel/kernel.picoc#L19) | Does not return | Disables hardware interrupts and stack protection, then jumps to the EPROM bootloader | [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Library functions:** [`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5) through syscall 1<br>**System calls:** reboot selector through [`handle_syscall()`](kernel/syscall.picoc#L16) |
-|  |  |  |  |  |
-| [`main(void)`](kernel/kernel.picoc#L31) | Returns `0` only if dispatch does not take control | Initializes kernel heaps, terminal, process table, shared-memory list, DMA, and interrupt registers, loads and makes PID 1 ready | [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11), [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`initialize_terminal()`](kernel/filesystem/terminal.picoc#L14), [`initialize_process_table()`](kernel/process/process.picoc#L21), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9), [`initialize_shared_memory()`](kernel/shared_memory.picoc#L9), [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`load_process()`](kernel/process/process_loader.picoc#L305), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Bootloader functions:** [`start_loaded_kernel()`](boot/bootloader.picoc#L21) |
+<!-- Presentation generation: Reproduce the libstart source from 1.1.4.3 here, directly before init's main/session loop. Show _start and start_process, including heap/environment initialization and exit(main(...)). Do not require navigation back to earlier slides. -->
 
-# 11. Init process
+### 10.3.1 Init responsibilities
 [\[↑ TOC\]](#contents)
 
-Once the kernel has loaded and dispatched its first process, userspace takes over session policy.
-Init connects the kernel's process-loading interface to the configured environment and the shell
-users interact with. Configuration is explained before the session loop that consumes
-it, followed by the policy applied when a shell exits.
-
-## 11.1 Init responsibilities
-[\[↑ TOC\]](#contents)
-
-[`system/init.picoc`](system/init.picoc) is the first userspace image loaded by the kernel and
-becomes PID 1. Like an init system such as `systemd` on Linux, it starts the userspace session,
-PicoOS init only establishes the initial environment, repeatedly starts one shell, and waits for
-that exact shell. Keeping this policy in userspace prevents configuration and session behavior from
-becoming kernel mechanisms. The responsibility table separates kernel setup from init’s session
-policy and the shell’s command handling.
+The kernel manages resources and process execution. Init configures the
+userspace session and keeps a shell available. This keeps environment
+configuration and shell restart decisions in an ordinary userspace program.
+The responsibilities follow the startup chain:
 
 | Component | Responsibility |
 | --- | --- |
-| Kernel [`main()`](kernel/kernel.picoc#L31) | Initialize global structures and devices, load PID 1, construct its first activation, and dispatch |
-| [`Init`](system/init.picoc#L100) | Read configuration, establish environment policy, load/run a shell, and restart it after a session |
-| [`Shell`](user/shell.picoc#L1448) | Read and edit commands, search `PATH`, launch programs, redirect output, and manage the foreground process |
+| Kernel [`main()`](kernel/kernel.picoc#L31) | Initialize kernel state and devices, load PID 1, prepare its first execution, and dispatch |
+| [`Init`](system/init.picoc#L100) | Read environment configuration, load and start a shell, wait for it, and load a new shell afterward |
+| [`Shell`](user/shell.picoc#L1448) | Read commands, find and load applications, redirect input/output, and manage foreground execution |
 
-## 11.2 Initial environment configuration
+The kernel creates init's PCB before any current process exists. Therefore
+[`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) resolves the relative
+`system/init.bin` input from PicoOS `/` and sends `/system/init.bin` to the emulator. Since PID 1
+also has no parent from which to inherit a directory, [`create_process()`](kernel/process/process.picoc#L89)
+stores a [`kmalloc()`](kernel/kmalloc.picoc#L23) copy of `/` directly in
+[`Process.working_directory`](kernel/process/process.header#L39), no `pwd` request is needed. Init
+otherwise uses the same public libraries and syscalls as every other process.
+
+### 10.3.2 Initial environment configuration
 [\[↑ TOC\]](#contents)
 
 [`read_environment()`](system/init.picoc#L19) allocates a 257-cell buffer, opens
@@ -6164,7 +6404,7 @@ table relates configuration parsing and shell restarts to the libraries init use
 | Init function | Return value / status | Library functions |
 | --- | --- | --- |
 | [`init_write_error(text)`](system/init.picoc#L10) | No value | [`write()`](library/unistd/io.picoc#L32) sends the diagnostic to standard error without changing persistent init state |
-| [`read_environment(void)`](system/init.picoc#L19) | `true` when the complete file was installed, `false` after an allocation, file, size, or syntax failure | [`malloc()`](library/stdlib/malloc.picoc#L35), [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`close()`](library/unistd/io.picoc#L54), [`setenv()`](library/stdlib/env.picoc#L126), and [`free()`](library/stdlib/malloc.picoc#L49), changes the process-global [`environ`](library/stdlib/env.picoc#L4) array |
+| [`read_environment(void)`](system/init.picoc#L19) | `true` when the complete file was read into the environment, `false` after an allocation, file, size, or syntax failure | [`malloc()`](library/stdlib/malloc.picoc#L35), [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`close()`](library/unistd/io.picoc#L54), [`setenv()`](library/stdlib/env.picoc#L126), and [`free()`](library/stdlib/malloc.picoc#L49), changes the process-global [`environ`](library/stdlib/env.picoc#L4) array |
 | [`main(void)`](system/init.picoc#L100) | Returns status 1 when setup or shell launch fails, otherwise does not return | [`setenv()`](library/stdlib/env.picoc#L126), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), and exact-child [`waitpid()`](library/sys/wait/wait.picoc#L14) |
 
 Missing, unreadable, oversized, or malformed environment input makes init report an error and return
@@ -6173,20 +6413,16 @@ status 1. [`load()`](library/unistd/process.picoc#L17) is given the shell's dire
 environment into the child’s stack, while the kernel copies init’s descriptor table. The working
 directory was already copied when the child was loaded.
 
-## 11.3 Loading, starting, and waiting for the shell
+### 10.3.3 Loading, starting, and waiting for the shell
 [\[↑ TOC\]](#contents)
 
-Init's responsibilities become a small startup path followed by a repeated shell session. The
-[Section 11.3.1, Complete init startup code](#1131-complete-init-startup-code) shows that handoff,
-[Section 11.2, Initial environment configuration](#112-initial-environment-configuration) and [Section 11.4, Shell exit and restart policy](#114-shell-exit-and-restart-policy)
-explain the decisions around it.
-
-### 11.3.1 Complete init startup code
-[\[↑ TOC\]](#contents)
-
-After the common userspace [`libstart`](library/start/libstart.picoc) code initializes init's local
-heap and environment and calls [`main()`](system/init.picoc#L100), init executes this complete
-startup/session loop:
+After the startup path above reaches init's [`main()`](system/init.picoc#L100),
+init reads its configuration and repeats the following shell session loop.
+The code keeps loading separate from starting: [`load()`](library/unistd/process.picoc#L17)
+creates the shell image, [`run()`](library/unistd/process.picoc#L31) sets the shell's
+[`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13),
+and [`waitpid()`](library/sys/wait/wait.picoc#L14) waits for that child.
 
 ```c
 int main(void) {
@@ -6224,31 +6460,69 @@ int main(void) {
 ```
 
 The helper [`read_environment()`](system/init.picoc#L19) is explained under
-[Section 11.2, Initial environment configuration](#112-initial-environment-configuration).
+[Section 10.3.2, Initial environment configuration](#1032-initial-environment-configuration).
 The complete code above expresses init's policy directly: after configuration,
-each loop iteration loads one shell, makes it ready, and waits for that exact
-child before starting another session. The userspace
+each loop iteration loads one shell, sets its
+[`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13), and waits for that
+exact child before starting another session. The userspace
 [`load()`](library/unistd/process.picoc#L17) wrapper invokes
 [`load_process_chunk()`](kernel/process/process_loader.picoc#L292), its separate
 polling and DMA flows are shown in
 [Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
 
-Kernel boot uses the distinct [`load_process()`](kernel/process/process_loader.picoc#L305)
-operation to load init before any userspace process exists. That continuous
-boot-time transfer and the later init session loop are separate flows, so they
-are documented in
-[Section 10.3, Loading init and entering normal execution](#103-loading-init-and-entering-normal-execution)
-and by the source above instead of being combined into one sequence diagram.
+### 10.3.4 Shell startup
+[\[↑ TOC\]](#contents)
 
-The kernel creates init's PCB before any current process exists. Therefore
-[`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92) resolves the relative
-`system/init.bin` input from PicoOS `/` and sends `/system/init.bin` to the emulator. Since PID 1
-also has no parent from which to inherit a directory, [`create_process()`](kernel/process/process.picoc#L89)
-stores `/` in
-[`Process.working_directory`](kernel/process/process.header#L39), no `pwd` request is needed. Init
-otherwise uses the same public libraries and syscalls as every other process.
+After init loads the shell and sets its
+[`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13), the dispatcher
+enters the shell's
+[`libstart _start()`](library/start/start.picoc#L14), just as it entered init.
+[`start_process()`](library/start/start.picoc#L7) prepares the shell's own heap
+and inherited environment and calls shell [`main()`](user/shell.picoc#L1448).
+The shared startup code is shown in
+[Section 1.1.4.3, PicoOS `libstart` startup sequence](#1143-picoos-libstart-startup-sequence).
 
-## 11.4 Shell exit and restart policy
+<!-- Presentation generation: Show the libstart source from 1.1.4.3 again at shell startup when this stage has its own slides. Place it here rather than sending the audience back to the earlier startup slides. -->
+
+The shell configures descriptors, terminal input ownership, and its parent-death
+signal, then enters its command-reading loop. Init remains blocked waiting for
+this shell. When the shell returns from [`main()`](user/shell.picoc#L1448),
+[`libstart`](library/start/start.picoc#L7) calls [`exit()`](library/stdlib/exit.picoc#L3)
+and init can load the next shell. The command loop is explained in
+[Section 11.2, Shell startup and command loop](#112-shell-startup-and-command-loop).
+
+### 10.3.5 Loading user applications
+[\[↑ TOC\]](#contents)
+
+For an external command, the shell loads the application using
+[`load()`](library/unistd/process.picoc#L17), either with a supplied path or
+through [`load_from_path()`](user/shell.picoc#L1186). The kernel allocates a
+separate process image in the process-image/shared-memory heap.
+[`run_process()`](user/shell.picoc#L1034) then calls
+[`run()`](library/unistd/process.picoc#L31) to prepare arguments, inherit the
+environment and descriptors, and set the application's
+[`Process.state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13). Shell built-ins
+execute in the shell and do not require a new process image.
+
+When scheduled, each application enters its own
+[`libstart _start()`](library/start/start.picoc#L14), then
+[`start_process()`](library/start/start.picoc#L7), then its `main` function.
+The common startup source is shown in
+[Section 1.1.4.3, PicoOS `libstart` startup sequence](#1143-picoos-libstart-startup-sequence).
+Returning from `main` becomes an [`exit()`](library/stdlib/exit.picoc#L3) syscall,
+so the kernel records the result and handles process termination. The shell
+waits for foreground applications and can keep accepting commands while
+background applications run. Multiple separate images can therefore coexist
+as in the diagram. Command details follow in
+[Section 11.4, Command parsing, expansion, and execution](#114-command-parsing-expansion-and-execution)
+and [Section 12, User applications and commands](#12-user-applications-and-commands).
+
+<!-- Presentation generation: Reproduce the libstart source from 1.1.4.3 directly at this application-startup stage when generating its slides. Show the application's main call and the exit path here. Do not rely on navigation back to earlier slides. -->
+
+### 10.3.6 Shell exit and restart policy
 [\[↑ TOC\]](#contents)
 
 Init blocks on [`waitpid()`](library/sys/wait/wait.picoc#L14) for
@@ -6265,20 +6539,71 @@ foreground job control targets the shell's children instead.
 [`init`](system/init.picoc) lives under [`system`](system/) because it implements
 system policy. It is not exposed through the normal `PATH=/user` command directory.
 
-# 12. Shell
+### 10.3.7 When init terminates
+[\[↑ TOC\]](#contents)
+
+PID 1 has no special signal protection.
+[`send_signal_by_pid()`](kernel/signal.picoc#L108) accepts it like any other live
+process, so the [`kill`](user/kill.picoc) command can kill init. The signal path
+reaches [`kill_process()`](kernel/signal.picoc#L71) and
+[`terminate_process()`](kernel/process/process.picoc#L304), which stores
+`128 + signal` in
+[`Process.exit_status`](kernel/process/process.header#L60). If the target is
+currently running, termination is deferred
+until the dispatcher can process it safely.
+
+Because init has no parent, it is removed immediately after termination rather
+than retained for parent collection.
+[`remove_process()`](kernel/process/process.picoc#L209) removes its wait-queue
+entry, releases shared-memory attachments, cancels an unfinished load, frees
+its image, destroys its descriptor table, and frees its paths and PCB.
+Shared-memory data is freed only when its entry has been unlinked and the final
+attachment is gone. Killing bypasses userspace cleanup. Kernel process cleanup
+still runs.
+
+Before removing init, [`orphan_and_signal_children()`](kernel/process/process.picoc#L279)
+sets each child's
+[`Process.parent_pid`](kernel/process/process.header#L57) to `0`, removes zombie
+children, and sends each live child its
+[`Process.parent_death_signal`](kernel/process/process.header#L59). The normal
+shell configures [`prctl(PR_SET_PDEATHSIG, SIGKILL)`](user/shell.picoc#L1469)
+with [`SIGKILL`](common/signal.header#L5), so killing init
+also terminates that shell. Children inherit this setting when loaded, so
+termination normally continues through the shell's applications. A child that
+cleared or changed the setting can behave differently, and a shell killed
+before it configures the setting need not receive `SIGKILL`.
+
+The kernel does not reload init, restart the shell, or automatically reboot.
+Surviving processes can continue, but init's shell-restart loop is gone. If
+init instead returns because configuration or shell loading failed,
+[`libstart`](library/start/start.picoc#L7) calls [`exit()`](library/stdlib/exit.picoc#L3).
+[`exit_process()`](kernel/process/process.picoc#L430) shuts down if no processes
+remain.
+
+There is a limitation when signals remove the final runnable process:
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) has no explicit
+shutdown for this case. If
+[`prepare_process_termination()`](kernel/signal.picoc#L126) removes the final
+selected process, the local [`next_process`](kernel/dispatcher.picoc#L56) can
+still point to its freed PCB and reach the switch below the loop. Therefore
+killing init and its whole process tree must not be described as a guaranteed
+clean shutdown: this path can attempt to resume freed process state. This is a
+source-code limitation, not a special PID-1 panic or reboot policy.
+
+# 11. Shell
 [\[↑ TOC\]](#contents)
 
 The shell is init's interactive child and turns terminal input into userspace process operations.
 [`shell.picoc`](user/shell.picoc#L1448) is one of the **18 user applications** in [`user`](user/):
 the shell plus 17 standalone commands, listed under
-[Section 13, User applications and commands](#13-user-applications-and-commands). It builds on
+[Section 12, User applications and commands](#12-user-applications-and-commands). It builds on
 the descriptor, signal, process, and library interfaces described above, then
 hands command execution to the applications in the next chapter. The sections
 below follow a command from persistent shell state through input, parsing,
 process control, redirection, and optional pipeline execution.
 
 
-## 12.1 Shell-owned state
+## 11.1 Shell-owned state
 [\[↑ TOC\]](#contents)
 
 The shell is an ordinary process. Its persistent state is stored in globals in that shell image’s
@@ -6337,7 +6662,7 @@ into the shell image's global [`shell_input_buffer`](user/shell.picoc#L42), and
 [`read_line()`](user/shell.picoc#L271) builds the current command in
 the stack-local [`command`](user/shell.picoc#L1449) array. None of those arrays is allocated on the userspace heap.
 
-## 12.2 Shell startup and command loop
+## 11.2 Shell startup and command loop
 [\[↑ TOC\]](#contents)
 
 At startup the shell first closes descriptors 3–7 so its private redirection
@@ -6408,7 +6733,7 @@ The function table below links the main loop’s operations to their library cal
 | [`eval(command)`](user/shell.picoc#L1224) | `false` only for `exit`, otherwise `true` | Selects a built-in or external execution path |
 | [`main(argc, argv)`](user/shell.picoc#L1448) | Shell exit status | [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`set_foreground_process()`](library/unistd/process.picoc#L59), [`lseek()`](library/unistd/io.picoc#L66), [`unsetenv()`](library/stdlib/env.picoc#L157), [`close()`](library/unistd/io.picoc#L54), [`read_line()`](user/shell.picoc#L271), and [`eval()`](user/shell.picoc#L1224), closes 3–7 at startup and owns the interactive or redirected-input execution path |
 
-## 12.3 Interactive line editing and command history
+## 11.3 Interactive line editing and command history
 [\[↑ TOC\]](#contents)
 
 The terminal ISR and descriptor layer deliver bytes, then
@@ -6457,7 +6782,7 @@ if (character == SHELL_CTRL_U) {
 `Ctrl+C` and `Ctrl+Z` follow a different path: the UART interrupt handler passes them to
 [`handle_terminal_signal_character()`](kernel/signal.picoc#L192), which consumes them before they
 enter either terminal input buffer. They control the foreground process as described in
-[Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals), not the
+[Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals), not the
 editable line.
 
 [`read_shell_character()`](user/shell.picoc#L252) refills the shell's 128-byte input buffer with one
@@ -6477,7 +6802,7 @@ and only passes known escape-free characters, backspaces, spaces, and newlines t
 paths. This avoids scanning known-safe output and avoids one output syscall per byte when input has
 accumulated.
 
-## 12.4 Command parsing, expansion, and execution
+## 11.4 Command parsing, expansion, and execution
 [\[↑ TOC\]](#contents)
 
 The parser validates balanced single and double quotes and recognizes one unquoted `|` before
@@ -6514,7 +6839,7 @@ and from nested shells. A relative entry supplied by the user is resolved from t
 [`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths.
 
 Built-ins execute directly in the shell and are listed in
-[Section 12.5, Shell built-in commands](#125-shell-built-in-commands). The
+[Section 11.5, Shell built-in commands](#115-shell-built-in-commands). The
 following sequence instead shows one successful foreground external command
 through [`eval()`](user/shell.picoc#L1224),
 [`load_from_path()`](user/shell.picoc#L1186), and
@@ -6566,7 +6891,7 @@ Argument handling is intentionally small. The kernel splits the final string on 
 tabs and removes matching single or double quotes. There is no general escape grammar.
 [`echo.bin`](user/echo.picoc#L20) itself interprets the two characters `\n`.
 
-## 12.5 Shell built-in commands
+## 11.5 Shell built-in commands
 [\[↑ TOC\]](#contents)
 
 Built-ins execute inside the shell process. This is essential for operations such as `cd` and
@@ -6592,7 +6917,7 @@ The built-ins report missing required operands. `exit`, `fg`, and `bg` reject ex
 assignment syntax and is treated as an external command, `unset` is not implemented even though the
 library provides [`unsetenv()`](library/stdlib/env.picoc#L157).
 
-### 12.5.1 Foreground processes, background processes, and job-control signals
+### 11.5.1 Foreground processes, background processes, and job-control signals
 [\[↑ TOC\]](#contents)
 
 For a foreground child, the shell gives the child's PID to
@@ -6711,7 +7036,7 @@ inherited by children, so children receive [`SIGKILL`](common/signal.header#L5)
 when their direct parent terminates, with termination propagating to further
 descendants that retain this setting.
 
-## 12.6 Input/output redirection
+## 11.6 Input/output redirection
 [\[↑ TOC\]](#contents)
 
 A conventional Unix shell commonly calls `fork()`, applies redirections to the child process's
@@ -6944,11 +7269,11 @@ This also explains background redirection. [`run()`](library/unistd/process.pico
 finishes the independent descriptor-table copy before returning, so the shell
 can restore its own 0–2 immediately while `command > file &` continues with
 the child's copied descriptor 1. The background status, `$?`, `$!`, and zombie
-behavior is described in [Section 12.5.1, Foreground processes, background processes, and job-control signals](#1251-foreground-processes-background-processes-and-job-control-signals).
+behavior is described in [Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals).
 Redirections can be combined, including
 `sed.bin "5iNEW" < input.txt > output.txt 2> str_err_file.txt`.
 
-## 12.7 Sequential file-backed pipelines
+## 11.7 Sequential file-backed pipelines
 [\[↑ TOC\]](#contents)
 
 Redirection also provides the storage used by the shell's single pipeline
@@ -7079,7 +7404,7 @@ cat.bin pipeline-output.txt
 rm.bin pipeline-input.txt pipeline-output.txt
 ```
 
-# 13. User applications and commands
+# 12. User applications and commands
 [\[↑ TOC\]](#contents)
 
 The shell described above is one of **18 user applications** in [`user/`](user/):
@@ -7090,7 +7415,7 @@ environment, working directory, or descriptor table. This chapter first maps
 each application to its libraries, then documents command behavior and error
 reporting.
 
-## 13.1 Available applications and their library use
+## 12.1 Available applications and their library use
 [\[↑ TOC\]](#contents)
 
 The table lists all 18 programs, links each source at its entry point, and
@@ -7102,7 +7427,7 @@ Shared command helpers are explained below the table.
 
 | Binary (source link) | Behavior | Library functions |
 | --- | --- | --- |
-| [`shell.bin`](user/shell.picoc#L1448) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11), see [Section 12, Shell](#12-shell) for the other calls |
+| [`shell.bin`](user/shell.picoc#L1448) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11), see [Section 11, Shell](#11-shell) for the other calls |
 | [`echo.bin`](user/echo.picoc#L20) | Prints [`argv[1..]`](user/echo.picoc#L20) separated by spaces, converts `\n` inside an argument, and adds a newline | [`printf()`](library/stdio/stdio.picoc#L354) |
 | [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | [`printf()`](library/stdio/stdio.picoc#L354), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
 | [`cat.bin`](user/cat.picoc#L104) | Copies named files or stdin to stdout, terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
@@ -7133,7 +7458,7 @@ and calls, neither helper keeps persistent state.
 Every user program except [`echo.bin`](user/echo.picoc) uses [`command_is_help()`](common/user_command.picoc#L13) for a sole help
 argument. [`echo.bin`](user/echo.picoc) keeps `-h` and `--help` as ordinary text to print.
 
-## 13.2 Command behavior and supported options
+## 12.2 Command behavior and supported options
 [\[↑ TOC\]](#contents)
 
 The application overview identifies each command's main purpose. This section
@@ -7201,9 +7526,9 @@ PicoOS> rm.bin demo.txt edited.txt
 
 The example omits process-created messages. The shell waits for the producer
 to finish before starting the consumer, as explained under
-[Section 12.7, Sequential file-backed pipelines](#127-sequential-file-backed-pipelines).
+[Section 11.7, Sequential file-backed pipelines](#117-sequential-file-backed-pipelines).
 
-## 13.3 Command errors and exit statuses
+## 12.3 Command errors and exit statuses
 [\[↑ TOC\]](#contents)
 
 Commands send ordinary results to stdout and diagnostics/usage failures to
@@ -7224,7 +7549,7 @@ For the status transfer from a child to the shell, see
 [`run_process()`](user/shell.picoc#L1034) and
 [Section 6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid).
 
-# 14. Test system
+# 13. Test system
 [\[↑ TOC\]](#contents)
 
 The preceding chapters describe the runtime path from compiler output to user
@@ -7233,7 +7558,7 @@ interactive-shell levels, including the boundaries between the sibling
 projects. The category overview establishes what is counted, then the execution
 section explains the standalone, system, and boot paths.
 
-## 14.1 Library, OS, shell, and boot test categories
+## 13.1 Library, OS, shell, and boot test categories
 [\[↑ TOC\]](#contents)
 
 The repository contains **64 test classes: 12 library, 23 OS feature, 28 shell,
@@ -7291,7 +7616,7 @@ compile source and commonly compare the result with GCC, RETI-Emulator system
 tests execute assembly programs, PicoOS system tests exercise the complete
 compiler-emulator-bootloader-kernel-userspace chain.
 
-## 14.2 Test execution
+## 13.2 Test execution
 [\[↑ TOC\]](#contents)
 
 The runners isolate every test case instead of resetting and reusing a running
@@ -7331,7 +7656,7 @@ kernel, the kernel starts init, init starts the shell, and the shell can load
 and run an ordinary user command. The GitHub Actions workflow calls `make test`,
 so this boot check is also part of CI.
 
-# 15. Use in operating-systems and real-time operating-systems lectures
+# 14. Use in operating-systems and real-time operating-systems lectures
 [\[↑ TOC\]](#contents)
 
 PicoOS was developed primarily so that students can inspect implementations of
@@ -7340,7 +7665,7 @@ the code and while the OS is executing. The first part gives operating-systems
 examples at the PicoC, RETI, and emulator levels, the second relates the
 scheduler, wait queues, and mutexes to real-time operating-systems topics.
 
-## 15.1 Operating-systems topics
+## 14.1 Operating-systems topics
 [\[↑ TOC\]](#contents)
 
 The table connects operating-systems lecture topics
@@ -7360,7 +7685,7 @@ on-device filesystem.
 Generated `.reti`, `.sections`, and debug files allow PicoC source, symbolic
 RETI, binary layout, and live machine state to be compared.
 
-### 15.1.1 Inspecting PicoOS execution in the RETI-Emulator
+### 14.1.1 Inspecting PicoOS execution in the RETI-Emulator
 [\[↑ TOC\]](#contents)
 
 Students who want to understand one of the RTOS or OS lecture concepts above
@@ -7413,7 +7738,7 @@ operating-systems lecture slides while the real kernel executes.
 
 <!-- TODO: Add the details for trying out memory-mapped devices with `(A)ssign value`. -->
 
-### 15.1.2 Exploring userspace heap allocation
+### 14.1.2 Exploring userspace heap allocation
 [\[↑ TOC\]](#contents)
 
 [`test/exercise_sheet_4_heap/launcher.picoc`](test/exercise_sheet_4_heap/launcher.picoc)
@@ -7510,7 +7835,7 @@ freeing and merging are exercised separately in
 [`basic_free.picoc`](test/basic_free.picoc) and
 [`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc).
 
-### 15.1.3 Editing and executing symbolic RETI assembly
+### 14.1.3 Editing and executing symbolic RETI assembly
 [\[↑ TOC\]](#contents)
 
 The heap exercise stays at the PicoC level. To inspect and modify the
@@ -7567,7 +7892,7 @@ $ picoc_compiler -o exercise.reti exercise.reti_blocks
 $ reti_emulator -d -c exercise.reti
 ```
 
-## 15.2 Real-time operating-systems topics
+## 14.2 Real-time operating-systems topics
 [\[↑ TOC\]](#contents)
 
 PicoOS also connects with topics from the real-time operating-systems lecture,
@@ -7639,7 +7964,7 @@ flowchart TD
     F -.->|If another process is waiting| E
 ```
 
-# 16. Use of AI in the project
+# 15. Use of AI in the project
 [\[↑ TOC\]](#contents)
 
 This section applies the University of Freiburg's transparency and documentation
@@ -7709,7 +8034,7 @@ Master's project for three semesters and spent the last one doing nothing but
 coding this operating system, so I thought it was reasonable to use AI a bit
 more extensively.
 
-# 17. Limitations
+# 16. Limitations
 [\[↑ TOC\]](#contents)
 
 The lecture examples and tests above should be read with these limits in
@@ -7732,7 +8057,7 @@ explanation.
   described in [Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack)
 - limited formatting and scanning, shell parsing, and standard-library subsets,
   as described in [Section 9.2.9, stdio: streams, formatting, and scanning](#929-stdio-streams-formatting-and-scanning),
-  [Section 12.4, Command parsing, expansion, and execution](#124-command-parsing-expansion-and-execution), and
+  [Section 11.4, Command parsing, expansion, and execution](#114-command-parsing-expansion-and-execution), and
   [Section 9.2, Library overview and dependencies](#92-library-overview-and-dependencies)
 - no implemented PicoOS-specific physical RETI CPU or hardware timer: the
   emulator's instruction-count timer provides reproducible preemption, not
