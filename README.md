@@ -375,7 +375,7 @@ lectures follow.
    - [4.5 Loading and starting a process](#45-loading-and-starting-a-process)
       - [4.5.1 Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
       - [4.5.2 Changing a completed image from `NEW` to `READY`](#452-changing-a-completed-image-from-new-to-ready)
-   - [4.6 Parent-child relationships, termination, and reaping](#46-parent-child-relationships-termination-and-reaping)
+   - [4.6 Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection)
       - [4.6.1 Creating parent-child relationships and handling orphans](#461-creating-parent-child-relationships-and-handling-orphans)
       - [4.6.2 Recording termination status](#462-recording-termination-status)
       - [4.6.3 Parent collection and final removal](#463-parent-collection-and-final-removal)
@@ -383,9 +383,8 @@ lectures follow.
    - [4.8 Process-loader and run-setup function reference](#48-process-loader-and-run-setup-function-reference)
 1. [Scheduling and context switching](#5-scheduling-and-context-switching)
    - [5.1 Scheduler implementation](#51-scheduler-implementation)
-      - [5.1.1 Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
-      - [5.1.2 Scheduling example, no-runnable case, and ready-queue tradeoff](#512-scheduling-example-no-runnable-case-and-ready-queue-tradeoff)
-      - [5.1.3 Scheduler function reference](#513-scheduler-function-reference)
+      - [5.1.1 Algorithm and Round Robin comparison](#511-algorithm-and-round-robin-comparison)
+      - [5.1.2 Scheduler function reference](#512-scheduler-function-reference)
    - [5.2 Saved process activation](#52-saved-process-activation)
    - [5.3 Saving the current process and selecting the next process](#53-saving-the-current-process-and-selecting-the-next-process)
    - [5.4 Restoring the selected process and returning with `RTI`](#54-restoring-the-selected-process-and-returning-with-rti)
@@ -2820,6 +2819,31 @@ struct Process *active_process = NULL;
 int next_process_id = 1;
 ```
 
+The globals point directly into the list of separately allocated PCBs. The
+diagram uses the implementation's actual lower-case names; conceptual labels
+such as `ProcessListHead` and `ProcessListTail` correspond to
+[`process_list_head`](kernel/process/process.picoc#L16) and
+[`process_list_tail`](kernel/process/process.picoc#L17) here.
+
+```mermaid
+flowchart LR
+    subgraph DATA["kernel .data globals"]
+        H["process_list_head"]
+        T["process_list_tail"]
+        A["active_process"]
+    end
+    subgraph KH["kernel heap: separately kmalloc-allocated PCBs"]
+        P1["PCB P1<br/>next"]
+        P2["PCB P2<br/>next"]
+        P3["PCB P3<br/>next = NULL"]
+    end
+    H -->|"first PCB"| P1
+    P1 -->|"next"| P2
+    P2 -->|"next"| P3
+    T -->|"last PCB"| P3
+    A -.->|"currently active PCB"| P2
+```
+
 Each node is one [`struct Process`](kernel/process/process.header#L31) PCB: the
 complete kernel record for one process. Its
 [`next`](kernel/process/process.header#L53) field points to the following PCB,
@@ -2862,7 +2886,7 @@ explains the separate unlinking required if the PCB is also in a wait queue.
 The scheduler scans this same list. There is no separate ready queue. Blocking
 queues use a different intrusive link inside each PCB, so
 [`next`](kernel/process/process.header#L53) remains available for process-table
-order. [Section 5.1.1, Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
+order. [Section 5.1.1, Algorithm and Round Robin comparison](#511-algorithm-and-round-robin-comparison)
 explains how the scheduler traverses this list.
 
 ## 4.2 Process control block fields
@@ -3052,7 +3076,7 @@ the terminated process outside the
 [`READY`](kernel/process/process.header#L13) and
 [`RUNNING`](kernel/process/process.header#L14) states accepted by
 [`scheduler_next_process()`](kernel/scheduler.picoc#L12), so the scheduler does
-not select it for execution. [Section 4.6, Parent-child relationships, termination, and reaping](#46-parent-child-relationships-termination-and-reaping)
+not select it for execution. [Section 4.6, Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection)
 explains status retention, parent notification, and final removal.
 
 The state diagram shows the usual load/run, blocking, signal, and termination
@@ -3240,14 +3264,14 @@ explains the descriptor-table details. Parent-child metadata is established
 during PCB creation and is covered next in
 [Section 4.6.1, Creating parent-child relationships and handling orphans](#461-creating-parent-child-relationships-and-handling-orphans).
 
-## 4.6 Parent-child relationships, termination, and reaping
+## 4.6 Parent-child relationships, termination, and collection
 [\[↑ TOC\]](#contents)
 
-Parent-child metadata determines who may collect a termination status and what
-happens when either side terminates. *Reaping* is PicoOS's final collection of
-a terminated child's saved status followed by removal of its PCB and remaining
-resources. The following subsections cover creation
-of that relationship, status recording, parent collection, and final resource
+Parent-child metadata determines who may collect a termination status and when
+a terminated PCB can be deleted. Unix literature calls that final status
+collection and deletion *reaping*; this section uses the clearer term
+*collection*. It covers relationship creation, termination, the two important
+[`waitpid()`](library/sys/wait/wait.picoc#L14) orderings, and final resource
 release. Detailed wait-queue and signal mechanics are in
 [Section 6, Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes).
 
@@ -3296,49 +3320,42 @@ signal state and delivery rules.
 ### 4.6.2 Recording termination status
 [\[↑ TOC\]](#contents)
 
-A normal [`exit()`](library/stdlib/exit.picoc#L3), a fatal CPU exception or
-signal, and explicit unloading all reach
-[`terminate_process()`](kernel/process/process.picoc#L304). For normal
-completion, [`start_process()`](library/start/start.picoc#L7) passes the value
-returned by the application entry point to [`exit()`](library/stdlib/exit.picoc#L3).
-Fatal signals and CPU exceptions supply their own status values. Explicit
-unloading supplies the success status before forcing final removal.
-[Section 6.2.1, Supported signals and fixed actions](#621-supported-signals-and-fixed-actions)
-lists the signal status values, while
-[Section 2.9, CPU exceptions and runtime errors](#29-cpu-exceptions-and-runtime-errors)
-explains exception termination.
+A normal [`exit()`](library/stdlib/exit.picoc#L3), fatal signal or CPU exception,
+and explicit unloading all reach
+[`terminate_process()`](kernel/process/process.picoc#L304). It first handles the
+terminating process's children, stores the supplied status in
+[`exit_status`](kernel/process/process.header#L60), changes
+[`state`](kernel/process/process.header#L33) to
+[`ZOMBIE`](kernel/process/process.header#L17), and wakes the process's
+[`waiters`](kernel/process/process.header#L46). Section
+[6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid) traces the
+status pointer and wakeup; [Section 6.2.1, Supported signals and fixed
+actions](#621-supported-signals-and-fixed-actions) and [Section 2.9, CPU
+exceptions and runtime errors](#29-cpu-exceptions-and-runtime-errors) define
+the non-normal status values.
 
-[`terminate_process()`](kernel/process/process.picoc#L304) first handles the
-terminating process's children, then saves the supplied status in
-[`exit_status`](kernel/process/process.header#L60) and changes the PCB state to
-[`ZOMBIE`](kernel/process/process.header#L17). It also wakes processes waiting
-on the terminating process. The queue operations used for that wakeup are
-explained in [Section 6.1, Wait Queue Structure and Intrusive PCB Links](#61-wait-queue-structure-and-intrusive-pcb-links),
-while the exact parent handoff is explained in
-[Section 6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid).
+For normal completion, [`start_process()`](library/start/start.picoc#L7) passes
+the application entry point's return value to
+[`exit()`](library/stdlib/exit.picoc#L3); explicit unloading uses the success
+status and then forces removal.
 
 ### 4.6.3 Parent collection and final removal
 [\[↑ TOC\]](#contents)
 
-If a live parent has not already waited, the terminated child remains a
-[`ZOMBIE`](kernel/process/process.header#L17). PicoOS keeps the complete PCB and
-its remaining resources because it does not create a smaller record for the
-child's [`pid`](kernel/process/process.header#L32),
-[`parent_pid`](kernel/process/process.header#L57), and
-[`exit_status`](kernel/process/process.header#L60). A later
-[`waitpid()`](library/sys/wait/wait.picoc#L14) uses those fields to identify the
-child, verify the relationship, return the saved status, and trigger final
-removal.
+The order of [`waitpid()`](library/sys/wait/wait.picoc#L14) and child
+termination decides which kernel path deletes the child PCB. Deletion is not a
+later dispatcher task in either case.
 
-If the parent was already waiting, its
-[`waiting_status_ptr`](kernel/process/process.header#L44) already points to the
-status variable in its suspended [`waitpid()`](library/sys/wait/wait.picoc#L14)
-stack frame. Termination writes the status through that pointer and wakes the
-parent. An orphan or a child whose parent was already waiting is removed
-immediately. [Section 6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid)
-shows where the request and status variable lie, how the child-owned queue
-finds the parent, how wakeup updates the parent's process state, and how the
-resumed call returns the status.
+| Lifecycle order | Status handoff and child state | Who deletes the child PCB, and when |
+| --- | --- | --- |
+| Parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) while child is alive | [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) links the parent PCB into the child's [`waiters`](kernel/process/process.header#L46) queue and blocks it. Child termination writes through the parent's [`waiting_status_ptr`](kernel/process/process.header#L44) and wakes it. | [`terminate_process()`](kernel/process/process.picoc#L304) calls [`remove_process()`](kernel/process/process.picoc#L209) directly after the status handoff because [`process_has_waiting_parent()`](kernel/process/process.picoc#L249) was true. Deletion occurs inside termination, not during later dispatch; for self-exit it precedes the [`exit_process()`](kernel/process/process.picoc#L430) dispatch. |
+| Child terminates before parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) | The complete child PCB remains [`ZOMBIE`](kernel/process/process.header#L17), retaining [`pid`](kernel/process/process.header#L32), [`parent_pid`](kernel/process/process.header#L57), [`exit_status`](kernel/process/process.header#L60), and owned resources. | The later syscall reaches [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), which copies [`exit_status`](kernel/process/process.header#L60) to the stack-local status and immediately calls [`remove_process()`](kernel/process/process.picoc#L209) before returning. |
+| No live parent remains | No future caller can collect the status. | [`terminate_process()`](kernel/process/process.picoc#L304) removes an orphan immediately; [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) also removes children that were already zombies when their parent terminates. |
+
+PicoOS keeps the complete zombie PCB because it has no smaller exit-status
+record. Section [6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid)
+shows where the suspended request lives, how the child-owned queue reaches the
+parent, and how the resumed call returns the status.
 
 Explicit unloading also removes an uncollected zombie, and the test reset
 helper removes selected PCBs directly. Final removal unlinks the PCB from its
@@ -3426,33 +3443,23 @@ and [Section 5.4, Restoring the selected process and returning with `RTI`](#54-r
 ## 5.1 Scheduler implementation
 [\[↑ TOC\]](#contents)
 
-The scheduler implementation uses the process list directly. The following subsections explain its
-Lazy Round Robin policy, show its edge cases and tradeoff against a ready queue, and document the
-two scheduler functions separately.
+The scheduler implementation uses the process list directly. The first
+subsection combines the policy, complete algorithm, example, edge cases, and
+comparison with textbook Round Robin. The second is a findable reference for
+the two functions in
+[`kernel/scheduler.picoc`](kernel/scheduler.picoc).
 
-### 5.1.1 Preemptive Cyclic Process Selection (Lazy Round Robin)
+### 5.1.1 Algorithm and Round Robin comparison
 [\[↑ TOC\]](#contents)
 
-PicoOS uses a cyclic traversal of the complete process list rather than a dedicated ready queue.
-The traditional name *process table* is doing a little imaginative work here: PicoOS's "table" is
-actually a singly linked list of PCBs, not an array. [Section 4.1, Global process list and current
-process](#41-global-process-list-and-current-process) describes that representation. Here *Lazy
-Round Robin* names the deliberate tradeoff: PicoOS does not maintain the runnable PCBs in textbook
-FIFO ready-queue order. Instead, when it must select a process, it discovers the next runnable PCB
-by scanning states in the existing process list.
-
-[`scheduler_next_process()`](kernel/scheduler.picoc#L12) does not restart at the beginning of the
-list after each scheduling decision. It obtains the current PCB through
-[`current_process()`](kernel/process/process.picoc#L62), follows that PCB's
-[`next`](kernel/process/process.header#L53) link, and starts the search with the following process.
-Only when there is no current process or the current PCB is the last entry does it start at
-[`first_process()`](kernel/process/process.picoc#L28). The first loop scans from that starting PCB to
-the end. If it finds nothing runnable, the second loop starts again at
-[`first_process()`](kernel/process/process.picoc#L28) and stops when it reaches the original start,
-so every PCB is examined at most once per call. A current process near the end can therefore be
-followed by a runnable process near the beginning. Because each ordinary search advances from the
-current PCB, processes near [`process_list_head`](kernel/process/process.picoc#L16) are not
-systematically preferred.
+PicoOS uses *Lazy Round Robin*: it cyclically scans the complete singly linked
+process list described in [Section 4.1, Global process list and current
+process](#41-global-process-list-and-current-process), rather than maintaining a
+separate FIFO ready queue. [`scheduler_next_process()`](kernel/scheduler.picoc#L12)
+starts after [`current_process()`](kernel/process/process.picoc#L62), or at
+[`first_process()`](kernel/process/process.picoc#L28) when there is no current
+PCB or it is the tail. It scans to the end, wraps to the head, and stops at its
+original starting point, so it examines every PCB at most once.
 
 For each PCB, [`scheduler_can_run()`](kernel/scheduler.picoc#L4) accepts
 [`PROCESS_STATE_READY`](kernel/process/process.header#L13) or
@@ -3463,15 +3470,12 @@ For each PCB, [`scheduler_can_run()`](kernel/scheduler.picoc#L4) accepts
 [`PROCESS_STATE_ZOMBIE`](kernel/process/process.header#L17). Sleeping and waiting processes use the
 `BLOCKED` state, so the scan may pass several such PCBs before it finds a process that can execute.
 
-This produces fair cyclic turns for processes that remain runnable: the scan cannot pass a runnable
-PCB and select a later one, and the next decision continues after the process that just ran. It is
-not textbook Round Robin across state changes, however. A conventional ready queue contains only
-runnable processes and normally supplies its head directly, when a blocked process becomes ready,
-it is appended at the tail. PicoOS leaves that process at its fixed position in the general process
-list, so a newly unblocked process can be encountered before another process that has been ready
-longer. That difference affects strict FIFO ready order. It also means that PicoOS considers every
-PCB it passes, including `BLOCKED` PCBs for sleeping or waiting processes and `STOPPED`, `NEW`, or
-`ZOMBIE` PCBs, whereas a conventional ready queue contains only runnable processes.
+Processes that remain runnable receive cyclic turns, but this is not strict
+FIFO Round Robin across state changes. A conventional ready queue appends a
+newly unblocked process behind processes already waiting. PicoOS leaves every
+PCB at its fixed process-list position, so that process may be found first; a
+scheduling decision may also inspect `BLOCKED`, `STOPPED`, `NEW`, and `ZOMBIE`
+PCBs that a ready queue would not contain.
 
 Preemption is also slightly looser than a textbook per-process quantum. The timer configured by
 [`interrupt_controller_activate_timer()`](kernel/interrupt_controller.picoc#L34) requests a switch
@@ -3482,9 +3486,6 @@ dispatcher does not restart the timer in
 [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), so a process selected after a
 voluntary switch may receive only the remainder of the current timer interval rather than a fresh
 full quantum.
-
-### 5.1.2 Scheduling example, no-runnable case, and ready-queue tradeoff
-[\[↑ TOC\]](#contents)
 
 The example below shows the linked-list order, each process state, and `P3` as the current process.
 It makes both the cyclic order and the extra traversal caused by non-runnable PCBs visible.
@@ -3497,40 +3498,27 @@ flowchart LR
     P4 --> P5["P5<br/>READY"]
 ```
 
-When `P3` yields or its timer interval expires, the dispatcher changes it to `READY`. The scheduler
-starts at `P4`, skips that stopped process, and selects `P5`. After `P5` runs, the next search starts
-at the beginning because `P5` is the last PCB, it finds `P1`, demonstrating the wrap-around. If a
-textbook Round Robin ready queue contained `P5` followed by `P1` before `P3` was requeued, it would
-append `P3` after `P1` and take `P5` directly, without examining `P4`. PicoOS obtains that order by
-inspecting the complete process list instead.
+When `P3` yields or is preempted, the scheduler starts at `P4`, skips it, and
+selects `P5`. The following search wraps from tail `P5` to `P1`. A textbook
+ready queue would take its runnable head directly; PicoOS obtains the cyclic
+order by inspecting the general process list.
 
-If one complete scan finds no `READY` or `RUNNING` PCB,
-[`scheduler_next_process()`](kernel/scheduler.picoc#L12) returns `NULL`, the scheduler itself does
-not begin another scan. This state is legal when all existing processes are blocked, stopped, new,
-or zombies, PicoOS does not require one process to remain runnable. There is no idle or fallback
-process.
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) handles the case by repeatedly
-calling the scheduler while the process list remains nonempty. A UART or DMA interrupt can make a
-blocked process ready during that wait. If no event can make any process runnable, the dispatcher
-keeps scanning indefinitely. If the process list is empty, the loop ends and the dispatcher
-returns. By contrast, preemption and [`yield()`](library/schedule/schedule.picoc#L4) do not normally
-reach the no-runnable case because
-[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) first changes the outgoing
-`RUNNING` process to `READY`.
+If a complete scan finds no `READY` or `RUNNING` PCB,
+[`scheduler_next_process()`](kernel/scheduler.picoc#L12) returns `NULL`. PicoOS
+has no idle process: [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55)
+retries while PCBs exist, allowing a UART or DMA interrupt to make one ready;
+it can spin indefinitely if no event can do so, and returns if the process
+list becomes empty. Preemption and
+[`yield()`](library/schedule/schedule.picoc#L4) normally avoid this case because
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) first changes
+the outgoing process to `READY`.
 
-Using the process list directly keeps the implementation small: state transitions do not also have
-to insert, remove, or reorder PCBs in a ready queue. The tradeoff is that a scheduling decision may
-traverse the complete process list, including non-runnable PCBs, before finding an eligible process.
-A conventional Round Robin ready queue would examine only runnable processes and take its head
-directly. PicoOS's finite process-image/shared-memory heap limits the number of resident processes,
-but the scheduler enforces no small fixed process count, so the source code does not guarantee that
-the traversal is always short.
+Scanning the existing list keeps state transitions simple because no ready
+queue must also be updated. The cost is an O(number of PCBs) selection in the
+worst case, including inspection of non-runnable PCBs; a textbook ready queue
+normally selects its head directly.
 
-### 5.1.3 Scheduler function reference
-[\[↑ TOC\]](#contents)
-
-The policy and edge cases above are implemented by two functions in
-[`kernel/scheduler.picoc`](kernel/scheduler.picoc). The complete code below shows that
+The complete implementation below shows that
 [`scheduler_can_run()`](kernel/scheduler.picoc#L4) checks whether one process can run, while
 [`scheduler_next_process()`](kernel/scheduler.picoc#L12) chooses the starting point and performs the
 two-part scan with wrap-around.
@@ -3576,8 +3564,13 @@ struct Process *scheduler_next_process(void) {
 }
 ```
 
-The table summarizes each function's return value, effects, calls, and callers. Dispatcher functions
-remain separate in [Section 5.5, Dispatcher function reference](#55-dispatcher-function-reference).
+### 5.1.2 Scheduler function reference
+[\[↑ TOC\]](#contents)
+
+The algorithm above is implemented entirely by the following two functions in
+[`kernel/scheduler.picoc`](kernel/scheduler.picoc). The table separates their
+contracts, state access, and callers; dispatcher functions remain in [Section
+5.5, Dispatcher function reference](#55-dispatcher-function-reference).
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
@@ -3602,6 +3595,24 @@ process, the scheduler returns its PCB pointer, which the dispatcher passes thro
 [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), the latter reads the selected PCB's
 activation by fixed offsets. The field order is therefore part of the assembly interface, and the
 following definition and table show the values that must remain available.
+
+The containment diagram distinguishes the embedded activation record from
+objects referenced by pointers. The PCB and its activation occupy one
+[`kmalloc()`](kernel/kmalloc.picoc#L23) allocation on the kernel heap;
+[`activation`](kernel/process/process.header#L40) is not separately allocated.
+
+```mermaid
+flowchart LR
+    AP["active_process<br/>kernel .data"] --> PCB
+    subgraph PCB["struct Process / PCB<br/>kernel heap"]
+        direction TB
+        ID["pid, state, memory metadata"]
+        AR["activation: ActivationRecord<br/>in1, in2, acc, sp, baf, cs, ds"]
+        FDP["file_descriptors pointer"]
+        WAIT["wait and lifecycle fields"]
+    end
+    FDP --> FDT["FileDescriptorTable<br/>separate kernel-heap allocation"]
+```
 
 ```c
 struct ActivationRecord {
@@ -3715,7 +3726,7 @@ even when the same process is selected again.
 [`prepare_process_termination()`](kernel/signal.picoc#L126) before dispatching it. Deferred
 termination can remove the selected process, requiring another scheduler pass. The no-runnable,
 interrupt-wakeup, and empty-list cases are explained with the selection loop in
-[Section 5.1.2, Scheduling example, no-runnable case, and ready-queue tradeoff](#512-scheduling-example-no-runnable-case-and-ready-queue-tradeoff).
+[Section 5.1.1, Algorithm and Round Robin comparison](#511-algorithm-and-round-robin-comparison).
 
 ## 5.4 Restoring the selected process and returning with `RTI`
 [\[↑ TOC\]](#contents)
@@ -3882,15 +3893,21 @@ request and result are stack-local, but its queue is not: the queue is the
 target child's kernel-heap PCB field. Those local objects exist only for the
 duration of the possibly suspended call.
 
-Three fields in each [`Process`](kernel/process/process.header#L31) provide the
-intrusive representation and keep queue ownership separate from queue
-membership:
+The compact reference below brings together the request, queue, and PCB state
+used by both direct sleeping and exact-child waiting. It also distinguishes
+embedded fields from pointers into userspace memory.
 
-| Attribute | Meaning | Used by |
+| Field and containing storage | Meaning and why it exists | Used by and important relationships |
 | --- | --- | --- |
-| [`waiters`](kernel/process/process.header#L46) | Queue of other processes waiting for this process to stop or terminate, it does not describe a queue on which this process is blocked | First initialized empty by [`create_process()`](kernel/process/process.picoc#L89), populated by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), drained by [`notify_process_stopped()`](kernel/signal.picoc#L23) or [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) |
-| [`waiting_queue_ptr`](kernel/process/process.header#L48) | Back-reference to the one queue containing this PCB, or `NULL` when it is not queued | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), assigned on insertion and used by [`remove_from_wait_queue()`](kernel/process/process.picoc#L176), terminal-read suspension, continuation, and final process removal |
-| [`wait_next`](kernel/process/process.header#L51) | Next PCB in the queue containing this PCB, or `NULL` for the last waiter | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), assigned through the old tail on insertion and cleared on removal |
+| [`WaitPidRequest.pid`](common/syscall.header#L62), in [`request`](library/sys/wait/wait.picoc#L16) on the parent's userspace stack | Exact child PID requested by the public API; it prevents another child's state change from completing this wait. | Set by [`waitpid()`](library/sys/wait/wait.picoc#L14); read by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), which also checks the child's [`parent_pid`](kernel/process/process.header#L57). The kernel does not retain this field after blocking. |
+| [`WaitPidRequest.status`](common/syscall.header#L63), in the same stack-local request | Points to the separate stack-local [`status`](library/sys/wait/wait.picoc#L15) result. The indirection lets the kernel use one request argument for both PID and result storage. | Set to `&status` by [`waitpid()`](library/sys/wait/wait.picoc#L14). Immediate paths write through it; the blocking path copies its value into the parent PCB's [`waiting_status_ptr`](kernel/process/process.header#L44). Neither the request nor status is allocated on the kernel heap. |
+| [`wait_queue.head`](common/wait_queue.header#L6) and [`wait_queue.tail`](common/wait_queue.header#L7), embedded in an owner or stored as a global/userspace object | First and last PCB in a FIFO. `tail` makes append constant-time; both are `NULL` when empty. | Initialized by each queue owner; maintained by [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`wakeup_wait_queue()`](kernel/process/process.picoc#L395), and [`remove_from_wait_queue()`](kernel/process/process.picoc#L176). The nodes are PCBs linked through [`wait_next`](kernel/process/process.header#L51). |
+| [`Process.waiters`](kernel/process/process.header#L46), embedded in each kernel-heap PCB | Queue of other processes waiting for this process to stop or terminate. It is queue ownership, not the queue containing this process. | Initialized empty by [`create_process()`](kernel/process/process.picoc#L89); the target child is found from the PID and its address `&child->waiters` is passed to [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390). Drained by [`notify_process_stopped()`](kernel/signal.picoc#L23) or [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261). |
+| [`Process.waiting_status_ptr`](kernel/process/process.header#L44), pointer stored in the waiting parent's kernel-heap PCB | Reaches the `status` integer in the suspended parent's userspace [`waitpid()`](library/sys/wait/wait.picoc#L14) frame. It exists because the child may finish while that call is not executing. | Initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89); set from [`WaitPidRequest.status`](common/syscall.header#L63) by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348); written and cleared through the parent PCB by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) or [`notify_process_stopped()`](kernel/signal.picoc#L23). |
+| [`Process.waiting_queue_ptr`](kernel/process/process.header#L48), pointer stored in every kernel-heap PCB | Back-reference to the one queue currently containing this PCB, or `NULL`. It lets code unlink a blocked process without already knowing whether the owner is a child, mutex, terminal, or DMA subsystem. | Set on insertion and cleared on wake/removal. [`remove_process()`](kernel/process/process.picoc#L209) follows it through [`remove_from_wait_queue()`](kernel/process/process.picoc#L176) before freeing the PCB; this prevents a later wakeup from following a dangling PCB pointer. It is also used when terminal reads are stopped or resumed. |
+| [`Process.wait_next`](kernel/process/process.header#L51), embedded in every kernel-heap PCB | Intrusive link to the next PCB in whichever wait queue contains this process. One field is sufficient because a blocked process can join only one queue at a time. | Initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89); linked through the old queue tail by [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375); traversed by [`remove_from_wait_queue()`](kernel/process/process.picoc#L176); cleared on wake/removal. It is independent of global-list [`next`](kernel/process/process.header#L53). |
+| [`Process.state`](kernel/process/process.header#L33) and [`Process.stopped_from_state`](kernel/process/process.header#L62), in the PCB | Record whether the waiter is `BLOCKED`, runnable, or visibly `STOPPED`, including whether a stopped wait completed. | Enqueue changes `state` to `BLOCKED`; [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) changes an ordinary waiter to `READY`, or keeps `state == STOPPED` and changes `stopped_from_state` to `READY` so [`continue_process()`](kernel/signal.picoc#L50) can resume it correctly. |
+| [`Process.parent_pid`](kernel/process/process.header#L57), [`Process.exit_status`](kernel/process/process.header#L60), and [`Process.stop_signal`](kernel/process/process.header#L61), in the child PCB | Verify that only the parent can wait and retain the child state needed by immediate/zombie/stopped `waitpid` paths. | Initialized by [`create_process()`](kernel/process/process.picoc#L89); read by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348); termination writes `exit_status`, stopping writes `stop_signal`, and later collection reads the corresponding value. |
 
 A wait queue is the PCB pointer in [`head`](common/wait_queue.header#L6),
 followed through [`wait_next`](kernel/process/process.header#L51) until `NULL`.
@@ -4025,18 +4042,18 @@ already stopped child before returning directly.
 
 ```mermaid
 sequenceDiagram
-    participant W as Parent
+    participant P as Waiting Parent (P)
     participant K as Kernel wait handling
-    participant T as Target child
+    participant C as Child (C)
 
-    W->>K: waitpid(T), syscall 7
-    K->>T: Check state and parent PID
-    alt T is already ZOMBIE
-        K->>T: Read exit status and remove T
-        K-->>W: Return the exit status
-    else T is STOPPED
-        K->>T: Read the stop signal
-        K-->>W: Return the stopped status
+    P->>K: waitpid(C.pid), syscall 7
+    K->>C: Find PCB and check C.parent_pid matches P.pid
+    alt C is already ZOMBIE
+        K->>C: Read C.exit_status and call remove_process(C)
+        K-->>P: Return exit status directly
+    else C is STOPPED
+        K->>C: Read C.stop_signal
+        K-->>P: Return stopped status directly
     end
 ```
 
@@ -4049,21 +4066,40 @@ parent becomes ready immediately, a stopped parent can resume after
 
 ```mermaid
 sequenceDiagram
-    participant W as Waiting parent
+    participant P as Waiting Parent (P)
     participant K as Kernel wait handling
-    participant T as Active child
+    participant C as Active Child (C)
 
-    W->>K: waitpid(T), syscall 7
-    K->>W: Save status pointer in PCB and mark BLOCKED
-    K->>T: Enqueue W on T.waiters
-    Note over W,K: W's suspended stack keeps status alive
-    T->>K: Stop or terminate later
-    K->>W: Write status, unlink waiter, and record completion
-    opt T terminated while W was waiting
-        K->>T: Remove the collected child
+    P->>K: waitpid(C.pid) with request.status pointing to status
+    K->>C: Find PCB and verify C.parent_pid matches P.pid
+    K->>P: Copy request.status to P.waiting_status_ptr
+    K->>C: Call sleep_on_wait_queue with C.waiters
+    K->>P: C.waiters points to P and P.waiting_queue_ptr points back
+    K->>P: Set P.state to BLOCKED
+    Note over P,C: P's suspended userspace frame keeps request and status alive
+    C->>K: terminate_process(C, exit_status) later
+    K->>C: Walk C.waiters from head through PCB.wait_next
+    K->>P: Reach P PCB and write exit_status through P.waiting_status_ptr
+    K->>P: Clear P.waiting_status_ptr
+    K->>C: wakeup_wait_queue on C.waiters advances head and tail
+    K->>P: Clear membership links and set P READY
+    opt C terminated while P was already waiting
+        K->>C: remove_process(C) immediately, before dispatch
     end
-    K-->>W: Dispatcher later resumes waitpid
+    K-->>P: Dispatcher later resumes suspended waitpid
 ```
+
+The unlink uses the child's queue object, not a search of the global process
+list: [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) removes
+`C.waiters.head`, follows that parent PCB's
+[`wait_next`](kernel/process/process.header#L51), updates `C.waiters.head` and
+`tail`, then clears the parent's
+[`waiting_queue_ptr`](kernel/process/process.header#L48) and `wait_next`.
+Conversely, if the waiting parent itself is deleted first,
+[`remove_process()`](kernel/process/process.picoc#L209) follows
+`P.waiting_queue_ptr` to `C.waiters` and calls
+[`remove_from_wait_queue()`](kernel/process/process.picoc#L176) before freeing
+P, preventing a later child wakeup from dereferencing a freed PCB.
 
 The local status variable remains valid because the parent's userspace stack
 is suspended while it is blocked. If the child exits before the call, it
@@ -4079,15 +4115,32 @@ not complete the wrong wait.
 [\[↑ TOC\]](#contents)
 
 After the direct blocking and child-waiting examples, the table below collects
-the functions that implement exact-child waiting and the intrusive queue
-operations used by terminal reads, DMA, and mutexes. Syscall-backed wait
-operations are listed before the kernel queue helpers.
+the paths from each public operation to the shared kernel primitives. It makes
+the connection to [Section 6.1.1, Blocking with `sleep` and Waking with
+`wakeup`](#611-blocking-with-sleep-and-waking-with-wakeup) and [Section 6.1.2,
+Child Waiting with `waitpid`](#612-child-waiting-with-waitpid) explicit.
+
+| Public/library operation | Syscall and kernel call path | Queue and request storage | Completion path |
+| --- | --- | --- | --- |
+| [`sleep(wq)`](library/unistd/blocking.picoc#L9) | [`SYSCALL_SLEEP`](common/syscall.header#L19) → [`handle_syscall()`](kernel/syscall.picoc#L16) → [`sleep_on_wait_queue(wq, caller_context)`](kernel/process/process.picoc#L390) → [`enqueue_current_process_on_wait_queue(wq)`](kernel/process/process.picoc#L375) | Caller supplies the [`wait_queue`](common/wait_queue.header#L5). It may be embedded in a userspace [`mutex`](library/mutex/mutex.header#L6) on that process's stack or in shared memory. | An event owner reaches [`wakeup_wait_queue(wq)`](kernel/process/process.picoc#L395), often through [`wakeup(wq)`](library/unistd/blocking.picoc#L19). |
+| [`wakeup(wq)`](library/unistd/blocking.picoc#L19) | [`SYSCALL_WAKEUP`](common/syscall.header#L20) → [`handle_syscall()`](kernel/syscall.picoc#L16) → [`wakeup_wait_queue(wq)`](kernel/process/process.picoc#L395) | Uses the same caller-supplied queue address and wakes at most its FIFO head. | Clears the removed PCB's intrusive membership fields and makes it `READY`, or records completion beneath `STOPPED`. |
+| [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) | [`SYSCALL_WAITPID`](common/syscall.header#L13) → [`handle_syscall()`](kernel/syscall.picoc#L16) → [`wait_for_process_by_pid(request, caller_context)`](kernel/process/process.picoc#L348) → the same [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) used by `sleep` | [`request`](library/sys/wait/wait.picoc#L16) and [`status`](library/sys/wait/wait.picoc#L15) are on the parent's userspace stack. The queue is not allocated for the syscall: it is the child PCB's embedded [`waiters`](kernel/process/process.header#L46) on the kernel heap. | Child termination calls [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261), which writes the status and calls the same [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) used by public `wakeup`. Child stopping uses [`notify_process_stopped()`](kernel/signal.picoc#L23) and that same wake primitive. |
+
+The kernel function reference gives every relevant function its own row.
+Syscall-backed operations come first, followed by internal queue and child
+lifecycle helpers.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`wait_for_process_by_pid(request, caller_context)`](kernel/process/process.picoc#L348) | Returns `true` after immediate status/error collection, blocking dispatch normally resumes userspace with saved `IN2 = 1` | Collects status or records the caller's status pointer and blocks it on a child queue | [`current_process()`](kernel/process/process.picoc#L62), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`remove_process()`](kernel/process/process.picoc#L209), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) | **Library functions:** [`waitpid()`](library/sys/wait/wait.picoc#L14)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`wait_for_process_by_pid(request, caller_context)`](kernel/process/process.picoc#L348) | Returns `true` after an immediate invalid, zombie, or stopped result. The normal blocking path switches away and resumes userspace with the successful `IN2 = 1` preset by [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L104); the source-level `false` fallback is reached only if dispatch returns instead of restoring a process. | Validates the parent-child relationship; immediately collects a zombie or stopped status; otherwise copies `request->status` into the parent PCB and blocks it on `&child->waiters`. | [`current_process()`](kernel/process/process.picoc#L62), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`remove_process()`](kernel/process/process.picoc#L209), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) | **Library functions:** [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`SYSCALL_WAITPID`](common/syscall.header#L13)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`sleep_on_wait_queue(queue, caller_context)`](kernel/process/process.picoc#L390) | Returns no value. Normally dispatch leaves through `RTI` and the saved userspace context resumes after a later wakeup; a C return is possible only if dispatch finds an empty process list. | Links the current PCB to `queue`, changes it to `BLOCKED`, saves its activation, and dispatches another process. | [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Library functions:** [`sleep()`](library/unistd/blocking.picoc#L9) through [`SYSCALL_SLEEP`](common/syscall.header#L19); [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
+| [`wakeup_wait_queue(queue)`](kernel/process/process.picoc#L395) | `false` when empty; `true` after waking one FIFO head. | Advances `head`, fixes `tail`, clears the removed PCB's `wait_next` and `waiting_queue_ptr`, and makes it ready or records a completed wait under `STOPPED`. | — | **Library functions:** [`wakeup()`](library/unistd/blocking.picoc#L19) through [`SYSCALL_WAKEUP`](common/syscall.header#L20)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16), [`handle_dma_interrupt()`](kernel/dma.picoc#L40), [`notify_process_stopped()`](kernel/signal.picoc#L23), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) |
 |  |  |  |  |  |
-| [`enqueue_current_process_on_wait_queue(queue)`](kernel/process/process.picoc#L375), [`sleep_on_wait_queue(queue, caller_context)`](kernel/process/process.picoc#L390), [`wakeup_wait_queue(queue)`](kernel/process/process.picoc#L395), [`remove_from_wait_queue(process)`](kernel/process/process.picoc#L176) | Enqueue/remove return no value, wake returns `false` for an empty queue and `true` after removing one waiter, sleep dispatches before resuming userspace | Maintain intrusive wait links and blocked/ready state | [`current_process()`](kernel/process/process.picoc#L62), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182), [`handle_dma_interrupt()`](kernel/dma.picoc#L40), [`handle_syscall()`](kernel/syscall.picoc#L16), [`notify_process_stopped()`](kernel/signal.picoc#L23), [`remove_process()`](kernel/process/process.picoc#L209), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L84), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), [`suspend_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L75), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) |
+| [`enqueue_current_process_on_wait_queue(queue)`](kernel/process/process.picoc#L375) | Returns no value. | Appends the current PCB in constant time, sets its `waiting_queue_ptr`, clears its `wait_next`, and changes it to `BLOCKED`. | [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`sleep()`](library/unistd/blocking.picoc#L9) and [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390)<br>**Kernel functions:** [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`start_dma_uart_receive()`](kernel/dma.picoc#L18) |
+| [`remove_from_wait_queue(process)`](kernel/process/process.picoc#L176) | Returns no value; no change when `waiting_queue_ptr == NULL` or the PCB is not found. | Follows the PCB's queue back-reference, finds its predecessor, reconnects the intrusive list, fixes queue endpoints, and clears membership fields. This is the arbitrary-member removal path, unlike FIFO wakeup. | — | **Kernel functions:** [`remove_process()`](kernel/process/process.picoc#L209), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L84), [`suspend_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L75) |
+| [`process_has_waiting_parent(process)`](kernel/process/process.picoc#L249) | `true` when the target process's queue contains a PCB whose PID equals its `parent_pid`; otherwise `false`. | Traverses `process->waiters` through `wait_next` without mutation. The result tells termination whether status delivery permits immediate child removal. | — | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
+| [`wake_parent_waiting_for_process(process, status)`](kernel/process/process.picoc#L261) | Returns no value. | Drains the process's waiter queue; for its parent PCB, writes through `waiting_status_ptr` and clears that pointer before waking. | [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
+| [`notify_process_stopped(process)`](kernel/signal.picoc#L23) | Returns no value. | Drains the stopped process's waiter queue, writes `128 + stop_signal` through each non-`NULL` `waiting_status_ptr`, clears it, and wakes each waiter. | [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Kernel functions:** [`stop_process()`](kernel/signal.picoc#L37) |
 
 ## 6.2 Process Signals
 [\[↑ TOC\]](#contents)
@@ -4379,6 +4432,35 @@ struct FileDescriptorTable {
 };
 ```
 
+The pointer and allocation relationships are shown below. A descriptor number
+is an array index; it is not a pointer to a separately allocated descriptor
+object. Only a non-`NULL` [`path`](kernel/filesystem/file_descriptor.header#L19)
+leads to an additional allocation.
+
+```mermaid
+flowchart LR
+    subgraph PCBALLOC["kernel heap: one PCB allocation"]
+        PCB["struct Process"]
+        FP["file_descriptors pointer"]
+        PCB --- FP
+    end
+    subgraph TABLEALLOC["kernel heap: table wrapper allocation"]
+        FDT["struct FileDescriptorTable"]
+        EP["entries pointer"]
+        FDT --- EP
+    end
+    subgraph ARRAYALLOC["kernel heap: one contiguous 8-element array"]
+        E0["entries[0]<br/>kind flags offset path"]
+        ED["..."]
+        E7["entries[7]<br/>kind flags offset path"]
+        E0 --- ED --- E7
+    end
+    PATH["separate path string allocation<br/>when path != NULL"]
+    FP --> FDT
+    EP --> E0
+    E0 -. "path" .-> PATH
+```
+
 [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) uses
 [`kmalloc()`](kernel/kmalloc.picoc#L23) once for the wrapper and once for the complete array.
 Individual entries are not separately allocated. It calls
@@ -4421,6 +4503,31 @@ separates ordinary descriptor slots from the shell's three reserved save slots.
 | 5 | Reserved shell save slot for stdin during `<` | Never returned by `open()` |
 | 6 | Reserved shell save slot for stdout during `>` or `>>` | Never returned by `open()` |
 | 7 | Reserved shell save slot for stderr during `2>` or `2>>` | Never returned by `open()` |
+
+The inheritance loop examines only indices `0` through `4`, but "the first
+five are inherited" needs one qualification: slots 0–2 are always copied,
+whereas slots 3–4 are copied only when their
+[`kind`](kernel/filesystem/file_descriptor.header#L16) is
+[`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L13).
+Slots 5–7 are not examined. Every copied entry and path is independent; the
+parent and child do not share Unix-style open-file descriptions.
+
+```mermaid
+flowchart LR
+    subgraph PARENT["parent entries[0..7]"]
+        P02["0, 1, 2<br/>always copy"]
+        P34["3, 4<br/>copy only FILE kind"]
+        P57["5, 6, 7<br/>never examine"]
+    end
+    subgraph CHILD["new child table and array"]
+        C02["0, 1, 2<br/>deep copies"]
+        C34["3, 4<br/>FILE deep copies or FREE"]
+        C57["5, 6, 7<br/>FREE"]
+    end
+    P02 --> C02
+    P34 -->|"conditional"| C34
+    P57 -. "not inherited" .-> C57
+```
 
 [`free_file_descriptor()`](kernel/filesystem/filesystem.picoc#L27) always returns the lowest entry
 whose kind is free among slots 0–4. With all three standard descriptors present, a process can
@@ -6843,7 +6950,7 @@ behind each topic, these are teaching mechanisms, with no deadline guarantees.
 
 | Real-time operating-systems lecture topic | What students can inspect in PicoOS |
 | --- | --- |
-| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`Process`](kernel/process/process.header#L31) list, [Section 4.6, Parent-child relationships, termination, and reaping](#46-parent-child-relationships-termination-and-reaping) explains why termination and removal are separate steps |
+| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`Process`](kernel/process/process.header#L31) list, [Section 4.6, Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection) explains why termination and removal are separate steps |
 | Scheduling and dispatching | The scheduler chooses a ready process, the dispatcher saves and restores its activation record |
 | [`waitpid()`](library/sys/wait/wait.picoc#L14), [`sleep()`](library/unistd/blocking.picoc#L9), and [`wakeup()`](library/unistd/blocking.picoc#L19) | A process blocks in a wait queue until a child, mutex, or other event wakes it |
 | Mutexes | [`mutex_lock()`](library/mutex/mutex.picoc#L18) blocks a contending process and [`mutex_unlock()`](library/mutex/mutex.picoc#L25) wakes a waiting process |
@@ -6991,7 +7098,7 @@ explanation.
   copied descriptor state rather than shared open-file descriptions, as
   described in [Section 7.1, Per-process file-descriptor table](#71-per-process-file-descriptor-table)
 - cyclic process selection (Lazy Round Robin) rather than ready-queue rotation (Round Robin), as described in
-  [Section 5.1.1, Preemptive Cyclic Process Selection (Lazy Round Robin)](#511-preemptive-cyclic-process-selection-lazy-round-robin)
+  [Section 5.1.1, Algorithm and Round Robin comparison](#511-algorithm-and-round-robin-comparison)
 - non-preemptive kernel execution and deferred rescheduling, as explained in
   [Section 2.6.2, Kernel non-preemption and deferred rescheduling](#262-kernel-non-preemption-and-deferred-rescheduling)
 - fixed/default process heap and stack sizing with no dynamic stack growth, as
