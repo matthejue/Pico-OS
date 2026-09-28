@@ -370,6 +370,7 @@ lectures follow.
       - [2.4.2 Process, wait, signal, and memory request structures](#242-process-wait-signal-and-memory-request-structures)
       - [2.4.3 File and directory request structures](#243-file-and-directory-request-structures)
       - [2.4.4 Request-pointer ownership and lifetime](#244-request-pointer-ownership-and-lifetime)
+      - [2.4.5 Loading-bar policy and environment inheritance](#245-loading-bar-policy-and-environment-inheritance)
    - [2.5 Handling system calls and returning to userspace](#25-handling-system-calls-and-returning-to-userspace)
       - [2.5.1 Selecting the return path](#251-selecting-the-return-path)
       - [2.5.2 System-call groups](#252-system-call-groups)
@@ -1061,6 +1062,41 @@ __attribute__((naked))
 void _start(int argc, char *first_argument) {
     start_process(argc, (char **)&first_argument);
 }
+```
+
+The sequence below follows that code from the initial userspace entry to the
+application and back to the kernel. It also shows why [`malloc()`](library/stdlib/malloc.picoc#L35)
+is ready before an application's [`main()`](library/start/start.picoc#L4) begins.
+The heap-bound queries only return addresses and sizes. The linked userspace
+allocator then manages the blocks directly inside the process image. The
+startup portion applies to every PicoOS userspace process. The calls shown
+after `main` begins use the heap exercise from [Section 14.1.2, Exploring
+userspace heap allocation](#1412-exploring-userspace-heap-allocation) as a
+concrete application example.
+
+```mermaid
+sequenceDiagram
+    participant S as Startup library
+    participant H as Userspace heap routines
+    participant E as Environment routines
+    participant A as Application main
+    participant K as Kernel
+    S->>H: init_process_heap()
+    H->>K: Query process heap start and size
+    K-->>H: Return process heap bounds
+    H->>H: heap_init_region()
+    H-->>S: Heap ready
+    S->>E: initialize_environment(initial envp)
+    E->>H: Allocate and copy process environment
+    E-->>S: Environment ready
+    S->>A: main(argc, argv)
+    A->>H: malloc(requested size)
+    H-->>A: Return heap pointer
+    Note over A: Application may also point at a stack object
+    A->>H: free(saved heap pointer)
+    H-->>A: Mark block free and merge adjacent free blocks
+    A-->>S: Return status
+    S->>K: exit(status)
 ```
 
 The naked [`_start()`](library/start/start.picoc#L14) sees the initial stack
@@ -1816,18 +1852,18 @@ local request before invoking the kernel. Kernel startup also constructs a
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`LoadProcessRequest.path`](common/syscall.header#L51) | Path of the `.bin` image | First initialized by [`load()`](library/unistd/process.picoc#L17), [`load()`](library/unistd/process.picoc#L17) / syscall 2, the loader normalizes it and the PCB receives its own [`kmalloc()`](kernel/kmalloc.picoc#L23) path copy |
+| [`LoadProcessRequest.path`](common/syscall.header#L51) | Path of the `.bin` image | First initialized by [`load()`](library/unistd/process.picoc#L17), passed through [`SYSCALL_LOAD_PROCESS`](common/syscall.header#L7), the loader normalizes it and the PCB receives its own [`kmalloc()`](kernel/kmalloc.picoc#L23) path copy |
 | [`LoadProcessRequest.show_loading_bar`](common/syscall.header#L52) | Whether UART transfer progress should be printed | First initialized by [`load()`](library/unistd/process.picoc#L17), read only during loading, derived from `PICOOS_LOADING_BAR` |
-| [`RunProcessRequest.pid`](common/syscall.header#L56) | PID of an existing `NEW` PCB | First initialized by [`run()`](library/unistd/process.picoc#L31) (or kernel [`main()`](kernel/kernel.picoc#L31) for init), [`run()`](library/unistd/process.picoc#L31) / syscall 3, identifies the PCB changed to `READY` |
+| [`RunProcessRequest.pid`](common/syscall.header#L56) | PID of an existing `NEW` PCB | First initialized by [`run()`](library/unistd/process.picoc#L31) (or kernel [`main()`](kernel/kernel.picoc#L31) for init), passed through [`SYSCALL_RUN_PROCESS_WITH_ARGUMENTS`](common/syscall.header#L8), identifies the PCB changed to `READY` |
 | [`RunProcessRequest.arguments`](common/syscall.header#L57) | Space/tab-separated argument string, or `NULL` | First initialized by [`run()`](library/unistd/process.picoc#L31) (or kernel [`main()`](kernel/kernel.picoc#L31) for init), copied into the child's initial process stack, the pointer itself is not retained |
 | [`RunProcessRequest.environment`](common/syscall.header#L58) | Null-terminated array of `NAME=value` pointers | First initialized by [`run()`](library/unistd/process.picoc#L31) (or kernel [`main()`](kernel/kernel.picoc#L31) for init), strings and pointer table are copied into the child's initial stack |
-| [`WaitPidRequest.pid`](common/syscall.header#L62) | Exact child PID | First initialized by [`waitpid()`](library/sys/wait/wait.picoc#L14), [`waitpid()`](library/sys/wait/wait.picoc#L14) / syscall 7, used to find and validate the child |
+| [`WaitPidRequest.pid`](common/syscall.header#L62) | Exact child PID | First initialized by [`waitpid()`](library/sys/wait/wait.picoc#L14), passed through [`SYSCALL_WAITPID`](common/syscall.header#L13), used to find and validate the child |
 | [`WaitPidRequest.status`](common/syscall.header#L63) | Address of caller's status cell | First initialized by [`waitpid()`](library/sys/wait/wait.picoc#L14), immediate status destination or copied into the waiting parent's [`waiting_status_ptr`](kernel/process/process.header#L44) while blocked |
-| [`KillRequest.pid`](common/syscall.header#L67) | Target process | First initialized by [`kill()`](library/signal/signal.picoc#L14), [`kill()`](library/signal/signal.picoc#L14) / syscall 10, lookup only, not retained |
+| [`KillRequest.pid`](common/syscall.header#L67) | Target process | First initialized by [`kill()`](library/signal/signal.picoc#L14), passed through [`SYSCALL_KILL`](common/syscall.header#L16), lookup only, not retained |
 | [`KillRequest.signal_number`](common/syscall.header#L68) | Signal to deliver, 0 probes existence | First initialized by [`kill()`](library/signal/signal.picoc#L14), may change target state or defer termination, but the request is not retained |
-| [`PrctlRequest.option`](common/syscall.header#L73) | Currently only [`PR_SET_PDEATHSIG`](common/prctl.header#L3) | First initialized by [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14) / syscall 11, selects the supported operation |
+| [`PrctlRequest.option`](common/syscall.header#L73) | Currently only [`PR_SET_PDEATHSIG`](common/prctl.header#L3) | First initialized by [`prctl()`](library/sys/prctl/prctl.picoc#L14), passed through [`SYSCALL_PRCTL`](common/syscall.header#L17), selects the supported operation |
 | [`PrctlRequest.argument`](common/syscall.header#L75) | Signal number, or 0 to disable | First initialized by [`prctl()`](library/sys/prctl/prctl.picoc#L14), copied into current PCB [`parent_death_signal`](kernel/process/process.header#L59) |
-| [`ShmOpenRequest.name`](common/syscall.header#L79) | Name used to find an entry in the kernel's shared-memory linked list | First initialized by [`shm_open()`](library/sys/mman/mman.picoc#L15), [`shm_open()`](library/sys/mman/mman.picoc#L15) / syscall 18, a new entry receives a [`kmalloc()`](kernel/kmalloc.picoc#L23) copy |
+| [`ShmOpenRequest.name`](common/syscall.header#L79) | Name used to find an entry in the kernel's shared-memory linked list | First initialized by [`shm_open()`](library/sys/mman/mman.picoc#L15), passed through [`SYSCALL_SHM_OPEN`](common/syscall.header#L26), a new entry receives a [`kmalloc()`](kernel/kmalloc.picoc#L23) copy |
 | [`ShmOpenRequest.size`](common/syscall.header#L80) | Requested shared region size in RETI cells | First initialized by [`shm_open()`](library/sys/mman/mman.picoc#L15), used only when creating a name, an existing entry is not resized |
 
 ### 2.4.3 File and directory request structures
@@ -1845,9 +1881,9 @@ initialize their corresponding request structures before the call.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`OpenRequest.path`](common/file.header#L27) | Relative or absolute PicoOS path to a host-backed file or kernel device | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125), [`open()`](library/fcntl/fcntl.picoc#L5)/[`fopen()`](library/stdio/stdio.picoc#L125) and syscall 22, normalized and copied into the selected descriptor |
+| [`OpenRequest.path`](common/file.header#L27) | Relative or absolute PicoOS path to a host-backed file or kernel device | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125), passed through [`SYSCALL_OPEN`](common/syscall.header#L31), normalized and copied into the selected descriptor |
 | [`OpenRequest.flags`](common/file.header#L28) | Access mode plus [`O_CREAT`](common/file.header#L13), [`O_TRUNC`](common/file.header#L14), or [`O_APPEND`](common/file.header#L15) | First initialized by [`open()`](library/fcntl/fcntl.picoc#L5) or [`fopen()`](library/stdio/stdio.picoc#L125), copied into the descriptor, create/truncate decide open requests and append changes later write positioning |
-| [`IoRequest.file_descriptor`](common/file.header#L32) | Entry number in the current PCB’s eight-entry table | First initialized by [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), or stdio I/O wrappers, used by syscalls 23/24 |
+| [`IoRequest.file_descriptor`](common/file.header#L32) | Entry number in the current PCB’s eight-entry table | First initialized by [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), or stdio I/O wrappers, passed through [`SYSCALL_READ`](common/syscall.header#L32) or [`SYSCALL_WRITE`](common/syscall.header#L33) |
 | [`IoRequest.buffer`](common/file.header#L33) | Userspace destination for read or source for write | First initialized by [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), or stdio I/O wrappers, used directly during the call, for a blocked terminal read the caller's PCB temporarily retains the destination pointer |
 | [`IoRequest.count`](common/file.header#L34) | Maximum cells to read or exact cells to write | First initialized by [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), or stdio I/O wrappers, validated before transfer, retained in terminal pending state only while stdin is blocked |
 | [`IoRequest.protect_uart_control`](common/file.header#L35) | Whether a write must scan for `<ESC>` and protect a matching buffer with `literal-output <count>` | First initialized to `true` by [`write()`](library/unistd/io.picoc#L32), [`fputc()`](library/stdio/stdio.picoc#L204), and [`fputs()`](library/stdio/stdio.picoc#L229), initialized to `false` by [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`read()`](library/unistd/io.picoc#L6), [`fgetc()`](library/stdio/stdio.picoc#L178), [`write_process_exception_message()`](kernel/exception.picoc#L29), and [`list_processes()`](kernel/process/process.picoc#L32), read by [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
@@ -1855,14 +1891,14 @@ initialize their corresponding request structures before the call.
 | [`IoRequest.transferred`](common/file.header#L37) | Bytes already copied by earlier chunks of the same [`read()`](library/unistd/io.picoc#L6) | First initialized to 0 by [`read()`](library/unistd/io.picoc#L6) (or stdio input), updated by [`read()`](library/unistd/io.picoc#L6) and read by [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90) as the next buffer position |
 | [`IoRequest.loading_bar_update`](common/file.header#L38) | Next total byte count that redraws read progress | First initialized by [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90) after the first successful range response, retained and updated for subsequent chunks |
 | [`IoRequest.complete`](common/file.header#L39) | Whether [`read()`](library/unistd/io.picoc#L6) should return instead of invoking another chunk | First initialized to false by [`read()`](library/unistd/io.picoc#L6), set by [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) or [`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90) on completion/error |
-| [`SeekRequest.file_descriptor`](common/file.header#L43) | Regular-file descriptor to reposition | First initialized by [`lseek()`](library/unistd/io.picoc#L66), [`lseek()`](library/unistd/io.picoc#L66) / syscall 26 |
+| [`SeekRequest.file_descriptor`](common/file.header#L43) | Regular-file descriptor to reposition | First initialized by [`lseek()`](library/unistd/io.picoc#L66), passed through [`SYSCALL_LSEEK`](common/syscall.header#L35) |
 | [`SeekRequest.offset`](common/file.header#L44) | Signed displacement | First initialized by [`lseek()`](library/unistd/io.picoc#L66), combined with [`SEEK_SET`](common/file.header#L17), current descriptor offset, or host file size |
 | [`SeekRequest.origin`](common/file.header#L45) | [`SEEK_SET`](common/file.header#L17), [`SEEK_CUR`](common/file.header#L18), or [`SEEK_END`](common/file.header#L19) | First initialized by [`lseek()`](library/unistd/io.picoc#L66), selects the base for the new descriptor offset |
-| [`Dup2Request.old_file_descriptor`](common/file.header#L49) | Descriptor to copy | First initialized by [`dup2()`](library/unistd/io.picoc#L58), syscall 27 leaves the source entry unchanged |
+| [`Dup2Request.old_file_descriptor`](common/file.header#L49) | Descriptor to copy | First initialized by [`dup2()`](library/unistd/io.picoc#L58), [`SYSCALL_DUP2`](common/syscall.header#L36) leaves the source entry unchanged |
 | [`Dup2Request.new_file_descriptor`](common/file.header#L50) | Entry to replace | First initialized by [`dup2()`](library/unistd/io.picoc#L58), the target receives an independent copy of the source fields and path |
-| [`GetCwdRequest.buffer`](common/syscall.header#L84) | Userspace destination | First initialized by [`getcwd()`](library/unistd/working_directory.picoc#L11), [`getcwd()`](library/unistd/working_directory.picoc#L11) / syscall 30, receives the selected directory copy |
+| [`GetCwdRequest.buffer`](common/syscall.header#L84) | Userspace destination | First initialized by [`getcwd()`](library/unistd/working_directory.picoc#L11), passed through [`SYSCALL_GETCWD`](common/syscall.header#L40), receives the selected directory copy |
 | [`GetCwdRequest.size`](common/syscall.header#L85) | Destination capacity | First initialized by [`getcwd()`](library/unistd/working_directory.picoc#L11), prevents copying a path that does not fit |
-| [`ReadDirectoryRequest.path`](common/syscall.header#L89) | Directory to list | First initialized by [`opendir()`](library/dirent/dirent.picoc#L8), [`opendir()`](library/dirent/dirent.picoc#L8) / syscall 32, normalized for the host request |
+| [`ReadDirectoryRequest.path`](common/syscall.header#L89) | Directory to list | First initialized by [`opendir()`](library/dirent/dirent.picoc#L8), passed through [`SYSCALL_READ_DIRECTORY`](common/syscall.header#L42), normalized for the host request |
 | [`ReadDirectoryRequest.buffer`](common/syscall.header#L90) | Userspace listing buffer | First initialized by [`opendir()`](library/dirent/dirent.picoc#L8), receives `d name\n` / `- name\n` records from the host |
 | [`ReadDirectoryRequest.capacity`](common/syscall.header#L91) | Maximum returned cells | First initialized by [`opendir()`](library/dirent/dirent.picoc#L8), bounds the UART response and copy |
 | [`MoveRequest.old_path`](common/syscall.header#L95) | Existing file or directory | First initialized by [`move()`](library/unistd/file_removal.picoc#L12), normalized and sent as the first `move` host request path |
@@ -1887,6 +1923,72 @@ kernel copies that separate pointer into
 remains safe because the caller’s stack is suspended. A blocked or stopped terminal read similarly
 retains the destination buffer and count in the PCB, as shown in
 [Section 7.3, Blocking and completing terminal reads](#73-blocking-and-completing-terminal-reads).
+
+### 2.4.5 Loading-bar policy and environment inheritance
+[\[↑ TOC\]](#contents)
+
+Loading bars for process-image transfers and regular-file reads use two
+different kinds of state. The source-defined
+[`loading_bar_enabled`](config/config.header#L5) flag is compiled separately
+into the bootloader, kernel, and init images. The bootloader's copy controls
+the kernel transfer, and the kernel's copy controls the initial transfer of
+init. Neither copy creates a userspace environment variable.
+
+The userspace policy begins in [`init`](system/init.picoc#L100). Its own copy
+of [`loading_bar_enabled`](config/config.header#L5) is currently `true`, so
+init adds [`PICOOS_LOADING_BAR`](common/loading_bar.header#L5) to its
+heap-backed environment after reading [`config/environment.txt`](config/environment.txt):
+
+```c
+if (loading_bar_enabled) {
+    if (setenv(
+            LOADING_BAR_ENVIRONMENT_VARIABLE,
+            "true",
+            true
+        ) != 0) {
+        init_write_error("init: could not configure loading bar\n");
+        return 1;
+    }
+}
+```
+
+The variable is enabled by its presence. [`load()`](library/unistd/process.picoc#L17)
+copies the result of
+`getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL` into
+[`LoadProcessRequest.show_loading_bar`](common/syscall.header#L52), and
+[`read()`](library/unistd/io.picoc#L6) does the same for
+[`IoRequest.show_loading_bar`](common/file.header#L36). The string value is
+not parsed, so even a present value such as `false` enables the bars.
+
+Init does not give the kernel a persistent environment object. When it calls
+[`run(shell_pid, NULL, NULL)`](system/init.picoc#L124), the library replaces
+the `NULL` environment argument with init's
+[`current_environment()`](library/stdlib/env.picoc#L6). The kernel copies that
+array and its strings into the shell's initial userspace stack in
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125).
+The shell's [`libstart`](library/start/start.picoc#L7) then copies the initial
+`envp` into its own process heap. The shell repeats the same path when it calls
+[`run()`](library/unistd/process.picoc#L31) with a `NULL` environment for an
+application. The resulting inheritance chain is therefore `init` environment
+to shell initial stack and heap, then shell environment to application initial
+stack and heap. The variable used while loading a child comes from the
+caller's environment because [`load()`](library/unistd/process.picoc#L17) runs
+before that child exists.
+
+[`cat.bin`](user/cat.picoc#L104) deliberately removes the inherited variable
+from its own environment before it starts reading:
+
+```c
+unsetenv(LOADING_BAR_ENVIRONMENT_VARIABLE);
+```
+
+This does not change the shell's or init's copy. It makes each later
+[`read()`](library/unistd/io.picoc#L6) set `show_loading_bar` to false. Without
+it, [`copy_file_descriptor()`](user/cat.picoc#L35) would start a separate
+loading-bar sequence for each 64-cell read while `cat` copies and outputs the
+file, causing bars to appear repeatedly among the displayed file contents.
+[`cp.bin`](user/cp.picoc#L16) and [`sed.bin`](user/sed.picoc#L67) remove the
+same variable for their repeated file reads.
 
 ## 2.5 Handling system calls and returning to userspace
 [\[↑ TOC\]](#contents)
@@ -4148,10 +4250,11 @@ are `NULL` for an empty queue. Queue owners initialize those endpoints, while
 membership fields and its own [`waiters`](kernel/process/process.header#L46)
 queue.
 
-Normal blocking insertion sets the running PCB's
+Normal blocking insertion sets the current process PCB's
 [`wait_next`](kernel/process/process.header#L51) to `NULL`, saves the queue in
 [`waiting_queue_ptr`](kernel/process/process.header#L48), appends the PCB, and
-changes it to [`BLOCKED`](kernel/process/process.header#L15). The back-reference
+sets its [`state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_BLOCKED`](kernel/process/process.header#L15). The back-reference
 lets later code remove a PCB without already knowing which owner contains it,
 [`remove_process()`](kernel/process/process.picoc#L209) and terminal-read stop
 and resume handling need this. It is unrelated to the PCB's own
@@ -4179,23 +4282,34 @@ A process may simultaneously own its separate
 [`waiters`](kernel/process/process.header#L46) queue while its own PCB is blocked
 on another queue, ownership does not make the owner an entry in that queue.
 
-The graph below shows why these queues need no separately allocated nodes. Each
-PCB supplies both its successor and its back-reference to the queue. The
-specific child-owned queue and return-value handoff used by
-[`waitpid()`](library/sys/wait/wait.picoc#L14) are explained in
-[Section 6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid).
+The graph below shows the exact-child case and why it needs no separately
+allocated queue nodes. PCB A represents the child being waited on. Its
+embedded [`waiters`](kernel/process/process.header#L46) field is the queue
+object. PCBs B, C, and D represent processes contained in that queue. In the
+normal API only A's parent waits for A, but the queue representation and the
+wakeup code can traverse more than one entry.
 
 ```mermaid
 flowchart LR
-    Q["wait_queue"] -->|head| A["PCB A"]
-    A -->|wait_next| B["PCB B"]
-    B -->|wait_next| C["PCB C"]
-    C -->|wait_next| N["NULL"]
-    Q -->|tail| C
-    A -. waiting_queue_ptr .-> Q
-    B -. waiting_queue_ptr .-> Q
-    C -. waiting_queue_ptr .-> Q
+    subgraph A["PCB A: process being waited on<br/>kernel heap"]
+        AW["waiters: embedded wait_queue"]
+    end
+    AW -->|head| B["PCB B: waiting process<br/>kernel heap"]
+    B -->|wait_next| C["PCB C: waiting process<br/>kernel heap"]
+    C -->|wait_next| D["PCB D: waiting process<br/>kernel heap"]
+    D -->|wait_next| N["NULL"]
+    AW -->|tail| D
+    B -. waiting_queue_ptr .-> AW
+    C -. waiting_queue_ptr .-> AW
+    D -. waiting_queue_ptr .-> AW
 ```
+
+PCB A does not point to a separately allocated queue. The queue is contained
+inside PCB A, and the kernel passes its address as `&child->waiters`. Each
+waiting PCB's [`waiting_queue_ptr`](kernel/process/process.header#L48) points
+back to that embedded object. [Section 6.1.2, Child Waiting with
+`waitpid`](#612-child-waiting-with-waitpid) adds the stack-local request and
+return-value handoff to this relationship.
 
 ### 6.1.1 Blocking with `sleep` and Waking with `wakeup`
 [\[↑ TOC\]](#contents)
@@ -4221,11 +4335,11 @@ sequenceDiagram
     participant D as Dispatcher
     participant E as Event owner
 
-    P->>K: sleep(&queue), syscall 12
+    P->>K: sleep(&queue), sleep syscall
     K->>Q: Append P using PCB.wait_next
     K->>P: RUNNING to BLOCKED
     K->>D: Save activation and select another process
-    E->>K: wakeup(&queue), syscall 13
+    E->>K: wakeup(&queue), wakeup syscall
     K->>Q: Remove FIFO head and clear intrusive links
     K->>P: BLOCKED to READY
     D-->>P: Restore later when selected
@@ -4249,6 +4363,35 @@ local [`status`](library/sys/wait/wait.picoc#L15) variable, and the syscall
 passes the address of [`request`](library/sys/wait/wait.picoc#L16) to the
 kernel. If the child is already stopped or a zombie, the kernel writes the
 status through that pointer immediately.
+
+The complete public wrapper shows both stack-local objects and the request
+pointer passed onward. PicoC allocates `status` and `request` as locals in this
+invocation's userspace stack frame. No call to [`malloc()`](library/stdlib/malloc.picoc#L35),
+[`kmalloc()`](kernel/kmalloc.picoc#L23), or queue allocator is involved:
+
+```c
+int waitpid(int pid) {
+    int status = 0;
+    struct WaitPidRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
+    }
+    return status;
+}
+```
+
+[`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) puts
+`&request` in `IN1`. [`handle_syscall()`](kernel/syscall.picoc#L16) casts that
+same absolute address back to `struct WaitPidRequest *` and passes it to
+[`wait_for_process_by_pid()`](kernel/process/process.picoc#L348). The kernel
+reads `request.pid` during that syscall entry. On the blocking path it copies
+only `request.status`, which is `&status`, into the waiting parent's
+[`waiting_status_ptr`](kernel/process/process.header#L44). It does not retain
+`&request`. The suspended userspace frame keeps both locals alive until the
+parent resumes and returns `status`. The register-level wrapper is explained
+in [Section 9.1.2, Packing arguments and executing the syscall](#912-packing-arguments-and-executing-the-syscall).
 
 If the child has neither stopped nor terminated, the kernel copies
 [`WaitPidRequest.status`](common/syscall.header#L63) into the parent PCB's
@@ -4279,7 +4422,7 @@ sequenceDiagram
     participant K as Kernel wait handling
     participant C as Child (C)
 
-    P->>K: waitpid(C.pid), syscall 7
+    P->>K: waitpid(C.pid), waitpid syscall
     K->>C: Find PCB and check C.parent_pid matches P.pid
     alt C is already ZOMBIE
         K->>C: Read C.exit_status and call remove_process(C)
@@ -4632,6 +4775,31 @@ void mutex_unlock(struct mutex *m) {
 }
 ```
 
+[`testset()`](library/mutex/mutex.picoc#L3) is the small userspace wrapper
+around RETI's atomic `TSL` instruction. It is not a complete mutex operation.
+The inline assembly loads `lock_addr`, atomically reads the old cell while
+writing `1`, and returns that old value through the ordinary PicoC return
+register. An old value of `false` means this process changed an unlocked cell
+to locked and acquired the mutex. An old value of `true` means another process
+already held it.
+
+The following flowchart visualizes the loop in
+[`mutex_lock()`](library/mutex/mutex.picoc#L18) together with the separate
+[`mutex_unlock()`](library/mutex/mutex.picoc#L25) path. A wakeup makes one
+waiting process eligible for scheduling. It does not transfer ownership, so
+the resumed process must execute `testset()` again.
+
+```mermaid
+flowchart TD
+    A["mutex_lock: call testset"] --> B{"Old lock value?"}
+    B -->|false| C["Lock changed from 0 to 1<br/>enter critical section"]
+    B -->|true| D["sleep on mutex.waiters"]
+    D --> E["Resume after wakeup and scheduling"]
+    E --> A
+    C --> F["mutex_unlock: clear lock, then call wakeup"]
+    F -.->|If a process is waiting| E
+```
+
 The attribute table identifies the two pieces of shared state, the library
 function table then connects the operations above to the queue syscalls.
 
@@ -4644,8 +4812,8 @@ function table then connects the operations above to the queue syscalls.
 | --- | --- | --- |
 | [`testset(lock_addr)`](library/mutex/mutex.picoc#L3) | Returns the previous lock value while atomically storing true | None, uses RETI `TSL` |
 | [`mutex_init(m)`](library/mutex/mutex.picoc#L12) | No value, clears the lock and initializes the queue | None |
-| [`mutex_lock(m)`](library/mutex/mutex.picoc#L18) | No value, returns after acquiring the lock, sleeping and retrying while it is held | 12 through [`sleep()`](library/unistd/blocking.picoc#L9) |
-| [`mutex_unlock(m)`](library/mutex/mutex.picoc#L25) | No value, clears the lock and makes at most one waiter eligible | 13 through [`wakeup()`](library/unistd/blocking.picoc#L19) |
+| [`mutex_lock(m)`](library/mutex/mutex.picoc#L18) | No value, returns after acquiring the lock, sleeping and retrying while it is held | [`SYSCALL_SLEEP`](common/syscall.header#L19) through [`sleep()`](library/unistd/blocking.picoc#L9) |
+| [`mutex_unlock(m)`](library/mutex/mutex.picoc#L25) | No value, clears the lock and makes at most one waiter eligible | [`SYSCALL_WAKEUP`](common/syscall.header#L20) through [`wakeup()`](library/unistd/blocking.picoc#L19) |
 
 Only the `TSL` operation itself is atomic. The failed test and subsequent
 [`sleep()`](library/unistd/blocking.picoc#L9) are separate: if the owner unlocks between them, the wakeup can occur
@@ -5606,7 +5774,16 @@ flowchart LR
     end
     FDT -->|entries| FD
     FD -->|path| PATH["separate kmalloc path string"]
-    PATH -. "terminal-device path selects" .-> TERM["global terminal in kernel .data<br/>embedded input_buffer and input_waiters"]
+    subgraph TERM["global Terminal object: kernel .data"]
+        TROOT["Terminal fields"]
+        INPUT["input_buffer[128]<br/>embedded ring storage"]
+        INPUTQ["input_waiters<br/>embedded wait_queue"]
+    end
+    TROOT -->|contains| INPUT
+    TROOT -->|contains| INPUTQ
+    INPUTQ -->|head / tail| READER["waiting reader PCB<br/>kernel heap"]
+    READER -->|waiting_queue_ptr| INPUTQ
+    PATH -. "terminal-device path selects" .-> TROOT
     P -->|"binary_path / working_directory"| STR["separate kmalloc strings"]
     P -->|pending_load| LOAD["ProcessLoad: kmalloc<br/>path copy and unfinished pmalloc image"]
     P -->|shared_memory_attachments| ATT["SharedMemoryAttachment: kmalloc"]
@@ -5617,9 +5794,47 @@ flowchart LR
     SE -->|address| SH["shared data: pmalloc"]
     P -->|waiting_queue_ptr| Q["queue currently containing this PCB<br/>may belong to another PCB, terminal, DMA, or userspace"]
     P -->|wait_next| WP["next PCB in that wait queue or NULL"]
-    P -->|waiting_status_ptr| STATUS["parent's stack-local waitpid status or NULL"]
-    P -->|pending_terminal_read_buffer| BUF["caller buffer for pending read or NULL"]
+    P -->|waiting_status_ptr| STATUS["parent's stack-local waitpid status<br/>inside its process image, or NULL"]
+    P -->|pending_terminal_read_buffer| BUF["pending read destination<br/>caller stack, .data, heap, or shared data"]
 ```
+
+Call-local syscall request structures form a separate relationship that is
+easy to miss in the persistent-object graph. The next diagram uses
+[`WaitPidRequest`](common/syscall.header#L61) as the one representative
+request type. Other userspace wrappers follow the same stack-local pattern,
+although their fields and blocking behavior differ.
+
+```mermaid
+flowchart LR
+    subgraph IMAGE["parent process image: one pmalloc payload"]
+        direction TB
+        DATA[".data<br/>library globals such as environ"]
+        HEAP["userspace heap<br/>malloc environment and application objects"]
+        subgraph FRAME["waitpid function frame: userspace stack"]
+            REQ["WaitPidRequest request<br/>pid and status pointer"]
+            RESULT["int status"]
+        end
+    end
+    REQ -->|status| RESULT
+    REQ -->|"&request through IN1"| ARG["handle_syscall argument<br/>pointer value in a kernel stack frame"]
+    ARG -->|read during syscall| WAIT["wait_for_process_by_pid<br/>kernel stack frame"]
+    PARENT["parent PCB<br/>kernel heap"] -->|waiting_status_ptr| RESULT
+    CHILD["child PCB<br/>kernel heap"] -->|contains| Q["waiters: embedded wait_queue"]
+    Q -->|head / tail| PARENT
+    PARENT -->|waiting_queue_ptr| Q
+```
+
+The request itself remains in the suspended userspace frame. The syscall
+entry changes to the kernel stack before [`handle_syscall()`](kernel/syscall.picoc#L16)
+and [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) execute,
+but passing its address does not copy the object to that stack. Only the
+status-cell address is retained in the PCB. Kernel code can also construct a
+request as one of its own stack locals, such as
+[`init_request`](kernel/kernel.picoc#L33) or the
+[`IoRequest`](common/file.header#L31) in
+[`list_processes()`](kernel/process/process.picoc#L32). Those objects reside in
+kernel stack frames because their declaring functions execute there. Neither
+case creates a kernel-heap request object.
 
 The global process list uses [`Process.next`](kernel/process/process.header#L53).
 A wait queue uses the independent [`Process.wait_next`](kernel/process/process.header#L51).
@@ -5663,7 +5878,7 @@ periphery registers are not additional kernel-global allocations.
 | [`foreground_process_target`](kernel/signal.picoc#L12) | `int` | Signed process ID for terminal control: 0 means no registered owner, positive ID permits terminal signal delivery, negative ID retains input ownership while suppressing that delivery. It is not a PCB pointer |
 | [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART service-routine indices `{1, 4, 2}` copied into periphery configuration. They are not function pointers |
 | [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART priorities `{1, 1, 2}` used during controller initialization |
-| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. It configures kernel boot-time loading progress. The separately linked bootloader has its own copy |
+| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. This kernel-image copy controls the init transfer. The separately linked bootloader and init images each have their own copy, as explained in [Section 2.4.5, Loading-bar policy and environment inheritance](#245-loading-bar-policy-and-environment-inheritance) |
 | [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) | `void (*[OS_INTERRUPT_VECTOR_COUNT])(void)` (5 entries) | `.ivt` array of syscall, timer, UART, exception and DMA handler addresses. The CPU reads these to enter kernel `.text` |
 
 The following example shows three PCBs and the three global pointers into the
@@ -5801,9 +6016,10 @@ struct WaitPidRequest {
 
 The local object is named [`request`](library/sys/wait/wait.picoc#L16), not `waitreq`. Its
 [`pid`](common/syscall.header#L62) field receives the function argument and its
-[`status`](common/syscall.header#L63) field receives the address of a local integer. The following
-complete helper and wrapper from [`wait.picoc`](library/sys/wait/wait.picoc) show how that object
-reaches the kernel:
+[`status`](common/syscall.header#L63) field receives the address of a local integer. The complete
+public wrapper and its stack-local request appear in [Section 6.1.2, Child
+Waiting with `waitpid`](#612-child-waiting-with-waitpid). The assembly helper
+below shows how the wrapper's request address crosses into the kernel:
 
 ```c
 int invoke_waitpid_syscall(int number, int argument) {
@@ -5814,17 +6030,6 @@ int invoke_waitpid_syscall(int number, int argument) {
     asm("INT 0");
     asm("STOREIN BAF IN2 0");
     return result;
-}
-
-int waitpid(int pid) {
-    int status = 0;
-    struct WaitPidRequest request;
-
-    request.pid = pid;
-    request.status = &status;
-    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
-    }
-    return status;
 }
 ```
 
@@ -6737,8 +6942,12 @@ otherwise uses the same public libraries and syscalls as every other process.
 [`open(O_RDONLY)`](library/fcntl/fcntl.picoc#L5), reads at most 256 cells (a file of 256 or more
 cells is rejected), closes the descriptor, and parses newline/CRLF-separated `NAME=value` records.
 Each valid record is copied into the process heap by
-[`setenv(name, value, true)`](library/stdlib/env.picoc#L126). The current configuration establishes
-`PATH=/user`, a build-time setting may additionally create `PICOOS_LOADING_BAR=true`. The function
+[`setenv(name, value, true)`](library/stdlib/env.picoc#L126). The current file establishes
+`PATH=/user`. After reading it, init's separately compiled
+[`loading_bar_enabled`](config/config.header#L5) flag causes init to add
+[`PICOOS_LOADING_BAR=true`](common/loading_bar.header#L5). The variable's complete origin and child-inheritance
+path are explained in [Section 2.4.5, Loading-bar policy and environment
+inheritance](#245-loading-bar-policy-and-environment-inheritance). The function
 table relates configuration parsing and shell restarts to the libraries init uses.
 
 | Init function | Return value / status | Library functions |
@@ -8449,57 +8658,26 @@ int main(void) {
 }
 ```
 
-The test does not call [`init_process_heap()`](library/stdlib/malloc.picoc#L18) itself. Every OS test program is
-linked with [`library/start/libstart.picoc`](library/start/libstart.picoc)
-through `-C library/start/libstart.picoc`. The complete source and the default
-startup it replaces appear earlier in
-[Section 1.1.5, Selecting a startup function with `-C` / `--startup-source`](#115-selecting-a-startup-function-with--c----startup-source). Its
-[`_start()`](library/start/start.picoc#L14) reaches
-[`init_process_heap()`](library/stdlib/malloc.picoc#L18) before the application
-entry point.
+Students can first predict which objects are on the stack, which object is on
+the process heap, and which pointers alias each object. They can then
+single-step the test and compare their drawing with the debugger's stack and
+memory annotations. Useful follow-up tasks are to explain why `p3` must retain
+the allocated address, predict the value written through `a`, and identify the
+address that must be passed to [`free()`](library/stdlib/malloc.picoc#L49).
 
-The sequence diagram separates initialization calls from application calls:
-[`_start()`](library/start/start.picoc#L14) enters [`start_process()`](library/start/start.picoc#L7), which calls [`init_process_heap()`](library/stdlib/malloc.picoc#L18)
-(and therefore [`heap_init_region()`](common/heap.picoc#L49)), then [`initialize_environment()`](library/stdlib/env.picoc#L97). Only
-after both return does it call the test's [`main()`](test/exercise_sheet_4_heap/launcher.picoc#L10),
-its return value is passed to [`exit()`](library/stdlib/exit.picoc#L3).
+The mechanisms needed to check those answers are established earlier. [Section
+3.1, Heap block layout and allocation algorithm](#31-heap-block-layout-and-allocation-algorithm)
+explains allocation, splitting, freeing, and merging. [Section 8.1, Memory
+layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes)
+distinguishes the process stack from the process heap. The startup sequence
+that makes [`malloc()`](library/stdlib/malloc.picoc#L35) available before
+[`main()`](test/exercise_sheet_4_heap/launcher.picoc#L10) is visualized in
+[Section 1.1.5.3, PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence).
 
-```mermaid
-sequenceDiagram
-    participant S as Startup library
-    participant H as Heap routines
-    participant E as Environment routines
-    participant A as Heap exercise
-    participant K as Kernel
-    S->>H: init_process_heap()
-    H->>K: Query heap start and size (syscalls 15 and 16)
-    K-->>H: Process heap bounds
-    H->>H: heap_init_region()
-    H-->>S: Heap ready
-    S->>E: initialize_environment()
-    E-->>S: Environment ready
-    S->>A: main()
-    A->>H: malloc(sizeof(struct point))
-    H-->>A: Heap pointer
-    Note over A: Reassign a pointer to the stack object
-    A->>H: free(p3)
-    H-->>A: Block freed and adjacent free blocks merged
-    A-->>S: Return 0
-    S->>K: exit(0) invokes syscall 6
-```
-
-[`malloc()`](library/stdlib/malloc.picoc#L35) uses first fit and splits a sufficiently large free block,
-[`free()`](library/stdlib/malloc.picoc#L49) marks the block free and merges adjacent free blocks. In this test,
-[`p3`](test/exercise_sheet_4_heap/launcher.picoc#L12) keeps the heap address after
-[`p1`](test/exercise_sheet_4_heap/launcher.picoc#L11) is redirected to
-[`p2`](test/exercise_sheet_4_heap/launcher.picoc#L14). Because
-[`p2.y`](test/exercise_sheet_4_heap/launcher.picoc#L7) is 4, the else branch
-changes [`p2.x`](test/exercise_sheet_4_heap/launcher.picoc#L6) to 1 through
-[`a`](test/exercise_sheet_4_heap/launcher.picoc#L13). The final free uses the
-saved heap pointer. This exercise has only one allocation, allocation after
-freeing and merging are exercised separately in
+After the one-allocation exercise, students can use
 [`basic_free.picoc`](test/basic_free.picoc) and
-[`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc).
+[`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc) to
+test their understanding of reuse and merging with longer allocation traces.
 
 ### 14.1.3 Editing and executing symbolic RETI assembly
 [\[↑ TOC\]](#contents)
@@ -8614,21 +8792,16 @@ scenario adds messages around lock acquisition, yielding, and unlocking so
 students can follow the order in its
 [expected output](test/shared_memory_mutual_exclusion/expected_output.txt).
 
-The flowchart shows why a contending [`mutex_lock()`](library/mutex/mutex.picoc#L18) can sleep instead of
-spinning continuously: it retries [`testset()`](library/mutex/mutex.picoc#L3) after [`sleep()`](library/unistd/blocking.picoc#L9) returns.
-[`mutex_unlock()`](library/mutex/mutex.picoc#L25) clears the lock and calls [`wakeup()`](library/unistd/blocking.picoc#L19), waking a process makes
-it eligible to run, but does not transfer ownership of the lock.
-
-```mermaid
-flowchart TD
-    A["mutex_lock: try testset"] --> B{"Was it already locked?"}
-    B -->|No| C["Enter critical section"]
-    B -->|Yes| D["sleep on mutex wait queue"]
-    D --> E["Resume when scheduled after wakeup"]
-    E --> A
-    C --> F["mutex_unlock: clear lock, then call wakeup"]
-    F -.->|If another process is waiting| E
-```
+As an exercise, students can predict the possible worker order before running
+the test, record each worker's process state at the yield and unlock points,
+and explain why the final counter is two. Removing the lock or moving the
+yield gives a comparison for discussing mutual exclusion and scheduling.
+[Section 6.3, Mutex Locking with Test-and-Set and Wait
+Queues](#63-mutex-locking-with-test-and-set-and-wait-queues) contains the
+implementation and the lock, sleep, wakeup, and retry flowchart
+needed to check those explanations. [Section 5.1.1, Algorithm and Round Robin
+comparison](#511-algorithm-and-round-robin-comparison) provides the scheduling
+policy for predicting which ready worker can run next.
 
 # 15. Use of AI in the project
 [\[↑ TOC\]](#contents)
