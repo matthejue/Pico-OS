@@ -146,14 +146,15 @@ bootloader and kernel metadata start the emulated machine, the UART host
 service supplies the program image, and the kernel creates a userspace
 process for it.
 
-The available tests comprise **12 library test classes, 23 OS test classes,
-28 shell test classes, and one boot test class** in [`test/`](test/). Here a class means one
-standalone library source or one system-test directory, rather than each
-assertion inside it. [`run_sys_tests.sh`](run_sys_tests.sh) selects the standalone
-sources, [`run_os_tests.py`](run_os_tests.py) classifies OS and shell scenarios
-by their launcher and input script.
+The test files and commands are documented in
+[Section 13, Test system](#13-test-system). One test can exercise several
+behaviors, so its count is based on one top-level Library source file or one
+runnable Boot, OS, or Shell directory rather than on the number of checks it
+performs.
 
-The table below lists build commands and ways to select these test groups:
+The table below lists the common firmware build and run commands. Test commands
+are kept with their file and execution explanations in
+[Section 13.2.1, Make targets](#1321-make-targets).
 
 | Command | Purpose |
 | --- | --- |
@@ -169,14 +170,6 @@ The table below lists build commands and ways to select these test groups:
 | `make bootload-dma` | Boot through the debug TUI with DMA enabled |
 | `make bootload-notui` | Boot directly in the terminal without the debug TUI |
 | `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
-| `make run-os OS_RUN_PATH=test/hello_world` | Run one configured OS scenario |
-| `make test` | Run the library, OS feature, shell, and boot tests |
-| `make test-lib` | Run the standalone library tests |
-| `make test-sys` | Run the OS feature and shell tests |
-| `make test-os` | Run the OS feature tests |
-| `make test-shell` | Run the shell tests |
-| `make test-boot` | Boot through the EPROM bootloader and run one `echo.bin` command |
-| `make test DMA=1` | Run the complete test workflow with emulator DMA enabled |
 
 ### Release archive layout
 [\[↓ TOC\]](#contents)
@@ -471,7 +464,13 @@ lectures follow.
       - [12.1.2 Command errors and exit statuses](#1212-command-errors-and-exit-statuses)
 1. [Test system](#13-test-system)
    - [13.1 Library, OS, shell, and boot test categories](#131-library-os-shell-and-boot-test-categories)
+      - [13.1.1 Files that make up a test](#1311-files-that-make-up-a-test)
+      - [13.1.2 Library test example](#1312-library-test-example)
+      - [13.1.3 OS test example](#1313-os-test-example)
+      - [13.1.4 Shell test example](#1314-shell-test-example)
+      - [13.1.5 Boot test example](#1315-boot-test-example)
    - [13.2 Test execution](#132-test-execution)
+      - [13.2.1 Make targets](#1321-make-targets)
 1. [Use in operating-systems and real-time operating-systems lectures](#14-use-in-operating-systems-and-real-time-operating-systems-lectures)
    - [14.1 Operating-systems topics](#141-operating-systems-topics)
       - [14.1.1 Inspecting PicoOS execution in the RETI-Emulator](#1411-inspecting-picoos-execution-in-the-reti-emulator)
@@ -7626,38 +7625,163 @@ For the status transfer from a child to the shell, see
 # 13. Test system
 [\[↑ TOC\]](#contents)
 
-The preceding chapters describe the runtime path from compiler output to user
-commands. The test system exercises that path at library, kernel, and
-interactive-shell levels, including the boundaries between the sibling
-projects. The category overview establishes what is counted, then the execution
-section explains the standalone, system, and boot paths.
+The preceding chapters describe how library code and a complete PicoOS system
+execute. The test system turns those paths into repeatable checks. A test
+provides input, runs code in RETI-Emulator, records the produced output, and
+compares that output with a concrete expected value. This section first shows
+the files that provide those pieces, then follows each kind of test from its
+input to its pass or failure result.
 
 ## 13.1 Library, OS, shell, and boot test categories
 [\[↑ TOC\]](#contents)
 
-The repository contains **64 test classes: 12 library, 23 OS feature, 28 shell,
-and 1 boot class**. Here, a class means one top-level library source or one
-test directory, which may contain several programs and checks. The
-table explains how the runners classify them, so a directory containing
-PicoC code is not automatically counted as an OS feature class.
+The repository currently has **61 tests**. The count is **12 Library tests**,
+**1 Boot test**, **23 OS tests**, and **25 Shell tests**. The 48 OS and Shell
+tests form the **System tests** selected by `make test-sys`. One test can check
+many related behaviors. For example, the single
+[`stream_redirection` test](test/stream_redirection/) checks input, output, and
+error redirection, append mode, the null device, and a pipeline.
 
-| Test category | Classes | Classification and execution |
-| --- | ---: | --- |
-| Library | 12 | A top-level `.picoc` file in [`test/`](test/), direct RETI execution with test ISR support, without booting PicoOS |
-| OS feature | 23 | A directory with `launcher.picoc` and exactly the three input lines that load that launcher, run PID 3, and power off |
-| Shell | 28 | Every remaining scenario directory except [`test/boot/`](test/boot/), exercises command handling and application behavior through shell input |
-| Boot | 1 | [`test/boot/`](test/boot/) has no private PicoC program, it runs the release `echo.bin` after the complete bootloader, kernel, init, and shell startup |
+This count follows the selection rules in
+[`run_sys_tests.sh`](run_sys_tests.sh) and
+[`selected_test_dirs()`](run_os_tests.py#L130). Empty directories created by a
+previous emulator run, such as `test/ls/`, `test/shell_file/`, and
+`test/stdio_terminal/`, are not tests because they have neither `input.txt`
+nor `expected_output.txt`. Counting those directories produced the older but
+incorrect total of 28 Shell tests.
 
-Library tests integrate library code with the compiler, emulator, and small
-[test ISR implementation](interrupt_service_routines/isrs.picoc), including
-UART I/O and heap-bound queries. They do not run the full kernel. OS feature,
-shell, and boot tests validate complete PicoOS sessions.
+The diagram shows both the categories and the value used for the final output
+comparison. The Boot test remains its own category and Make target. In the
+current implementation, however, OS and Shell tests also start through the
+EPROM bootloader, so they share more than only the comparison mechanism with
+the Boot test.
 
-For example, [`test/hello_world/input.txt`](test/hello_world/input.txt) contains
-the following three lines. This input makes
-[`run_os_tests.py`](run_os_tests.py#L115) classify the directory as an OS
-feature test, [`launcher.picoc`](test/hello_world/launcher.picoc) performs the
-process orchestration inside PicoOS:
+```mermaid
+flowchart TD
+    T["61 Tests<br/><code>make test</code>"] --> L["12 Library Tests<br/><code>make test-lib</code>"]
+    T --> B["1 Boot Test<br/><code>make test-boot</code>"]
+    T --> S["48 System Tests<br/><code>make test-sys</code>"]
+    S --> O["23 OS Tests<br/><code>make test-os</code>"]
+    S --> H["25 Shell Tests<br/><code>make test-shell</code>"]
+    L --> LM["Expected output from<br/><code>// expected:</code> source metadata"]
+    B --> EF["Expected output from<br/><code>expected_output.txt</code>"]
+    O --> EF
+    H --> EF
+    LM --> LC["Compare actual Library output<br/>with expected output"]
+    EF --> SC["Compare normalized <code>output.txt</code><br/>with <code>expected_output.txt</code>"]
+```
+
+### 13.1.1 Files that make up a test
+[\[↑ TOC\]](#contents)
+
+A Library test is one `.picoc` source file directly in [`test/`](test/). Boot,
+OS, and Shell tests instead use one subdirectory per test. These two real
+examples show the source-controlled files before any generated build or output
+files exist. The top-level source is one complete Library test, while the four
+files below `hello_world/` together form one complete OS test.
+
+```mermaid
+flowchart TD
+    T["<code>test/</code>"] --> L["<code>basic_printf_newline_escape.picoc</code><br/>one Library test"]
+    T --> O["<code>hello_world/</code><br/>one OS test"]
+    O --> I["<code>input.txt</code>"]
+    O --> E["<code>expected_output.txt</code>"]
+    O --> A["<code>launcher.picoc</code>"]
+    O --> P["<code>hello_world.picoc</code>"]
+```
+
+Every runnable Boot, OS, or Shell directory has `input.txt` and
+`expected_output.txt`. The other files depend on what the test needs. A Shell
+test that exercises release commands may need no private PicoC program, while
+an OS test can contain a launcher, several worker programs, a shared header,
+and ordinary data files.
+
+| File or generated file | Role | Test categories |
+| --- | --- | --- |
+| [`test/*.picoc`](test/) | One top-level file is one Library test. Its opening comments declare emulator input, expected output, and linked `.reti_blocks` dependencies. The Library tests have no separate test-specific `.header` files. | Library |
+| `test/<name>/input.txt` | Host-side UTF-8 text read by [`run_os_tests.py`](run_os_tests.py#L522). Each line becomes one command or encoded key sequence sent to the shell after the runner sees `PicoOS> `. | Boot, OS, Shell |
+| `test/<name>/expected_output.txt` | Source-controlled UTF-8 output that the test expects after terminal output has been normalized. | Boot, OS, Shell |
+| `test/<name>/launcher.picoc` | A test-specific user program that coordinates an OS test by loading, starting, waiting for, or checking other programs. Its presence alone does not classify a directory as an OS test. | Every OS test and the [`shell_exit_status_pid` Shell test](test/shell_exit_status_pid/) |
+| `test/<name>/<program>.picoc` | Optional test application or worker. Every `.picoc` file in the directory is compiled and assembled into a `.bin` file under `binary/test/<name>/`. | OS, Shell |
+| `test/<name>/*.header` | Optional definitions shared by test programs. The current shared-memory mutex tests use this form. | OS when needed |
+| Other `test/<name>/*.txt` source files | Optional guest-visible data, command script, or expected-output variant used by the test. The runner copies these files below `binary/test/<name>/`. | OS, Shell |
+| `test/<name>/raw_output.txt` | Generated complete RETI-Emulator stdout, including prompts, typed commands, control characters, and loading bars. | Boot, OS, Shell |
+| `test/<name>/output.txt` | Generated readable output after prompt lines, loading bars, terminal cursor effects, and empty lines have been removed. This is the actual value used for comparison. | Boot, OS, Shell |
+| `test/<library-name>.input`, `.expected_output`, `.output`, `.error`, `.reti`, and compiler files | Generated files derived from a top-level Library source. The `.input` and `.expected_output` values come from its first two metadata comments. | Library |
+
+[`stage_test_directories()`](run_os_tests.py#L176) copies each selected
+directory to `binary/test/<name>/`, which becomes `/test/<name>/` from the
+guest's view. [`build_test_programs()`](run_os_tests.py#L725) compiles every
+test-local `.picoc` file and assembles its staged `.reti` file into a `.bin`
+file in that copied directory. Although `input.txt` is also copied, the Python
+runner reads commands from the original source-controlled file. Guest programs
+can open copied data files through paths such as
+`test/stdio_scanf/values.txt`.
+
+### 13.1.2 Library test example
+[\[↑ TOC\]](#contents)
+
+The complete
+[`basic_printf_newline_escape.picoc`](test/basic_printf_newline_escape.picoc)
+test shows the Library format. `// in:` declares no input. `// expected:` uses
+the emulator metadata spelling `\n` for the expected newline. The dependency
+comment tells the test build to link the stdio library implementation.
+
+```c
+// in:
+// expected:newline\n
+// dependencies: ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdio/stdio.header"
+
+int main() {
+    printf("newline\n");
+    return 0;
+}
+```
+
+[`run_sys_tests.sh`](run_sys_tests.sh#L112) extracts the first two comments to
+`test/basic_printf_newline_escape.input` and
+`test/basic_printf_newline_escape.expected_output`. The compiler links the
+test with its declared stdio dependency. RETI-Emulator runs the resulting RETI
+program with the small
+[`interrupt_service_routines/isrs.picoc`](interrupt_service_routines/isrs.picoc)
+implementation rather than the PicoOS kernel. Emulator test mode consumes the
+declared input and writes the program's output to
+`test/basic_printf_newline_escape.output`.
+
+In the default staged build mode,
+[`run_lib_test_case.sh`](run_lib_test_case.sh#L41) recognizes `input` or `in`,
+`expected` or `exp`, and `datasegment` or `data` metadata comments. It rewrites
+them as `# input:`, `# expected:`, and `# datasegment:` lines at the start of
+the linked `.reti` file for emulator test mode. In direct build mode, the
+compiler receives the `.picoc` source and dependencies directly. In both
+modes, the host comparison value is the `.expected_output` file extracted
+from the source's second line.
+
+[`run_lib_test_case.sh`](run_lib_test_case.sh#L79) removes trailing whitespace
+from each expected and actual line and passes the test only when `diff` finds
+no difference. A compiler error, emulator error, missing output file, or the
+five-second timeout also prevents a pass.
+
+```mermaid
+flowchart LR
+    M["Source metadata in <code>.picoc</code>"] --> R["Compiled RETI program"]
+    M --> E["Generated <code>.expected_output</code>"]
+    R --> A["Actual <code>.output</code>"]
+    E --> C["Exact line comparison"]
+    A --> C
+    C --> P["Pass or fail"]
+```
+
+### 13.1.3 OS test example
+[\[↑ TOC\]](#contents)
+
+An OS test moves the process orchestration into a test-local `launcher.picoc`.
+[`is_os_feature_test()`](run_os_tests.py#L117) classifies a directory as an OS
+test only when it has `launcher.picoc` and its `input.txt` contains exactly the
+three lines shown by the
+[`hello_world` test](test/hello_world/):
 
 ```text
 load test/hello_world/launcher.bin
@@ -7665,70 +7789,218 @@ run 3
 poweroff.bin
 ```
 
-Detailed fixture and runner behavior is in [`test/README.md`](test/README.md).
-The [CI workflow](.github/workflows/run_tests.yml) checks out the compiler's
-`linker_update` branch and the latest version-sorted `v*` release tag of the
-emulator, rebuilds both, and runs PicoOS tests with direct source linking and
-DMA enabled. The diagram distinguishes the standalone library path from the
-complete boot path used by every OS feature, shell, and boot case.
+The shell's `load` built-in creates the launcher as PID 3 in this fresh system.
+Its `run` built-in starts that PID and waits for it. The launcher then loads,
+starts, and waits for the actual test application:
 
-```mermaid
-flowchart TD
-    T["64 test classes"] --> L["12 library classes"]
-    T --> S["52 booted classes"]
-    S --> O["23 OS feature classes"]
-    S --> H["28 shell classes"]
-    S --> B["1 boot class"]
-    L --> LC["Compile and run RETI with test ISRs<br/>Compare metadata-based expected output"]
-    O --> K["Compile and assemble programs<br/>Boot EPROM, kernel, init, shell<br/>Run scenario and compare fixture"]
-    H --> K
-    B --> K
+```c
+// test/hello_world/launcher.picoc
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks
+
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../common/stddef.header"
+
+int main(void) {
+    int pid = load("test/hello_world/hello_world.bin");
+
+    run(pid, NULL, NULL);
+    waitpid(pid);
+    return 0;
+}
 ```
 
-The three related repositories validate different levels: PicoC-Compiler tests
-compile source and commonly compare the result with GCC, RETI-Emulator system
-tests execute assembly programs, PicoOS system tests exercise the complete
-compiler-emulator-bootloader-kernel-userspace chain.
+The launched application is also a complete test-local source file:
+
+```c
+// test/hello_world/hello_world.picoc
+// dependencies: ../../library/stdio/libstdio.reti_blocks
+
+#include "../../library/stdio/stdio.header"
+
+int main(void) {
+    printf("hello world");
+    return 0;
+}
+```
+
+The shell messages around the application's output are intentional parts of
+[`expected_output.txt`](test/hello_world/expected_output.txt):
+
+```text
+process with pid 3 created
+hello world
+process with pid 5 created
+```
+
+The complete path is therefore:
+
+```mermaid
+flowchart LR
+    I["<code>input.txt</code>"] --> S["Shell <code>load</code> and <code>run</code> built-ins"]
+    S --> L["<code>launcher.bin</code>"]
+    L --> H["<code>hello_world.bin</code>"]
+    H --> C["Captured emulator stdout"]
+    C --> O["Normalized <code>output.txt</code>"]
+    O --> D["Comparison"]
+    E["<code>expected_output.txt</code>"] --> D
+    D --> P["Pass or fail"]
+```
+
+This design lets one launcher coordinate several processes, shared memory,
+signals, or scheduler events while the host input remains three simple shell
+commands.
+
+### 13.1.4 Shell test example
+[\[↑ TOC\]](#contents)
+
+A Shell test uses `input.txt` primarily as commands typed into the running
+shell. It does not have the exact OS-test launcher sequence. It may invoke
+release applications directly, run test-local programs, use shell built-ins,
+or send encoded editing keys. [`decode_test_input()`](run_os_tests.py#L461)
+recognizes `\up`, `\down`, `\right`, `\left`, `\home`, `\esc`, `\ctrlU`,
+`\ctrlW`, `\ctrlC`, `\ctrlZ`, `\ctrlL`, and `\b`. After startup, the runner
+stays synchronized with the shell by waiting for each new `PicoOS> ` prompt
+before it sends the next line.
+
+The complete [`ps` Shell test](test/ps/) needs only the two required text
+files. Its [`input.txt`](test/ps/input.txt) runs the release `ps.bin` command
+and then powers off PicoOS:
+
+```text
+ps.bin
+poweroff.bin
+```
+
+Its [`expected_output.txt`](test/ps/expected_output.txt) checks both the shell's
+process-creation messages and the command's process listing:
+
+```text
+process with pid 3 created
+1 system/init.bin
+2 user/shell.bin
+3 user/ps.bin
+process with pid 4 created
+```
+
+For each command, the shell parses the line, loads the selected application,
+starts it, waits for a foreground process, and returns to its command loop.
+The host runner then sees the next prompt and sends the next line. A more
+complex Shell test can contain private `.picoc` applications or additional
+text files, but input still begins in `input.txt` and passes through the shell.
+
+```mermaid
+flowchart LR
+    I["<code>input.txt</code>"] --> R["Runner waits for <code>PicoOS&gt;</code>"]
+    R --> S["Shell"]
+    S --> A["Command or test application"]
+    A --> C["Captured UART output"]
+    C --> O["Normalized <code>output.txt</code>"]
+    O --> D["Comparison"]
+    E["<code>expected_output.txt</code>"] --> D
+    D --> P["Pass or fail"]
+```
+
+### 13.1.5 Boot test example
+[\[↑ TOC\]](#contents)
+
+The one [`boot` test directory](test/boot/) has no private PicoC program. Its
+[`input.txt`](test/boot/input.txt) runs a release command after startup:
+
+```text
+echo.bin hello world
+poweroff.bin
+```
+
+Its [`expected_output.txt`](test/boot/expected_output.txt) is:
+
+```text
+process with pid 3 created
+hello world
+process with pid 4 created
+```
+
+`make test-boot` selects only this directory. RETI-Emulator receives
+`binary/boot/bootloader.reti` through its `-e` EPROM option. The bootloader
+requests `kernel/kernel.bin`, the kernel loads `system/init.bin`, Init loads
+`user/shell.bin`, and the runner supplies the two lines above after the shell
+prompts appear. The `echo.bin` process produces `hello world`, then
+`poweroff.bin` ends the emulator run.
+
+```mermaid
+flowchart LR
+    B["EPROM <code>bootloader.reti</code>"] --> K["<code>kernel.bin</code>"]
+    K --> I["<code>init.bin</code>"]
+    I --> S["<code>shell.bin</code>"]
+    S --> E["<code>echo.bin</code>"]
+    E --> C["Captured UART output"]
+    C --> O["Normalized <code>output.txt</code>"]
+    O --> D["Comparison"]
+    X["<code>expected_output.txt</code>"] --> D
+    D --> P["Pass or fail"]
+```
+
+The Boot test has a separate target so its small command sequence can serve as
+the explicit startup check. It is important not to infer a different startup
+path for the System tests from that organization. The current
+[`RUNTIME_BOOT_ARGUMENTS`](run_os_tests.py#L28) are used by all Boot, OS, and
+Shell tests, so every one of those tests also supplies the EPROM bootloader and
+executes the same bootloader, kernel, Init, and shell startup. There is no
+direct-kernel shortcut in the current System test implementation.
 
 ## 13.2 Test execution
 [\[↑ TOC\]](#contents)
 
-The runners isolate every test case instead of resetting and reusing a running
-PicoOS session. The table shows which cases boot PicoOS, build commands remain
-in [Build and run](#build-and-run).
+Each Library test and each Boot, OS, or Shell directory gets a separate
+RETI-Emulator process and temporary peripheral directory. Boot, OS, and Shell
+tests each get a fresh PicoOS boot. Independent tests can run in parallel, but
+no running PicoOS instance is reset and reused for another test. The redesigned
+table uses one unique test representation per row and follows its complete
+data path.
 
-| Execution mode | Scope | Boot strategy |
-| --- | --- | --- |
-| Standalone library runner, [`run_lib_test_case.sh`](run_lib_test_case.sh) | Library programs | No PicoOS boot, one emulator process per program |
-| System runner, [`run_os_tests.py`](run_os_tests.py) | OS feature or shell cases selected with `--kind os` or `--kind shell` | Fresh boot per case, independent cases can run in parallel |
-| System runner, [`run_os_tests.py`](run_os_tests.py) | The one case selected with `--kind boot` | One complete boot, then `echo.bin hello world` and `poweroff.bin` |
+| Test representation | Started by | Input path | Code that runs | Output and pass condition |
+| --- | --- | --- | --- | --- |
+| Top-level Library `.picoc` file | [`run_sys_tests.sh`](run_sys_tests.sh), then [`run_lib_test_case.sh`](run_lib_test_case.sh) | `// in:` is extracted from the source and supplied by RETI-Emulator test mode | The compiled test and declared library dependencies run with the generated `config/isrs.reti` test interrupt service routines, without PicoOS | Emulator output in `<name>.output` is compared with the value extracted from `// expected:`. Trailing whitespace is removed per line. Compile, emulator, timeout, missing-file, or comparison failure prevents a pass. |
+| OS directory | [`run_os_tests.py`](run_os_tests.py) with `--kind os` | The runner waits for `PicoOS> ` before sending each decoded `input.txt` line to emulator stdin. The shell loads and runs `launcher.bin`. | EPROM bootloader, kernel, Init, shell, launcher, and any worker or application binaries | Complete stdout is saved as `raw_output.txt`. [`normalize_os_output()`](run_os_tests.py#L440) applies terminal cursor effects and removes prompts, typed commands, loading bars, and empty lines to produce `output.txt`. [`outputs_match()`](run_os_tests.py#L633) removes trailing whitespace from the complete expected and actual strings and requires equality. |
+| Shell directory | [`run_os_tests.py`](run_os_tests.py) with `--kind shell` | The same prompt-controlled `input.txt` path feeds shell commands and encoded keys. | EPROM bootloader, kernel, Init, shell, and commands or test-local applications named by those lines | The same `raw_output.txt`, normalized `output.txt`, and `expected_output.txt` comparison as an OS test. |
+| [`test/boot/`](test/boot/) | [`run_os_tests.py`](run_os_tests.py) with `--kind boot` | The same prompt-controlled path sends `echo.bin hello world` and `poweroff.bin` from `input.txt` | EPROM bootloader, kernel, Init, shell, and release applications. There is no test-local binary. | The same `raw_output.txt`, normalized `output.txt`, and `expected_output.txt` comparison as OS and Shell tests. |
 
-Normal system tests compile and assemble every program in one test directory,
-start the release-style EPROM bootloader, wait for shell prompts, inject UART
-input, capture raw terminal output, normalize terminal control sequences, and
-compare the result with that directory's `expected_output.txt`. Generated test
-binaries and input fixtures are staged below the generated `binary/test/`
-directory. Observed `output.txt` and `raw_output.txt` files are written beside
-the source fixture, such as [`test/hello_world/`](test/hello_world/).
+All test-local user programs are compiled with
+[`library/start/libstart.picoc`](library/start/libstart.picoc) as their startup
+source. This initializes the process heap, calls the program's `main`, and exits
+through the process syscall.
+In staged build mode, reusable `.reti_blocks` and `.st` files are compiled
+first. `TEST_BUILD_MODE=direct` instead makes the compiler link directly from
+the `.picoc` sources. The execution path and output comparison do not change.
+Library tests have a five-second emulator timeout. Boot, OS, and Shell tests
+have a 120-second timeout.
 
-The compiler's `-C library/start/libstart.picoc` option supplies the
-[Section 1.1.4.3, PicoOS `libstart` startup sequence](#1143-picoos-libstart-startup-sequence), and
-`reti_emulator -a` assembles the resulting `.reti` files. Runtime execution
-uses `-e boot/bootloader.reti`, `-O`, `-n 5`, and `-r 262144`, with kernel
-layout/debug metadata supplied by `-S` and `-D`. Library tests instead read
-input/expected-output metadata, compile one program, apply a five-second
-emulator timeout, and compare output with trailing whitespace removed. Booted
-tests allow 120 seconds per case. Passing `--direct` to a system runner selects
-`picoc_compiler --direct-source-link`, which compiles from PicoC sources instead
-of reusing staged `.reti_blocks`/`.st` artifacts.
+The [CI workflow](.github/workflows/run_tests.yml) calls `make test` with direct
+source linking and DMA enabled. It therefore runs all four categories through
+the same target hierarchy described below.
 
-`make test-sys` runs `make test-os` and `make test-shell`. `make test` runs
-`make test-lib`, `make test-sys`, and finally `make test-boot`. The boot target
-uses the real EPROM image through `-e boot/bootloader.reti`. Its deliberately
-small [`input.txt`](test/boot/input.txt) checks that the bootloader loads the
-kernel, the kernel starts init, init starts the shell, and the shell can load
-and run an ordinary user command. The GitHub Actions workflow calls `make test`,
-so this boot check is also part of CI.
+### 13.2.1 Make targets
+[\[↑ TOC\]](#contents)
+
+The repository uses singular `test` target names. There is no `make tests`
+target or a two-word form such as `make tests boot`. The table lists the actual
+target spelling and its current scope.
+
+| Command | Tests run |
+| --- | --- |
+| `make test` | Builds the release tree, then runs `make test-lib`, `make test-sys`, and `make test-boot`, in that order. With the default empty patterns, this is all 61 tests. |
+| `make test-all` | Alias for `make test`. |
+| `make test-lib` | The 12 top-level Library tests, or the subset selected by `TEST_PATTERN`. |
+| `make test-sys` | Aggregate for `make test-os` followed by `make test-shell`. It does not invoke `make test-boot`. |
+| `make test-os` | The 23 directories recognized by the exact `launcher.picoc` and three-line `input.txt` rule. |
+| `make test-shell` | The 25 runnable non-Boot directories that do not match the OS rule. |
+| `make test-boot` | Only `test/boot/`, using one emulator job. This target is called directly by `make test`, not by `make test-sys`. |
+| `make test_not_passed` | Only Library source paths recorded in `config/not_passed_tests.txt` by the preceding Library run. |
+
+`make run-os` is related but is not a pass or failure test target. It runs the
+directory selected by `OS_RUN_PATH`, produces output files outside debug mode,
+and deliberately skips the `expected_output.txt` comparison. The path is useful
+when inspecting one scenario interactively before running its category target.
 
 # 14. Use in operating-systems and real-time operating-systems lectures
 [\[↑ TOC\]](#contents)

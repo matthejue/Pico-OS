@@ -7,8 +7,10 @@ This directory contains four kinds of tests:
 - shell tests whose `input.txt` exercises shell command handling
 - one boot test that runs `echo.bin` after the complete bootloader and PicoOS startup
 
-OS feature and shell tests start at the kernel, init process, and shell. The
-boot test additionally starts at the EPROM bootloader.
+OS feature, shell, and boot tests currently all start at the EPROM bootloader,
+which loads the kernel before the kernel starts init and init starts the shell.
+The boot test is a separately selected, deliberately small startup case with no
+private test program.
 
 ## OS Test Directory Layout
 

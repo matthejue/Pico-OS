@@ -24,7 +24,7 @@ They demonstrate the relevant operating-system concepts, but do not implement
 full POSIX job control or independent terminal queues.
 
 - [Six fixed-action signals](../README.md#64-process-signals) and one
-  [foreground/input owner](../README.md#126-foreground-processes-background-processes-and-job-control-signals)
+  [foreground/input owner](../README.md#1251-foreground-processes-background-processes-and-job-control-signals)
   replace full job control.
 - One [global terminal ring and wait queue](../README.md#72-global-terminal-input-buffer)
   serves per-process pending input reads.
@@ -38,5 +38,5 @@ host-backed file concurrently.
 
 ## Pipelines
 
-The shell supports one [sequential, file-backed pipeline](../README.md#128-sequential-file-backed-pipelines)
+The shell supports one [sequential, file-backed pipeline](../README.md#127-sequential-file-backed-pipelines)
 per command. It has no streaming kernel pipes.
