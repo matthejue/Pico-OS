@@ -1,12 +1,20 @@
 # PicoOS
 [\[↓ TOC\]](#contents)
 
-PicoOS is a small educational operating system for the RETI teaching CPU. It
-was developed as a master’s project to make central operating-system mechanisms
-visible in a compact codebase: bootloading, interrupt vectors and service
-routines, process creation and termination, scheduling and dispatching, wait
-queues, signals, memory allocation, shared memory, file descriptors, and a
-minimal userspace.
+PicoOS is a small educational operating system for the RETI teaching CPU. The
+repository contains a working kernel, bootloader, userspace, and test system.
+This README is also a small operating-systems book. It uses the implementation
+to explain how bootloading, interrupt service routines, system calls, processes,
+scheduling, wait queues, signals, memory, file descriptors, and a shell fit
+together.
+
+You can approach PicoOS in three ways. To try the system, start with
+[Build and run](#build-and-run) and [Use the PicoOS shell](#use-the-picoos-shell).
+To study operating-system concepts, follow the numbered chapters from the
+[contents](#contents). To change or rebuild PicoOS, use the separate
+[development workflow](documentation/development_workflow.md). Each chapter
+links the explanation back to the relevant source, data structures, and state
+changes so that the code remains the concrete example.
 
 The current userspace contains **15 distinct libraries**, including the startup
 library in [`library/`](library/), and **18 user applications** in
@@ -30,11 +38,8 @@ RETI-Emulator host. The small scope is intentional: a reader can connect a
 userspace call to its interrupt entry, kernel data-structure changes, and
 eventual context switch.
 
-This README is a report on what was implemented and how the main parts fit
-together. It emphasizes kernel state, data-structure relationships, and lifecycle rather than
-walking through every function statement by statement.
-
-PicoOS is developed together with two sibling projects:
+PicoOS is developed together with two sibling projects. Together, these three
+repositories form the path from PicoC source to an executing operating system:
 
 - [PicoC-Compiler](../PicoC-Compiler/README.md) compiles the PicoC subset of C,
   links multiple translation units, lays out interrupt, code, and data
@@ -46,20 +51,23 @@ PicoOS is developed together with two sibling projects:
   user programs, and tests
 
 The following diagram follows source files through assembly and runtime loading.
-The bootloader loads the kernel, the kernel loader later loads user programs.
+The three emphasized boxes are the main systems a reader encounters. The
+bootloader loads the kernel, then the kernel loader loads user programs.
 
 ```mermaid
 flowchart LR
-    SRC["PicoOS .picoc sources"] --> CPL["PicoC-Compiler"]
+    SRC["PicoOS Source"]:::focus --> CPL["PicoC Compiler"]:::focus
     CPL --> ASM["linked RETI assembly"]
     CPL --> SEC[".sections and generated memory constants"]
-    ASM --> EMU["RETI-Emulator assembler/runtime"]
+    ASM --> EMU["RETI Emulator"]:::focus
     SEC --> EMU
     EMU --> BIN["five-word header + encoded .bin payload"]
     HOST["UART host service"] -->|serves .bin files| BOOT["EPROM bootloader / kernel process loader"]
     BIN --> HOST
     BOOT -->|copy payload| SRAM["kernel/process images in SRAM"]
     SRAM --> K["PicoOS kernel and userspace"]
+
+    classDef focus fill:#fff2b2,stroke:#8a5a00,stroke-width:4px,color:#111
 ```
 
 The table below identifies what each part passes to the next, including runtime
@@ -76,114 +84,106 @@ requests that are separate from the generated build files.
 ## Build and run
 [\[↓ TOC\]](#contents)
 
-The build expects `picoc_compiler`, `reti_emulator`, and `make` on `PATH`. The
-release-style boot path is:
+The quickest way to run PicoOS is the ready-built archive attached to the
+[latest PicoOS release](https://github.com/matthejue/Pico-OS/releases/latest).
+Download `pico-os-runtime.tar.gz`, extract it into its own directory, enter that
+directory, and use the launcher for your platform. The archive expands its
+runtime files directly, without an extra top-level directory.
 
 ```console
-$ make bootload
+$ curl -fLO https://github.com/matthejue/Pico-OS/releases/latest/download/pico-os-runtime.tar.gz
+$ mkdir pico-os-runtime
+$ tar -xzf pico-os-runtime.tar.gz -C pico-os-runtime
+$ cd pico-os-runtime
+$ ./start-picoos.sh
 ```
 
-This builds the bootloader, kernel, system programs, libraries, user programs,
-and device markers, then starts the RETI debugger with the EPROM bootloader.
-The command corresponds to:
+On Windows, extract the same archive and run `./start-picoos.ps1` from
+PowerShell. On Android, use Termux and the shell launcher. The launchers search
+the archive directory and `PATH` for the tools. When the RETI Emulator or PicoC
+Compiler is absent, `start-picoos` offers to download a compatible release
+beside the archive files. The extracted directory becomes PicoOS `/`, so files
+created from PicoOS remain there. The emulator is required to run PicoOS. The
+compiler is included for related PicoC work.
 
-```console
-$ cd binary
-$ ../run_reti_emulator_isolated.sh -n 5 -e ./boot/bootloader.reti \
-    -d -c -O -r 262144 \
-    -S kernel/kernel.sections -D kernel/kernel.debuginfo
-```
+The launcher options let you choose the runtime mode without editing
+`config/emulator_options.txt`:
 
-The options in this command select the boot image, memory size, and debugger
-metadata as summarized below. Run the command from [`binary/`](binary/) so
-runtime paths resolve to the release files.
+| Behavior | Shell launcher | PowerShell launcher |
+| --- | --- | --- |
+| Use a specific emulator | `--reti-emulator PATH` | `-RetiEmulator PATH` |
+| Enable DMA loading | `--dma` or `-M` | `-Dma` or `-M` |
+| Run directly in the terminal | `--notui` or `-N` | `-NoTui` or `-N` |
+| Show help | `--help` or `-h` | `-Help` or `-h` |
+| Pass remaining emulator options | `-- EMULATOR_ARGS...` | `-- EMULATOR_ARGS...` |
 
-| Option | Role in `make bootload` |
-| --- | --- |
-| `-e` | Selects the EPROM bootloader image |
-| `-r` | Configures 2^18 SRAM cells |
-| `-d -c` | Opens the commented debug TUI |
-| `-S` / `-D` | Supplies the compiler-generated kernel layout and debug information |
-| `-O` | Supplies the modeled OS context from which the first dispatcher `RTI` can leave |
-| `-n 5` | Reserves five IVT entries that the bootloader later loads into SRAM |
+If DMA was not selected on the command line, the launcher asks whether to
+enable it. Direct memory access lets the emulated DMA device copy an executable
+from UART into SRAM while the CPU can schedule other work. This reduces CPU
+copying and avoids repeated polling syscalls during process loading. Choose it
+when studying the asynchronous device path, or answer no to use the simpler
+polling path. [Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
+compares both paths, and [Section 2.8, DMA completion interrupt path](#28-dma-completion-interrupt-path)
+explains how a completed transfer wakes the waiting process.
+
+On its first run, the launcher also offers to download
+[`picoos-cheatsheet.pdf`](https://github.com/matthejue/Pico-OS_Cheatsheet/releases/latest/download/picoos-cheatsheet.pdf)
+into the archive directory. If you decline, it adds that download link to the
+archive README instead. Either choice is recorded on the README's last line so
+the launcher does not ask again. You can use the linked release asset to
+download the cheat sheet directly at any time.
+
+The archive is for running the released system. Contributors who want to build
+from source, use Make targets such as `bootload`, or run a locally built kernel
+should follow the [development workflow](documentation/development_workflow.md).
 
 ### Use the PicoOS shell
 [\[↓ TOC\]](#contents)
 
-Readers who want to use the shell instead of inspecting startup state have two
-paths:
+The release launcher opens the Debug TUI by default. Press `c`, then Enter, to
+continue through bootloader, kernel, and init startup. Press capital `V` to
+open the raw UART terminal, where arrow keys, `Ctrl+C`, and `Ctrl+Z` reach
+PicoOS. `Ctrl+]` returns to the debugger. Lowercase `v` opens the normal
+terminal and Escape returns from it. Alternatively, start with `--notui` on
+the shell launcher or `-NoTui` on PowerShell to use the PicoOS terminal
+directly.
 
-- Run `make bootload-notui` to omit `-d` and connect the terminal directly to PicoOS. It also accepts `DMA=1`.
-
-- Run `make bootload` for the debug-TUI path:
-
-  1. Choose `c`, then Enter, to continue execution.
-  2. Press capital `V` for the raw UART terminal when arrow keys, `Ctrl+C`, or `Ctrl+Z` must reach PicoOS, `Ctrl+]` returns to the debugger.
-  3. Press lowercase `v` for the normal terminal when those sequences are not needed, Escape returns from it.
-
-`make bootload-dma` adds DMA loading to the debug-TUI path.
-
-After startup, this short [shell](user/shell.picoc) session makes loading and
-running visible as separate steps. In a fresh session, init and the shell have
-PIDs 1 and 2, so loading [`echo.picoc`](user/echo.picoc)'s binary creates PID 3.
-Use the reported PID if other programs have already been loaded. Here `PicoOS>` is
-the PicoOS prompt, unlike the host shell's `$` in the build commands above.
-Loading-progress output is omitted from this transcript:
+At the `PicoOS>` prompt, a program can be run by its executable name, a
+relative path, or an absolute PicoOS path inside the runtime directory. The
+shell finds names such as `echo.bin` in `/user`, so normal use does not require separate `load`
+and `run` commands. This compact session sends `echo.bin` through one
+file-backed pipeline, redirects the result to `topics.txt`, and then reads the
+file:
 
 ```console
-PicoOS> load user/echo.bin
-process with pid 3 created
-PicoOS> run 3 hello PicoOS
-hello PicoOS
+PicoOS> echo.bin "kernel\ncontext switcher\nscheduler" | sed.bin s/context switch/dispatcher/ > topics.txt
+PicoOS> cat.bin topics.txt
+kernel
+dispatcher
+scheduler
 ```
 
-The first command creates a [`NEW`](kernel/process/process.header#L12) process, the second makes it ready and waits
-for its exit. [Section 4.4, Process states and transitions](#44-process-states-and-transitions) connects these
-commands to the PCB transitions.
-
-This short session crosses the complete runtime boundary: the generated
-bootloader and kernel metadata start the emulated machine, the UART host
-service supplies the program image, and the kernel creates a userspace
-process for it.
-
-The test files and commands are documented in
-[Section 13, Test system](#13-test-system). One test can exercise several
-behaviors, so its count is based on one top-level Library source file or one
-runnable Boot, OS, or Shell directory rather than on the number of checks it
-performs.
-
-The table below lists the common firmware build and run commands. Test commands
-are kept with their file and execution explanations in
-[Section 13.2.1, Make targets](#1321-make-targets).
-
-| Command | Purpose |
-| --- | --- |
-| `make firmware` | Build the complete firmware/release tree |
-| `make release-tree` / `make release-archive` | Build the release tree or create the release archive |
-| `make clean-firmware` / `make rebuild-firmware` | Remove generated firmware files or rebuild them |
-| `make devices` | Add the terminal and null device markers under [`binary/device`](binary/device/) |
-| `make eprom` / `make kernel` | Build only the EPROM bootloader or kernel image |
-| `make system` / `make user` | Build the complete release tree, including system and user programs |
-| `make run-firmware` | Run the kernel image directly in the debug TUI |
-| `make run-kernel` | Rebuild and run the kernel image directly |
-| `make bootload-debug` | Rebuild bootloader and kernel with source/debug metadata, then boot through the debug TUI |
-| `make bootload-dma` | Boot through the debug TUI with DMA enabled |
-| `make bootload-notui` | Boot directly in the terminal without the debug TUI |
-| `make bootload-notui DMA=1` | Boot directly in the terminal with DMA enabled |
+The pipeline is sequential rather than concurrent. The shell first redirects
+the left command into a temporary file, then makes that file the right
+command's standard input. The final `>` makes the right command's standard
+output name `topics.txt`. [Section 11.7, Sequential file-backed pipelines](#117-sequential-file-backed-pipelines)
+and [Section 11.6, Input/output redirection](#116-inputoutput-redirection)
+explain the implementation. The [development workflow](documentation/development_workflow.md#reaching-the-shell-from-a-source-checkout)
+documents the corresponding source-tree launch choices.
 
 ### Release archive layout
 [\[↓ TOC\]](#contents)
 
-`make release-archive` first rebuilds the generated [`binary/`](binary/)
-release tree, verifies that it contains only release files, and packages its
-contents as `pico-os-runtime.tar.gz`. The archive contains a complete PicoOS
-runtime and the scripts needed to start it in RETI-Emulator, it is not a copy
-of the source repository and contains no test fixtures, PicoC sources, or
-libraries.
+For every `v*` tag, the [release workflow](.github/workflows/build.yml) builds
+and verifies [`binary/`](binary/), then publishes its contents as
+`pico-os-runtime.tar.gz`. The archive contains a complete PicoOS runtime and
+the scripts needed to start it in RETI Emulator. It is not a copy of the
+source repository and contains no test fixtures, PicoC sources, or libraries.
+The [development workflow](documentation/development_workflow.md#building-the-release-tree-and-archive)
+explains how contributors create the same tree and archive locally.
 
-Both `make bootload` and the archive launchers start the emulator in the runtime directory.
-That directory becomes PicoOS `/`. Host `/tmp` is not mounted or added to directory listings.
-Use the updated RETI-Emulator together with the rebuilt PicoOS binaries.
+Host `/tmp` is not mounted or added to directory listings. Use the RETI
+Emulator version offered by the launcher with these binaries.
 
 The following paths show where to find each runtime component in that archive,
 the links point to their generated locations under [`binary/`](binary/).
@@ -192,7 +192,7 @@ the links point to their generated locations under [`binary/`](binary/).
 | --- | --- |
 | [`binary/README.md`](binary/README.md) | Short release-specific startup and host-filesystem instructions. It becomes `README.md` at the archive root. |
 | [`binary/start-picoos.sh`](binary/start-picoos.sh), [`binary/start-picoos.ps1`](binary/start-picoos.ps1) | Linux/macOS/Android and Windows launchers. They find or download the tools, select the boot and kernel metadata, and start the emulator. |
-| [`binary/download-tools.sh`](binary/download-tools.sh), [`binary/download-tools.ps1`](binary/download-tools.ps1) | Download matching released `picoc_compiler` and `reti_emulator` binaries when they are not already available. |
+| [`binary/download-tools.sh`](binary/download-tools.sh), [`binary/download-tools.ps1`](binary/download-tools.ps1) | Helpers used by the launcher to download matching released `picoc_compiler` and `reti_emulator` binaries when they are missing. |
 | [`binary/boot/`](binary/boot/) | [`bootloader.reti`](binary/boot/bootloader.reti), the RETI EPROM image built from [`bootloader.picoc`](boot/bootloader.picoc) that loads and starts the kernel. |
 | [`binary/kernel/`](binary/kernel/) | [`kernel.bin`](binary/kernel/kernel.bin), the loadable image built from [`kernel.picoc`](kernel/kernel.picoc), [`kernel.sections`](binary/kernel/kernel.sections), its linked memory-layout metadata, and [`kernel.debuginfo`](binary/kernel/kernel.debuginfo), its source/debug metadata. |
 | [`binary/system/`](binary/system/) | Loadable system-program binaries, currently [`init.bin`](system/init.picoc). |
@@ -211,6 +211,44 @@ IS61WV25616BLL-10TLI SRAM chips, and a SparkFun Serial Basic USB-to-UART
 adapter. The prices below are the example parts-list prices used for this
 design, including VAT. They were last checked at DigiKey Germany on 12 August
 2026, component and shipping prices can change.
+
+The simplified circuit-style view below keeps the control logic together on
+the FPGA side and shows the external connections that matter to PicoOS. Both
+SRAM chips receive the same address and control signals. Their separate lower
+and upper 16-bit data buses combine into the RETI CPU's 32-bit data bus. UART
+remains an 8-bit serial connection and reaches the host through the USB-to-UART
+adapter.
+
+```mermaid
+flowchart LR
+    subgraph FPGA["Alchitry Cu V2 FPGA"]
+        RETI["32-bit RETI CPU"]:::logic
+        CONTROL["Interrupt controller<br/>SRAM control logic"]:::logic
+        UART["UART controller"]:::logic
+        RETI <--> CONTROL
+        RETI <--> UART
+    end
+
+    AC["A[17:0] address bus<br/>CE, OE, WE, and byte enables"]:::bus
+    LOW["SRAM 0<br/>256K × 16 bit<br/>lower word"]:::memory
+    HIGH["SRAM 1<br/>256K × 16 bit<br/>upper word"]:::memory
+    ADAPTER["CH340C USB-to-UART<br/>adapter"]:::adapter
+    HOST["Host USB"]:::host
+
+    CONTROL -->|shared address and control lines| AC
+    AC --> LOW
+    AC --> HIGH
+    CONTROL ==>|"lower data bus D[15:0]"| LOW
+    CONTROL ==>|"upper data bus D[31:16]"| HIGH
+    UART <-->|"TX / RX, 8-bit serial bytes"| ADAPTER
+    ADAPTER <-->|USB| HOST
+
+    classDef logic fill:#eaf4ff,stroke:#174a7e,stroke-width:2px,color:#111
+    classDef memory fill:#fff8dc,stroke:#7a5b00,stroke-width:3px,color:#111
+    classDef adapter fill:#edf9ed,stroke:#266b2e,stroke-width:2px,color:#111
+    classDef host fill:#f5f5f5,stroke:#555,stroke-width:2px,color:#111
+    classDef bus fill:#fff,stroke:#444,stroke-width:1px,color:#111
+```
 
 - **FPGA: [Alchitry Cu V2](https://www.digikey.de/short/8cmz0qnc) with Lattice
   iCE40-HX8K** ([board schematic](https://cdn.sparkfun.com/assets/2/f/9/9/3/CuSchematic.pdf),
