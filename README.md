@@ -466,9 +466,9 @@ lectures follow.
    - [11.6 Input/output redirection](#116-inputoutput-redirection)
    - [11.7 Sequential file-backed pipelines](#117-sequential-file-backed-pipelines)
 1. [User applications and commands](#12-user-applications-and-commands)
-   - [12.1 Available applications and their library use](#121-available-applications-and-their-library-use)
-   - [12.2 Command behavior and supported options](#122-command-behavior-and-supported-options)
-   - [12.3 Command errors and exit statuses](#123-command-errors-and-exit-statuses)
+   - [12.1 Available applications, library functions, and Host Requests](#121-available-applications-library-functions-and-host-requests)
+      - [12.1.1 Command behavior and supported options](#1211-command-behavior-and-supported-options)
+      - [12.1.2 Command errors and exit statuses](#1212-command-errors-and-exit-statuses)
 1. [Test system](#13-test-system)
    - [13.1 Library, OS, shell, and boot test categories](#131-library-os-shell-and-boot-test-categories)
    - [13.2 Test execution](#132-test-execution)
@@ -4087,8 +4087,10 @@ pending-read behavior are documented in
 
 Six signals are implemented. [`SIGINT`](common/signal.header#L4) and [`SIGKILL`](common/signal.header#L5) terminate, [`SIGSTOP`](common/signal.header#L7),
 [`SIGTSTP`](common/signal.header#L8), and [`SIGTTIN`](common/signal.header#L9) stop, and [`SIGCONT`](common/signal.header#L6) resumes a stopped process. Signal
-0 remains an existence probe for [`kill()`](library/signal/signal.picoc#L14) and performs no action. The table
-below maps the accepted numbers to their fixed actions and reported statuses.
+0 remains an existence probe for [`kill()`](library/signal/signal.picoc#L14) and performs no action. Thus PicoOS
+implements **six signals** but accepts **seven `kill` selectors** when the
+probe is included. The table below maps the accepted numbers to their fixed
+actions and reported statuses.
 
 | Number | Name | Kernel action | Reported status/state |
 | ---: | --- | --- | --- |
@@ -4102,8 +4104,27 @@ below maps the accepted numbers to their fixed actions and reported statuses.
 
 [`signal_number_is_valid()`](kernel/signal.picoc#L14) compares against those six named constants
 explicitly. A numeric value in a gap between them is not accepted merely
-because it lies within the implemented range. Signal 0 is handled separately by
-[`send_signal_by_pid()`](kernel/signal.picoc#L108) because it performs lookup without delivery.
+because it lies within the implemented range. Probe is requested from C as
+`kill(pid, 0)` or from the shell as `kill.bin 0 PID`. It is implemented by
+[`send_signal_by_pid()`](kernel/signal.picoc#L108): the function returns 0 when
+it finds a [`Process`](kernel/process/process.header#L31) whose
+[`state`](kernel/process/process.header#L33) is not
+[`ZOMBIE`](kernel/process/process.header#L17), and `-1` for a missing or zombie
+PID, without calling
+[`send_signal_to_process()`](kernel/signal.picoc#L75). The
+[`kill.bin`](user/kill.picoc#L69) application exposes it, and the
+[`parent_death_signal` test](test/parent_death_signal/launcher.picoc#L22) uses
+it to check whether children survived. No production kernel path generates
+Probe internally.
+
+This null-signal convention is not PicoOS-specific. The
+[POSIX `kill()` specification](https://man7.org/linux/man-pages/man3/kill.3p.html)
+calls signal 0 the *null signal*. Linux implements the convention in
+[its `kill(2)` system call](https://man7.org/linux/man-pages/man2/kill.2.html),
+which sends nothing while checking existence and permission. PicoOS keeps the
+existence-test idea but has no user identities, signal permissions, or
+process-group PID forms. It also returns `-1` for a zombie, while POSIX counts
+a zombie as an existing process until it is collected.
 
 ### 6.2.2 Stopping and continuing a process
 [\[↑ TOC\]](#contents)
@@ -7412,43 +7433,55 @@ The shell described above is one of **18 user applications** in [`user/`](user/)
 [`system/`](system/) is not included in this count. An application
 runs in its own process and cannot directly change its parent shell's
 environment, working directory, or descriptor table. This chapter first maps
-each application to its libraries, then documents command behavior and error
-reporting.
+each application to its library functions and Host Requests, then documents
+command behavior and error reporting.
 
-## 12.1 Available applications and their library use
+## 12.1 Available applications, library functions, and Host Requests
 [\[↑ TOC\]](#contents)
 
 The table lists all 18 programs, links each source at its entry point, and
-identifies the main library calls behind its behavior. These calls come from
-the 15 libraries listed in [Section 9.2, Library overview and dependencies](#92-library-overview-and-dependencies).
-They use the 37 kernel syscalls listed in
-[Section 2.5.2, System-call groups](#252-system-call-groups) when a kernel service is needed.
-Shared command helpers are explained below the table.
+identifies the main library calls and UART Host Requests behind its behavior.
+The calls come from the 15 libraries listed in
+[Section 9.2, Library overview and dependencies](#92-library-overview-and-dependencies)
+and use the 37 kernel syscalls in
+[Section 2.5.2, System-call groups](#252-system-call-groups). Host Requests are
+listed only when the command's execution reaches the emulator-backed host
+service. Loading the command binary itself belongs to its parent shell and is
+not repeated in every row.
 
-| Binary (source link) | Behavior | Library functions |
+Several rows refer to **shared output requests**. Terminal stdout and the null
+device need none. A regular-file output can use `file-size <path>` when
+appending, then `write-at <offset> <path>` and `write stdout`. Terminal stderr
+uses `write stderr` followed by `write stdout`. A protected write containing
+the protocol's Escape byte first uses `literal-output <count>`. This common
+descriptor routing is stated once rather than duplicated for every command's
+ordinary output, help text, and diagnostics. Shared command helpers are
+explained below the table.
+
+| Binary (source link) | Behavior | Library functions / Host Requests |
 | --- | --- | --- |
-| [`shell.bin`](user/shell.picoc#L1448) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11), see [Section 11, Shell](#11-shell) for the other calls |
-| [`echo.bin`](user/echo.picoc#L20) | Prints [`argv[1..]`](user/echo.picoc#L20) separated by spaces, converts `\n` inside an argument, and adds a newline | [`printf()`](library/stdio/stdio.picoc#L354) |
-| [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | [`printf()`](library/stdio/stdio.picoc#L354), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
-| [`cat.bin`](user/cat.picoc#L104) | Copies named files or stdin to stdout, terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
-| [`touch.bin`](user/touch.picoc#L11) | Creates each named file or updates its timestamps while preserving contents | [`touch()`](library/unistd/file_removal.picoc#L20) |
-| [`cp.bin`](user/cp.picoc#L16) | Copies one file to another in 64-cell chunks | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157) |
-| [`mv.bin`](user/mv.picoc#L11) | Moves or renames one file or directory | [`move()`](library/unistd/file_removal.picoc#L12) |
-| [`sed.bin`](user/sed.picoc#L67) | Reads stdin and inserts, changes, or appends text at selected lines | [`lseek()`](library/unistd/io.picoc#L66), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`malloc()`](library/stdlib/malloc.picoc#L35), [`free()`](library/stdlib/malloc.picoc#L49), [`unsetenv()`](library/stdlib/env.picoc#L157) |
-| [`ps.bin`](user/ps.picoc#L11) | Prints every process PID and canonical system-relative binary path | [`list_processes()`](library/unistd/process.picoc#L51) |
-| [`ls.bin`](user/ls.picoc#L13) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | [`opendir()`](library/dirent/dirent.picoc#L8), [`readdir()`](library/dirent/dirent.picoc#L40), [`closedir()`](library/dirent/dirent.picoc#L66) |
-| [`mkdir.bin`](user/mkdir.picoc#L12) | Creates every supplied directory and reports individual failures | [`mkdir()`](library/sys/stat/stat.picoc#L5) |
-| [`pwd.bin`](user/pwd.picoc#L11) | Prints the working directory copied from its PCB | [`getcwd()`](library/unistd/working_directory.picoc#L11) |
-| [`rm.bin`](user/rm.picoc#L11) | Removes every supplied file and continues after errors | [`unlink()`](library/unistd/file_removal.picoc#L4) |
-| [`rmdir.bin`](user/rmdir.picoc#L11) | Removes every supplied empty directory and continues after errors | [`rmdir()`](library/unistd/file_removal.picoc#L8) |
-| [`kill.bin`](user/kill.picoc#L69) | Sends [`SIGKILL`](common/signal.header#L5) by default, a named/numbered signal, or signal 0 as a PID probe | [`kill()`](library/signal/signal.picoc#L14), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4) |
-| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5) |
-| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | [`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5) |
-| [`uname.bin`](user/uname.picoc#L15) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54) |
+| [`shell.bin`](user/shell.picoc#L1448) | Interactive command interpreter that can read newline-separated commands from redirected stdin | [`read()`](library/unistd/io.picoc#L6), [`write_without_uart_escape_check()`](library/unistd/io.picoc#L43), [`lseek()`](library/unistd/io.picoc#L66), [`load()`](library/unistd/process.picoc#L17), [`run()`](library/unistd/process.picoc#L31), [`waitpid()`](library/sys/wait/wait.picoc#L14), [`kill()`](library/signal/signal.picoc#L14), [`prctl()`](library/sys/prctl/prctl.picoc#L14), [`getenv()`](library/stdlib/env.picoc#L115), [`setenv()`](library/stdlib/env.picoc#L126), [`strlen()`](library/string/string.picoc#L60), [`open()`](library/fcntl/fcntl.picoc#L5), [`dup2()`](library/unistd/io.picoc#L58), [`close()`](library/unistd/io.picoc#L54), [`unlink()`](library/unistd/file_removal.picoc#L4), [`chdir()`](library/unistd/working_directory.picoc#L4), [`getcwd()`](library/unistd/working_directory.picoc#L11). See [Section 11, Shell](#11-shell) for the other calls<br>**Host Requests:** `file-size <path>` and `read-range <offset> <count> <path>` for process loading and regular-file stdin<br>`write <path>` then `write stdout` when creating/truncating redirected output<br>`is-directory <path>` for `cd`<br>`unlink <path>` for the pipeline file<br>Shared output requests when its own descriptors require them |
+| [`echo.bin`](user/echo.picoc#L20) | Prints [`argv[1..]`](user/echo.picoc#L20) separated by spaces, converts `\n` inside an argument, and adds a newline | [`printf()`](library/stdio/stdio.picoc#L354)<br>**Host Requests:** shared output requests only |
+| [`count.bin`](user/count.picoc#L20) | Counts forever with an optional busy-loop delay and yields after each displayed value | [`printf()`](library/stdio/stdio.picoc#L354), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4)<br>**Host Requests:** shared output requests only |
+| [`cat.bin`](user/cat.picoc#L104) | Copies named files or stdin to stdout, terminal stdin supports line editing | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`lseek()`](library/unistd/io.picoc#L66), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157)<br>**Host Requests:** `file-size <path>` on named-file open, `read-range <offset> <count> <path>` for regular input, plus shared output requests |
+| [`touch.bin`](user/touch.picoc#L11) | Creates each named file or updates its timestamps while preserving contents | [`touch()`](library/unistd/file_removal.picoc#L20)<br>**Host Request:** `touch <path>`<br>Shared output requests only for help/diagnostics |
+| [`cp.bin`](user/cp.picoc#L16) | Copies one file to another in 64-cell chunks | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54), [`unsetenv()`](library/stdlib/env.picoc#L157)<br>**Host Requests:** source `file-size <path>` and `read-range <offset> <count> <path>`<br>Destination `write <path>`, `write stdout`, then `write-at <offset> <path>` and `write stdout`<br>Shared output requests for diagnostics |
+| [`mv.bin`](user/mv.picoc#L11) | Moves or renames one file or directory | [`move()`](library/unistd/file_removal.picoc#L12)<br>**Host Request:** `move <old path>\n<new path>`<br>Shared output requests for help/diagnostics |
+| [`sed.bin`](user/sed.picoc#L67) | Reads stdin and inserts, changes, appends, or substitutes text at selected lines | [`lseek()`](library/unistd/io.picoc#L66), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`malloc()`](library/stdlib/malloc.picoc#L35), [`free()`](library/stdlib/malloc.picoc#L49), [`unsetenv()`](library/stdlib/env.picoc#L157)<br>**Host Requests:** `file-size <path>` for its `SEEK_END`, `read-range <offset> <count> <path>` for regular stdin, plus shared output requests |
+| [`ps.bin`](user/ps.picoc#L11) | Prints every process PID and canonical system-relative binary path | [`list_processes()`](library/unistd/process.picoc#L51)<br>**Host Requests:** shared output requests only |
+| [`ls.bin`](user/ls.picoc#L13) | Lists `.` or one directory, hides dot entries by default, and supports `-a` | [`opendir()`](library/dirent/dirent.picoc#L8), [`readdir()`](library/dirent/dirent.picoc#L40), [`closedir()`](library/dirent/dirent.picoc#L66)<br>**Host Request:** `ls <path>`<br>Shared output requests |
+| [`mkdir.bin`](user/mkdir.picoc#L12) | Creates every supplied directory and reports individual failures | [`mkdir()`](library/sys/stat/stat.picoc#L5)<br>**Host Request:** `mkdir <path>` for each operand<br>Shared output requests for help/diagnostics |
+| [`pwd.bin`](user/pwd.picoc#L11) | Prints [`working_directory`](kernel/process/process.header#L39) from the current [`Process`](kernel/process/process.header#L31) | [`getcwd()`](library/unistd/working_directory.picoc#L11)<br>**Host Requests:** shared output requests only |
+| [`rm.bin`](user/rm.picoc#L11) | Removes every supplied file and continues after errors | [`unlink()`](library/unistd/file_removal.picoc#L4)<br>**Host Request:** `unlink <path>` for each operand<br>Shared output requests for help/diagnostics |
+| [`rmdir.bin`](user/rmdir.picoc#L11) | Removes every supplied empty directory and continues after errors | [`rmdir()`](library/unistd/file_removal.picoc#L8)<br>**Host Request:** `rmdir <path>` for each operand<br>Shared output requests for help/diagnostics |
+| [`kill.bin`](user/kill.picoc#L69) | Sends [`SIGKILL`](common/signal.header#L5) by default, a named/numbered signal, or signal 0 as a PID probe | [`kill()`](library/signal/signal.picoc#L14), [`atoi()`](library/stdlib/atoi.picoc#L4), [`yield()`](library/schedule/schedule.picoc#L4)<br>**Host Requests:** none on success<br>Shared output requests for help/diagnostics |
+| [`poweroff.bin`](user/poweroff.picoc#L12) | Halts PicoOS | [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5)<br>**Host Requests:** none on shutdown<br>Shared output requests for help/diagnostics |
+| [`reboot.bin`](user/reboot.picoc#L12) | Requests a kernel-controlled reboot | [`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5)<br>**Host Requests after restart:** `load kernel/kernel.bin`, then `load /system/init.bin`<br>Shared output requests for help/diagnostics before a valid reboot |
+| [`uname.bin`](user/uname.picoc#L15) | Prints the PicoOS version stored in [`config/os-release.txt`](config/os-release.txt) | [`open()`](library/fcntl/fcntl.picoc#L5), [`read()`](library/unistd/io.picoc#L6), [`write()`](library/unistd/io.picoc#L32), [`close()`](library/unistd/io.picoc#L54)<br>**Host Requests:** `file-size <path>`, `read-range <offset> <count> <path>`, plus shared output requests |
 
 [`common/user_command.picoc`](common/user_command.picoc) supplies two shared
 application helpers. The table explains their return values, output effects,
-and calls, neither helper keeps persistent state.
+and calls. Neither helper keeps persistent state.
 
 | Kernel function (shared helper) | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
@@ -7458,77 +7491,118 @@ and calls, neither helper keeps persistent state.
 Every user program except [`echo.bin`](user/echo.picoc) uses [`command_is_help()`](common/user_command.picoc#L13) for a sole help
 argument. [`echo.bin`](user/echo.picoc) keeps `-h` and `--help` as ordinary text to print.
 
-## 12.2 Command behavior and supported options
+### 12.1.1 Command behavior and supported options
 [\[↑ TOC\]](#contents)
 
 The application overview identifies each command's main purpose. This section
 records the accepted operands and options, along with behavior that differs
-from familiar Unix commands.
+from familiar Unix commands. Every application except
+[`echo.bin`](user/echo.picoc) accepts a sole `-h` or `--help`. Those two strings
+are ordinary output operands for [`echo.bin`](user/echo.picoc). The executable
+names are also deliberately small and exact. Copying and moving use
+[`cp.bin`](user/cp.picoc) and [`mv.bin`](user/mv.picoc), text editing uses
+[`sed.bin`](user/sed.picoc), and the repository has no `cut.bin`. Changing the
+shell's directory uses the [`cd` built-in](user/shell.picoc#L1290) rather than
+a separate application.
 
-[`echo.bin`](user/echo.picoc) always returns 0 and implements no `-n` option. [`count.bin`](user/count.picoc) accepts
-at most one nonnegative loop-count delay, its delay is not measured in milliseconds, and
-[`yield()`](library/schedule/schedule.picoc#L4) makes its infinite loop a visible scheduler example.
+- [`echo.bin`](user/echo.picoc) converts each literal `\n` pair inside an
+  argument to a newline, separates arguments with spaces, adds a final
+  newline, and always returns 0. It has no `-n` option.
+- [`count.bin`](user/count.picoc) accepts at most one nonnegative busy-loop
+  delay. The value is not milliseconds. [`yield()`](library/schedule/schedule.picoc#L4)
+  after every displayed number makes the infinite loop a visible scheduler
+  example.
+- [`cat.bin`](user/cat.picoc) copies each named path in 64-cell chunks. With no
+  operands, seekable stdin is copied byte-for-byte, so `cat.bin < input.txt`
+  needs no special cat logic. Terminal stdin is line-buffered: Backspace/Delete
+  edits, Enter emits the line, and Ctrl+D finishes. With redirected stdout,
+  editing feedback stays on stderr. An open, read, or write failure returns 1.
+- [`touch.bin`](user/touch.picoc) accepts one or more paths and stops at the
+  first failure. [`cp.bin`](user/cp.picoc) and [`mv.bin`](user/mv.picoc) accept
+  exactly one source and destination and no options. [`cp.bin`](user/cp.picoc)
+  copies in 64-cell chunks and disables
+  [`PICOOS_LOADING_BAR`](common/loading_bar.header#L5). [`mv.bin`](user/mv.picoc)
+  uses one [`move()`](library/unistd/file_removal.picoc#L12) call and matching
+  `move` Host Request. [`ps.bin`](user/ps.picoc) takes no operands and lists
+  every [`Process`](kernel/process/process.header#L31), including its own and
+  any process whose [`state`](kernel/process/process.header#L33) is
+  [`ZOMBIE`](kernel/process/process.header#L17) and has not yet been removed.
+- [`sed.bin`](user/sed.picoc) has no path operand: `sed.bin EXPRESSION` reads
+  seekable stdin and writes stdout. `5iNEW LINE`, `5cNEW LINE`, `5aNEW LINE`,
+  and `/pattern/iNEW LINE` insert before, change, append after, or insert before
+  each matching line. `s/pattern/replacement/` replaces the first literal
+  occurrence on every line. It reads all input into memory and disables the
+  loading bar.
+- [`ls.bin`](user/ls.picoc) lists `.` or one directory. Its only special option
+  is `-a`, which includes names beginning with `.`. Directories receive `d `
+  and other entries `- `. There is no long or recursive mode.
+  [`mkdir.bin`](user/mkdir.picoc) has no `-p`, [`rm.bin`](user/rm.picoc) has no
+  force/recursive mode, and [`rmdir.bin`](user/rmdir.picoc) removes only empty
+  directories. Those three commands accept multiple operands and continue
+  after an individual error.
+- [`kill.bin`](user/kill.picoc) defaults to [`SIGKILL`](common/signal.header#L5).
+  It accepts `0`, or [`SIGINT`](common/signal.header#L4),
+  [`SIGKILL`](common/signal.header#L5), [`SIGCONT`](common/signal.header#L6),
+  [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), and
+  [`SIGTTIN`](common/signal.header#L9) by exact name without a leading `-`, or
+  by number. Probe 0 checks for a non-zombie PID without delivering anything.
+  See [Section 6.2, Process Signals](#62-process-signals). After an accepted
+  request, the command yields so the target can be selected promptly.
+- [`poweroff.bin`](user/poweroff.picoc) invokes
+  [`SYSCALL_SHUTDOWN`](common/syscall.header#L5) and halts PicoOS.
+  Unlike the shell's [`exit`](user/shell.picoc#L1257), it does not let init
+  start a replacement shell. [`reboot.bin`](user/reboot.picoc) invokes
+  [`SYSCALL_REBOOT`](common/syscall.header#L6) for full bootloader and kernel
+  startup without ending the emulator process.
+  [`uname.bin`](user/uname.picoc) prints `PicoOS-` plus the installed
+  [`config/os-release.txt`](config/os-release.txt) version. These commands take
+  no operands.
 
-[`cat.bin`](user/cat.picoc) copies each named path in 64-cell chunks. With no operands, seekable
-stdin is copied byte-for-byte, so `cat.bin < input.txt` needs no special cat
-logic. Terminal stdin is line-buffered: Backspace/Delete edits the current
-line, Enter writes it to stdout, and Ctrl+D finishes. When stdout is redirected
-to a file, editing feedback goes to stderr so `cat.bin > output.txt` remains
-usable. It returns 1 after an open, read, or write failure.
-
-[`touch.bin`](user/touch.picoc) accepts one or more paths and stops at the first failure. [`cp.bin`](user/cp.picoc) and [`mv.bin`](user/mv.picoc) each accept exactly
-one source and destination and have no options. [`cp.bin`](user/cp.picoc) also disables
-`PICOOS_LOADING_BAR`, [`mv.bin`](user/mv.picoc) demonstrates a small multi-path syscall and the
-emulator's matching `move` host request. [`ps.bin`](user/ps.picoc) calls the process-list
-syscall from its own process.
-
-[`sed.bin`](user/sed.picoc) has no path operand: `sed.bin EXPRESSION` reads seekable stdin and
-writes its result to stdout. Input can come from `< input.txt` or from the
-shell's file-backed pipeline. Expressions such as `5iNEW LINE`, `5cNEW LINE`,
-`5aNEW LINE`, and `/pattern/iNEW LINE` respectively insert before, change,
-append after, or insert before every matching line. `s/pattern/replacement/`
-replaces the first literal occurrence of `pattern` on every line. Sed loads
-stdin into memory and disables `PICOOS_LOADING_BAR` so output is not mixed with
-progress text.
-
-[`ls.bin`](user/ls.picoc) receives entries sorted by name from the emulator and hides names
-beginning with `.` unless `-a` is given. It prefixes directories with `d ` and other entries with
-`- `. There is no long format or recursion. [`mkdir.bin`](user/mkdir.picoc) has no
-`-p`, [`rm.bin`](user/rm.picoc) has no force/recursive mode, [`rmdir.bin`](user/rmdir.picoc) removes only empty
-directories. [`mkdir.bin`](user/mkdir.picoc), [`rm.bin`](user/rm.picoc), and [`rmdir.bin`](user/rmdir.picoc) continue through later
-operands after an individual error.
-
-[`kill.bin`](user/kill.picoc) accepts [`SIGINT`](common/signal.header#L4), [`SIGKILL`](common/signal.header#L5), [`SIGCONT`](common/signal.header#L6), [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), and
-[`SIGTTIN`](common/signal.header#L9) by name without a leading `-`, or by number. Signal 0 checks
-existence without delivery. It yields after success so the target can be
-selected promptly. [`poweroff.bin`](user/poweroff.picoc) differs from shell built-in [`exit`](user/shell.picoc#L1257): the former
-uses [`reboot(REBOOT_CMD_POWER_OFF)`](library/sys/reboot/reboot.picoc#L5), which invokes syscall 0
-and halts the OS, whereas the latter lets init start a new shell.
-[`reboot.bin`](user/reboot.picoc) uses
-[`reboot(REBOOT_CMD_RESTART)`](library/sys/reboot/reboot.picoc#L5), which invokes syscall 1 and
-performs a full bootloader and kernel startup without ending the emulator process.
-[`uname.bin`](user/uname.picoc) prints `PicoOS-` followed by the release version installed from
-[`config/os-release.txt`](config/os-release.txt).
-
-The following commands can be entered in the PicoOS shell from a writable
-directory. They show how [`echo.bin`](user/echo.picoc), [`cat.bin`](user/cat.picoc), and [`sed.bin`](user/sed.picoc) work together:
-create two lines, replace text through a file-backed pipeline, then read and
-remove both files. Each line after a prompt is a separate shell command.
+The compact session below builds a small report and uses one
+[`echo.bin`](user/echo.picoc) command to write a five-command PicoOS shell
+script. Redirecting that file into [`shell.bin`](user/shell.picoc) runs each
+line in sequence. It is not a Bash script. The second half controls an infinite
+background counter. Process-creation/loading messages, most script output, and
+unrelated [`ps.bin`](user/ps.picoc) rows are omitted. In this fresh-session
+example the counter is PID 14, while `$!` avoids relying on that number.
 
 ```console
-PicoOS> echo.bin "first\nsecond" > demo.txt
-PicoOS> cat.bin demo.txt | sed.bin "s/second/changed/" > edited.txt
-PicoOS> cat.bin edited.txt
-first
-changed
-PicoOS> rm.bin demo.txt edited.txt
+PicoOS> mkdir.bin demo
+PicoOS> cd demo
+PicoOS> echo.bin "todo\nreview" > n
+PicoOS> cat.bin n | sed.bin "s/todo/done/" > r
+PicoOS> echo.bin "pwd.bin\ntouch.bin e\ncp.bin n c\nmv.bin c b\nls.bin -a" > x
+PicoOS> shell.bin < x
+/demo
+PicoOS> count.bin 0 > /device/null.dev &
+PicoOS> ps.bin
+14 user/count.bin
+PicoOS> kill.bin SIGSTOP $!
+PicoOS> kill.bin SIGCONT $!
+PicoOS> kill.bin $!
+PicoOS> kill.bin 0 $!
+kill: process not found
+PicoOS> echo.bin $?
+1
+PicoOS> ps.bin
+14 user/count.bin
+PicoOS> cd ..
+PicoOS> rm.bin demo/n demo/b demo/e demo/r demo/x
+PicoOS> rmdir.bin demo
 ```
 
-The example omits process-created messages. The shell waits for the producer
-to finish before starting the consumer, as explained under
+The first [`ps.bin`](user/ps.picoc) excerpt shows the live counter. After
+the default [`SIGKILL`](common/signal.header#L5), Probe fails and
+[`echo.bin`](user/echo.picoc) prints the resulting status 1. The second
+[`ps.bin`](user/ps.picoc) still lists PID 14 because it prints every PCB,
+including the counter's uncollected zombie
+[`Process`](kernel/process/process.header#L31). The pipeline retains the useful
+[`cat.bin`](user/cat.picoc) `|` [`sed.bin`](user/sed.picoc) `> file` form.
+PicoOS waits for the producer and backs the single pipe with a temporary file,
+as explained in
 [Section 11.7, Sequential file-backed pipelines](#117-sequential-file-backed-pipelines).
 
-## 12.3 Command errors and exit statuses
+### 12.1.2 Command errors and exit statuses
 [\[↑ TOC\]](#contents)
 
 Commands send ordinary results to stdout and diagnostics/usage failures to
