@@ -2821,6 +2821,53 @@ payload. Allocation performs a first-fit scan and may split a block. Free marks 
 adjacent free blocks. Reallocation shrinks/splits, grows into a following free block, or
 allocates/copies/frees.
 
+For example, [`process_memory_heap`](kernel/pmalloc.picoc#L7) can manage the
+following consecutive blocks. Each [`BlockHeader`](common/heap.header#L5)
+occupies three RETI cells for `size`, `free`, and `next`. Its `size` payload
+cells follow immediately. Lines without arrowheads show physical neighbors in
+increasing address order. Labeled arrows show stored pointers. The order and
+sizes are illustrative.
+
+```mermaid
+flowchart LR
+    ROOT["process_memory_heap<br/>kernel .data"] -->|first_block| H1
+
+    subgraph ARENA["process-image/shared-memory heap · increasing SRAM addresses →"]
+        direction LR
+        H1["BlockHeader A<br/>size = A cells<br/>free = false"] --- P1["payload A<br/>process image A"]
+        P1 --- H2["BlockHeader B<br/>size = B cells<br/>free = false"]
+        H2 --- P2["payload B<br/>shared data"]
+        P2 --- H3["BlockHeader C<br/>size = C cells<br/>free = false"]
+        H3 --- P3["payload C<br/>process image B"]
+        P3 --- H4["BlockHeader D<br/>size = remaining cells<br/>free = true<br/>next = NULL"]
+        H4 --- P4["free payload<br/>available to First Fit"]
+    end
+
+    H1 -->|next| H2
+    H2 -->|next| H3
+    H3 -->|next| H4
+    PCB_A["PCB A.base_address"] --> P1
+    SHARED["SharedMemoryEntry.address"] --> P2
+    PCB_B["PCB B.base_address"] --> P3
+
+    classDef header fill:#fff0cf,stroke:#a66b00,color:#242424
+    classDef payload fill:#e4f1ff,stroke:#3d6fa3,color:#242424
+    classDef free fill:#e7f4e4,stroke:#4d874a,color:#242424
+    class H1,H2,H3,H4 header
+    class P1,P2,P3 payload
+    class P4 free
+```
+
+[`pmalloc()`](kernel/pmalloc.picoc#L20) returns the first payload cell. A
+[`Process`](kernel/process/process.header#L31) PCB stores that address in
+[`Process.base_address`](kernel/process/process.header#L34). A
+[`SharedMemoryEntry`](kernel/shared_memory.header#L8) stores its payload address in
+[`SharedMemoryEntry.address`](kernel/shared_memory.header#L11).
+[`Heap.first_block`](common/heap.header#L12) and each
+[`BlockHeader.next`](common/heap.header#L8) point to headers. If adjacent free
+blocks are merged, their payloads and the intervening header become one larger
+free block.
+
 | Field | Meaning | Used by |
 | --- | --- | --- |
 | [`BlockHeader.size`](common/heap.header#L6) | Number of usable cells after this header and before the next header | First initialized by [`heap_init_region()`](common/heap.picoc#L49), changed by [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), and [`heap_realloc_from()`](common/heap.picoc#L87) |
@@ -2832,10 +2879,8 @@ allocates/copies/frees.
 [\[↑ TOC\]](#contents)
 
 PicoOS uses the common allocator through three sets of wrappers. Sizes are RETI
-memory cells; PicoC scalar values occupy one 32-bit cell. The table maps each
-interface to its descriptor. Their storage and the objects allocated from each
-region are collected in
-[Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes).
+memory cells. PicoC scalar values occupy one 32-bit cell. The table maps each
+interface to its descriptor.
 
 | Heap instance | Descriptor | Allocation / release interface |
 | --- | --- | --- |
@@ -2844,7 +2889,7 @@ region are collected in
 | One process's local allocations | [`process_heap`](library/stdlib/malloc.picoc#L6) | [`malloc()`](library/stdlib/malloc.picoc#L35) / [`free()`](library/stdlib/malloc.picoc#L49) |
 
 Each descriptor anchors an independent block list. Complete process images and
-shared-data allocations use the same outer list; each process heap has its own
+shared-data allocations use the same outer list. Each process heap has its own
 inner list. Freeing a userspace allocation therefore does not release the
 process image containing it.
 
@@ -2855,19 +2900,79 @@ starts at the first block and uses the first free block that is large enough for
 an allocation, [`heap_merge_free_blocks()`](common/heap.picoc#L30) joins neighboring free blocks so
 that a later First Fit search can reuse the combined space.
 
+The diagram runs from low to high SRAM addresses. The `.ivt` section stores the
+five interrupt service routine addresses. Kernel code and globals follow it.
+After the kernel stack,
+[`pmalloc()`](kernel/pmalloc.picoc#L20) manages complete process images and shared-data
+allocations in one region. Each process image contains its own heap, managed by
+[`malloc()`](library/stdlib/malloc.picoc#L35). The example allocation order and
+block widths are illustrative. First Fit can reuse free blocks in another order.
+
+```mermaid
+block-beta
+    columns 15
+    IVT[".ivt"]:1
+    KT["kernel code<br/>.text"]:2
+    KD["global data<br/>.data"]:2
+    KH["kernel heap<br/>kmalloc"]:2
+    KS["kernel stack"]:2
+    P1["process image A<br/>process heap"]:2
+    SM["shared data"]:1
+    P2["process image B<br/>process heap"]:2
+    FREE["free space"]:1
+```
+
 ## 3.3 Kernel SRAM memory map
 [\[↑ TOC\]](#contents)
 
-The comprehensive SRAM map and current numeric offsets are in
-[Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes).
+The checked-in [`kernel/memory_constants.header`](kernel/memory_constants.header)
+and generated [`kernel/kernel.sections`](kernel/kernel.sections) currently give
+the following offsets relative to [`SRAM_BASE`](kernel/memory_constants.header#L1).
+They move when linked kernel code or data changes.
+
+| SRAM offset | Region |
+| ---: | --- |
+| `0..4` | Five-cell `.ivt` table of interrupt service routine addresses |
+| `5..40765` | Kernel code (`.text`), including interrupt service routines |
+| `40766..41496` | Kernel globals (`.data`) |
+| `41497..45592` | Kernel heap, 4096 cells |
+| `45593..48308` | Kernel stack room, ending at the initial free `SP` cell |
+| `48309..262143` | Process-image/shared-memory heap |
+
+The same regions appear below in address order. Widths group regions for
+readability and are not proportional to their sizes.
+
+```mermaid
+block-beta
+    columns 12
+    IVT[".ivt<br/>0–4"]:1
+    KT["kernel .text<br/>5–40765"]:3
+    KD["kernel .data<br/>40766–41496"]:2
+    KH["kernel heap<br/>41497–45592"]:2
+    KS["kernel stack<br/>45593–48308"]:2
+    PM["process images + shared data<br/>48309–262143"]:2
+```
+
+The image payload is `.ivt`, `.text`, then `.data`, as explained in
+[Section 1.1.6, Program sections, interrupt-vector entries, and linker placement](#116-program-sections-interrupt-vector-entries-and-linker-placement).
+The `.ivt` table contains five handler addresses. The handlers themselves are
+functions in `.text`. The five-word binary file header is consumed by the
+[`bootloader`](boot/bootloader.picoc#L42) and is not copied into the `.ivt` cells.
+Heap and stack reservations follow the loaded payload. They are not assembly sections.
+
 For allocator setup, [`init_kernel_heap()`](kernel/kmalloc.picoc#L17) uses
 [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) and
 [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4), while
 [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9) spans
 [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) through
 [`SRAM_MAX_ADDRESS_IN_MEMORY_MAP`](kernel/memory_constants.header#L2), inclusive.
-The constants follow the linked section boundaries, so rebuilding code or data
-can change addresses without changing this organization.
+The final kernel-heap cell, offset 45592, is the stack boundary installed by
+[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). The stack
+grows toward lower addresses from the initial free `SP` at 48308.
+[`PUSH`](#1171-interrupt-safe-push-and-pop) writes the old free cell and lowers `SP`.
+The process-image/shared-memory heap begins at 48309. Absolute SRAM addresses
+add `SRAM_BASE` (`-2147483648`) to these offsets. During loading, the bootloader
+temporarily uses the top of SRAM as its stack.
 
 ## 3.4 Linked code, data, heap, and stack address ranges
 [\[↑ TOC\]](#contents)
@@ -3349,12 +3454,27 @@ startup values stored on the stack.
 ### 4.3.1 Code, data, heap, and stack placement
 [\[↑ TOC\]](#contents)
 
-The process-image inset in
-[Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes)
-orders its sections, userspace heap, and stack within the outer process-image
-allocation. [`malloc()`](library/stdlib/malloc.picoc#L35) manages that inner
-heap. The stack begins at the high end and grows toward it; the final heap cell
-is protected by the active boundary register.
+[Section 3.2, Kernel, process-image/shared-memory, and per-process heap instances](#32-kernel-process-imageshared-memory-and-per-process-heap-instances)
+places each complete process image in SRAM. Within that one
+[`pmalloc()`](kernel/pmalloc.picoc#L20) payload, the linked sections come before
+the process heap and reserved stack room. The drawing runs from low to high
+addresses and is not to scale. A program may have no `.ivt` section.
+
+```mermaid
+block-beta
+    columns 9
+    IVT["optional .ivt"]:1
+    TEXT[".text<br/>program + libraries"]:2
+    DATA[".data<br/>process globals"]:2
+    HEAP["process heap<br/>malloc"]:2
+    STACK["stack room<br/>initial stack at high end"]:2
+```
+
+The relative offsets are defined in
+[Section 3.4, Linked code, data, heap, and stack address ranges](#34-linked-code-data-heap-and-stack-address-ranges).
+[`malloc()`](library/stdlib/malloc.picoc#L35) manages the heap inside the image.
+The stack begins at the high end and grows toward the heap. The active boundary
+register protects the final heap cell.
 
 The binary header determines the size of this complete region. If its
 [`heap_size`](kernel/process/process_loader.picoc#L120) word is `-1`, the loader
@@ -5650,66 +5770,15 @@ can reference the same shared-memory entry.
 ## 8.1 Memory layout, allocation sources, and lifetimes
 [\[↑ TOC\]](#contents)
 
-All kernel and process runtime storage shares physical SRAM. The following
-expanded version of the allocator memory map places regions from low to high
-SRAM offsets, with a closer view of one process image. Arrows along the left
-show address order, not pointers. Allocation order within either heap varies
-with First Fit reuse. The drawing is not to scale.
-
-```mermaid
-flowchart TB
-    subgraph SRAM["SRAM: offsets 0–262143 from SRAM_BASE. Addresses increase downward"]
-        direction TB
-        IVT["0–4: kernel .ivt<br/>five interrupt-service-routine addresses"]
-        TEXT["5–40765: kernel .text<br/>startup, interrupt service routines, ordinary kernel functions"]
-        DATA["40766–41496: kernel .data<br/>process-list pointers. Heap descriptors. Terminal and its ring/queue<br/>DMA queue. Shared-memory registry. Scheduling/configuration globals. Strings"]
-        KH["41497–45592: kernel heap, 4096 cells<br/>BlockHeaders and kmalloc payloads: PCBs, descriptor-table wrappers<br/>descriptor arrays and paths, ProcessLoad, shared-memory entries and attachments"]
-        KS["45593–48308: kernel stack reservation<br/>initial free SP = 48308. Stack grows UP in this drawing toward lower addresses<br/>kernel call frames, local requests, scratch buffers. Kernel interrupt frames"]
-        subgraph PM["48309–262143: process-image/shared-memory heap, managed by pmalloc"]
-            direction TB
-            BH["BlockHeader before each allocation. Free blocks remain on the same list"]
-            subgraph IMAGE["One complete process-image payload"]
-                direction TB
-                PI["optional .ivt, then .text: program and linked libraries"]
-                PD[".data: process globals, including process_heap and environ when linked"]
-                PH["process heap: its own BlockHeaders and malloc payloads<br/>environment copies, directory streams, caller-allocated buffers or mutexes"]
-                PS["process stack: grows toward lower addresses<br/>startup arguments/environment. Wrapper requests. waitpid status<br/>caller-local mutex/queue. Interrupt frames and saved return PC"]
-                PI --> PD --> PH --> PS
-            end
-            SH["Another pmalloc payload: shared data<br/>may contain a shared mutex with an embedded wait_queue"]
-            MORE["Other process images, shared-data allocations, and free blocks"]
-            BH ~~~ IMAGE
-            IMAGE ~~~ SH ~~~ MORE
-        end
-        IVT --> TEXT --> DATA --> KH --> KS --> PM
-    end
-    OTHER["Outside this SRAM layout:<br/>EPROM holds bootloader code/data<br/>memory-mapped periphery holds UART, timer, interrupt, DMA and exception registers"]
-    SRAM ~~~ OTHER
-```
-
-These offsets agree with the current [`kernel/memory_constants.header`](kernel/memory_constants.header)
-and generated [`kernel/kernel.sections`](kernel/kernel.sections). They change with the linked
-code/data size. Absolute SRAM addresses add [`SRAM_BASE`](kernel/memory_constants.header#L1)
-(`-2147483648`) to the offsets. The section order is the one explained in
-[Section 1.1.6, Program sections, interrupt-vector entries, and linker placement](#116-program-sections-interrupt-vector-entries-and-linker-placement):
-the kernel image payload is `.ivt`, `.text`, then `.data`. Its interrupt service
-routines are functions in `.text`. `.ivt` contains their five addresses, not
-the handler bodies. The legacy metadata name `interrupt_service_routines_start`
-is 5, equal to `codesegment_start`. It does not describe a separate region
-between the table and `.text`. The five-word **file header** is consumed by the
-[`bootloader`](boot/bootloader.picoc#L42), not copied into these five SRAM cells.
-Heap and stack reservations follow the loaded payload and are not assembly sections.
-
-The kernel heap starts at [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3).
-Its final cell, offset 45592, is the boundary installed by
-[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). The kernel
-stack grows toward decreasing addresses from the initial free `SP` at 48308.
-[`PUSH`](#1171-interrupt-safe-push-and-pop) writes the old free cell and leaves `SP` one cell lower.
-The next region begins at [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5),
-offset 48309. The bootloader temporarily uses the top of SRAM as its stack
-before transferring control. This is not a second permanent kernel stack.
-
-The table distinguishes complete allocations from fields embedded in them.
+All kernel and process runtime storage shares physical SRAM.
+[Section 3.1, Heap block layout and allocation algorithm](#31-heap-block-layout-and-allocation-algorithm)
+shows individual heap blocks.
+[Section 3.2, Kernel, process-image/shared-memory, and per-process heap instances](#32-kernel-process-imageshared-memory-and-per-process-heap-instances)
+shows the allocation regions, and
+[Section 3.3, Kernel SRAM memory map](#33-kernel-sram-memory-map)
+lists their current offsets.
+The table below distinguishes complete allocations from fields embedded in
+them, showing how individual objects are reached and when their storage is released.
 A pointer field lives with its containing object even when the pointed-to
 storage is in another region. The wait-specific cases are expanded in
 [Section 8.4, Wait requests and queue storage](#84-wait-requests-and-queue-storage).
@@ -6627,7 +6696,9 @@ Each init, shell, or application image is a separate allocation containing its
 `.text`, `.data`, local heap, and stack. Its PCB is in the kernel heap. The
 process blocks above illustrate the loading relationship, not fixed allocation
 addresses or sizes. Shared-memory data uses separate allocations from the same
-region. The complete map and the allocation ownership are explained in
+region. The full SRAM map is in
+[Section 3.3, Kernel SRAM memory map](#33-kernel-sram-memory-map), and the
+allocation ownership is in
 [Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes).
 
 The components use the following startup implementations. Although each entry
