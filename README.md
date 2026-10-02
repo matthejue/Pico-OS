@@ -439,13 +439,23 @@ lectures follow.
    - [3.3 Kernel memory and kernel heap](#33-kernel-memory-and-kernel-heap)
       - [3.3.1 Kernel SRAM map](#331-kernel-sram-map)
       - [3.3.2 Kernel heap blocks and kernel objects](#332-kernel-heap-blocks-and-kernel-objects)
-   - [3.4 Process-image and shared-data heap](#34-process-image-and-shared-data-heap)
+      - [3.3.3 Kernel Heap allocator function reference](#333-kernel-heap-allocator-function-reference)
+   - [3.4 Process and Shared Data Heap](#34-process-and-shared-data-heap)
       - [3.4.1 Process-image allocations](#341-process-image-allocations)
       - [3.4.2 Shared-data allocations](#342-shared-data-allocations)
+      - [3.4.3 Process and Shared Data Heap allocator function reference](#343-process-and-shared-data-heap-allocator-function-reference)
    - [3.5 User-process memory and heap](#35-user-process-memory-and-heap)
       - [3.5.1 Linked sections, heap, and stack ranges](#351-linked-sections-heap-and-stack-ranges)
       - [3.5.2 Per-process heap blocks and active context](#352-per-process-heap-blocks-and-active-context)
+      - [3.5.3 User Process Heap allocator function reference](#353-user-process-heap-allocator-function-reference)
    - [3.6 Heap and allocator function reference](#36-heap-and-allocator-function-reference)
+      - [3.6.1 Common allocator linkage and function reference](#361-common-allocator-linkage-and-function-reference)
+      - [3.6.2 Reallocation decisions](#362-reallocation-decisions)
+      - [3.6.3 Allocation and repeated coalescing example](#363-allocation-and-repeated-coalescing-example)
+         - [3.6.3.1 Initial state and first-fit search](#3631-initial-state-and-first-fit-search)
+         - [3.6.3.2 Allocation splits D](#3632-allocation-splits-d)
+         - [3.6.3.3 Free D and merge its remainder](#3633-free-d-and-merge-its-remainder)
+         - [3.6.3.4 Free C and merge repeatedly at B](#3634-free-c-and-merge-repeatedly-at-b)
    - [3.7 Shared-memory entries and mappings](#37-shared-memory-entries-and-mappings)
       - [3.7.1 Named entries and per-process attachments](#371-named-entries-and-per-process-attachments)
       - [3.7.2 Mapping, unlinking, and deferred destruction](#372-mapping-unlinking-and-deferred-destruction)
@@ -1447,7 +1457,7 @@ table connects the kernel constants to the state they initialize or restore.
 | Kernel constant | Consumer and purpose |
 | --- | --- |
 | [`SRAM_BASE`](kernel/memory_constants.header#L1) | Converts process-relative linked addresses to the absolute SRAM address space |
-| [`SRAM_MAX_ADDRESS_IN_MEMORY_MAP`](kernel/memory_constants.header#L2) | Inclusive final configured SRAM cell, bounds the process-image/shared-memory heap |
+| [`SRAM_MAX_ADDRESS_IN_MEMORY_MAP`](kernel/memory_constants.header#L2) | Inclusive final configured SRAM cell, bounds the Process and Shared Data Heap |
 | [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3), [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4) | Initialize the global [`kernel_heap`](kernel/kmalloc.picoc#L7) descriptor and define its stack boundary |
 | [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) | First cell managed by the global [`process_memory_heap`](kernel/pmalloc.picoc#L7) for process images and shared data |
 | [`KERNEL_CS_START_ASM`](kernel/memory_constants.header#L6), [`KERNEL_DS_START_ASM`](kernel/memory_constants.header#L7) | Inline assembly fragments used when interrupt entries install kernel segments |
@@ -2820,7 +2830,7 @@ terminates it instead of returning.
 
 The table covers every CPU exception emitted by the RETI emulator, the two
 allocation failures routed through dedicated exception or panic handlers, and
-exhaustion of the separate process-image/shared-memory heap. Invalid syscall arguments,
+exhaustion of the separate Process and Shared Data Heap. Invalid syscall arguments,
 missing files, and rejected process images use normal failure return values
 instead and are not fatal runtime errors.
 
@@ -2831,7 +2841,7 @@ instead and are not fatal runtime errors.
 | Illegal instruction | The fetched word is not a valid RETI instruction, or instruction decoding reaches an unsupported opcode | CPU exception cause `3`, fixed vector 3 | [`handle_cpu_exception()`](kernel/exception.picoc#L70) reports an illegal instruction and applies the process-or-kernel policy above. The message helper also treats any unexpected cause value as illegal instruction. |
 | Process heap full | [`malloc()`](library/stdlib/malloc.picoc#L35) or [`realloc()`](library/stdlib/malloc.picoc#L42) cannot satisfy a positive-size allocation | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) invokes the process-heap-full syscall | [`handle_process_heap_full_exception()`](kernel/exception.picoc#L82) reports `Process terminated: heap full` through descriptor 1 and terminates the current process with exception status. |
 | Kernel heap full | [`kmalloc()`](kernel/kmalloc.picoc#L23) or [`krealloc()`](kernel/kmalloc.picoc#L31) cannot satisfy a positive-size allocation | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9) calls the panic handler directly | [`panic_kernel_heap_full()`](kernel/exception.picoc#L89) writes `Kernel panic: kernel heap full` directly over UART and shuts down. |
-| Process-image/shared-memory heap exhausted | [`pmalloc()`](kernel/pmalloc.picoc#L20) cannot reserve a contiguous process image or shared-memory region | Returns [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3), no CPU exception is raised | [`begin_process_load()`](kernel/process/process_loader.picoc#L109) and [`load_process()`](kernel/process/process_loader.picoc#L305) report `error: not enough process memory` and fail the load. [`open_shared_memory()`](kernel/shared_memory.picoc#L92) frees the new entry and returns `-1`. The running process and kernel continue. |
+| Process and Shared Data Heap exhausted | [`pmalloc()`](kernel/pmalloc.picoc#L20) cannot reserve a contiguous process image or shared-memory region | Returns [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3), no CPU exception is raised | [`begin_process_load()`](kernel/process/process_loader.picoc#L109) and [`load_process()`](kernel/process/process_loader.picoc#L305) report `error: not enough process memory` and fail the load. [`open_shared_memory()`](kernel/shared_memory.picoc#L92) frees the new entry and returns `-1`. The running process and kernel continue. |
 
 ### 2.8.3 Exception and stack-boundary function reference
 [\[↑ TOC\]](#contents)
@@ -2879,13 +2889,13 @@ struct Heap {
 
 [`struct Heap`](common/heap.header#L11) is the stable representation of one heap, while its
 [`Heap.first_block`](common/heap.header#L12) entry pointer is mutable. The heap therefore remains
-the same object when [`heap_init_region()`](common/heap.picoc#L49) assigns its first block or a
-later allocator change replaces that block. A bare [`BlockHeader`](common/heap.header#L5) pointer
+the same object when [`heap_init_region()`](common/heap.picoc#L49) assigns its first block.
+Allocation, splitting, and merging update the block list without replacing that entry pointer. A bare [`BlockHeader`](common/heap.header#L5) pointer
 would identify only the current first block. A `struct BlockHeader **` parameter could also let an
 allocator replace that pointer, but it would not represent the heap itself as clearly. Keeping the
 mutable entry pointer in [`struct Heap`](common/heap.header#L11) gives the allocator a stable heap
-object even when that pointer changes. The same representation lets the allocator operate on the kernel,
-process-image/shared-memory, and per-process heaps. Each
+object. The same representation lets the allocator operate on the Kernel Heap,
+Process and Shared Data Heap, and User Process Heap. Each
 [`BlockHeader`](common/heap.header#L5) is stored inside the managed region immediately before its
 payload. Allocation performs a first-fit scan and may split a block. Free marks it and merges
 adjacent free blocks. Reallocation shrinks/splits, grows into a following free block, or
@@ -2925,27 +2935,30 @@ flowchart LR
 [`BlockHeader.next`](common/heap.header#L8) point to headers. If adjacent free
 blocks are merged, their payloads and the intervening header become one larger
 free block. The later heap-type sections apply this representation to the
-kernel, process-image/shared-data, and userspace heaps.
+Kernel Heap, Process and Shared Data Heap, and User Process Heap.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`BlockHeader.size`](common/heap.header#L6) | Number of usable cells after this header and before the next header | First initialized by [`heap_init_region()`](common/heap.picoc#L49), changed by [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), and [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`BlockHeader.free`](common/heap.header#L7) | Whether the associated cells may satisfy an allocation | First initialized by [`heap_init_region()`](common/heap.picoc#L49), initialized for split blocks by [`heap_split_block()`](common/heap.picoc#L14), read/changed by [`heap_alloc_from()`](common/heap.picoc#L65), [`heap_realloc_from()`](common/heap.picoc#L87), [`heap_free_from()`](common/heap.picoc#L146), and [`heap_merge_free_blocks()`](common/heap.picoc#L30) |
-| [`BlockHeader.next`](common/heap.header#L8) | Address of the next in-region header, or `NULL`, splitting inserts and merging removes links | First initialized by [`heap_init_region()`](common/heap.picoc#L49), changed by [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), and [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`Heap.first_block`](common/heap.header#L12) | First header in the managed region, the descriptor owns no separate block array | First initialized by [`heap_init_region()`](common/heap.picoc#L49), used by [`heap_alloc_from()`](common/heap.picoc#L65) and [`heap_merge_free_blocks()`](common/heap.picoc#L30), indirectly used by reallocation/freeing |
+| [`BlockHeader.size`](common/heap.header#L6) | Number of usable cells after this header, excluding the header itself | First initialized by [`heap_init_region()`](common/heap.picoc#L49), read by [`heap_alloc_from()`](common/heap.picoc#L65), read/changed by [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), and [`heap_realloc_from()`](common/heap.picoc#L87) |
+| [`BlockHeader.free`](common/heap.header#L7) | Whether the associated cells may satisfy an allocation | First initialized by [`heap_init_region()`](common/heap.picoc#L49), initialized for new split headers by [`heap_split_block()`](common/heap.picoc#L14), read/changed by [`heap_alloc_from()`](common/heap.picoc#L65), changed by [`heap_free_from()`](common/heap.picoc#L146), read by [`heap_realloc_from()`](common/heap.picoc#L87) and [`heap_merge_free_blocks()`](common/heap.picoc#L30) |
+| [`BlockHeader.next`](common/heap.header#L8) | Address of the next in-region header, or `NULL`. Splitting inserts and merging removes links | First initialized by [`heap_init_region()`](common/heap.picoc#L49), read by [`heap_alloc_from()`](common/heap.picoc#L65), read/changed by [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), and [`heap_realloc_from()`](common/heap.picoc#L87) |
+| [`Heap.first_block`](common/heap.header#L12) | First header in the managed region, the descriptor owns no separate block array | First initialized by [`heap_init_region()`](common/heap.picoc#L49), read by [`heap_alloc_from()`](common/heap.picoc#L65) and [`heap_merge_free_blocks()`](common/heap.picoc#L30). Reallocation/freeing reach it through these functions |
+
+[`3.6.3 Allocation and repeated coalescing example`](#363-allocation-and-repeated-coalescing-example)
+follows these sizes and links through an allocation and two frees.
 
 ## 3.2 SRAM image and heap hierarchy
 [\[↑ TOC\]](#contents)
 
 PicoOS uses one physical SRAM address space and three allocator contexts. The
-kernel heap and the process-image/shared-data heap are peer regions managed by
+kernel heap and the Process and Shared Data Heap are peer regions managed by
 kernel globals. A userspace heap is nested inside every process-image payload.
 Sizes are RETI memory cells, and every PicoC scalar occupies one 32-bit cell.
 
 | Heap context | Descriptor storage | Managed payloads | Interface |
 | --- | --- | --- | --- |
 | Kernel heap | [`kernel_heap`](kernel/kmalloc.picoc#L7) in kernel `.data` | PCBs, paths, descriptor tables, shared-memory metadata, and other kernel objects | [`kmalloc()`](kernel/kmalloc.picoc#L23) / [`kfree()`](kernel/kmalloc.picoc#L38) |
-| Process-image/shared-data heap | [`process_memory_heap`](kernel/pmalloc.picoc#L7) in kernel `.data` | Whole process images and shared-memory data regions | [`pmalloc()`](kernel/pmalloc.picoc#L20) / [`pfree()`](kernel/pmalloc.picoc#L47) |
+| Process and Shared Data Heap | [`process_memory_heap`](kernel/pmalloc.picoc#L7) in kernel `.data` | Whole process images and shared-memory data regions | [`pmalloc()`](kernel/pmalloc.picoc#L20) / [`pfree()`](kernel/pmalloc.picoc#L47) |
 | One userspace heap per process image | [`process_heap`](library/stdlib/malloc.picoc#L6) in that image's `.data` | Allocations made by that process's linked userspace libraries | [`malloc()`](library/stdlib/malloc.picoc#L35) / [`free()`](library/stdlib/malloc.picoc#L49) |
 
 The diagram moves from the complete SRAM layout to outer allocator blocks and
@@ -2960,7 +2973,7 @@ flowchart TB
         KI["Kernel linked image<br/>.ivt + .text + .data"]
         KH["Kernel heap region<br/>kernel_heap"]
         KS["Kernel stack room"]
-        PM["Process-image/shared-data region<br/>process_memory_heap"]
+        PM["Process and Shared Data Heap region<br/>process_memory_heap"]
         KI --- KH --- KS --- PM
     end
 
@@ -2992,7 +3005,7 @@ therefore returns the entire image, including its inner heap and stack room, to
 [\[↑ TOC\]](#contents)
 
 The linked kernel image owns the fixed kernel heap and stack reservations that
-precede the dynamic process-image/shared-data region. This section first places
+precede the dynamic Process and Shared Data Heap region. This section first places
 those ranges in SRAM and then expands the kernel heap into allocator blocks.
 
 ### 3.3.1 Kernel SRAM map
@@ -3010,7 +3023,7 @@ They move when linked kernel code or data changes.
 | Linked kernel image | `40766..41496` | `.data` section | Kernel globals, including [`kernel_heap`](kernel/kmalloc.picoc#L7) and [`process_memory_heap`](kernel/pmalloc.picoc#L7) |
 | Kernel runtime reservation | `41497..45592` | Kernel heap region | 4096 cells managed by [`kernel_heap`](kernel/kmalloc.picoc#L7) |
 | Kernel runtime reservation | `45593..48308` | Kernel stack room | Downward-growing stack ending at the initial free `SP` cell |
-| Dynamic process/shared area | `48309..262143` | Process-image/shared-data heap region | Outer blocks for complete process images and shared data |
+| Dynamic process/shared area | `48309..262143` | Process and Shared Data Heap region | Outer blocks for complete process images and shared data |
 
 The grouped diagram distinguishes linked sections from reservations and the
 later dynamic area. Widths are not proportional to range sizes.
@@ -3077,12 +3090,29 @@ flowchart LR
 The PCB's [`base_address`](kernel/process/process.header#L34) points elsewhere,
 to a process-image payload in the outer heap described next.
 
-## 3.4 Process-image and shared-data heap
+### 3.3.3 Kernel Heap allocator function reference
+[\[↑ TOC\]](#contents)
+
+The functions in [`kernel/kmalloc.picoc`](kernel/kmalloc.picoc) select
+[`kernel_heap`](kernel/kmalloc.picoc#L7) for Kernel Heap allocations.
+They call the shared allocator directly and add the kernel's panic policy for
+failed positive-size requests. The table includes initialization and the
+failure helper from the same file.
+
+| Kernel / Library Function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`kmalloc(size)`](kernel/kmalloc.picoc#L23) (Kernel only) | Payload pointer, `NULL` for nonpositive size, panics if a positive request has no fit | Allocates through the list rooted at [`kernel_heap`](kernel/kmalloc.picoc#L7)'s [`first_block`](common/heap.header#L12), may insert a split header and marks the selected block allocated | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_process()`](kernel/process/process.picoc#L89), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`copy_file_path()`](kernel/filesystem/file_descriptor.picoc#L6), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
+| [`krealloc(ptr, size)`](kernel/kmalloc.picoc#L31) (Kernel only) | Original/replacement payload pointer, `NULL` after freeing on nonpositive size, panics on positive-size failure | Resizes a Kernel Heap block, a null pointer requests a new allocation. Currently unused | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_realloc_from()`](common/heap.picoc#L87) | — |
+| [`kfree(ptr)`](kernel/kmalloc.picoc#L38) (Kernel only) | Returns no value | Marks the preceding [`BlockHeader.free`](common/heap.header#L7) true and coalesces free neighbors throughout the Kernel Heap. A null pointer has no effect | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`remove_process()`](kernel/process/process.picoc#L209), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128), [`copy_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L82), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L146) |
+| [`init_kernel_heap(void)`](kernel/kmalloc.picoc#L17) (Kernel only) | Returns no value | Initializes [`kernel_heap`](kernel/kmalloc.picoc#L7) over [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) and [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4), creating one free block | [`heap_init_region()`](common/heap.picoc#L49) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`require_kernel_heap_allocation(memory, size)`](kernel/kmalloc.picoc#L9) (Kernel only) | Returns the unchanged pointer, or does not return if a positive request failed | Converts a failed positive Kernel Heap allocation into a kernel panic | [`panic_kernel_heap_full()`](kernel/exception.picoc#L89) | **Kernel functions:** [`kmalloc()`](kernel/kmalloc.picoc#L23), [`krealloc()`](kernel/kmalloc.picoc#L31) |
+
+## 3.4 Process and Shared Data Heap
 [\[↑ TOC\]](#contents)
 
 [`process_memory_heap`](kernel/pmalloc.picoc#L7) manages one region from
 [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) through the final
-SRAM cell. Its First Fit list contains two payload categories. One category is
+SRAM cell. Its first-fit list contains two payload categories. One category is
 a complete process image. The other is the data cells of a named shared-memory
 object. Process metadata and shared-memory metadata remain separate
 [`kmalloc()`](kernel/kmalloc.picoc#L23) allocations in the kernel heap.
@@ -3098,7 +3128,7 @@ process image size recorded in the PCB.
 ```mermaid
 flowchart LR
     ROOT["kernel .data<br/>process_memory_heap"] -->|first_block| H1
-    subgraph OUTER["Process-image/shared-data region, offsets 48309–262143"]
+    subgraph OUTER["Process and Shared Data Heap region, offsets 48309–262143"]
         direction LR
         H1["BlockHeader A<br/>free=false"] --- IMG["Process image payload<br/>.ivt · .text · .data · userspace heap · stack"]
         IMG --- H2["BlockHeader B<br/>free=false"] --- SHARED["Shared-data payload"]
@@ -3132,7 +3162,7 @@ flowchart LR
     end
     ENTRY -->|address| PAYLOAD
     ROOT["kernel .data<br/>process_memory_heap"] -->|first_block| FIRST["earlier BlockHeader"]
-    subgraph PM["Process-image/shared-data heap"]
+    subgraph PM["Process and Shared Data Heap"]
         direction LR
         FIRST --- EARLIER["earlier payload"] --- HEADER["BlockHeader<br/>free=false"] --- PAYLOAD["shared-data payload"]
         PAYLOAD --- NEXT["next BlockHeader"]
@@ -3144,6 +3174,35 @@ until [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) calls
 [`pfree()`](kernel/pmalloc.picoc#L47). Section [3.7, Shared-memory entries and
 mappings](#37-shared-memory-entries-and-mappings) explains the entry and
 attachment lifetimes that decide when destruction is allowed.
+
+### 3.4.3 Process and Shared Data Heap allocator function reference
+[\[↑ TOC\]](#contents)
+
+The functions in [`kernel/pmalloc.picoc`](kernel/pmalloc.picoc) select
+[`process_memory_heap`](kernel/pmalloc.picoc#L7) for complete process images
+and shared data. They call the shared allocator directly, returning absolute
+integer payload addresses or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3)
+instead of pointers or `NULL`. The current names
+[`pmalloc()`](kernel/pmalloc.picoc#L20), [`prealloc()`](kernel/pmalloc.picoc#L31),
+and [`pfree()`](kernel/pmalloc.picoc#L47) apply to both payload categories.
+
+User-facing operations reach these kernel allocations through their syscalls.
+[`load()`](library/unistd/process.picoc#L17) invokes process loading, whose
+handlers reserve an image with [`pmalloc()`](kernel/pmalloc.picoc#L20).
+[`shm_open()`](library/sys/mman/mman.picoc#L15) reaches
+[`open_shared_memory()`](kernel/shared_memory.picoc#L92), which uses
+[`kmalloc()`](kernel/kmalloc.picoc#L23) for metadata and
+[`pmalloc()`](kernel/pmalloc.picoc#L20) for shared data.
+[`mmap()`](library/sys/mman/mman.picoc#L23) reaches
+[`map_shared_memory()`](kernel/shared_memory.picoc#L130), which allocates a
+kernel attachment record with [`kmalloc()`](kernel/kmalloc.picoc#L23).
+
+| Kernel / Library Function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`pmalloc(size)`](kernel/pmalloc.picoc#L20) (Kernel only) | Absolute payload address, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for nonpositive size or no fit | Allocates a complete process image or shared-data region through [`process_memory_heap`](kernel/pmalloc.picoc#L7), converts the common payload pointer to an integer address | [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`prealloc(start, size)`](kernel/pmalloc.picoc#L31) (Kernel only) | Absolute original/replacement payload address, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for nonpositive size or no fit | Resizes an outer allocation. An invalid start requests a new allocation. Nonpositive size releases an existing block, failed positive growth preserves it. Currently unused | [`heap_realloc_from()`](common/heap.picoc#L87) | — |
+| [`pfree(start)`](kernel/pmalloc.picoc#L47) (Kernel only) | Returns no value | Releases the outer block at the supplied payload address and coalesces free neighbors throughout [`process_memory_heap`](kernel/pmalloc.picoc#L7). An invalid start has no effect | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`init_process_memory_heap(void)`](kernel/pmalloc.picoc#L9) (Kernel only) | Returns no value | Initializes [`process_memory_heap`](kernel/pmalloc.picoc#L7) over [`PROCESS_MEMORY_START`](kernel/memory_constants.header#L5) through [`SRAM_MAX_ADDRESS_IN_MEMORY_MAP`](kernel/memory_constants.header#L2), inclusive, creating one free block | [`heap_init_region()`](common/heap.picoc#L49) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 
 ## 3.5 User-process memory and heap
 [\[↑ TOC\]](#contents)
@@ -3234,52 +3293,74 @@ its activation changes which process image and heap globals the CPU addresses.
 The detailed process-image view in [Section 4.3.1, Code, data, heap, and stack
 placement](#431-code-data-heap-and-stack-placement) uses this same nesting.
 
+### 3.5.3 User Process Heap allocator function reference
+[\[↑ TOC\]](#contents)
+
+The functions in [`library/stdlib/malloc.picoc`](library/stdlib/malloc.picoc)
+select the calling image's [`process_heap`](library/stdlib/malloc.picoc#L6).
+Their block operations run directly in the linked library code. Syscalls obtain
+the initial heap bounds and handle failed positive-size requests.
+The table includes these startup and failure helpers from the same file.
+
+| Kernel / Library Function | Return value / status | Effects | Calls | Syscalls | Called by |
+| --- | --- | --- | --- | --- | --- |
+| [`malloc(size)`](library/stdlib/malloc.picoc#L35) (Library only) | Payload pointer, `NULL` for nonpositive size, process-heap-full exception if a positive request has no fit | Allocates through the calling image's [`process_heap`](library/stdlib/malloc.picoc#L6), searches and updates blocks directly in library code | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8), [`heap_alloc_from()`](common/heap.picoc#L65) | Process-heap-full on positive-size failure | **Library functions:** [`opendir()`](library/dirent/dirent.picoc#L8), [`copy_environment_variable()`](library/stdlib/env.picoc#L20), [`initialize_environment()`](library/stdlib/env.picoc#L97), [`setenv()`](library/stdlib/env.picoc#L126), [`clone_environment()`](library/stdlib/env.picoc#L205)<br>**User applications:** [`main()` in sed](user/sed.picoc#L67), [`read_environment()` in init](system/init.picoc#L19)<br>**Test programs (direct calls):** [`basic_heap_allocator_example.picoc`](test/basic_heap_allocator_example.picoc), [`basic_malloc.picoc`](test/basic_malloc.picoc), [`basic_free.picoc`](test/basic_free.picoc), [`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc), [`basic_realloc.picoc`](test/basic_realloc.picoc), [`basic_realloc_null_and_zero.picoc`](test/basic_realloc_null_and_zero.picoc), [`basic_string.picoc`](test/basic_string.picoc), [`exception_heap_full/heap_full.picoc`](test/exception_heap_full/heap_full.picoc), [`exercise_sheet_4_heap/launcher.picoc`](test/exercise_sheet_4_heap/launcher.picoc) |
+| [`realloc(ptr, size)`](library/stdlib/malloc.picoc#L42) (Library only) | Original/replacement payload pointer, `NULL` after freeing on nonpositive size, process-heap-full exception on positive-size failure | Resizes a User Process Heap block, a null pointer requests a new allocation. Calls the common implementation directly | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8), [`heap_realloc_from()`](common/heap.picoc#L87) | Process-heap-full on positive-size failure | **Library functions:** [`store_environment_variable()`](library/stdlib/env.picoc#L67)<br>**Test programs (direct calls):** [`basic_realloc.picoc`](test/basic_realloc.picoc), [`basic_realloc_null_and_zero.picoc`](test/basic_realloc_null_and_zero.picoc) |
+| [`free(ptr)`](library/stdlib/malloc.picoc#L49) (Library only) | Returns no value | Releases and coalesces blocks only in the calling image's [`process_heap`](library/stdlib/malloc.picoc#L6). A null pointer has no effect | [`heap_free_from()`](common/heap.picoc#L146) | None | **Library functions:** [`opendir()`](library/dirent/dirent.picoc#L8), [`closedir()`](library/dirent/dirent.picoc#L66), [`store_environment_variable()`](library/stdlib/env.picoc#L67), [`unsetenv()`](library/stdlib/env.picoc#L157), [`clearenv()`](library/stdlib/env.picoc#L194), [`destroy_environment()`](library/stdlib/env.picoc#L230)<br>**User applications:** [`main()` in sed](user/sed.picoc#L67), [`read_environment()` in init](system/init.picoc#L19)<br>**Test programs (direct calls):** [`basic_heap_allocator_example.picoc`](test/basic_heap_allocator_example.picoc), [`basic_free.picoc`](test/basic_free.picoc), [`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc), [`basic_realloc.picoc`](test/basic_realloc.picoc), [`exercise_sheet_4_heap/launcher.picoc`](test/exercise_sheet_4_heap/launcher.picoc) |
+| [`init_process_heap(void)`](library/stdlib/malloc.picoc#L18) (Library only) | Returns no value | Gets the current process's absolute heap start and size, then initializes [`process_heap`](library/stdlib/malloc.picoc#L6) and its first free header | [`heap_init_region()`](common/heap.picoc#L49) | Process-heap-start, process-heap-size | **Library functions:** [`start_process()`](library/start/start.picoc#L7)<br>**Test programs (direct calls):** [`basic_heap_allocator_example.picoc`](test/basic_heap_allocator_example.picoc), [`basic_environment.picoc`](test/basic_environment.picoc), [`basic_malloc.picoc`](test/basic_malloc.picoc), [`basic_free.picoc`](test/basic_free.picoc), [`basic_free_block_merging.picoc`](test/basic_free_block_merging.picoc), [`basic_realloc.picoc`](test/basic_realloc.picoc), [`basic_realloc_null_and_zero.picoc`](test/basic_realloc_null_and_zero.picoc), [`basic_string.picoc`](test/basic_string.picoc) |
+| [`require_process_heap_allocation(memory, size)`](library/stdlib/malloc.picoc#L8) (Library only) | Returns the unchanged pointer, or terminates the process if a positive request failed | Invokes the process-heap-full syscall only when the common allocator returns `NULL` for a positive request | No C calls | Process-heap-full on positive-size failure | **Library functions:** [`malloc()`](library/stdlib/malloc.picoc#L35), [`realloc()`](library/stdlib/malloc.picoc#L42) |
+
 ## 3.6 Heap and allocator function reference
 [\[↑ TOC\]](#contents)
 
-These functions implement the heap and allocation mechanisms used throughout PicoOS. The same
-[`common/heap.picoc`](common/heap.picoc) implementation is linked into the kernel and included in
-the userspace [`libstdlib`](library/stdlib/libstdlib.picoc), so it becomes kernel code in the first
-case and library code in the second. Kernel wrappers use [`kmalloc()`](kernel/kmalloc.picoc#L23)
-for [`Process`](kernel/process/process.header#L31) structures and other kernel metadata, while
-[`pmalloc()`](kernel/pmalloc.picoc#L20) reserves complete process images and shared-memory data
-regions from the process-image/shared-memory heap. Each program's [`malloc()`](library/stdlib/malloc.picoc#L35)
-instead manages the userspace heap inside that process image. Startup obtains
-its bounds through the process-heap-start and process-heap-size syscalls, but
-later block searches and updates run directly in the linked library code.
+[`common/heap.picoc`](common/heap.picoc) implements the allocator used by all
+three heaps. Its functions take a [`Heap`](common/heap.header#L11) descriptor
+rather than choosing a region or an allocation-failure policy themselves.
+The heap-specific interfaces are documented in
+[`3.3.3 Kernel Heap allocator function reference`](#333-kernel-heap-allocator-function-reference),
+[`3.4.3 Process and Shared Data Heap allocator function reference`](#343-process-and-shared-data-heap-allocator-function-reference),
+and [`3.5.3 User Process Heap allocator function reference`](#353-user-process-heap-allocator-function-reference).
 
-User-facing operations that allocate outside the calling process's local heap enter the kernel.
-[`load()`](library/unistd/process.picoc#L17) reaches process loading and its [`pmalloc()`](kernel/pmalloc.picoc#L20)
-allocation through the process-load syscall. [`shm_open()`](library/sys/mman/mman.picoc#L15) reaches
-[`open_shared_memory()`](kernel/shared_memory.picoc#L92) through the shared-memory-open syscall, which allocates kernel
-metadata with [`kmalloc()`](kernel/kmalloc.picoc#L23) and the shared data with
-[`pmalloc()`](kernel/pmalloc.picoc#L20). [`mmap()`](library/sys/mman/mman.picoc#L23) reaches
-[`map_shared_memory()`](kernel/shared_memory.picoc#L130) through the shared-memory-map syscall, which allocates a
-kernel attachment record. The table distinguishes these target-specific wrappers from the common
-functions linked directly into each target.
+### 3.6.1 Common allocator linkage and function reference
+[\[↑ TOC\]](#contents)
+
+The kernel links [`common/heap.picoc`](common/heap.picoc) as a separate source.
+Userspace [`libstdlib`](library/stdlib/libstdlib.picoc#L1) includes that same
+source, giving each linked process image its own allocator code and
+[`process_heap`](library/stdlib/malloc.picoc#L6) descriptor. The arrows below
+are direct C calls within each target. Library block searches, splits, and
+merges execute in the calling process image.
+
+```mermaid
+flowchart TB
+    subgraph K["Kernel target"]
+        KW["kmalloc / krealloc / kfree<br/>kernel_heap"] --> KC["common/heap.picoc<br/>heap_alloc_from / heap_realloc_from / heap_free_from"]
+        PW["pmalloc / prealloc / pfree<br/>process_memory_heap"] --> KC
+    end
+    subgraph L["Each userspace target: libstdlib"]
+        LW["malloc / realloc / free<br/>process_heap in this image"] --> LC["same common/heap.picoc source<br/>heap_alloc_from / heap_realloc_from / heap_free_from"]
+    end
+```
+
+The table covers only [`common/heap.picoc`](common/heap.picoc). Sizes and copy
+counts are RETI cells. Every header is an in-region
+[`BlockHeader`](common/heap.header#L5) with three cells.
+For a non-null payload pointer, reallocation and freeing assume a valid
+allocation from the supplied heap. They recover its header by pointer
+arithmetic, without searching for it or checking ownership.
 
 | Kernel / Library Function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`heap_init_region(heap, start, cell_count)`](common/heap.picoc#L49) (Shared/Common) | Returns no value | Writes the initial free block and stores it in the heap descriptor | — | **Library functions (directly linked):** [`init_process_heap()`](library/stdlib/malloc.picoc#L18)<br>**Kernel functions (directly linked):** [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9) |
-| [`heap_alloc_from(heap, size)`](common/heap.picoc#L65) (Shared/Common) | Payload pointer, or `NULL` for invalid size/no fit | First-fit scan, optional split, marks block used | [`heap_split_block()`](common/heap.picoc#L14) | **Library functions (directly linked):** [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**Kernel functions (directly linked):** [`kmalloc()`](kernel/kmalloc.picoc#L23), [`pmalloc()`](kernel/pmalloc.picoc#L20)<br>**Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`heap_realloc_from(heap, ptr, size)`](common/heap.picoc#L87) (Shared/Common) | Payload pointer, or `NULL` for invalid heap/no fit/nonpositive size | May split, merge/grow, move/copy, or free on nonpositive size, failed growth leaves the old allocation intact | [`heap_free_from()`](common/heap.picoc#L146), [`heap_alloc_from()`](common/heap.picoc#L65), [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), [`heap_copy_cells()`](common/heap.picoc#L3) | **Library functions (directly linked):** [`realloc()`](library/stdlib/malloc.picoc#L42)<br>**Kernel functions (directly linked):** [`krealloc()`](kernel/kmalloc.picoc#L31), [`prealloc()`](kernel/pmalloc.picoc#L31) |
-| [`heap_free_from(heap, ptr)`](common/heap.picoc#L146) (Shared/Common) | Returns no value | Marks the preceding header free and merges adjacent blocks | [`heap_merge_free_blocks()`](common/heap.picoc#L30) | **Library functions (directly linked):** [`free()`](library/stdlib/malloc.picoc#L49)<br>**Kernel functions (directly linked):** [`kfree()`](kernel/kmalloc.picoc#L38), [`pfree()`](kernel/pmalloc.picoc#L47)<br>**Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`heap_split_block(block, size)`](common/heap.picoc#L14) (Shared/Common) | Returns no value | Splits a sufficiently large free block after the requested payload | — | **Shared/common functions (directly linked):** [`heap_alloc_from()`](common/heap.picoc#L65), [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`heap_merge_free_blocks(heap)`](common/heap.picoc#L30) (Shared/Common) | Returns no value | Coalesces adjacent free blocks in one heap | — | **Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87), [`heap_free_from()`](common/heap.picoc#L146) |
-| [`heap_copy_cells(destination, source, count)`](common/heap.picoc#L3) (Shared/Common) | Returns no value | Copies cells from the old allocation into a replacement allocation | — | **Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
-| [`init_process_heap(void)`](library/stdlib/malloc.picoc#L18) (Library only) | Returns no value | Retrieves the process heap range through the process-heap-start and process-heap-size syscalls, then initializes the library heap descriptor | [`heap_init_region()`](common/heap.picoc#L49) | **Library functions:** [`start_process()`](library/start/start.picoc#L7) |
-| [`malloc(size)`](library/stdlib/malloc.picoc#L35) (Library only) | Pointer, or triggers the process-heap-full exception for a positive failed allocation | Allocates a process-heap block | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8), [`heap_alloc_from()`](common/heap.picoc#L65) | **Library functions:** [`opendir()`](library/dirent/dirent.picoc#L8), [`copy_environment_variable()`](library/stdlib/env.picoc#L20), [`initialize_environment()`](library/stdlib/env.picoc#L97), [`setenv()`](library/stdlib/env.picoc#L126), [`clone_environment()`](library/stdlib/env.picoc#L205) |
-| [`realloc(ptr, size)`](library/stdlib/malloc.picoc#L42) (Library only) | Pointer, or triggers the process-heap-full exception for a positive failed allocation | Resizes a process-heap block | [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8), [`heap_realloc_from()`](common/heap.picoc#L87) | **Library functions:** [`store_environment_variable()`](library/stdlib/env.picoc#L67) |
-| [`free(ptr)`](library/stdlib/malloc.picoc#L49) (Library only) | Returns no value | Releases a process-heap block | [`heap_free_from()`](common/heap.picoc#L146) | **Library functions:** [`opendir()`](library/dirent/dirent.picoc#L8), [`closedir()`](library/dirent/dirent.picoc#L66), [`store_environment_variable()`](library/stdlib/env.picoc#L67), [`unsetenv()`](library/stdlib/env.picoc#L157), [`clearenv()`](library/stdlib/env.picoc#L194), [`destroy_environment()`](library/stdlib/env.picoc#L230) |
-|  |  |  |  |  |
-| [`init_kernel_heap(void)`](kernel/kmalloc.picoc#L17) (Kernel only) | Returns no value | Initializes global kernel descriptor over the fixed kernel heap | [`heap_init_region()`](common/heap.picoc#L49) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`init_process_memory_heap(void)`](kernel/pmalloc.picoc#L9) (Kernel only) | Returns no value | Initializes the process-image/shared-memory heap descriptor over remaining SRAM | [`heap_init_region()`](common/heap.picoc#L49) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`kmalloc(size)`](kernel/kmalloc.picoc#L23) (Kernel only) | Kernel pointer, panics on positive allocation failure | Allocates from the kernel heap | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_process()`](kernel/process/process.picoc#L89), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`copy_file_path()`](kernel/filesystem/file_descriptor.picoc#L6), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) |
-| [`krealloc(ptr, size)`](kernel/kmalloc.picoc#L31) (Kernel only) | Kernel pointer, panics on positive allocation failure | Reallocates a kernel-heap block | [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9), [`heap_realloc_from()`](common/heap.picoc#L87) | — |
-| [`kfree(ptr)`](kernel/kmalloc.picoc#L38) (Kernel only) | Returns no value | Releases and merges a kernel-heap block | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`unlink_shared_memory()`](kernel/shared_memory.picoc#L151), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`remove_process()`](kernel/process/process.picoc#L209), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128), [`copy_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L82), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L146) |
-| [`pmalloc(size)`](kernel/pmalloc.picoc#L20) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for invalid size/no fit | Allocates a process image or shared-data region | [`heap_alloc_from()`](common/heap.picoc#L65) | **Kernel functions:** [`open_shared_memory()`](kernel/shared_memory.picoc#L92), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`prealloc(start, size)`](kernel/pmalloc.picoc#L31) (Kernel only) | Absolute start, or [`PMALLOC_INVALID_START`](kernel/pmalloc.header#L3) (`-1`) for invalid size/no fit | Reallocates a process-image/shared-memory heap region | [`heap_realloc_from()`](common/heap.picoc#L87) | — |
-| [`pfree(start)`](kernel/pmalloc.picoc#L47) (Kernel only) | Returns no value | Releases and merges a process-image/shared-memory heap region | [`heap_free_from()`](common/heap.picoc#L146) | **Kernel functions:** [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`heap_init_region(heap, start, cell_count)`](common/heap.picoc#L49) (Shared/Common) | Returns no value | For a null heap, does nothing. For a null start or at most three cells, sets [`Heap.first_block`](common/heap.header#L12) to `NULL`. Otherwise writes one header with [`size`](common/heap.header#L6) = cell count minus three, [`free`](common/heap.header#L7) = true, [`next`](common/heap.header#L8) = `NULL`, and stores its address in the descriptor | — | **Library functions (directly linked):** [`init_process_heap()`](library/stdlib/malloc.picoc#L18)<br>**Kernel functions (directly linked):** [`init_kernel_heap()`](kernel/kmalloc.picoc#L17), [`init_process_memory_heap()`](kernel/pmalloc.picoc#L9)<br>**Test programs (direct calls):** [`basic_heap_allocator_example.picoc`](test/basic_heap_allocator_example.picoc) |
+| [`heap_alloc_from(heap, size)`](common/heap.picoc#L65) (Shared/Common) | Payload pointer, or `NULL` for a null heap, nonpositive size, or no fit | Scans from [`Heap.first_block`](common/heap.header#L12) through [`next`](common/heap.header#L8), selects the first free block with enough payload cells, optionally splits it, sets [`free`](common/heap.header#L7) false, and returns the address immediately after the header | [`heap_split_block()`](common/heap.picoc#L14) | **Library functions (directly linked):** [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**Kernel functions (directly linked):** [`kmalloc()`](kernel/kmalloc.picoc#L23), [`pmalloc()`](kernel/pmalloc.picoc#L20)<br>**Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
+| [`heap_realloc_from(heap, ptr, size)`](common/heap.picoc#L87) (Shared/Common) | Original/replacement payload pointer, or `NULL` for a null heap, nonpositive size, or failed replacement allocation | With a valid heap, nonpositive size frees the block, a null pointer allocates. Otherwise shrinks/splits in place and coalesces, grows into only the immediate free neighbor if sufficient, or allocates/copies/frees. Failed replacement allocation preserves the old block | [`heap_free_from()`](common/heap.picoc#L146), [`heap_alloc_from()`](common/heap.picoc#L65), [`heap_split_block()`](common/heap.picoc#L14), [`heap_merge_free_blocks()`](common/heap.picoc#L30), [`heap_copy_cells()`](common/heap.picoc#L3) | **Library functions (directly linked):** [`realloc()`](library/stdlib/malloc.picoc#L42)<br>**Kernel functions (directly linked):** [`krealloc()`](kernel/kmalloc.picoc#L31), [`prealloc()`](kernel/pmalloc.picoc#L31) |
+| [`heap_free_from(heap, ptr)`](common/heap.picoc#L146) (Shared/Common) | Returns no value | For a null heap or pointer, does nothing. Otherwise finds the preceding header, sets [`free`](common/heap.header#L7) true, and scans the entire heap to coalesce consecutive free blocks. Does not erase payload contents | [`heap_merge_free_blocks()`](common/heap.picoc#L30) | **Library functions (directly linked):** [`free()`](library/stdlib/malloc.picoc#L49)<br>**Kernel functions (directly linked):** [`kfree()`](kernel/kmalloc.picoc#L38), [`pfree()`](kernel/pmalloc.picoc#L47)<br>**Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
+| [`heap_split_block(block, size)`](common/heap.picoc#L14) (Shared/Common) | Returns no value | Splits only if [`size`](common/heap.header#L6) ≥ requested size + three header cells + one payload cell. Inserts a free header after the requested payload, links it to the old successor, then updates the original size and successor. Otherwise leaves the block unchanged. Does not change the original free flag | — | **Shared/common functions (directly linked):** [`heap_alloc_from()`](common/heap.picoc#L65), [`heap_realloc_from()`](common/heap.picoc#L87) |
+| [`heap_merge_free_blocks(heap)`](common/heap.picoc#L30) (Shared/Common) | Returns no value | For a null heap, does nothing. Scans from [`Heap.first_block`](common/heap.header#L12). When current and next are free, adds three header cells and the next payload to the current size, bypasses the next header, and rechecks the same current header. Advances only when the pair cannot merge | — | **Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87), [`heap_free_from()`](common/heap.picoc#L146) |
+| [`heap_copy_cells(destination, source, count)`](common/heap.picoc#L3) (Shared/Common) | Returns no value | Copies count cells in increasing index order from source to destination. Used for the overlap between old payload size and requested replacement size | — | **Shared/common functions (directly linked):** [`heap_realloc_from()`](common/heap.picoc#L87) |
+
+### 3.6.2 Reallocation decisions
+[\[↑ TOC\]](#contents)
 
 The decision graph follows [`heap_realloc_from()`](common/heap.picoc#L87) for a valid existing block
 and a positive requested size. It shows when the payload address stays the same and when allocation,
@@ -3292,7 +3373,7 @@ flowchart TD
     R["Resize an existing block"] --> FIT{"Current payload large enough?"}
     FIT -->|Yes| SHRINK["heap_split_block<br/>heap_merge_free_blocks"]
     SHRINK --> SAME["Return original pointer"]
-    FIT -->|No| NEXT{"Next block free and combined space enough?"}
+    FIT -->|No| NEXT{"Immediate next block free and combined space enough?"}
     NEXT -->|Yes| GROW["Absorb next header and payload<br/>heap_split_block"]
     GROW --> SAME
     NEXT -->|No| ALLOC["heap_alloc_from"]
@@ -3302,15 +3383,152 @@ flowchart TD
     COPY --> NEW["Return replacement pointer"]
 ```
 
-The stack-boundary register catches stack growth into the configured heap, but there is no isolation
-between arbitrary process data accesses and other memory.
+In-place growth absorbs at most one successor and then optionally splits the
+result. It returns without another merge scan. Shrinking calls
+[`heap_merge_free_blocks()`](common/heap.picoc#L30) after splitting, and moving
+calls it through [`heap_free_from()`](common/heap.picoc#L146). These paths use
+the same repeated merge loop demonstrated next.
+
+### 3.6.3 Allocation and repeated coalescing example
+[\[↑ TOC\]](#contents)
+
+This example follows one 52-cell heap through allocation and two frees using
+[`heap_alloc_from()`](common/heap.picoc#L65) and
+[`heap_free_from()`](common/heap.picoc#L146).
+[`3.1 Heap block layout and allocation algorithm`](#31-heap-block-layout-and-allocation-algorithm)
+defines the descriptor and header fields used here. Yellow rectangles are
+headers, blue payloads are allocated, and green payloads are free. Each header
+and payload has its own boundary. Curved arrows show
+[`BlockHeader.next`](common/heap.header#L8) pointing to the following header,
+and the final header stores `NULL`. The orange outline marks the selected or
+changed block. Widths leave room for header fields and are not proportional to
+cell counts, but memory boundaries stay in the same positions between steps.
+Offsets below the region are in cells relative to its start.
+
+#### 3.6.3.1 Initial state and first-fit search
+[\[↑ TOC\]](#contents)
+
+The starting list has four blocks, A through D. Their payload sizes are 8, 4,
+12, and 16 cells. With four three-cell headers, this occupies exactly
+`8 + 4 + 12 + 16 + 4 × 3 = 52` cells.
+This state can be built by initializing the region, allocating those four
+sizes in order, then freeing B and D. Allocated C keeps the two free blocks
+apart, so the initial state does not require unmerged free neighbors.
+
+![Initial heap with allocated A, C and free B, D, linked from left to right](documentation/images/heap-01-initial.svg)
+
+For an 11-cell request, [`heap_alloc_from()`](common/heap.picoc#L65) begins at
+[`Heap.first_block`](common/heap.header#L12), which points to Header A.
+It skips A because it is allocated, follows A's link to B, and skips B because
+its four payload cells are too few. C is allocated, so the next candidate is
+D. D is free and has 16 payload cells. First fit selects D immediately.
+
+#### 3.6.3.2 Allocation splits D
+[\[↑ TOC\]](#contents)
+
+[`heap_alloc_from()`](common/heap.picoc#L65) calls
+[`heap_split_block()`](common/heap.picoc#L14) for D. The split condition
+`16 >= 11 + 3 + 1` is true, so D becomes an 11-cell allocation followed by a
+new free block. The remainder is labeled D′ to show that it comes from D.
+Header D stays at offset 33, its [`size`](common/heap.header#L6) becomes 11,
+and the allocator sets its [`free`](common/heap.header#L7) to false.
+The returned pointer is D's payload at offset 36.
+
+Header D′ is written at `36 + 11 = 47`. Its
+[`size`](common/heap.header#L6) is `16 − 11 − 3 = 2`, its
+[`free`](common/heap.header#L7) is true, and its
+[`next`](common/heap.header#L8) inherits D's old `NULL` link.
+D's [`next`](common/heap.header#L8) now points to D′.
+The original 16-cell payload is divided into 11 allocated payload cells,
+three cells for Header D′, and two free payload cells at offsets 50 and 51.
+A, B, and C do not move, and their links remain unchanged.
+
+![After allocation, D has eleven allocated payload cells and links to new free Header D′ with two payload cells](documentation/images/heap-02-allocated.svg)
+
+> **Note:** If the request were 14 cells instead, the split condition
+> `16 >= 14 + 3 + 1` would be false. The remaining two cells would not fit a
+> three-cell header plus at least one usable payload cell. The allocator would
+> therefore allocate D's entire 16-cell payload without splitting it, leaving
+> its [`size`](common/heap.header#L6) and [`next`](common/heap.header#L8) unchanged.
+
+#### 3.6.3.3 Free D and merge its remainder
+[\[↑ TOC\]](#contents)
+
+Freeing the returned pointer lets [`heap_free_from()`](common/heap.picoc#L146)
+recover Header D by subtracting one header from the payload pointer. It first
+sets D's [`free`](common/heap.header#L7) to true without changing any sizes or
+links. This diagram shows that intermediate state before the merge scan.
+
+![D marked free with its eleven payload cells still separate from free D′ and its two payload cells](documentation/images/heap-03-d-marked-free.svg)
+
+[`heap_merge_free_blocks()`](common/heap.picoc#L30) scans from A rather than
+starting at D. It advances past A/B, B/C, and C/D because each pair includes
+an allocated block. At D/D′ both headers say free, so D absorbs the header and
+payload of D′. D's [`size`](common/heap.header#L6) becomes `11 + 3 + 2 = 16`,
+and its [`next`](common/heap.header#L8) inherits the `NULL` link from D′.
+The three cells of Header D′ become usable space within D's payload. D′ is no
+longer a list node, and its former metadata is not cleared.
+
+![D restored to sixteen free payload cells after absorbing Header D′ and its two payload cells](documentation/images/heap-04-d-merged.svg)
+
+The loop keeps D as its current header, but D's
+[`next`](common/heap.header#L8) is now `NULL`, so the loop ends.
+The heap has returned to its four-block initial state.
+
+#### 3.6.3.4 Free C and merge repeatedly at B
+[\[↑ TOC\]](#contents)
+
+A second free releases C's payload at offset 21.
+[`heap_free_from()`](common/heap.picoc#L146) marks Header C free, producing
+three consecutive free blocks B, C, and D. This state exists inside the free
+operation before its merge scan.
+
+![C marked free, making B, C, and D consecutive free blocks after allocated A](documentation/images/heap-05-c-marked-free.svg)
+
+The scan skips A/B and reaches B/C. Both are free, so B absorbs C's header and
+payload. B's [`size`](common/heap.header#L6) becomes `4 + 3 + 12 = 19` and its
+[`next`](common/heap.header#L8) becomes D. Header C is now part of B's payload.
+
+![First merge at B bypasses Header C and produces nineteen free payload cells followed by free D](documentation/images/heap-06-b-c-merged.svg)
+
+The loop does not advance after that merge. It checks the new B/D pair with
+B still current, finds both free, and merges again. B's
+[`size`](common/heap.header#L6) becomes `19 + 3 + 16 = 38` and its
+[`next`](common/heap.header#L8) becomes `NULL`, inherited from D. The 38-cell
+payload at offsets 14 through 51 now includes the former C and D headers and
+their payloads, including the cells formerly occupied by Header D′.
+This is repeated iteration at the same header, not recursion.
+
+![Second merge at B bypasses Header D, leaving allocated A and a thirty-eight-cell free B with next equal to NULL](documentation/images/heap-07-b-d-merged.svg)
+
+The loop still keeps B as its current header. Because B's
+[`next`](common/heap.header#L8) is now `NULL`, the loop condition is false and
+the scan finishes. The final list is A → B, and its two headers plus payloads
+still occupy `8 + 38 + 2 × 3 = 52` cells.
+A remains allocated and does not move, and
+[`Heap.first_block`](common/heap.header#L12) continues to point to A throughout
+the example.
+
+The merge loop checks the two free flags, relying on the list's headers being
+in contiguous address order. It does not compare addresses separately.
+By rechecking the same header after every merge and continuing the scan,
+[`heap_merge_free_blocks()`](common/heap.picoc#L30) combines every consecutive
+free run before it returns.
+The Library test
+[`basic_heap_allocator_example.picoc`](test/basic_heap_allocator_example.picoc)
+checks this 52-cell example through the actual library
+[`malloc()`](library/stdlib/malloc.picoc#L35) and
+[`free()`](library/stdlib/malloc.picoc#L49) functions, including first fit,
+splitting, repeated merging, preserved allocated data, and the no-split note.
+The editable diagrams are generated by
+[`documentation/generate_heap_allocator_diagrams.py`](documentation/generate_heap_allocator_diagrams.py).
 
 ## 3.7 Shared-memory entries and mappings
 [\[↑ TOC\]](#contents)
 
 Shared memory gives multiple processes access to the same physical cells, so a value written by
 one process is visible to the others that map the region. PicoOS allocates each shared-memory data
-region with [`pmalloc()`](kernel/pmalloc.picoc#L20) from the same process-image/shared-memory heap that holds
+region with [`pmalloc()`](kernel/pmalloc.picoc#L20) from the same Process and Shared Data Heap that holds
 complete process images. A process image and a shared-memory region are separate allocations, but
 both occupy the payload of a [`BlockHeader`](common/heap.header#L5) in that heap. The kernel keeps a
 named entry for each shared region and a separate attachment record in every process that maps it.
@@ -3525,7 +3743,7 @@ internal kernel operations.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`open_shared_memory(request)`](kernel/shared_memory.picoc#L92) | Existing/new ID, `-1` for a null request/name, a nonpositive new size, or insufficient process-image/shared-memory heap space | If the name already exists, returns its [`SharedMemoryEntry.id`](kernel/shared_memory.header#L10) without creating a structure. Otherwise creates a [`SharedMemoryEntry`](kernel/shared_memory.header#L8) and copied name with [`kmalloc()`](kernel/kmalloc.picoc#L23), creates its data region with [`pmalloc()`](kernel/pmalloc.picoc#L20), and prepends the [`SharedMemoryEntry`](kernel/shared_memory.header#L8) to the kernel's linked list | [`find_shared_memory_by_name()`](kernel/shared_memory.picoc#L45), [`kmalloc()`](kernel/kmalloc.picoc#L23), [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`kfree()`](kernel/kmalloc.picoc#L38) | **Library functions:** [`shm_open()`](library/sys/mman/mman.picoc#L15)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`open_shared_memory(request)`](kernel/shared_memory.picoc#L92) | Existing/new ID, `-1` for a null request/name, a nonpositive new size, or insufficient Process and Shared Data Heap space | If the name already exists, returns its [`SharedMemoryEntry.id`](kernel/shared_memory.header#L10) without creating a structure. Otherwise creates a [`SharedMemoryEntry`](kernel/shared_memory.header#L8) and copied name with [`kmalloc()`](kernel/kmalloc.picoc#L23), creates its data region with [`pmalloc()`](kernel/pmalloc.picoc#L20), and prepends the [`SharedMemoryEntry`](kernel/shared_memory.header#L8) to the kernel's linked list | [`find_shared_memory_by_name()`](kernel/shared_memory.picoc#L45), [`kmalloc()`](kernel/kmalloc.picoc#L23), [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27), [`pmalloc()`](kernel/pmalloc.picoc#L20), [`kfree()`](kernel/kmalloc.picoc#L38) | **Library functions:** [`shm_open()`](library/sys/mman/mman.picoc#L15)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`map_shared_memory(shared_memory_id)`](kernel/shared_memory.picoc#L130) | Address, or `NULL` for an unknown ID or no current process | For every successful mapping, creates one [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) with [`kmalloc()`](kernel/kmalloc.picoc#L23), links it from the current PCB's [`shared_memory_attachments`](kernel/process/process.header#L55) field, points it at the existing [`SharedMemoryEntry`](kernel/shared_memory.header#L8), and increments that entry's count | [`current_process()`](kernel/process/process.picoc#L62), [`find_shared_memory_by_id()`](kernel/shared_memory.picoc#L57), [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Library functions:** [`mmap()`](library/sys/mman/mman.picoc#L23)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`unlink_shared_memory(name)`](kernel/shared_memory.picoc#L151) | `0` on unlink, `-1` for a null or unknown name | Frees the name and marks the existing [`SharedMemoryEntry`](kernel/shared_memory.header#L8) for removal, destroys that [`SharedMemoryEntry`](kernel/shared_memory.header#L8) immediately only when its mapping count is zero | [`find_shared_memory_by_name()`](kernel/shared_memory.picoc#L45), [`kfree()`](kernel/kmalloc.picoc#L38), [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) | **Library functions:** [`shm_unlink()`](library/sys/mman/mman.picoc#L27)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
 |  |  |  |  |  |
@@ -3679,7 +3897,7 @@ struct Process {
 | [`exit_status`](kernel/process/process.header#L60) | Status retained while the process is a zombie | First initialized to 0 by [`create_process()`](kernel/process/process.picoc#L89), set by [`terminate_process()`](kernel/process/process.picoc#L304), collected by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
 | [`stop_signal`](kernel/process/process.header#L61), [`stopped_from_state`](kernel/process/process.header#L62), [`pending_termination_signal`](kernel/process/process.header#L63) | Signal state for stopped and deferred termination paths | First initialized by [`create_process()`](kernel/process/process.picoc#L89), used by [`stop_process()`](kernel/signal.picoc#L37), [`continue_process()`](kernel/signal.picoc#L50), [`send_signal_to_process()`](kernel/signal.picoc#L75), and [`prepare_process_termination()`](kernel/signal.picoc#L126) |
 | [`pending_terminal_read_buffer`](kernel/process/process.header#L65), [`pending_terminal_read_count`](kernel/process/process.header#L66) | Userspace request retained while a terminal read is blocked or stopped | First initialized to `NULL`/0 by [`create_process()`](kernel/process/process.picoc#L89), set by [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), consumed by [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) or [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L84) |
-| [`pending_load`](kernel/process/process.header#L68) | Executable metadata, paths, progress, and reserved process-image/shared-memory heap region while this process is between load chunks | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), set by [`begin_process_load()`](kernel/process/process_loader.picoc#L109), advanced by [`continue_process_load()`](kernel/process/process_loader.picoc#L227), cleared by [`finish_process_load()`](kernel/process/process_loader.picoc#L90) or [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) |
+| [`pending_load`](kernel/process/process.header#L68) | Executable metadata, paths, progress, and reserved Process and Shared Data Heap region while this process is between load chunks | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), set by [`begin_process_load()`](kernel/process/process_loader.picoc#L109), advanced by [`continue_process_load()`](kernel/process/process_loader.picoc#L227), cleared by [`finish_process_load()`](kernel/process/process_loader.picoc#L90) or [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) |
 
 The PCB is kernel metadata, but its address fields refer into the separate
 process image. Because RETI has no MMU, these are ordinary absolute pointers,
@@ -3964,7 +4182,7 @@ the transfer.
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
-| [`ProcessLoad.base_address`](kernel/process/process_loader.picoc#L15) | Absolute start of the reserved process-image/shared-memory heap region | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), used by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227), [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
+| [`ProcessLoad.base_address`](kernel/process/process_loader.picoc#L15) | Absolute start of the reserved Process and Shared Data Heap region | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), used by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227), [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
 | [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16) | Total reserved cells for code, data, heap, stack, and startup values | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
 | [`ProcessLoad.code_start`](kernel/process/process_loader.picoc#L17), [`ProcessLoad.data_start`](kernel/process/process_loader.picoc#L18) | Linked code- and data-segment offsets from the binary header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
 | [`ProcessLoad.heap_start`](kernel/process/process_loader.picoc#L19), [`ProcessLoad.heap_size`](kernel/process/process_loader.picoc#L20) | Resolved userspace heap offset and cell count | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
@@ -6077,9 +6295,9 @@ storage is in another region. The wait-specific cases are expanded in
 | [`Terminal`](kernel/filesystem/terminal.header#L9) | Global [`terminal`](kernel/filesystem/terminal.picoc#L12) in kernel `.data`. Ring array and input wait queue are embedded | [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22) returns its address | Whole kernel run |
 | [`SharedMemoryEntry`](kernel/shared_memory.header#L8), name, and [`SharedMemoryAttachment`](kernel/shared_memory.header#L17) nodes | Separate kernel-heap allocations | Registry links entries. Each PCB links its attachments. Each attachment references one entry | Attachment released at process removal. Name on unlink. Entry after unlink and final attachment release |
 | Shared data | Separate [`pmalloc()`](kernel/pmalloc.picoc#L20) payload | Entry [`address`](kernel/shared_memory.header#L11). Mapping returns the same absolute address to each process | Entry destruction. The data is not tied to one mapper's image |
-| Kernel and process-image [`Heap`](common/heap.header#L11) descriptors | Two kernel `.data` globals | Each [`first_block`](common/heap.header#L12) points into its own managed region | Whole kernel run |
+| Kernel Heap and Process and Shared Data Heap [`Heap`](common/heap.header#L11) descriptors | Two kernel `.data` globals | Each [`first_block`](common/heap.header#L12) points into its own managed region | Whole kernel run |
 | Per-process [`process_heap`](library/stdlib/malloc.picoc#L6) and [`environ`](library/stdlib/env.picoc#L4) | Process `.data` globals when the libraries are linked | Descriptor reaches process-heap blocks. Environment pointer reaches the process's environment array | Image lifetime. Environment contents can be replaced |
-| [`BlockHeader`](common/heap.header#L5) | Inside **each managed heap**, immediately before its payload. It is not separately allocated metadata | Heap descriptor → first header → [`next`](common/heap.header#L8) header | Split/merged by allocator. Process-image headers and inner process-heap headers belong to different lists |
+| [`BlockHeader`](common/heap.header#L5) | Inside **each managed heap**, immediately before its payload. It is not separately allocated metadata | Heap descriptor → first header → [`next`](common/heap.header#L8) header | Split/merged by allocator. Outer heap headers and inner User Process Heap headers belong to different lists |
 | Userspace library objects, buffers, and caller-created mutexes/queues | Process heap via [`malloc()`](library/stdlib/malloc.picoc#L35), process `.data`, process stack, or mapped shared data according to the caller | Examples include [`DirectoryStream`](library/dirent/dirent.header#L14), environment copies, and [`mutex`](library/mutex/mutex.header#L6) | Caller/library controls lifetime. Any kernel-retained pointer must remain valid until completion |
 | Syscall requests and result cells | Library wrappers use user-process stack locals. Kernel internal calls also use kernel-stack requests, e.g. [`init_request`](kernel/kernel.picoc#L33) and [`IoRequest`](kernel/process/process.picoc#L34) | Syscall pointer argument or direct function argument | Call lifetime. Retained status/buffer addresses can outlast one syscall entry while the user call stays suspended |
 | Pending terminal-read state and destination | Buffer pointer/count are PCB fields. Destination is caller storage, potentially stack, `.data`, heap, or shared data | [`pending_terminal_read_buffer`](kernel/process/process.header#L65) and [`pending_terminal_read_count`](kernel/process/process.header#L66) | Fields cleared at completion/cancellation. Caller buffer stays alive through the blocked call |
@@ -6218,7 +6436,7 @@ periphery registers are not additional kernel-global allocations.
 | [`active_process`](kernel/process/process.picoc#L18) | `struct Process *` | Selected/current PCB returned by [`current_process()`](kernel/process/process.picoc#L62). It is also the scheduler's position in the list. Initially `NULL`. Removal may replace it with the preceding PCB, so it does not always designate a `RUNNING` process |
 | [`next_process_id`](kernel/process/process.picoc#L19) | `int` | Next ID assigned by [`create_process()`](kernel/process/process.picoc#L89), initially 1. It is not a process count or PCB pointer |
 | [`kernel_heap`](kernel/kmalloc.picoc#L7) | `struct Heap` | Embedded descriptor whose first-block pointer reaches the kernel heap |
-| [`process_memory_heap`](kernel/pmalloc.picoc#L7) | `struct Heap` | Descriptor for the larger process-image/shared-data allocator. It is not a user's local heap |
+| [`process_memory_heap`](kernel/pmalloc.picoc#L7) | `struct Heap` | Descriptor for the larger Process and Shared Data Heap allocator. It is not a user's local heap |
 | [`terminal`](kernel/filesystem/terminal.picoc#L12) | `struct Terminal` | Contains the 128-cell ring, three ring indices/count fields, and embedded input wait queue. It is shared by all terminal descriptors |
 | [`shared_memory_list_head`](kernel/shared_memory.picoc#L6) | `struct SharedMemoryEntry *` | First named entry or first unlinked entry that is still used. The registry follows [`SharedMemoryEntry.next`](kernel/shared_memory.header#L14) |
 | [`next_shared_memory_id`](kernel/shared_memory.picoc#L7) | `int` | Next registry ID, initially 1. It is independent of process IDs |
@@ -6937,7 +7155,7 @@ sequenceDiagram
         participant KH as Kernel heap<br/>41497–45592
         participant KS as Kernel stack<br/>45593–48308
     end
-    box rgb(239, 252, 242) Process-image and shared-memory heap: SRAM offsets 48309–262143, managed by pmalloc
+    box rgb(239, 252, 242) Process and Shared Data Heap: SRAM offsets 48309–262143, managed by pmalloc
         participant I as Init image<br/>libstart startup
         participant SH as Shell image<br/>libstart startup
         participant A as Application A<br/>libstart startup
@@ -6967,7 +7185,7 @@ stack boundary to the end of the kernel heap at offset `45592`, and
 [`heap_init_region()`](common/heap.picoc#L49) for offsets `41497` through
 `45592`. The kernel stack grows toward that boundary.
 
-The separate process-image/shared-memory heap starts at offset `48309`, one cell
+The separate Process and Shared Data Heap starts at offset `48309`, one cell
 above the initial kernel `SP`. Calling this latter region the *kernel heap*
 would confuse two distinct allocators:
 [`kmalloc()`](kernel/kmalloc.picoc#L23) manages the kernel heap before the stack,
@@ -7400,7 +7618,7 @@ and init can load the next shell. The command loop is explained in
 For an external command, the shell loads the application using
 [`load()`](library/unistd/process.picoc#L17), either with a supplied path or
 through [`load_from_path()`](user/shell.picoc#L1186). The kernel allocates a
-separate process image in the process-image/shared-memory heap.
+separate process image in the Process and Shared Data Heap.
 [`run_process()`](user/shell.picoc#L1034) then calls
 [`run()`](library/unistd/process.picoc#L31) to prepare arguments, inherit the
 environment and descriptors, and set the application's
@@ -8514,7 +8732,7 @@ input to its pass or failure result.
 ## 13.1 Library, OS, shell, and boot test categories
 [\[↑ TOC\]](#contents)
 
-The repository currently has **61 tests**. The count is **12 Library tests**,
+The repository currently has **62 tests**. The count is **13 Library tests**,
 **1 Boot test**, **23 OS tests**, and **25 Shell tests**. The 48 OS and Shell
 tests form the **System tests** selected by `make test-sys`. One test can check
 many related behaviors. For example, the single
@@ -8537,7 +8755,7 @@ the Boot test.
 
 ```mermaid
 flowchart TD
-    T["61 Tests<br/><code>make test</code>"] --> L["12 Library Tests<br/><code>make test-lib</code>"]
+    T["62 Tests<br/><code>make test</code>"] --> L["13 Library Tests<br/><code>make test-lib</code>"]
     T --> B["1 Boot Test<br/><code>make test-boot</code>"]
     T --> S["48 System Tests<br/><code>make test-sys</code>"]
     S --> O["23 OS Tests<br/><code>make test-os</code>"]
@@ -8867,9 +9085,9 @@ target spelling and its current scope.
 
 | Command | Tests run |
 | --- | --- |
-| `make test` | Builds the release tree, then runs `make test-lib`, `make test-sys`, and `make test-boot`, in that order. With the default empty patterns, this is all 61 tests. |
+| `make test` | Builds the release tree, then runs `make test-lib`, `make test-sys`, and `make test-boot`, in that order. With the default empty patterns, this is all 62 tests. |
 | `make test-all` | Alias for `make test`. |
-| `make test-lib` | The 12 top-level Library tests, or the subset selected by `TEST_PATTERN`. |
+| `make test-lib` | The 13 top-level Library tests, or the subset selected by `TEST_PATTERN`. |
 | `make test-sys` | Aggregate for `make test-os` followed by `make test-shell`. It does not invoke `make test-boot`. |
 | `make test-os` | The 23 directories recognized by the exact `launcher.picoc` and three-line `input.txt` rule. |
 | `make test-shell` | The 25 runnable non-Boot directories that do not match the OS rule. |

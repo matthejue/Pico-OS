@@ -1,0 +1,108 @@
+// in:
+// expected:1 1 1 1 1 1
+// dependencies: ../library/stdlib/libstdlib.reti_blocks ../library/stdio/libstdio.reti_blocks
+
+#include "../library/stdlib/stdlib.header"
+#include "../library/stdio/stdio.header"
+
+bool matches_block(int *region, int offset, int size, bool is_free, int next_offset) {
+    struct BlockHeader *header = (struct BlockHeader *)(region + offset);
+    struct BlockHeader *next = NULL;
+
+    if (next_offset >= 0) {
+        next = (struct BlockHeader *)(region + next_offset);
+    }
+
+    return header->size == size && header->free == is_free && header->next == next;
+}
+
+bool matches_initial_heap(int *region) {
+    return matches_block(region, 0, 8, false, 11) &&
+        matches_block(region, 11, 4, true, 18) &&
+        matches_block(region, 18, 12, false, 33) &&
+        matches_block(region, 33, 16, true, -1);
+}
+
+int main() {
+    struct Heap example_heap;
+    struct BlockHeader *first;
+    int *region;
+    int *a;
+    int *b;
+    int *c;
+    int *d;
+    int *selected;
+    bool initial_matches;
+    bool split_matches;
+    bool freed_d_matches;
+    bool merged_matches;
+    bool payload_matches;
+    bool note_matches;
+
+    init_process_heap();
+
+    // Restricts the first library heap block to the example's 52-cell region
+    region = (int *)malloc(49);
+    first = (struct BlockHeader *)region - 1;
+    region = (int *)first;
+    heap_init_region(&example_heap, first, 52);
+
+    a = (int *)malloc(8);
+    b = (int *)malloc(4);
+    c = (int *)malloc(12);
+    d = (int *)malloc(16);
+    a[0] = 42;
+    a[7] = 99;
+    c[0] = 73;
+    c[11] = 81;
+    free(b);
+    free(d);
+    initial_matches = sizeof(struct BlockHeader) == 3 &&
+        a == region + 3 && b == region + 14 &&
+        c == region + 21 && d == region + 36 &&
+        matches_initial_heap(region);
+
+    // Skips the undersized B and splits D into eleven cells and a two-cell tail
+    selected = (int *)malloc(11);
+    split_matches = selected == d &&
+        matches_block(region, 0, 8, false, 11) &&
+        matches_block(region, 11, 4, true, 18) &&
+        matches_block(region, 18, 12, false, 33) &&
+        matches_block(region, 33, 11, false, 47) &&
+        matches_block(region, 47, 2, true, -1);
+
+    // Restores D by absorbing the tail's header and payload
+    free(selected);
+    freed_d_matches = matches_initial_heap(region) &&
+        c[0] == 73 && c[11] == 81;
+
+    // Merges B with C and then with D during the same free call
+    free(c);
+    merged_matches = matches_block(region, 0, 8, false, 11) &&
+        matches_block(region, 11, 38, true, -1);
+    payload_matches = a[0] == 42 && a[7] == 99 &&
+        example_heap.first_block == first;
+
+    // Rebuilds the initial state to check the note's fourteen-cell request
+    heap_init_region(&example_heap, first, 52);
+    a = (int *)malloc(8);
+    b = (int *)malloc(4);
+    c = (int *)malloc(12);
+    d = (int *)malloc(16);
+    free(b);
+    free(d);
+    selected = (int *)malloc(14);
+    note_matches = selected == d &&
+        matches_block(region, 0, 8, false, 11) &&
+        matches_block(region, 11, 4, true, 18) &&
+        matches_block(region, 18, 12, false, 33) &&
+        matches_block(region, 33, 16, false, -1);
+    free(selected);
+    note_matches = note_matches && matches_initial_heap(region);
+
+    // Restores the complete library heap before reporting the results
+    init_process_heap();
+    printf("%d %d %d %d %d %d", initial_matches, split_matches,
+        freed_d_matches, merged_matches, payload_matches, note_matches);
+    return 0;
+}

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1294" height="292" viewBox="0 0 1294 292" role="img" aria-labelledby="title desc">
+<title id="title">Second merge at B: B.size = 19 + 3 + 16 = 38, B.next = NULL</title>
+<desc id="desc">One horizontal heap region with separate headers and payloads. Curved next arrows link headers in address order. Green payloads are free, blue payloads are allocated, and the orange outline marks the changed or selected block. Widths preserve memory positions across steps but are not to scale in cells.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker></defs>
+<rect width="1294" height="292" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif">
+<text x="32" y="27" font-size="18" font-weight="bold" text-anchor="start" fill="#172b3a">Second merge at B: B.size = 19 + 3 + 16 = 38, B.next = NULL</text>
+<rect x="32" y="100" width="102" height="116" fill="#fff0cc" stroke="#43576a"/>
+<text x="83.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
+<text x="83.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">A</text>
+<text x="83.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 8</text>
+<text x="83.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = false</text>
+<text x="83.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
+<rect x="134" y="100" width="144" height="116" fill="#deecff" stroke="#43576a"/>
+<text x="206.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload A</text>
+<text x="206.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">ALLOCATED</text>
+<text x="206.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">8 cells</text>
+<text x="32" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">0</text>
+<rect x="278" y="100" width="102" height="116" fill="#fff0cc" stroke="#43576a"/>
+<text x="329.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
+<text x="329.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">B</text>
+<text x="329.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 38</text>
+<text x="329.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = true</text>
+<text x="329.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
+<rect x="380" y="100" width="882" height="116" fill="#e5f3de" stroke="#43576a"/>
+<text x="821.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload B</text>
+<text x="821.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">FREE</text>
+<text x="821.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">38 cells</text>
+<text x="821.0" y="205" font-size="12" font-weight="normal" text-anchor="middle" fill="#172b3a">Includes former Headers C, D, D′</text>
+<rect x="278" y="100" width="984" height="116" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<text x="278" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">11</text>
+<path d="M 83.0 100 C 83.0 46, 329.0 46, 329.0 96" fill="none" stroke="#405ea8" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="206.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#405ea8">next</text>
+<text x="821.0" y="76" font-size="13" font-weight="normal" text-anchor="middle" fill="#405ea8">next = NULL</text>
+<text x="32" y="76" font-size="12" font-weight="normal" text-anchor="start" fill="#172b3a">first_block</text>
+<path d="M 38 82 L 83.0 97" stroke="#405ea8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="32" y="273" font-size="14" font-weight="normal" text-anchor="start" fill="#172b3a">Header offsets in RETI cells from region start</text>
+<text x="1262" y="238" font-size="13" font-weight="normal" text-anchor="end" fill="#172b3a">52</text>
+<text x="1262" y="273" font-size="14" font-weight="normal" text-anchor="end" fill="#172b3a">Increasing addresses →</text>
+</g>
+</svg>
