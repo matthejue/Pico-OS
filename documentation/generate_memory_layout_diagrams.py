@@ -338,6 +338,7 @@ def shared_memory_list():
     ]
     fig = sram(
         "shared-list", "Global shared-memory list and entry names in SRAM",
+        "Kernel .ivt, .text and .data form the outlined Kernel Image. "
         "The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. "
         "SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and "
         "its copied name occupy separate Kernel Heap payloads. name points to the corresponding "
@@ -355,7 +356,7 @@ def shared_memory_list():
               target_shift=60)
     for source, target in (("kpA", "kpB"), ("kpC", "kpD")):
         fig.arrow(source, target, "name", lane=275, color=ADDRESS, source_shift=-50)
-    fig.highlight("data", "data")
+    fig.highlight("ivt", "data")
     for key in ("kpA", "kpC"):
         x, width = fig.positions[key]
         fig.parts.append(fig.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
@@ -380,7 +381,7 @@ def shared_memory_list():
                  f"reference_count = {3 - number}", "unlink_requested = false",
                  "next = NULL" if number == 2 else "next")
         fig.parts.append(
-            f'<path d="M {fig.center(source)} {fig.bottom} L {x + node_width / 2} {lower_y}" '
+            f'<path d="M {fig.center(source)} {TOP + CELL_HEIGHT} L {x + node_width / 2} {lower_y}" '
             'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
         fig.parts.append(fig.rect(x, lower_y, node_width, lower_height, ALLOCATED,
                                   stroke=FOCUS, stroke_width=3))
@@ -554,136 +555,130 @@ def shared_memory_attachments():
 
 
 def shared_memory_destruction():
-    """Draw the two cleanup triggers, the lifetime test and registry removal."""
-    width, height = 2610, 1380
-    parts = [Diagram.text(LEFT, 30, "When PicoOS finally frees a Shared Data Payload",
-                          size=23, bold=True, anchor="start"),
-             Diagram.text(LEFT, 55,
-                          "Existing entry · unlink removes its name · PCB removal releases its attachments",
-                          size=16, anchor="start")]
+    """Show one entry's lifetime as five snapshots, without cleanup branches."""
+    panel_width, gap = 316, 28
+    width, height = 2 * LEFT + 5 * panel_width + 4 * gap, 738
+    parts = []
 
-    def node(x, y, w, h, lines, *, decision=False, link="", fill=ALLOCATED):
-        if decision:
-            shape = (f'<path d="M {x + w / 2} {y} L {x + w} {y + h / 2} '
-                     f'L {x + w / 2} {y + h} L {x} {y + h / 2} Z" '
-                     f'fill="{HEADER}" stroke="{LINE}" stroke-width="1.5"/>')
+    def label(x, y, value, *, size=17, bold=False, link="", color="#172b3a",
+              anchor="middle", max_width=None):
+        text = Diagram.text(x, y, value, size=size, bold=bold, color=color,
+                            anchor=anchor, max_width=max_width)
+        parts.append(f'<a href="../../{link}">{text}</a>' if link else text)
+
+    def box(x, y, w, h, fill=ALLOCATED):
+        parts.append(Diagram.rect(x, y, w, h, fill, stroke=LINE, stroke_width=1.5))
+
+    label(LEFT, 32, "Remove the name now. Free the data after the last mapping.",
+          size=25, bold=True, anchor="start")
+    label(LEFT, 61, "Example: Shared Memory Entry 1 and Shared Data Payload A, mapped by two processes",
+          size=18, anchor="start")
+
+    stages = (
+        ("1  Open", "shm_open(name, size)", "Create Entry 1 and its data",
+         "library/sys/mman/mman.picoc#L15", 0, False, ()),
+        ("2  Map", "mmap(id) in each process", "Both receive the same address",
+         "library/sys/mman/mman.picoc#L23", 2, False, (1, 2)),
+        ("3  Unlink", "shm_unlink(name)", "Remove the name, keep the data",
+         "library/sys/mman/mman.picoc#L27", 2, True, (1, 2)),
+        ("4  Release one mapping", "remove_process(PCB 1)", "Release PCB 1's attachment",
+         "kernel/process/process.picoc#L209", 1, True, (2,)),
+        ("5  Release the last mapping", "remove_process(PCB 2)", "Release PCB 2's attachment",
+         "kernel/process/process.picoc#L209", 0, True, ()),
+    )
+    for index, (title, function, effect, link, count, unlinked, pcbs) in enumerate(stages):
+        x = LEFT + index * (panel_width + gap)
+        center = x + panel_width / 2
+        box(x, 90, panel_width, 96, HEADER)
+        label(center, 116, title, bold=True, max_width=panel_width - 16)
+        label(center, 143, function, link=link, max_width=panel_width - 16)
+        label(center, 169, effect, size=16, max_width=panel_width - 16)
+        if index < len(stages) - 1:
+            # Horizontal arrows indicate time, vertical arrows are stored pointers.
+            parts.append(Diagram.path(
+                f"M {x + panel_width} 138 H {x + panel_width + gap - 3}",
+                POINTER, arrow=True))
+
+        if pcbs:
+            attachment_width = 142
+            for pcb in pcbs:
+                ax = x + (10 if pcb == 1 else panel_width - attachment_width - 10)
+                box(ax, 220, attachment_width, 54)
+                label(ax + attachment_width / 2, 242, f"PCB {pcb}", bold=True,
+                      link="kernel/process/process.header#L55")
+                label(ax + attachment_width / 2, 264, "attachment", size=16,
+                      link="kernel/shared_memory.header#L17")
+                parts.append(Diagram.path(
+                    f"M {ax + attachment_width / 2} 274 V 317", METADATA, arrow=True))
+                label(ax + attachment_width / 2 + 8, 300, "entry", size=15,
+                      anchor="start", color=METADATA,
+                      link="kernel/shared_memory.header#L18")
         else:
-            shape = Diagram.rect(x, y, w, h, fill, stroke=LINE, stroke_width=1.5)
-        first_line = y + (h - len(lines) * 23) / 2 + 17
-        labels = "".join(Diagram.text(x + w / 2, first_line + i * 23, line,
-                                      size=16, bold=i == 0,
-                                      max_width=w * 0.70 if decision else w - 18)
-                         for i, line in enumerate(lines))
-        parts.append(f'<a href="../../{link}">{shape}{labels}</a>' if link else shape + labels)
+            label(center, 245, "No attachments remain" if index == 4 else "No attachments yet",
+                  size=18, bold=True)
+            if index == 4:
+                label(center, 276, "reference_count: 1 → 0", size=18,
+                      link="kernel/shared_memory.header#L12")
 
-    def edge(path, label="", x=0, y=0, color=POINTER):
-        parts.append(Diagram.path(path, color, arrow=True))
-        if label:
-            w = len(label) * 9 + 14
-            parts.append(Diagram.rect(x - w / 2, y - 17, w, 23, "white"))
-            parts.append(Diagram.text(x, y, label, size=16, color=color))
+        box(x, 320, panel_width, 182, MUTED if index == 4 else ALLOCATED)
+        label(center, 347, "Entry 1 removed" if index == 4 else "Shared Memory Entry 1",
+              bold=True, link="kernel/shared_memory.header#L8")
+        if index == 4:
+            label(center, 384, "Destroy the unlinked entry", size=19, bold=True)
+            label(center, 417, "destroy_shared_memory_entry(entry)", size=15,
+                  link="kernel/shared_memory.picoc#L69", max_width=panel_width - 12)
+            label(center, 451, "PSDFree((int)entry->address)", size=16,
+                  link="kernel/psdmalloc.picoc#L47", max_width=panel_width - 12)
+            label(center, 480, "kfree(entry)", link="kernel/kmalloc.picoc#L38")
+        else:
+            label(center, 386, str(count), size=32, bold=True,
+                  link="kernel/shared_memory.header#L12")
+            label(center, 412, "reference_count", size=17,
+                  link="kernel/shared_memory.header#L12")
+            label(center, 449, 'name = NULL' if unlinked else 'name = "shared"',
+                  link="kernel/shared_memory.header#L9")
+            label(center, 479, "unlink_requested = " + ("true" if unlinked else "false"),
+                  link="kernel/shared_memory.header#L13", max_width=panel_width - 16)
+            parts.append(Diagram.path(f"M {center} 502 V 559", ADDRESS, arrow=True))
+            label(center + 10, 538, "address", size=16, color=ADDRESS,
+                  anchor="start", link="kernel/shared_memory.header#L11")
 
-    node(32, 85, 330, 110, ("unlink_shared_memory(name)", "entry = find_shared_memory_by_name(name)"),
-         link="kernel/shared_memory.picoc#L151")
-    node(490, 85, 450, 110, ("Remove the lookup name immediately", "kfree(entry->name)",
-                           "entry->name = NULL", "entry->unlink_requested = true"),
-         link="kernel/shared_memory.picoc#L163")
-    node(32, 280, 420, 165, ("terminate_process(process, status)", "Reached from exit_process or kill_process",
-                            "parent = find_process_by_pid(process->parent_pid)",
-                            "parent_is_waiting = parent != NULL &&",
-                            "process_has_waiting_parent(process)",
-                            "process->state = PROCESS_STATE_ZOMBIE"),
-         link="kernel/process/process.picoc#L304")
-    node(520, 295, 250, 135, ("parent == NULL", "|| parent_is_waiting?"), decision=True,
-         link="kernel/process/process.picoc#L322")
-    node(510, 505, 270, 100, ("Retain PCB and attachments", "Reference counts stay unchanged"),
-         link="kernel/process/process.picoc#L321", fill=MUTED)
-    node(900, 490, 360, 145, ("Later removal of retained PCB", "wait_for_process_by_pid(...)",
-                            "orphan_and_signal_children(parent)", "unload_process_by_pid(pid)"),
-         link="kernel/process/process.picoc#L348", fill=MUTED)
-    node(900, 312.5, 310, 100, ("remove_process(process)", "release_process_shared_memory(process)"),
-         link="kernel/process/process.picoc#L240")
-    node(1320, 292.5, 390, 140, ("Capture and clear the PCB list", "attachment =",
-                               "process->shared_memory_attachments",
-                               "process->shared_memory_attachments = NULL"),
-         link="kernel/shared_memory.picoc#L177")
-    node(1840, 295, 210, 135, ("attachment", "!= NULL?"), decision=True,
-         link="kernel/shared_memory.picoc#L179")
-    node(2200, 312.5, 310, 100, ("Attachment release complete", "remove_process continues cleanup",
-                               "and frees the PCB"), link="kernel/process/process.picoc#L241", fill=FREE)
-    node(1790, 540, 490, 150, ("Release one attachment", "next = attachment->next",
-                             "entry = attachment->entry",
-                             "entry->reference_count = entry->reference_count - 1",
-                             "kfree(attachment)"), link="kernel/shared_memory.picoc#L180")
-    node(1180, 880, 380, 180, ("entry->unlink_requested", "&&", "entry->reference_count == 0?"),
-         decision=True, link="kernel/shared_memory.picoc#L184")
-    node(1750, 920, 420, 100, ("Keep SharedMemoryEntry in the registry", "Keep Shared Data Payload allocated"),
-         fill=MUTED)
-    node(660, 905, 380, 130, ("destroy_shared_memory_entry(entry)", "Find candidate and previous",
-                            "by traversing shared_memory_list_head"), link="kernel/shared_memory.picoc#L69")
-    node(360, 902.5, 200, 135, ("previous", "== NULL?"), decision=True,
-         link="kernel/shared_memory.picoc#L81")
-    node(32, 780, 250, 100, ("Remove first registry entry", "shared_memory_list_head =", "candidate->next"),
-         link="kernel/shared_memory.picoc#L82")
-    node(32, 1060, 250, 100, ("Bypass entry in the registry", "previous->next = candidate->next"),
-         link="kernel/shared_memory.picoc#L84")
-    node(660, 1190, 1080, 120, ("PSDFree((int)candidate->address): free Shared Data Payload in process_shared_data_heap",
-                              "kfree(candidate->name): name is already NULL after unlink",
-                              "kfree(candidate): free SharedMemoryEntry in kernel_heap"),
-         link="kernel/shared_memory.picoc#L87", fill=FREE)
-    node(2280, 885, 230, 170, ("Attachment", "release loop?"), decision=True)
-    node(2290, 735, 250, 70, ("attachment = next",), link="kernel/shared_memory.picoc#L187")
-    node(2200, 1130, 310, 90, ("unlink_shared_memory returns 0",),
-         link="kernel/shared_memory.picoc#L169", fill=FREE)
+        box(x, 562, panel_width, 58, FREE if index == 4 else ALLOCATED)
+        label(center, 586, "Freed cells" if index == 4 else "Shared Data Payload A", bold=True)
+        label(center, 609, "Reusable by the heap" if index == 4 else "Same allocation stays alive",
+              size=16, max_width=panel_width - 16)
 
-    edge("M 362 140 H 487")
-    # Route unlink's lifetime check around the process-removal path.
-    edge("M 940 140 H 1730 V 805 H 1370 V 877", "After unlink", 1600, 799)
-    edge("M 452 362.5 H 517")
-    edge("M 770 362.5 H 897", "Yes", 835, 352)
-    edge("M 645 430 V 502", "No", 671, 468)
-    edge("M 780 555 H 897", "Later", 837, 545)
-    edge("M 1080 490 V 415.5")
-    edge("M 1210 362.5 H 1317")
-    # Bridge the independent unlink path, without implying a control-flow join.
-    edge("M 1710 362.5 H 1722 Q 1730 348.5 1738 362.5 H 1837")
-    edge("M 2050 362.5 H 2197", "No", 2125, 352)
-    edge("M 1945 430 V 537", "Yes", 1970, 487)
-    edge("M 2035 690 V 805 H 1370 V 877", "After each attachment", 2010, 799)
-    edge("M 1560 970 H 1747", "No", 1655, 959)
-    edge("M 1180 970 H 1043", "Yes", 1110, 959)
-    edge("M 660 970 H 563")
-    edge("M 460 902.5 V 830 H 285", "Yes: first entry", 402, 818)
-    edge("M 460 1037.5 V 1110 H 285", "No: predecessor exists", 430, 1098)
-    edge("M 282 830 H 310 V 1250 H 657")
-    edge("M 282 1110 H 310 V 1250 H 657")
-    edge("M 2170 970 H 2277")
-    edge("M 1740 1250 H 2190 V 970 H 2277")
-    edge("M 2510 970 H 2580 V 770 H 2543", "Yes", 2540, 958)
-    edge("M 2415 735 V 705 H 2560 V 240 H 1945 V 292", "Next attachment", 2260, 229)
-    edge("M 2395 1055 V 1127", "No: unlink call", 2430, 1097)
+    box(LEFT, 649, width - 2 * LEFT, 62, HEADER)
+    label(width / 2, 674, "Free the entry and data only when BOTH conditions hold", size=21, bold=True)
+    label(width / 2 - 22, 699, "unlink_requested == true", size=19, anchor="end",
+          link="kernel/shared_memory.header#L13")
+    label(width / 2, 699, "and", size=19)
+    label(width / 2 + 22, 699, "reference_count == 0", size=19, anchor="start",
+          link="kernel/shared_memory.header#L12")
 
-    parts.append(Diagram.text(LEFT, height - 24,
-                              "Registry links are SharedMemoryEntry.next pointers. No separate list-node allocation is freed.",
-                              size=16, anchor="start"))
-    defs = (f'<marker id="{POINTER[1:]}" viewBox="0 0 10 10" refX="9" refY="5" '
-            f'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
-            f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{POINTER}"/></marker>')
+    defs = "".join(
+        f'<marker id="{color[1:]}" viewBox="0 0 10 10" refX="9" refY="5" '
+        'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+        f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{color}"/></marker>'
+        for color in (POINTER, METADATA, ADDRESS))
     description = (
-        "Unlink frees the name and sets unlink_requested. Termination retains attachments while a PCB "
-        "is a zombie, unless no parent exists or the parent has already collected its status. "
-        "Final PCB removal releases all attachments, following saved next pointers and decrementing "
-        "reference_count once per attachment. Only unlink_requested with reference_count zero destroys "
-        "the shared entry. Destruction updates shared_memory_list_head or the predecessor next pointer, "
-        "frees the Shared Data Payload with PSDFree, and frees the entry with kfree. The diagram applies "
-        "to existing registry entries and valid process cleanup. The attachment-release-loop decision "
-        "indicates caller context, not a PicoOS variable. The bridge separates independent arrow crossings.")
+        "Five snapshots of one shared-memory entry. shm_open creates Entry 1 and Shared Data Payload A "
+        "with reference_count zero and unlink_requested false. mmap in the processes represented by "
+        "PCB 1 and PCB 2 creates one attachment each, bringing reference_count to two. Both receive "
+        "the same address. shm_unlink frees the name, sets name to NULL and unlink_requested to true, "
+        "but leaves both attachments and the shared data alive. Final removal of PCB 1 releases its "
+        "attachment and reduces reference_count to one. Final removal of PCB 2 reduces the count to "
+        "zero, removes Entry 1 from the registry and frees the shared data and entry. Each PCB's "
+        "shared_memory_attachments list owns its attachment, whose entry pointer reaches Entry 1. "
+        "Horizontal arrows show time. Vertical arrows show entry and address pointers. This example "
+        "tracks Entry 1 only, without additional mappings after unlink. Cleanup requires both "
+        "unlink_requested true and reference_count zero, regardless of their order.")
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-           f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">'
-           '<title id="title">Shared-memory deferred destruction decisions</title>'
-           f'<desc id="desc">{escape(description)}</desc><defs>{defs}</defs>'
-           f'<rect width="{width}" height="{height}" fill="white"/>'
-           '<g font-family="DejaVu Sans, sans-serif">' + "\n".join(parts) + '</g></svg>\n')
+           f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">\n'
+           '<title id="title">Shared-memory lifetime: open, map, unlink, release</title>\n'
+           f'<desc id="desc">{escape(description)}</desc>\n<defs>{defs}</defs>\n'
+           f'<rect width="{width}" height="{height}" fill="white"/>\n'
+           '<g font-family="DejaVu Sans, sans-serif">\n' + "\n".join(parts) + '\n</g></svg>\n')
     (OUTPUT / "memory-shared-destruction.svg").write_text(svg)
 
 

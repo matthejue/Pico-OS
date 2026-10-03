@@ -266,14 +266,17 @@ def process_payload_links():
 
 
 def placement():
+    highlight_fill = ALLOCATED
+    highlight_border = FOCUS
     f = Figure("stack-placement", "One user-process stack in the SRAM hierarchy",
                "The complete SRAM contains a Kernel area and the Process and Shared Data Heap. "
                "Each process is one independent allocator payload containing a User Process Image, "
-               "User Process Heap and User Process Stack. Only the stack in Payload A is highlighted.",
+               "User Process Heap and User Process Stack. Process Payload A and its User Process "
+               "Stack are highlighted with matching blue fills and thick red outlines.",
                height=490)
     f.row(100, 90, [("kernel", 430, ("Kernel area", "image · heap · stack"), MUTED),
                     ("ha", 100, ("Block", "Header A"), HEADER),
-                    ("pa", 360, ("Process Payload A", "one user process"), MUTED),
+                    ("pa", 360, ("Process Payload A", "one user process"), highlight_fill),
                     ("hb", 100, ("Block", "Header B"), HEADER),
                     ("pb", 330, ("Process Payload B", "another user process"), MUTED),
                     ("other", 370, ("Other outer blocks", "processes · shared data · free space"), MUTED)])
@@ -283,12 +286,14 @@ def placement():
                      ("text", 300, (".text", "program + libraries"), MUTED),
                      ("data", 260, (".data", "process globals"), MUTED),
                      ("heap", 470, ("User Process Heap", "independent allocator"), MUTED),
-                     ("stack", 510, ("User Process Stack", "grows toward lower addresses ←"), ALLOCATED)])
+                     ("stack", 510, ("User Process Stack", "grows toward lower addresses ←"), highlight_fill)])
     f.band("ivt", "data", 420, "User Process Image")
     f.band("heap", "heap", 420, "User Process Heap")
-    f.band("stack", "stack", 420, "User Process Stack", ALLOCATED)
+    f.band("stack", "stack", 420, "User Process Stack", highlight_fill)
     f.expand("pa", "ivt", "stack", "Expand Process Payload A · outer header remains outside the payload")
-    f.focus("stack")
+    for key, band_height in (("pa", 0), ("stack", 30)):
+        x, y, w, h = f.cells[key]
+        f.box(x, y, w, h + band_height, "none", highlight_border, 4)
     f.save()
 
 
@@ -296,9 +301,10 @@ def memory_snapshot(f, running=False):
     """Common post-load/pre-dispatch layout for the load and run figures."""
     descriptor = ("Payload C", "child descriptor table", "new inherited copy") if running else (
         "Payload C", "child descriptor table", "fresh standard entries")
-    child = ("Payload B · PCB 2", "state: NEW → READY", "sp = E − 1", "baf = E − 2",
+    child = ("Payload B · PCB 2", "state: NEW → READY", "sp = entry_pc_address − 1", "baf = entry_pc_address − 2",
              "file_descriptors replaced") if running else (
-        "Payload B · PCB 2", "state = NEW", "sp = H − 1 · baf = H", "cs = base + code_start",
+        "Payload B · PCB 2", "state = NEW", "sp = highest_stack_address − 1",
+        "baf = highest_stack_address", "cs = base + code_start",
         "ds = base + data_start", "next = NULL")
     f.row(250, 170, [("ivt", 70, (".ivt",), MUTED), ("text", 110, (".text",), MUTED),
                      ("data", 260, (".data · kernel globals", "process_list_head = PCB 1",
@@ -325,10 +331,12 @@ def memory_snapshot(f, running=False):
         f.focus_lines("child", 1, 4, 5)
     else:
         f.focus("child")
-    stack = ("User Process Stack", "E: entry PC = cs − 1", "E + 1: argc", "argv[] · NULL · envp[] · NULL",
-             "copied path, arguments, NAME=value strings", "H: final string terminator (overwrites old entry PC)") if running else (
-        "User Process Stack", "lower cells: uninitialized", "H = base_address + size − 1",
-        "M[H] = activation.cs − 1", "no argc, argv[] or envp[] yet", "stack grows ←")
+    stack = ("User Process Stack", "entry_pc_address: entry PC = cs − 1",
+             "entry_pc_address + 1: argc", "argv[] · NULL · envp[] · NULL",
+             "copied path, arguments, NAME=value strings",
+             "highest_stack_address: final string terminator (overwrites old entry PC)") if running else (
+        "User Process Stack", "lower cells: uninitialized", "highest_stack_address = base_address + size − 1",
+        "M[highest_stack_address] = activation.cs − 1", "no argc, argv[] or envp[] yet", "stack grows ←")
     f.row(615, 160, [("oh", 100, ("Outer Block", "Header B"), HEADER),
                      ("uivt", 130, ("optional .ivt",), MUTED),
                      ("utext", 270, (".text", "received instructions"), MUTED),
@@ -404,7 +412,7 @@ def load_complete():
                "After transfer, create_process allocates PCB 2 in the Kernel Heap and initializes state "
                "to NEW. The previous tail PCB 1 receives next = PCB 2 and process_list_tail changes "
                "to PCB 2. The new PCB points to a fresh standard descriptor table and its Process "
-               "Payload. create_process writes cs minus one into the highest stack cell H. "
+               "Payload. create_process writes cs minus one into the cell at highest_stack_address. "
                "The argument and environment layout does not exist yet.", width=1824, height=890)
     f.label(32, 99, "create_process(): old tail.next = new PCB · process_list_tail = new PCB · next_process_id increments",
             anchor="start", size=16, color=FOCUS)
@@ -424,7 +432,8 @@ def run_setup():
                "initial User Process Stack, and change activation.sp, activation.baf and state. "
                "Arguments and environment are copied from the caller's user memory. Globals "
                "process_list_head, process_list_tail and active_process do not change during run setup. "
-               "E is the new entry PC cell, H is the final stack cell. Caller input buffers "
+               "entry_pc_address identifies the new entry PC cell; highest_stack_address identifies "
+               "the final stack cell. Caller input buffers "
                "are shown separately below the child's contiguous memory layout.", width=1824, height=1040)
     f.label(32, 99, "mark_process_ready_with_arguments(): descriptor copy → stack copy → state = READY",
             anchor="start", size=16, color=FOCUS)
@@ -446,31 +455,37 @@ def run_setup():
 
 def initial_example():
     f = Figure("initial-stack-example", "Concrete initial stack · add.bin · two arguments · two environment variables",
-               "Every box is one 32-bit RETI cell. E is base_address plus size minus 29. "
+               "Every box is one 32-bit RETI cell, labeled by its offset from entry_pc_address, "
+               "which is base_address plus size minus 29. "
                "The first nine cells contain the entry PC, argc, three argument pointers and NULL, "
                "two environment pointers and NULL. Higher cells contain add.bin, 2, 3, X=1 "
-               "and Y=0 with a zero cell after every string. argv is E+2 and envp is E+6. "
-               "Their pointers address E+9, E+17, E+19, E+21 and E+25 respectively. "
-               "SP is E-1 and BAF is E-2. Read rows in order, with increasing addresses to the right "
-               "and stack growth to the left. Continuation arrows connect E+8 to E+9 and E+16 to E+17. "
+               "and Y=0 with a zero cell after every string. argv is entry_pc_address + 2 "
+               "and envp is entry_pc_address + 6. Pointer targets are shown as offsets 9, 17, 19, "
+               "21 and 25, but stored pointers are absolute addresses: entry_pc_address plus that offset. "
+               "The saved stack pointer is entry_pc_address minus one and the saved frame pointer "
+               "is entry_pc_address minus two. Read rows in order, with increasing addresses "
+               "to the right and stack growth to the left. Continuation arrows connect cell offsets "
+               "8 to 9 and 16 to 17. "
                "All cells belong to the same contiguous stack.",
-               width=1264, height=640)
+               width=1264, height=730)
     f.label(32, 92, "Stack grows ← toward decreasing addresses · read rows in order · every box is one 32-bit cell",
             anchor="start", size=16)
+    f.label(32, 115, "Cell address = entry_pc_address + offset · pointer targets show offsets; stored pointers are absolute addresses",
+            anchor="start", size=16)
     cells = [
-        ("entry", 100, ("E", "entry PC", "cs − 1"), MUTED),
-        ("argc", 100, ("E + 1", "argc", "3"), ALLOCATED),
-        ("argv0", 100, ("E + 2", "argv[0]", "E + 9"), ALLOCATED),
-        ("argv1", 100, ("E + 3", "argv[1]", "E + 17"), ALLOCATED),
-        ("argv2", 100, ("E + 4", "argv[2]", "E + 19"), ALLOCATED),
-        ("argvnull", 100, ("E + 5", "argv[3]", "NULL = 0"), MUTED),
-        ("env0", 100, ("E + 6", "envp[0]", "E + 21"), ALLOCATED),
-        ("env1", 100, ("E + 7", "envp[1]", "E + 25"), ALLOCATED),
-        ("envnull", 100, ("E + 8", "envp[2]", "NULL = 0"), MUTED),
+        ("entry", 100, ("offset 0", "entry PC", "cs − 1"), MUTED),
+        ("argc", 100, ("offset 1", "argc", "3"), ALLOCATED),
+        ("argv0", 100, ("offset 2", "argv[0]", "→ offset 9"), ALLOCATED),
+        ("argv1", 100, ("offset 3", "argv[1]", "→ offset 17"), ALLOCATED),
+        ("argv2", 100, ("offset 4", "argv[2]", "→ offset 19"), ALLOCATED),
+        ("argvnull", 100, ("offset 5", "argv[3]", "NULL = 0"), MUTED),
+        ("env0", 100, ("offset 6", "envp[0]", "→ offset 21"), ALLOCATED),
+        ("env1", 100, ("offset 7", "envp[1]", "→ offset 25"), ALLOCATED),
+        ("envnull", 100, ("offset 8", "envp[2]", "NULL = 0"), MUTED),
     ]
-    f.row(120, 90, cells)
-    f.band("argv0", "argvnull", 210, "argv = E + 2")
-    f.band("env0", "envnull", 210, "envp = E + 6")
+    f.row(145, 90, cells)
+    f.band("argv0", "argvnull", 235, "argv = entry_pc_address + 2")
+    f.band("env0", "envnull", 235, "envp = entry_pc_address + 6")
 
     def string_row(y, start, values, title):
         f.label(32, y - 15, title, anchor="start", size=16, bold=True)
@@ -478,19 +493,19 @@ def initial_example():
         for index, value in enumerate(values):
             offset = start + index
             character = "'\\0'" if value == "\0" else repr(value)
-            row.append((f"s{offset}", 100, (f"E + {offset}", f"{character} = {ord(value)}"),
+            row.append((f"s{offset}", 100, (f"offset {offset}", f"{character} = {ord(value)}"),
                         MUTED if value == "\0" else ALLOCATED))
         f.row(y, 72, row)
 
-    string_row(300, 9, "add.bin\0", "Copied executable path")
-    f.band("s9", "s16", 372, 'argv[0] → "add.bin\\0"')
-    string_row(462, 17, "2\0" + "3\0" + "X=1\0" + "Y=0\0",
+    string_row(325, 9, "add.bin\0", "Copied executable path · strings_start_address = entry_pc_address + 9")
+    f.band("s9", "s16", 397, 'argv[0] → "add.bin\\0"')
+    string_row(487, 17, "2\0" + "3\0" + "X=1\0" + "Y=0\0",
                "Two argument strings, then two environment strings")
     for first, last, label in ((17, 18, 'argv[1] → "2\\0"'),
                                (19, 20, 'argv[2] → "3\\0"'),
                                (21, 24, 'envp[0] → "X=1\\0"'),
                                (25, 28, 'envp[1] → "Y=0\\0"')):
-        f.band(f"s{first}", f"s{last}", 534, label)
+        f.band(f"s{first}", f"s{last}", 559, label)
 
     def continuation(source, target, label, lane):
         """Join consecutive memory cells across a line break in the drawing."""
@@ -506,9 +521,13 @@ def initial_example():
                        f'marker-end="url(#{FOCUS[1:]})"/>')
         f.label((left + right) / 2, lane - 8, label, size=15, bold=True, color=FOCUS)
 
-    continuation("envnull", "s9", "Next memory cell: E + 8 → E + 9", 266)
-    continuation("s16", "s17", "Next memory cell: E + 16 → E + 17", 428)
-    f.label(32, 612, "E = base_address + size − 29 · H = E + 28 · saved SP = E − 1 · saved BAF = E − 2",
+    continuation("envnull", "s9", "Next memory cell: offset 8 → offset 9", 291)
+    continuation("s16", "s17", "Next memory cell: offset 16 → offset 17", 453)
+    f.label(32, 630, "startup_cell_count = 29 · entry_pc_address = base_address + size − startup_cell_count",
+            anchor="start", size=16)
+    f.label(32, 655, "highest_stack_address = entry_pc_address + 28 · final string terminator at offset 28",
+            anchor="start", size=16)
+    f.label(32, 680, "Saved stack pointer (SP) = entry_pc_address − 1 · saved frame pointer (BAF) = entry_pc_address − 2",
             anchor="start", size=16)
     f.save()
 

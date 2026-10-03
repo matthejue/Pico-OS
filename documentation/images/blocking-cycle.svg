@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+<title id="title">Sleep, wakeup, resume: the waiting cycle</title>
+<desc id="desc">A clockwise cycle shows one process's PCB state. BLOCKED: waiting for an event on a wait queue after sleep(). An event triggers wakeup(), removing the waiter and making its state READY: waiting for CPU time. The scheduler selects it and the dispatcher resumes it with state RUNNING. If it needs another event, sleep() joins the wait queue again. Kernel events use the corresponding queue helpers directly. The central message is READY does not mean RUNNING.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#43576a"/></marker>
+</defs>
+<rect width="1600" height="900" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif">
+<text x="800" y="88" text-anchor="middle" font-size="48" font-weight="bold" fill="#172b3a">sleep() → wakeup() → resume</text>
+<a href="../../kernel/process/process.header#L33"><text x="800" y="148" text-anchor="middle" font-size="26" font-weight="normal" fill="#43576a">One process · its PCB state</text></a>
+<rect x="160" y="260" width="360" height="160" fill="#fff5e3" stroke="#995b0b" stroke-width="2.5"/>
+<a href="../../kernel/process/process.header#L15"><text x="340" y="326" text-anchor="middle" font-size="38" font-weight="bold" fill="#995b0b">BLOCKED</text></a>
+<text x="340" y="374" text-anchor="middle" font-size="26" font-weight="normal" fill="#172b3a">Waiting for an event</text>
+<rect x="1080" y="260" width="360" height="160" fill="#eef5ff" stroke="#285fa3" stroke-width="2.5"/>
+<a href="../../kernel/process/process.header#L13"><text x="1260" y="326" text-anchor="middle" font-size="38" font-weight="bold" fill="#285fa3">READY</text></a>
+<text x="1260" y="374" text-anchor="middle" font-size="26" font-weight="normal" fill="#172b3a">Waiting for CPU time</text>
+<rect x="620" y="620" width="360" height="160" fill="#edf7f1" stroke="#26715b" stroke-width="2.5"/>
+<a href="../../kernel/process/process.header#L14"><text x="800" y="686" text-anchor="middle" font-size="38" font-weight="bold" fill="#26715b">RUNNING</text></a>
+<text x="800" y="734" text-anchor="middle" font-size="26" font-weight="normal" fill="#172b3a">Executing on the CPU</text>
+<path d="M 532 340 H 1068" fill="none" stroke="#43576a" stroke-width="4" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<a href="../../library/unistd/blocking.picoc#L19"><text x="800" y="300" text-anchor="middle" font-size="34" font-weight="bold" fill="#172b3a">wakeup()</text></a>
+<a href="../../common/wait_queue.header#L5"><text x="800" y="384" text-anchor="middle" font-size="28" font-weight="normal" fill="#172b3a">Leave wait queue</text></a>
+<path d="M 1260 432 C 1260 570 1108 700 992 700" fill="none" stroke="#43576a" stroke-width="4" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<a href="../../kernel/scheduler.picoc#L12"><text x="1430" y="540" text-anchor="middle" font-size="26" font-weight="bold" fill="#172b3a">Scheduler selects</text></a>
+<a href="../../kernel/dispatcher.picoc#L43"><text x="1430" y="582" text-anchor="middle" font-size="24" font-weight="normal" fill="#172b3a">Dispatcher resumes</text></a>
+<path d="M 608 700 C 492 700 340 570 340 432" fill="none" stroke="#43576a" stroke-width="4" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<a href="../../library/unistd/blocking.picoc#L9"><text x="256" y="540" text-anchor="middle" font-size="34" font-weight="bold" fill="#172b3a">sleep()</text></a>
+<a href="../../common/wait_queue.header#L5"><text x="256" y="582" text-anchor="middle" font-size="28" font-weight="normal" fill="#172b3a">Join wait queue</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="800" y="526" text-anchor="middle" font-size="32" font-weight="bold" fill="#285fa3">READY ≠ RUNNING</text></a>
+</g></svg>

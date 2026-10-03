@@ -24,7 +24,7 @@ They demonstrate the relevant operating-system concepts, but do not implement
 full POSIX job control or independent terminal queues.
 
 - Six fixed-action signals and one foreground/input owner replace full job
-  control. See [`7.2 Process Signals`](../README.md#72-process-signals) and
+  control. See [`7.3 Process Signals`](../README.md#73-process-signals) and
   [`12.5.1 Foreground processes, background processes, and job-control signals`](../README.md#1251-foreground-processes-background-processes-and-job-control-signals).
 - One global terminal ring and wait queue serve per-process pending input
   reads, as explained in

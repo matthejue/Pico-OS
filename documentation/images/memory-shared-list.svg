@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2109" height="1017" viewBox="0 0 2109 1017" role="img" aria-labelledby="title desc">
 <title id="title">Global shared-memory list and entry names in SRAM</title>
-<desc id="desc">The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and its copied name occupy separate Kernel Heap payloads. name points to the corresponding string, skipping allocator headers. Entry 1 has two attachments and Entry 2 has one. Both are named and unlink_requested is false. Below SRAM, the same two entry objects appear as a logical registry list with the same global head and next link. Dashed lines identify those objects across the two views. Allocator pointer arrows are omitted.</desc>
+<desc id="desc">Kernel .ivt, .text and .data form the outlined Kernel Image. The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and its copied name occupy separate Kernel Heap payloads. name points to the corresponding string, skipping allocator headers. Entry 1 has two attachments and Entry 2 has one. Both are named and unlink_requested is false. Below SRAM, the same two entry objects appear as a logical registry list with the same global head and next link. Dashed lines identify those objects across the two views. Allocator pointer arrows are omitted.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
 <rect width="2109" height="1017" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
@@ -73,17 +73,17 @@
 <path d="M 1237.0 310 V 287 Q 1237.0 275 1249.0 275 H 1575.0 Q 1587.0 275 1587.0 287 V 307" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
 <rect x="1389.0" y="262" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1412.0" y="276" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">name</text>
-<rect x="202" y="310" width="300" height="186" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<rect x="32" y="310" width="470" height="186" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="572" y="310" width="230" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="1172" y="310" width="230" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <text x="32" y="581" text-anchor="start" font-size="17" font-weight="bold" fill="#172b3a">Same two SharedMemoryEntry objects shown as the registry list</text>
 <rect x="32" y="776" width="350" height="156" fill="#f0f3f6" stroke="#9c3d15" stroke-width="3"/>
 <text x="207.0" y="831" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Kernel registry global</text>
 <text x="207.0" y="861" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">shared_memory_list_head</text>
-<path d="M 687.0 526 L 860.0 776" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 687.0 466 L 860.0 776" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
 <rect x="650" y="776" width="420" height="156" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
 <a href="../../kernel/shared_memory.header#L8"><text x="860.0" y="802" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text><text x="860.0" y="823" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">SharedMemoryEntry</text><text x="860.0" y="844" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">id = 2</text><text x="860.0" y="865" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">reference_count = 2</text><text x="860.0" y="886" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">unlink_requested = false</text><text x="860.0" y="907" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">next</text></a>
-<path d="M 1287.0 526 L 1610.0 776" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 1287.0 466 L 1610.0 776" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
 <rect x="1400" y="776" width="420" height="156" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
 <a href="../../kernel/shared_memory.header#L8"><text x="1610.0" y="802" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Shared Memory Entry 2</text><text x="1610.0" y="823" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">SharedMemoryEntry</text><text x="1610.0" y="844" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">id = 1</text><text x="1610.0" y="865" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">reference_count = 1</text><text x="1610.0" y="886" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">unlink_requested = false</text><text x="1610.0" y="907" text-anchor="middle" font-size="15" font-weight="normal" fill="#172b3a">next = NULL</text></a>
 <path d="M 207.0 776 V 668 Q 207.0 656 219.0 656 H 848.0 Q 860.0 656 860.0 668 V 773" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
