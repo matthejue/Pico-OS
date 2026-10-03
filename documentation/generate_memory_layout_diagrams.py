@@ -337,7 +337,7 @@ def shared_memory_list():
          "reference_count = 1", "unlink_requested = false", "next = NULL"),
     ]
     fig = sram(
-        "shared-list", "Global shared-memory registry within SRAM",
+        "shared-list", "Global shared-memory list and entry names in SRAM",
         "The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. "
         "SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and "
         "its copied name occupy separate Kernel Heap payloads. name points to the corresponding "
@@ -408,59 +408,32 @@ def shared_memory_list():
     fig.save()
 
 
-def shared_memory_mappings():
-    """Connect PCB attachment lists to registry entries and their shared data."""
+def shared_memory_payload_links():
+    """Mirror the PCB payload view with two entries pointing to shared data."""
     mapping = sram(
-        "shared-mappings", "From PCB attachments through shared entries to shared data",
-        "All seven depicted metadata objects are separate Kernel Heap payloads. In kernel .data, "
-        "active_process reaches PCB 1 and shared_memory_list_head reaches Entry 1. PCB 1 links "
-        "Shared Memory Attachment 1 then 2, referencing Shared Memory Entry 1 then 2. "
-        "PCB 2 links Shared Memory Attachment 3, also referencing Entry 1. Entry 1 has reference_count 2 "
-        "and Entry 2 has reference_count 1. Both have unlink_requested false. Entries are linked "
-        "by SharedMemoryEntry.next. address reaches Shared Data Payloads A and C. "
-        "Every object pointer reaches a payload, never an allocator header. Copied name strings, "
-        "allocator pointer arrows, and PCB base_address arrows are omitted.",
-        data=(".data · kernel globals", "active_process", "shared_memory_list_head"),
+        "shared-mappings", "From Shared Memory Entries to Shared Data Payloads in SRAM",
+        "Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap "
+        "and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. "
+        "Each depicted heap has three Block Headers A, B and C. Kernel Heap Payloads A and C "
+        "contain Shared Memory Entry 1 and Shared Memory Entry 2. Their address fields reach "
+        "Shared Data Payloads A and C, immediately after their outer headers. Kernel Heap "
+        "Payload B contains PCB 1, whose Process Payload B is shown for context. Only the "
+        "two shared-data address pointers are drawn. Other allocations are omitted.",
+        data=(".data · kernel globals", "global data"),
         kernel_payloads=[
-            ("PCB 1", "ProcessControlBlock", "shared_memory_attachments", "base_address", "next"),
-            ("PCB 2", "ProcessControlBlock", "shared_memory_attachments", "base_address", "next = NULL"),
-            ("Shared Memory", "Attachment 1", "SharedMemoryAttachment", "entry", "next"),
-            ("Shared Memory", "Attachment 2", "SharedMemoryAttachment", "entry", "next = NULL"),
-            ("Shared Memory", "Attachment 3", "SharedMemoryAttachment", "entry", "next = NULL"),
-            ("Shared Memory Entry 1", "SharedMemoryEntry", "id = 2", "address",
-             "reference_count = 2", "unlink_requested = false", "next"),
-            ("Shared Memory Entry 2", "SharedMemoryEntry", "id = 1", "address",
-             "reference_count = 1", "unlink_requested = false", "next = NULL"),
+            ("Payload A", "Shared Memory Entry 1", "SharedMemoryEntry", "address"),
+            ("Payload B", "PCB 1", "ProcessControlBlock", "base_address"),
+            ("Payload C", "Shared Memory Entry 2", "SharedMemoryEntry", "address"),
         ],
         outer_payloads=[("Shared Data Payload A", "shared cells"),
-                        ("Process Payload B", "PCB 1's user process"),
-                        ("Shared Data Payload C", "shared cells"),
-                        ("Process Payload D", "PCB 2's user process")],
-        data_width=280, kernel_payload_width=220, outer_payload_width=175,
-        kernel_header_width=60, outer_header_width=65, show_heap_links=False,
+                        ("Process Payload B", "PCB 1's user process", "image · heap · stack"),
+                        ("Shared Data Payload C", "shared cells")],
+        data_width=310, kernel_payload_width=210, outer_payload_width=210,
+        show_heap_links=False,
     )
-    mapping.arrow("data", "kpF", "shared_memory_list_head", lane=90, source_shift=-40,
-                  target_shift=40, label_x=1020)
-    mapping.arrow("data", "kpA", "active_process", lane=125, source_shift=45)
-    mapping.arrow("kpA", "kpB", "next", lane=220, color=METADATA, source_shift=65,
-                  target_shift=65)
-    mapping.arrow("kpA", "kpC", "shared_memory_attachments", lane=165,
-                  color=METADATA, source_shift=-70, target_shift=-50, label_x=740)
-    mapping.arrow("kpB", "kpE", "shared_memory_attachments", lane=200,
-                  color=METADATA, source_shift=-70, label_x=1170)
-    mapping.arrow("kpC", "kpD", "next", lane=245, color=METADATA, source_shift=50,
-                  target_shift=50)
-    mapping.arrow("kpF", "kpG", "next", lane=245, color=METADATA, source_shift=65,
-                  target_shift=65)
-    mapping.arrow("kpF", "opA", "address", lane=165, color=ADDRESS, source_shift=-65)
-    mapping.arrow("kpG", "opC", "address", lane=200, color=ADDRESS, source_shift=-65)
-    for source, target, lane, shift in (("kpC", "kpF", 565, -65),
-                                        ("kpD", "kpG", 605, 0),
-                                        ("kpE", "kpF", 645, 65)):
-        mapping.arrow(source, target, "entry", lane=lane, color=METADATA, below=True,
-                      target_shift=shift)
-    mapping.highlight("data", "data")
-    for key in ("kpA", "kpB", "kpC", "kpD", "kpE", "kpF", "kpG"):
+    mapping.arrow("kpA", "opA", "address", lane=80, color=ADDRESS, source_shift=-55)
+    mapping.arrow("kpC", "opC", "address", lane=150, color=ADDRESS, source_shift=-55)
+    for key in ("kpA", "kpB", "kpC"):
         x, width = mapping.positions[key]
         mapping.parts.append(mapping.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
                                           stroke_width=3))
@@ -471,6 +444,7 @@ def shared_memory_attachments():
     """Show the same PCB attachment lists in SRAM and as logical lists."""
     fig = sram(
         "shared-attachments", "Per-process shared-memory attachment lists within SRAM",
+        "Kernel .ivt, .text and .data form the outlined Kernel Image. "
         "Two PCBs, three SharedMemoryAttachment objects and two SharedMemoryEntry objects "
         "occupy seven separate Kernel Heap payloads. PCB 1 links Attachment 1 then Attachment 2, "
         "which reference Entry 1 and Entry 2. PCB 2 links Attachment 3, which also references "
@@ -479,11 +453,12 @@ def shared_memory_attachments():
         "Entry 1 and SharedMemoryEntry.next reaches Entry 2. Below SRAM, the same seven objects "
         "are repeated as two per-process attachment lists. Dashed lines identify the same objects "
         "across views, not additional allocations or stored pointers. The Process and Shared Data "
-        "Heap is one box. Name strings, other kernel allocations and payload address arrows are omitted.",
-        data=(".data · kernel globals", "active_process", "shared_memory_list_head"),
+        "Heap is one box. Name strings, other kernel allocations, process-list pointers and "
+        "payload address arrows are omitted.",
+        data=(".data · kernel globals", "shared_memory_list_head"),
         kernel_payloads=[
-            ("PCB 1", "ProcessControlBlock", "shared_memory_attachments", "next"),
-            ("PCB 2", "ProcessControlBlock", "shared_memory_attachments", "next = NULL"),
+            ("PCB 1", "ProcessControlBlock", "shared_memory_attachments"),
+            ("PCB 2", "ProcessControlBlock", "shared_memory_attachments"),
             ("Shared Memory", "Attachment 1", "SharedMemoryAttachment", "entry", "next"),
             ("Shared Memory", "Attachment 2", "SharedMemoryAttachment", "entry", "next = NULL"),
             ("Shared Memory", "Attachment 3", "SharedMemoryAttachment", "entry", "next = NULL"),
@@ -497,9 +472,6 @@ def shared_memory_attachments():
     )
     fig.arrow("data", "kpF", "shared_memory_list_head", lane=90, source_shift=-40,
               target_shift=40, label_x=1020)
-    fig.arrow("data", "kpA", "active_process", lane=125, source_shift=45)
-    fig.arrow("kpA", "kpB", "next", lane=220, color=METADATA, source_shift=65,
-              target_shift=65)
     fig.arrow("kpA", "kpC", "shared_memory_attachments", lane=165, color=METADATA,
               source_shift=-70, target_shift=-50, label_x=740)
     fig.arrow("kpB", "kpE", "shared_memory_attachments", lane=200, color=METADATA,
@@ -513,7 +485,7 @@ def shared_memory_attachments():
                                       ("kpE", "kpF", 645, 65)):
         fig.arrow(source, target, "entry", lane=lane, color=METADATA, below=True,
                   target_shift=shift)
-    fig.highlight("data", "data")
+    fig.highlight("ivt", "data")
     for key in ("kpA", "kpB", "kpC", "kpD", "kpE", "kpF", "kpG"):
         x, width = fig.positions[key]
         fig.parts.append(fig.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
@@ -824,7 +796,7 @@ def main():
     process("user-heap", expanded=True)
 
     shared_memory_list()
-    shared_memory_mappings()
+    shared_memory_payload_links()
     shared_memory_attachments()
     shared_memory_destruction()
 

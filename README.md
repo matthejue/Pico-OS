@@ -434,8 +434,8 @@ lectures follow.
    - [4.4 Process list, PCB metadata, and lifecycle function reference](#44-process-list-pcb-metadata-and-lifecycle-function-reference)
 1. [Shared Memory Entries and Mappings](#5-shared-memory-entries-and-mappings)
    - [5.1 Named entries and per-process attachments](#51-named-entries-and-per-process-attachments)
-      - [5.1.1 Global shared-memory registry](#511-global-shared-memory-registry)
-         - [5.1.1.1 From PCB Attachments to Shared Data Payloads in SRAM](#5111-from-pcb-attachments-to-shared-data-payloads-in-sram)
+      - [5.1.1 Global shared-memory list and entry names](#511-global-shared-memory-list-and-entry-names)
+         - [5.1.1.1 From Shared Memory Entries to Shared Data Payloads in SRAM](#5111-from-shared-memory-entries-to-shared-data-payloads-in-sram)
       - [5.1.2 Per-process attachment lists in SRAM](#512-per-process-attachment-lists-in-sram)
    - [5.2 Mapping, unlinking, and deferred destruction](#52-mapping-unlinking-and-deferred-destruction)
    - [5.3 Shared Memory function reference](#53-shared-memory-function-reference)
@@ -4528,7 +4528,7 @@ Appending preserves creation order among the remaining PCBs.
 it reaches `NULL`. It does not read the tail pointer, so the tail speeds up
 insertion rather than scheduler traversal.
 
-The shared-memory registry described in [`5.1.1 Global shared-memory registry`](#511-global-shared-memory-registry)
+The shared-memory registry described in [`5.1.1 Global shared-memory list and entry names`](#511-global-shared-memory-list-and-entry-names)
 identifies regions by name or ID and does not require creation order. The
 comparison below shows why both lists can link a new node in constant time
 with different global pointers. O(1) means the linking work does not grow
@@ -5073,194 +5073,79 @@ The directory lifecycle is explained in
 ##### 4.3.2.1.1 Environment origin and propagation
 [\[↑ TOC\]](#contents)
 
-The first populated userspace environment originates in
-[`init`](system/init.picoc), not in the kernel or shell. The kernel has no
-persistent environment object. Its [`main()`](kernel/kernel.picoc#L31)
-loads init with [`load_process()`](kernel/process/process_loader.picoc#L305)
-and calls [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-directly with a [`RunProcessRequest`](common/syscall.header#L55) containing
-`arguments = NULL` and `environment = NULL`. This uses the same kernel start
-helper reached by the user library wrapper, without invoking that wrapper or
-inheriting an environment from a kernel process. It then activates the timer
-and dispatches init. The full boot path is in
+[`init`](system/init.picoc) creates the first populated userspace environment
+from configuration. The kernel copies environment data when starting a
+process, but keeps no persistent environment object or environment pointer in
+its [`ProcessControlBlock`](kernel/process/process.header#L31).
+During boot, kernel [`main()`](kernel/kernel.picoc#L31) loads init and calls
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+directly with both [`RunProcessRequest.arguments`](common/syscall.header#L57)
+and [`RunProcessRequest.environment`](common/syscall.header#L58) set to `NULL`.
+Init therefore starts with its executable path as its only argument and an
+empty environment. The boot sequence is described in
 [`11.2.1 Loading init and entering normal execution`](#1121-loading-init-and-entering-normal-execution).
 
-Init's initial stack contains its path as the only argument, the argument
-sentinel, and an empty environment sentinel. Its linked
-[`environ`](library/stdlib/env.picoc#L4) starts as `NULL`.
-[`start_process()`](library/start/start.picoc#L7) initializes the heap and
-[`initialize_environment()`](library/stdlib/env.picoc#L97) creates an empty
-heap-backed array containing one `NULL` pointer. Init's
+Each process has its own library global
+[`environ`](library/stdlib/env.picoc#L4), which initially holds `NULL`.
+Before application execution, [`start_process()`](library/start/start.picoc#L7)
+initializes the process heap and calls
+[`initialize_environment()`](library/stdlib/env.picoc#L97). For init, this
+creates an empty heap array containing one `NULL` pointer. Init's
 [`read_environment()`](system/init.picoc#L19) then opens
-[`config/environment.txt`](config/environment.txt), reads at most 256 cells,
-parses each `NAME=value` entry, and stores it with
-[`setenv(name, value, true)`](library/stdlib/env.picoc#L126).
-Malformed entries, allocation/read failures, and a full buffer fail init
-startup. The current file supplies `PATH=/user`. Init adds the loading-bar
-setting next when configured, then loads and starts the shell.
+[`config/environment.txt`](config/environment.txt), reads at most
+[`INIT_ENVIRONMENT_CAPACITY`](system/init.picoc#L8) cells (256), closes the file,
+and parses the `NAME=value` entries. A full buffer, a missing `=` separator,
+or an allocation, file-access, or storage failure causes init startup to fail.
 
-The configuration reader below shows the actual file access, parsing,
-setting calls, and cleanup. Each [`setenv()`](library/stdlib/env.picoc#L126)
-copies the parsed name and value before the temporary input buffer is freed:
+For each entry, [`setenv(name, value, true)`](library/stdlib/env.picoc#L126)
+allocates a separate `NAME=value` string.
+[`store_environment_variable()`](library/stdlib/env.picoc#L67) frees and
+replaces an existing entry or grows the array referenced by
+[`environ`](library/stdlib/env.picoc#L4), keeping its final `NULL` pointer.
+The stored strings remain valid after init frees the temporary file buffer.
+The current configuration supplies `PATH=/user`. Init then adds
+[`PICOOS_LOADING_BAR`](common/loading_bar.header#L5) when enabled, as explained in
+[`4.3.2.1.2 Loading-bar environment variable`](#43212-loading-bar-environment-variable),
+and starts the [`shell`](user/shell.picoc).
 
-```c
-bool read_environment(void) {
-    char *contents;
-    char *name;
-    char *value;
-    int file_descriptor;
-    int length;
-    int index = 0;
+The first inheritance step is init's
+[`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31).
+A `NULL` environment argument makes this library wrapper read the caller's
+[`environ`](library/stdlib/env.picoc#L4) through
+[`current_environment()`](library/stdlib/env.picoc#L6) and place that pointer in
+[`RunProcessRequest.environment`](common/syscall.header#L58). An explicit
+array replaces this default selection, as shown in
+[`4.2.2.1 Concrete initial-stack example`](#4221-concrete-initial-stack-example).
+The kernel's direct boot call bypasses this library selection, which is why
+its `NULL` request field gives init an empty environment.
 
-    contents = (char *)malloc(INIT_ENVIRONMENT_CAPACITY + 1);
-    if (contents == NULL) {
-        init_write_error("init: could not allocate environment buffer\n");
-        return false;
-    }
+Environment propagation makes two independent copies. First,
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+passes the selected array to
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125).
+This function reserves space for the environment pointers, final `NULL`
+pointer, and strings on the child stack, then copies each string and builds
+pointers to those copies. It also updates the child's saved
+[`activation.sp`](kernel/process/process.header#L25) and
+[`activation.baf`](kernel/process/process.header#L26) before the start helper
+sets its PCB's [`state`](kernel/process/process.header#L33) to
+[`READY`](kernel/process/process.header#L13). The complete layout is in
+[`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp).
 
-    file_descriptor = open("./config/environment.txt", O_RDONLY);
-    if (file_descriptor < 0) {
-        free(contents);
-        init_write_error("init: could not open environment file\n");
-        return false;
-    }
-    length = read(
-        file_descriptor,
-        contents,
-        INIT_ENVIRONMENT_CAPACITY
-    );
-    close(file_descriptor);
-    if (length < 0) {
-        free(contents);
-        init_write_error("init: could not read environment file\n");
-        return false;
-    }
-    if (length == INIT_ENVIRONMENT_CAPACITY) {
-        free(contents);
-        init_write_error("init: environment file is too long\n");
-        return false;
-    }
-    contents[length] = '\0';
+Second, after dispatch, [`start_process()`](library/start/start.picoc#L7)
+locates the environment array after the argument array's `NULL` pointer and
+passes it to [`initialize_environment()`](library/stdlib/env.picoc#L97).
+Using [`copy_environment_variable()`](library/stdlib/env.picoc#L20), this
+creates a new pointer array and new strings in the child's heap, then stores
+the array's address in the child's [`environ`](library/stdlib/env.picoc#L4).
+The child can now resize or replace its environment without modifying its
+initial stack data or the caller's environment.
 
-    while (index < length) {
-        name = contents + index;
-        while (index < length &&
-               contents[index] != '=' &&
-               contents[index] != '\n' &&
-               contents[index] != '\r') {
-            index = index + 1;
-        }
-        if (index == length || contents[index] != '=') {
-            free(contents);
-            init_write_error("init: invalid environment entry\n");
-            return false;
-        }
-        contents[index] = '\0';
-        index = index + 1;
-
-        value = contents + index;
-        while (index < length &&
-               contents[index] != '\n' &&
-               contents[index] != '\r') {
-            index = index + 1;
-        }
-        contents[index] = '\0';
-
-        if (setenv(name, value, true) != 0) {
-            free(contents);
-            init_write_error(
-                "init: could not store environment variable\n"
-            );
-            return false;
-        }
-
-        index = index + 1;
-        while (index < length &&
-               (contents[index] == '\n' || contents[index] == '\r')) {
-            index = index + 1;
-        }
-    }
-
-    free(contents);
-    return true;
-}
-```
-
-The complete setter and its storage helper show the heap ownership described
-above. [`store_environment_variable()`](library/stdlib/env.picoc#L67) replaces
-an existing string or resizes [`environ`](library/stdlib/env.picoc#L4) for a new
-entry, preserving the final `NULL` sentinel:
-
-```c
-int setenv(char *name, char *value, bool overwrite) {
-    int name_length = environment_variable_length(name);
-    int value_length = environment_variable_length(value);
-    int environment_index = environment_variable_index(name, name_length);
-    int index = 0;
-    char *variable;
-
-    if (environment_index != -1 && !overwrite) {
-        return 0;
-    }
-
-    variable = (char *)malloc(name_length + value_length + 2);
-    if (variable == NULL) {
-        return -1;
-    }
-
-    while (index < name_length) {
-        variable[index] = name[index];
-        index = index + 1;
-    }
-    variable[name_length] = '=';
-
-    index = 0;
-    while (index <= value_length) {
-        variable[name_length + index + 1] = value[index];
-        index = index + 1;
-    }
-
-    return store_environment_variable(variable, name_length);
-}
-
-int store_environment_variable(char *variable, int name_length) {
-    int environment_index = environment_variable_index(variable, name_length);
-    char **resized_environment;
-
-    if (environment_index != -1) {
-        free(environ[environment_index]);
-        environ[environment_index] = variable;
-        return 0;
-    }
-
-    environment_index = 0;
-    while (environ[environment_index] != NULL) {
-        environment_index = environment_index + 1;
-    }
-
-    resized_environment = (char **)realloc(
-        environ,
-        (environment_index + 2) * sizeof(char *)
-    );
-    if (resized_environment == NULL) {
-        free(variable);
-        return -1;
-    }
-    environ = resized_environment;
-
-    environ[environment_index] = variable;
-    environ[environment_index + 1] = NULL;
-    return 0;
-}
-```
-
-The **first inheritance step** is init's
-[`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31). The shell receives a
-stack copy of init's environment and obtains its own heap copy on startup.
-Its subsequent [`run()`](library/unistd/process.picoc#L31) calls pass its
-current environment to applications in the same way. The diagram assumes no
-process changes its environment except in the two explicitly modified
-branches. Each inheritance arrow uses the default `NULL` selection.
+The shell passes its current environment to applications through the same
+[`run()`](library/unistd/process.picoc#L31) path. The diagram follows this
+propagation into unchanged, removal, and replacement branches. Every
+inheritance arrow uses the default `NULL` environment argument, and values
+remain unchanged except where a branch explicitly modifies them.
 
 ```mermaid
 flowchart LR
@@ -5276,219 +5161,18 @@ flowchart LR
     M -->|run child, NULL environment| MC["Child receives<br/>PATH=/user:/test"]
 ```
 
-The modification branches correspond to the actual library calls
+The modification branches use
 [`unsetenv("PICOOS_LOADING_BAR")`](library/stdlib/env.picoc#L157) and
 [`setenv("PATH", "/user:/test", true)`](library/stdlib/env.picoc#L126).
-[`setenv()`](library/stdlib/env.picoc#L126) allocates one `NAME=value` string,
-replacing an existing entry or extending the null-terminated pointer array.
-[`getenv()`](library/stdlib/env.picoc#L115) returns the address of its value
-part, or `NULL` when absent. [`unsetenv()`](library/stdlib/env.picoc#L157)
-frees the removed string and shifts the remaining pointers and final sentinel.
-Neither operation changes the parent or already-started children. Future
-children receive the modified environment when started with the default
-selection. An explicit environment array can instead replace that selection,
-as in
-[`4.2.2.1 Concrete initial-stack example`](#4221-concrete-initial-stack-example).
-The remaining environment operations are listed in
+Removal frees the matching string and shifts the remaining pointers,
+including the final `NULL` pointer. Replacement stores a newly allocated
+string in the existing entry. These changes affect only the calling process
+and the values copied to children it starts afterward. The parent and
+already-started children retain their own copies.
+[`getenv()`](library/stdlib/env.picoc#L115) reads the caller's environment and
+returns a pointer to an entry's value, or `NULL` when absent. The remaining
+operations are documented in
 [`10.2.7.3 Environment operations in env.picoc`](#10273-environment-operations-in-envpicoc).
-
-The complete library and startup functions make the two copies visible.
-[`run()`](library/unistd/process.picoc#L31) selects the source array through
-[`current_environment()`](library/stdlib/env.picoc#L6). Kernel
-[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-passes it to [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125),
-which builds the child stack shown in
-[`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp).
-After dispatch, [`start_process()`](library/start/start.picoc#L7) reaches
-[`initialize_environment()`](library/stdlib/env.picoc#L97) and
-[`copy_environment_variable()`](library/stdlib/env.picoc#L20), so the child's
-heap holds new strings rather than pointers into the parent's memory:
-
-```c
-bool run(int pid, char *arguments, char **environment) {
-    struct RunProcessRequest request;
-
-    request.pid = pid;
-    request.arguments = arguments;
-    if (environment == NULL) {
-        request.environment = current_environment();
-    } else {
-        request.environment = environment;
-    }
-    return (bool)invoke_syscall(
-        SYSCALL_RUN_PROCESS_WITH_ARGUMENTS,
-        (int)&request
-    );
-}
-
-char **current_environment(void) {
-    return environ;
-}
-
-void start_process(int argc, char **argv) {
-    init_process_heap();
-    initialize_environment(argv + argc + 1);
-    exit(main(argc, argv));
-}
-
-void initialize_environment(char **environment) {
-    int count = 0;
-    int index = 0;
-
-    if (environment != NULL) {
-        while (environment[count] != NULL) {
-            count = count + 1;
-        }
-    }
-
-    environ = (char **)malloc((count + 1) * sizeof(char *));
-    while (index < count) {
-        environ[index] = copy_environment_variable(environment[index]);
-        index = index + 1;
-    }
-    environ[count] = NULL;
-}
-
-char *copy_environment_variable(char *variable) {
-    int length = environment_variable_length(variable);
-    int index = 0;
-    char *copy = (char *)malloc(length + 1);
-
-    if (copy == NULL) {
-        return NULL;
-    }
-
-    while (index <= length) {
-        copy[index] = variable[index];
-        index = index + 1;
-    }
-
-    return copy;
-}
-```
-
-The kernel part of the chain below makes the first copy concrete.
-[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-uses the supplied request, then calls
-[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125)
-before setting the child's state to `READY`. The latter's excerpt preserves
-all environment sizing, pointer construction, string copies, and activation
-updates. Only argument-token parsing is omitted, since it is independent of
-environment inheritance:
-
-```c
-bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
-    struct ProcessControlBlock *process;
-    struct FileDescriptorTable *file_descriptors;
-
-    // Only a newly created process can be started
-    process = find_process_by_pid(request->pid);
-    if (process == NULL ||
-        process->state != PROCESS_STATE_NEW) {
-        return false;
-    }
-
-    if (current_process() != NULL) {
-        file_descriptors = inherit_file_descriptors(
-            current_process()->file_descriptors
-        );
-        destroy_file_descriptor_table(process->file_descriptors);
-        process->file_descriptors = file_descriptors;
-    }
-
-    // Arguments and environment must be placed on the process stack first
-    store_process_arguments(
-        process,
-        request->arguments,
-        request->environment
-    );
-
-    // This makes the process eligible for scheduling
-    process->state = PROCESS_STATE_READY;
-    return true;
-}
-
-void store_process_arguments(
-    struct ProcessControlBlock *process,
-    char *arguments,
-    char **environment
-) {
-    // Number of arguments, including the binary path in argv[0]
-    int argc = process_argument_token_count(arguments) + 1;
-    int environment_count = process_environment_count(environment);
-    // Cells for the entry PC, argc, argv, envp, their sentinels, and strings
-    int required_cells;
-    // Process-relative offset where the argument data begins
-    int argument_base_offset;
-    // Pointers into the process's initial stack layout
-    int *entry_pc_cell;
-    int *argc_cell;
-    char **argv;
-    char **envp;
-    // Next character where a copied argument or environment string is stored
-    char *string_target;
-    // Index of the next argv entry to point at a copied argument string
-    int argument_index = 1;
-    int environment_index = 0;
-    int path_cells;
-    int environment_string_cells = 0;
-    // ... Argument-token parser locals.
-
-    // Counts the arguments, environment strings, and cells needed for the
-    // initial process argument layout
-    path_cells = process_string_cell_count(process->binary_path);
-    while (environment_index < environment_count) {
-        environment_string_cells = environment_string_cells +
-            process_string_cell_count(environment[environment_index]);
-        environment_index = environment_index + 1;
-    }
-
-    // Reserves the RTI entry PC before the standard argc/argv/envp layout
-    // Both pointer tables include a required NULL sentinel
-    required_cells = 1 + 1 + argc + 1 + environment_count + 1 +
-                     path_cells +
-                     process_argument_string_cell_count(arguments) +
-                     environment_string_cells;
-    argument_base_offset = process->size - required_cells;
-
-    // Calculates pointers into [entry PC][argc][argv][NULL][envp][NULL][strings]
-    entry_pc_cell = (int *)(process->base_address + argument_base_offset);
-    argc_cell = entry_pc_cell + 1;
-    argv = (char **)(argc_cell + 1);
-    envp = argv + argc + 1;
-    string_target = (char *)(envp + environment_count + 1);
-
-    // Initializes the entry PC, argc, and argv/envp sentinels
-    *entry_pc_cell = process->activation.cs - 1;
-    *argc_cell = argc;
-    argv[argc] = NULL;
-    envp[environment_count] = NULL;
-
-    // Stores argv[0] and copies the process binary path into the string area
-    argv[0] = string_target;
-    string_target = copy_process_string(
-        string_target,
-        process->binary_path
-    );
-
-    // ... Parse/copy argument tokens and advance string_target past them.
-
-    environment_index = 0;
-    while (environment_index < environment_count) {
-        envp[environment_index] = string_target;
-        string_target = copy_process_string(
-            string_target,
-            environment[environment_index]
-        );
-        environment_index = environment_index + 1;
-    }
-
-    // Saves the initial base address and stack pointer used by the dispatcher
-    // Naked _start uses BAF + 3 and BAF + 4 for argc and argv
-    process->activation.baf = (int)argc_cell - 3;
-    process->activation.sp = (int)entry_pc_cell - 1;
-}
-```
 
 ##### 4.3.2.1.2 Loading-bar environment variable
 [\[↑ TOC\]](#contents)
@@ -5880,13 +5564,18 @@ owning the entry itself.
 | [`SharedMemoryAttachment.entry`](kernel/shared_memory.header#L18) | Non-owning pointer to the linked-list entry whose reference count this mapping contributes to | First initialized by [`map_shared_memory()`](kernel/shared_memory.picoc#L130), read by [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) to decrement the entry's count before freeing the attachment |
 | [`SharedMemoryAttachment.next`](kernel/shared_memory.header#L19) | Link in one PCB's [`shared_memory_attachments`](kernel/process/process.header#L55) list | First initialized by [`map_shared_memory()`](kernel/shared_memory.picoc#L130), traversed by [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) |
 
-### 5.1.1 Global shared-memory registry
+### 5.1.1 Global shared-memory list and entry names
 [\[↑ TOC\]](#contents)
 
 The [`SharedMemoryEntry`](kernel/shared_memory.header#L8) records form a
-global singly linked list through their [`next`](kernel/shared_memory.header#L14)
-fields. [`shared_memory_list_head`](kernel/shared_memory.picoc#L6) points to
-the first entry or is `NULL` when the list is empty.
+global singly linked list, called the shared-memory registry. Their
+[`next`](kernel/shared_memory.header#L14) fields link the entries, and
+[`shared_memory_list_head`](kernel/shared_memory.picoc#L6) points to the first
+entry or is `NULL` when the list is empty.
+[`find_shared_memory_by_name()`](kernel/shared_memory.picoc#L45) and
+[`find_shared_memory_by_id()`](kernel/shared_memory.picoc#L57) walk this list
+to find a region's entry when it is opened or mapped.
+
 [`next_shared_memory_id`](kernel/shared_memory.picoc#L7)
 supplies the next unique numeric ID when
 [`open_shared_memory()`](kernel/shared_memory.picoc#L92) creates an entry.
@@ -5908,69 +5597,63 @@ same objects as a linked list, with dashed lines connecting the two views.
 [`shared_memory_list_head`](kernel/shared_memory.picoc#L6) reaches Entry 1,
 whose [`next`](kernel/shared_memory.header#L14) reaches Entry 2 across the
 intervening name allocation. Entry 2 ends the registry with `NULL`.
-Their [`name`](kernel/shared_memory.header#L9) pointers reach separate copied
-strings. The [`id`](kernel/shared_memory.header#L10),
+Each [`name`](kernel/shared_memory.header#L9) points to a separate string
+allocated by [`copy_shared_memory_name()`](kernel/shared_memory.picoc#L27),
+so the registry keeps its own copy of the caller's name. The
+[`id`](kernel/shared_memory.header#L10),
 [`reference_count`](kernel/shared_memory.header#L12), and
 [`unlink_requested`](kernel/shared_memory.header#L13) fields show each entry's
 lookup identity and lifetime state before unlinking.
 
-![Shared-memory registry head and two entries in SRAM, followed by a linked-list view of the same entries with reference counts 2 and 1 and unlink_requested false](documentation/images/memory-shared-list.svg)
+![The global shared-memory list head reaches two linked entries in SRAM, each with a name pointer to a separate string. The lower view repeats the same two entries as a linked list.](documentation/images/memory-shared-list.svg)
 
-#### 5.1.1.1 From PCB Attachments to Shared Data Payloads in SRAM
+#### 5.1.1.1 From Shared Memory Entries to Shared Data Payloads in SRAM
 [\[↑ TOC\]](#contents)
 
-The registry locates shared metadata globally. Each process's PCB also records
-its mappings through [`shared_memory_attachments`](kernel/process/process.header#L55).
-That pointer starts a list of [`SharedMemoryAttachment`](kernel/shared_memory.header#L17)
-records. An attachment's [`entry`](kernel/shared_memory.header#L18) reaches a
-[`SharedMemoryEntry`](kernel/shared_memory.header#L8), whose
-[`address`](kernel/shared_memory.header#L11) reaches the Shared Data Payload.
-This path lets process cleanup find the entry for every mapping and adjust
-its [`reference_count`](kernel/shared_memory.header#L12).
+Once the registry lookup finds a
+[`SharedMemoryEntry`](kernel/shared_memory.header#L8), its
+[`address`](kernel/shared_memory.header#L11) locates the first cell of the
+Shared Data Payload in the Process and Shared Data Heap. The entry itself
+occupies a separate [`kmalloc()`](kernel/kmalloc.picoc#L23) allocation in the
+Kernel Heap. This is the same relationship as a PCB's
+[`base_address`](kernel/process/process.header#L34) reaching its Process
+Payload in
+[`4.1.2.1 From PCBs to Process Payloads in SRAM`](#4121-from-pcbs-to-process-payloads-in-sram).
 
-The SRAM example below uses the same two entries and counts as the registry
-view above. [`active_process`](kernel/process/process.picoc#L18) points to
-PCB 1, which [`current_process()`](kernel/process/process.picoc#L62) supplies
-to [`map_shared_memory()`](kernel/shared_memory.picoc#L130).
-PCB 1's [`shared_memory_attachments`](kernel/process/process.header#L55)
-reaches Attachment 1, whose [`next`](kernel/shared_memory.header#L19) reaches
-Attachment 2. Their [`entry`](kernel/shared_memory.header#L18) pointers
-reference Entries 1 and 2. PCB 2 reaches Attachment 3, which also references
-Entry 1. Entry 1 therefore has two mappings and Entry 2 has one. The final
-attachment in each process's list stores `NULL` in
-[`next`](kernel/shared_memory.header#L19).
-
-All seven illustrated metadata objects occupy separate
-[`kmalloc()`](kernel/kmalloc.picoc#L23) payloads in the Kernel Heap. Copied name
-strings are omitted from this view. In kernel `.data`,
-[`shared_memory_list_head`](kernel/shared_memory.picoc#L6) reaches Entry 1,
-whose [`next`](kernel/shared_memory.header#L14) reaches Entry 2. Their
+The diagram uses the same three-block layout in each heap. Kernel Heap
+Payloads A and C contain Shared Memory Entries 1 and 2. Their green
 [`address`](kernel/shared_memory.header#L11) arrows reach Shared Data Payloads
-A and C immediately after outer Block Headers A and C. The PCBs' Process
-Payloads B and D are shown for SRAM context. Both processes reach the same
-Shared Data Payload A through separate attachments to Entry 1.
+A and C, immediately after their outer
+[`BlockHeader`](common/heap.header#L5) records. Kernel Heap Payload B contains
+PCB 1, and Process Payload B shows that process memory shares the same outer
+heap with shared data. The two arrows show how the entries locate their data.
 
-![Kernel globals reach two PCBs and the shared-memory registry, PCB attachment lists reference entries with counts 2 and 1, and entry address pointers reach Shared Data Payloads A and C](documentation/images/memory-shared-mappings.svg)
+![Three blocks in each heap: Shared Memory Entries 1 and 2 point through address to Shared Data Payloads A and C. PCB 1 and Process Payload B provide context.](documentation/images/memory-shared-mappings.svg)
 
-The arrows show stored object pointers and omit allocator links and PCB
-[`base_address`](kernel/process/process.header#L34) links. Following an
-attachment also exposes the entry's [`id`](kernel/shared_memory.header#L10),
-[`reference_count`](kernel/shared_memory.header#L12), and
-[`unlink_requested`](kernel/shared_memory.header#L13) metadata. Mapping returns
-the entry's [`address`](kernel/shared_memory.header#L11) directly to the caller.
-The attachment records that mapping for later cleanup.
+[`open_shared_memory()`](kernel/shared_memory.picoc#L92) stores the address
+returned by [`PSDMalloc()`](kernel/psdmalloc.picoc#L20) in the entry's
+[`address`](kernel/shared_memory.header#L11). Later,
+[`map_shared_memory()`](kernel/shared_memory.picoc#L130) returns that same
+absolute SRAM address to every caller that maps the entry. How the kernel
+records each process's mappings is shown in
+[`5.1.2 Per-process attachment lists in SRAM`](#512-per-process-attachment-lists-in-sram).
 
 ### 5.1.2 Per-process attachment lists in SRAM
 [\[↑ TOC\]](#contents)
 
-The next view concentrates on how each PCB finds its mapped entries. It uses
-the same objects as
-[`5.1.1.1 From PCB Attachments to Shared Data Payloads in SRAM`](#5111-from-pcb-attachments-to-shared-data-payloads-in-sram),
-with the Process and Shared Data Heap shown as one box. The lower view repeats
-the two attachment lists, just as
-[`5.1.1 Global shared-memory registry`](#511-global-shared-memory-registry)
-repeats the registry list. Dashed lines identify the same objects in both
-views and do not represent additional allocations.
+Each PCB finds its mapped entries through
+[`shared_memory_attachments`](kernel/process/process.header#L55), which starts
+that process's list of [`SharedMemoryAttachment`](kernel/shared_memory.header#L17)
+records. The example below shows two processes mapping the two entries from
+[`5.1.1 Global shared-memory list and entry names`](#511-global-shared-memory-list-and-entry-names).
+The upper view locates their records in SRAM, and the lower view shows the
+same records as two attachment lists. Dashed lines connect the two views.
+The Process and Shared Data Heap is shown as one box, with the individual
+payload addresses explained in
+[`5.1.1.1 From Shared Memory Entries to Shared Data Payloads in SRAM`](#5111-from-shared-memory-entries-to-shared-data-payloads-in-sram).
+
+[`map_shared_memory()`](kernel/shared_memory.picoc#L130) records each mapping
+in the PCB returned by [`current_process()`](kernel/process/process.picoc#L62).
 
 [`create_process()`](kernel/process/process.picoc#L89) allocates each PCB with
 [`kmalloc()`](kernel/kmalloc.picoc#L23) and initializes its
@@ -6002,7 +5685,7 @@ to the global registry rooted at
 [\[↑ TOC\]](#contents)
 
 Mapping and unlinking change the lifetime metadata of the entries shown in
-[`5.1.1.1 From PCB Attachments to Shared Data Payloads in SRAM`](#5111-from-pcb-attachments-to-shared-data-payloads-in-sram).
+[`5.1.2 Per-process attachment lists in SRAM`](#512-per-process-attachment-lists-in-sram).
 Every successful [`mmap()`](library/sys/mman/mman.picoc#L23) adds one attachment
 and increments [`SharedMemoryEntry.reference_count`](kernel/shared_memory.header#L12),
 even when one process maps the same ID more than once. PicoOS has no `munmap()`
@@ -6021,7 +5704,7 @@ for that mapping. The entry and its [`PSDMalloc()`](kernel/psdmalloc.picoc#L20) 
 only after unlink has been requested and the count reaches zero.
 
 In that SRAM example, PCB 1 maps both entries and PCB 2 maps Entry 1.
-Unlinking Entry 1 leaves both of its mappings and Shared Data Payload A alive.
+Unlinking Entry 1 leaves both of its mappings and its Shared Data Payload alive.
 Removing the process represented by PCB 1 releases its two
 attachments, leaving Entry 1's count at 1 and Entry 2's count at 0. Entry 2
 is destroyed at that point only if it has also been unlinked. The unlinked
