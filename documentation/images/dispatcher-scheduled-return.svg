@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1602" height="875" viewBox="0 0 1602 875" role="img" aria-labelledby="title desc">
+<title id="title">Scheduled return through a selected PCB activation</title>
+<desc id="desc">The dispatcher reads the target PCB and boundary from its kernel call frame, sets the target SP before the boundary, restores six registers from the PCB, then uses RTI on the selected process stack.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#192c38">
+<text x="24" y="32" font-size="22" font-weight="bold" text-anchor="start">Scheduled return: restore registers from the PCB, then PC from the selected stack</text>
+<text x="24" y="77" font-size="21" font-weight="bold" text-anchor="start">1. Read target and limit</text>
+<path d="M 485 69 L 528 69" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="24" y="117" font-size="18" font-weight="bold" text-anchor="start">Kernel stack · naked-call frame</text>
+<rect x="24" y="136" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="136" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="157" font-size="16" font-weight="normal" text-anchor="start">q+3</text>
+<text x="137" y="157" font-size="17" font-weight="normal" text-anchor="start">precomputed process boundary</text>
+<rect x="24" y="164" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="164" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="185" font-size="16" font-weight="normal" text-anchor="start">q+2</text>
+<text x="137" y="185" font-size="17" font-weight="normal" text-anchor="start">selected Process pointer = p</text>
+<rect x="24" y="192" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="192" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="213" font-size="16" font-weight="normal" text-anchor="start">q+1</text>
+<text x="137" y="213" font-size="17" font-weight="normal" text-anchor="start">unused C return address</text>
+<rect x="24" y="220" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="220" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="241" font-size="16" font-weight="normal" text-anchor="start">q</text>
+<text x="137" y="241" font-size="17" font-weight="normal" text-anchor="start">free at naked entry</text>
+<text x="24" y="288" font-size="18" font-weight="bold" text-anchor="start">Selected PCB · activation cells</text>
+<rect x="24" y="310" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="310" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="331" font-size="16" font-weight="normal" text-anchor="start">p+14</text>
+<text x="137" y="331" font-size="17" font-weight="normal" text-anchor="start">activation.ds</text>
+<rect x="24" y="338" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="338" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="359" font-size="16" font-weight="normal" text-anchor="start">p+13</text>
+<text x="137" y="359" font-size="17" font-weight="normal" text-anchor="start">activation.cs</text>
+<rect x="24" y="366" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="366" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="387" font-size="16" font-weight="normal" text-anchor="start">p+12</text>
+<text x="137" y="387" font-size="17" font-weight="normal" text-anchor="start">activation.baf</text>
+<rect x="24" y="394" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="394" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="415" font-size="16" font-weight="normal" text-anchor="start">p+11</text>
+<text x="137" y="415" font-size="17" font-weight="normal" text-anchor="start">activation.sp = s</text>
+<rect x="24" y="422" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="422" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="443" font-size="16" font-weight="normal" text-anchor="start">p+10</text>
+<text x="137" y="443" font-size="17" font-weight="normal" text-anchor="start">activation.acc</text>
+<rect x="24" y="450" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="450" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="471" font-size="16" font-weight="normal" text-anchor="start">p+9</text>
+<text x="137" y="471" font-size="17" font-weight="normal" text-anchor="start">activation.in2</text>
+<rect x="24" y="478" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="478" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="499" font-size="16" font-weight="normal" text-anchor="start">p+8</text>
+<text x="137" y="499" font-size="17" font-weight="normal" text-anchor="start">activation.in1</text>
+<rect x="24" y="506" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="506" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="527" font-size="16" font-weight="normal" text-anchor="start">p</text>
+<text x="137" y="527" font-size="17" font-weight="normal" text-anchor="start">pid · p+1…7 omitted above</text>
+<path d="M 486 520 L 475 520" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="487" y="510" font-size="14" font-weight="normal" text-anchor="end">BAF=p</text>
+<text x="24" y="568" font-size="18" font-weight="bold" text-anchor="start">Selected user-process stack</text>
+<rect x="24" y="590" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="590" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="611" font-size="16" font-weight="normal" text-anchor="start">s+1</text>
+<text x="137" y="611" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="24" y="618" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="618" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="639" font-size="16" font-weight="normal" text-anchor="start">s</text>
+<text x="137" y="639" font-size="17" font-weight="normal" text-anchor="start">free before RTI</text>
+<rect x="24" y="690" width="450" height="110" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="716" font-size="17" font-weight="normal" text-anchor="start">SP=q, BAF=p</text>
+<text x="36" y="738" font-size="17" font-weight="normal" text-anchor="start">IN1 = process boundary</text>
+<text x="36" y="760" font-size="17" font-weight="normal" text-anchor="start">CS/DS still kernel</text>
+<text x="550" y="77" font-size="21" font-weight="bold" text-anchor="start">2. Select SP, then boundary</text>
+<path d="M 1011 69 L 1054 69" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="550" y="117" font-size="18" font-weight="bold" text-anchor="start">Kernel stack · naked-call frame</text>
+<rect x="550" y="136" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="136" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="157" font-size="16" font-weight="normal" text-anchor="start">q+3</text>
+<text x="663" y="157" font-size="17" font-weight="normal" text-anchor="start">precomputed process boundary</text>
+<rect x="550" y="164" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="164" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="185" font-size="16" font-weight="normal" text-anchor="start">q+2</text>
+<text x="663" y="185" font-size="17" font-weight="normal" text-anchor="start">selected Process pointer = p</text>
+<rect x="550" y="192" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="192" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="213" font-size="16" font-weight="normal" text-anchor="start">q+1</text>
+<text x="663" y="213" font-size="17" font-weight="normal" text-anchor="start">unused C return address</text>
+<rect x="550" y="220" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="220" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="241" font-size="16" font-weight="normal" text-anchor="start">q</text>
+<text x="663" y="241" font-size="17" font-weight="normal" text-anchor="start">free at naked entry</text>
+<text x="550" y="288" font-size="18" font-weight="bold" text-anchor="start">Selected PCB · activation cells</text>
+<rect x="550" y="310" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="310" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="331" font-size="16" font-weight="normal" text-anchor="start">p+14</text>
+<text x="663" y="331" font-size="17" font-weight="normal" text-anchor="start">activation.ds</text>
+<rect x="550" y="338" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="338" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="359" font-size="16" font-weight="normal" text-anchor="start">p+13</text>
+<text x="663" y="359" font-size="17" font-weight="normal" text-anchor="start">activation.cs</text>
+<rect x="550" y="366" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="366" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="387" font-size="16" font-weight="normal" text-anchor="start">p+12</text>
+<text x="663" y="387" font-size="17" font-weight="normal" text-anchor="start">activation.baf</text>
+<rect x="550" y="394" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="394" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="415" font-size="16" font-weight="normal" text-anchor="start">p+11</text>
+<text x="663" y="415" font-size="17" font-weight="normal" text-anchor="start">activation.sp = s</text>
+<rect x="550" y="422" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="422" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="443" font-size="16" font-weight="normal" text-anchor="start">p+10</text>
+<text x="663" y="443" font-size="17" font-weight="normal" text-anchor="start">activation.acc</text>
+<rect x="550" y="450" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="450" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="471" font-size="16" font-weight="normal" text-anchor="start">p+9</text>
+<text x="663" y="471" font-size="17" font-weight="normal" text-anchor="start">activation.in2</text>
+<rect x="550" y="478" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="478" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="499" font-size="16" font-weight="normal" text-anchor="start">p+8</text>
+<text x="663" y="499" font-size="17" font-weight="normal" text-anchor="start">activation.in1</text>
+<rect x="550" y="506" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="506" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="527" font-size="16" font-weight="normal" text-anchor="start">p</text>
+<text x="663" y="527" font-size="17" font-weight="normal" text-anchor="start">pid · p+1…7 omitted above</text>
+<path d="M 1012 520 L 1001 520" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="1013" y="510" font-size="14" font-weight="normal" text-anchor="end">BAF=p</text>
+<text x="550" y="568" font-size="18" font-weight="bold" text-anchor="start">Selected user-process stack</text>
+<rect x="550" y="590" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="590" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="611" font-size="16" font-weight="normal" text-anchor="start">s+1</text>
+<text x="663" y="611" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="550" y="618" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="618" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="639" font-size="16" font-weight="normal" text-anchor="start">s</text>
+<text x="663" y="639" font-size="17" font-weight="normal" text-anchor="start">free before RTI</text>
+<path d="M 1012 632 L 1001 632" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="1013" y="622" font-size="14" font-weight="normal" text-anchor="end">SP=s</text>
+<rect x="550" y="690" width="450" height="110" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="562" y="716" font-size="17" font-weight="normal" text-anchor="start">SP=s before boundary write</text>
+<text x="562" y="738" font-size="17" font-weight="normal" text-anchor="start">Then M[0x4000000a] = IN1</text>
+<text x="562" y="760" font-size="17" font-weight="normal" text-anchor="start">BAF=p still reads the activation</text>
+<text x="1076" y="77" font-size="21" font-weight="bold" text-anchor="start">3. Restore registers; RTI</text>
+<text x="1076" y="117" font-size="18" font-weight="bold" text-anchor="start">Kernel stack · naked-call frame</text>
+<rect x="1076" y="136" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="136" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="157" font-size="16" font-weight="normal" text-anchor="start">q+3</text>
+<text x="1189" y="157" font-size="17" font-weight="normal" text-anchor="start">precomputed process boundary</text>
+<rect x="1076" y="164" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="164" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="185" font-size="16" font-weight="normal" text-anchor="start">q+2</text>
+<text x="1189" y="185" font-size="17" font-weight="normal" text-anchor="start">selected Process pointer = p</text>
+<rect x="1076" y="192" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="192" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="213" font-size="16" font-weight="normal" text-anchor="start">q+1</text>
+<text x="1189" y="213" font-size="17" font-weight="normal" text-anchor="start">unused C return address</text>
+<rect x="1076" y="220" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="220" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="241" font-size="16" font-weight="normal" text-anchor="start">q</text>
+<text x="1189" y="241" font-size="17" font-weight="normal" text-anchor="start">free at naked entry</text>
+<text x="1076" y="288" font-size="18" font-weight="bold" text-anchor="start">Selected PCB · activation cells</text>
+<rect x="1076" y="310" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="310" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="331" font-size="16" font-weight="normal" text-anchor="start">p+14</text>
+<text x="1189" y="331" font-size="17" font-weight="normal" text-anchor="start">activation.ds</text>
+<rect x="1076" y="338" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="338" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="359" font-size="16" font-weight="normal" text-anchor="start">p+13</text>
+<text x="1189" y="359" font-size="17" font-weight="normal" text-anchor="start">activation.cs</text>
+<rect x="1076" y="366" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="366" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="387" font-size="16" font-weight="normal" text-anchor="start">p+12</text>
+<text x="1189" y="387" font-size="17" font-weight="normal" text-anchor="start">activation.baf</text>
+<rect x="1076" y="394" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="394" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="415" font-size="16" font-weight="normal" text-anchor="start">p+11</text>
+<text x="1189" y="415" font-size="17" font-weight="normal" text-anchor="start">activation.sp = s</text>
+<rect x="1076" y="422" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="422" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="443" font-size="16" font-weight="normal" text-anchor="start">p+10</text>
+<text x="1189" y="443" font-size="17" font-weight="normal" text-anchor="start">activation.acc</text>
+<rect x="1076" y="450" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="450" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="471" font-size="16" font-weight="normal" text-anchor="start">p+9</text>
+<text x="1189" y="471" font-size="17" font-weight="normal" text-anchor="start">activation.in2</text>
+<rect x="1076" y="478" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="478" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="499" font-size="16" font-weight="normal" text-anchor="start">p+8</text>
+<text x="1189" y="499" font-size="17" font-weight="normal" text-anchor="start">activation.in1</text>
+<rect x="1076" y="506" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="506" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="527" font-size="16" font-weight="normal" text-anchor="start">p</text>
+<text x="1189" y="527" font-size="17" font-weight="normal" text-anchor="start">pid · p+1…7 omitted above</text>
+<text x="1076" y="568" font-size="18" font-weight="bold" text-anchor="start">Selected user-process stack</text>
+<rect x="1076" y="590" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="590" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="611" font-size="16" font-weight="normal" text-anchor="start">s+1</text>
+<text x="1189" y="611" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="1076" y="618" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="618" width="347" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="639" font-size="16" font-weight="normal" text-anchor="start">s</text>
+<text x="1189" y="639" font-size="17" font-weight="normal" text-anchor="start">free before RTI</text>
+<path d="M 1538 604 L 1527 604" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="1539" y="594" font-size="14" font-weight="normal" text-anchor="end">SP=s+1</text>
+<rect x="1076" y="690" width="450" height="110" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="1088" y="716" font-size="17" font-weight="normal" text-anchor="start">CS/DS, IN1/IN2, ACC, BAF restored</text>
+<text x="1088" y="738" font-size="17" font-weight="normal" text-anchor="start">RTI: SP=s+1, PC=P+1</text>
+<text x="1088" y="760" font-size="17" font-weight="normal" text-anchor="start">Resume selected process</text>
+<path d="M 1527 310 h 10 v 196 h -10" fill="none" stroke="#27617b" stroke-width="2"/>
+<path d="M 1538 408 L 1566 408 L 1566 740 L 1527 740" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="1534" y="675" font-size="15" font-weight="normal" text-anchor="start">load</text>
+<text x="24" y="850" font-size="17" font-weight="normal" text-anchor="start">Higher addresses at top · yellow: saved values · purple: PC · blue: active registers · dashed arrows: pointers</text>
+</g></svg>

@@ -1,0 +1,255 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1602" height="850" viewBox="0 0 1602 850" role="img" aria-labelledby="title desc">
+<title id="title">UART / DMA: keep the interrupted stack and return to the same context</title>
+<desc id="desc">UART and DMA use identical save/call/restore sequences. Their C return address is at c and their saved caller BAF at c-1 below the displayed register frame. If kernel work was interrupted, that same frame is on the kernel stack rather than the user stack.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#192c38">
+<text x="24" y="30" font-size="23" font-weight="bold" text-anchor="start">UART / DMA: keep the interrupted stack and return to the same context</text>
+<text x="24" y="72" font-size="21" font-weight="bold" text-anchor="start">1. Save and call C handler</text>
+<path d="M 485 64 L 528 64" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="24" y="107" font-size="17" font-weight="bold" text-anchor="start">Kernel stack · higher addresses at top</text>
+<rect x="24" y="122" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="122" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="143" font-size="16" font-weight="normal" text-anchor="start">K</text>
+<text x="137" y="143" font-size="17" font-weight="normal" text-anchor="start">not reset or selected by ISR</text>
+<rect x="24" y="150" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="150" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="171" font-size="16" font-weight="normal" text-anchor="start">K-1</text>
+<text x="137" y="171" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="178" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="178" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="199" font-size="16" font-weight="normal" text-anchor="start">K-2</text>
+<text x="137" y="199" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="206" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="206" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="227" font-size="16" font-weight="normal" text-anchor="start">K-3</text>
+<text x="137" y="227" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="234" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="234" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="255" font-size="16" font-weight="normal" text-anchor="start">K-4</text>
+<text x="137" y="255" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="262" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="262" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="283" font-size="16" font-weight="normal" text-anchor="start">K-5</text>
+<text x="137" y="283" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="290" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="290" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="311" font-size="16" font-weight="normal" text-anchor="start">K-6</text>
+<text x="137" y="311" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="24" y="318" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="318" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="339" font-size="16" font-weight="normal" text-anchor="start">K-7</text>
+<text x="137" y="339" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<text x="24" y="414" font-size="17" font-weight="bold" text-anchor="start">User-process stack · grows downward</text>
+<rect x="24" y="429" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="429" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="450" font-size="16" font-weight="normal" text-anchor="start">c+7</text>
+<text x="137" y="450" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="24" y="457" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="457" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="478" font-size="16" font-weight="normal" text-anchor="start">c+6</text>
+<text x="137" y="478" font-size="17" font-weight="normal" text-anchor="start">saved ACC</text>
+<rect x="24" y="485" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="485" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="506" font-size="16" font-weight="normal" text-anchor="start">c+5</text>
+<text x="137" y="506" font-size="17" font-weight="normal" text-anchor="start">saved IN1</text>
+<rect x="24" y="513" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="513" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="534" font-size="16" font-weight="normal" text-anchor="start">c+4</text>
+<text x="137" y="534" font-size="17" font-weight="normal" text-anchor="start">saved IN2</text>
+<rect x="24" y="541" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="541" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="562" font-size="16" font-weight="normal" text-anchor="start">c+3</text>
+<text x="137" y="562" font-size="17" font-weight="normal" text-anchor="start">saved BAF</text>
+<rect x="24" y="569" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="569" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="590" font-size="16" font-weight="normal" text-anchor="start">c+2</text>
+<text x="137" y="590" font-size="17" font-weight="normal" text-anchor="start">saved CS</text>
+<rect x="24" y="597" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="597" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="618" font-size="16" font-weight="normal" text-anchor="start">c+1</text>
+<text x="137" y="618" font-size="17" font-weight="normal" text-anchor="start">saved DS</text>
+<rect x="24" y="625" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="625" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="646" font-size="16" font-weight="normal" text-anchor="start">c</text>
+<text x="137" y="646" font-size="17" font-weight="normal" text-anchor="start">uart/dma_interrupt_return address</text>
+<rect x="24" y="653" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="653" width="347" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="674" font-size="16" font-weight="normal" text-anchor="start">c-1</text>
+<text x="137" y="674" font-size="17" font-weight="normal" text-anchor="start">saved caller BAF = c</text>
+<rect x="24" y="681" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="681" width="347" height="28" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="702" font-size="16" font-weight="normal" text-anchor="start">c-2</text>
+<text x="137" y="702" font-size="17" font-weight="normal" text-anchor="start">C locals / free SP ← BAF</text>
+<rect x="24" y="710" width="450" height="83" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="736" font-size="17" font-weight="normal" text-anchor="start">Before C: BAF=c, SP=c−1; CS/DS=kernel</text>
+<text x="36" y="758" font-size="17" font-weight="normal" text-anchor="start">C prologue: BAF=c−2; SP below locals</text>
+<text x="487" y="685" font-size="14" font-weight="normal" text-anchor="end">BAF</text>
+<path d="M 484 695 L 475 695" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="550" y="72" font-size="21" font-weight="bold" text-anchor="start">2. C returns; restore frame</text>
+<path d="M 1011 64 L 1054 64" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="550" y="107" font-size="17" font-weight="bold" text-anchor="start">Kernel stack · higher addresses at top</text>
+<rect x="550" y="122" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="122" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="143" font-size="16" font-weight="normal" text-anchor="start">K</text>
+<text x="663" y="143" font-size="17" font-weight="normal" text-anchor="start">not reset or selected by ISR</text>
+<rect x="550" y="150" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="150" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="171" font-size="16" font-weight="normal" text-anchor="start">K-1</text>
+<text x="663" y="171" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="178" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="178" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="199" font-size="16" font-weight="normal" text-anchor="start">K-2</text>
+<text x="663" y="199" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="206" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="206" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="227" font-size="16" font-weight="normal" text-anchor="start">K-3</text>
+<text x="663" y="227" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="234" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="234" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="255" font-size="16" font-weight="normal" text-anchor="start">K-4</text>
+<text x="663" y="255" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="262" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="262" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="283" font-size="16" font-weight="normal" text-anchor="start">K-5</text>
+<text x="663" y="283" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="290" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="290" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="311" font-size="16" font-weight="normal" text-anchor="start">K-6</text>
+<text x="663" y="311" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="550" y="318" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="318" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="339" font-size="16" font-weight="normal" text-anchor="start">K-7</text>
+<text x="663" y="339" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<text x="550" y="414" font-size="17" font-weight="bold" text-anchor="start">User-process stack · grows downward</text>
+<rect x="550" y="429" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="429" width="347" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="450" font-size="16" font-weight="normal" text-anchor="start">c+7</text>
+<text x="663" y="450" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="550" y="457" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="457" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="478" font-size="16" font-weight="normal" text-anchor="start">c+6</text>
+<text x="663" y="478" font-size="17" font-weight="normal" text-anchor="start">saved ACC</text>
+<rect x="550" y="485" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="485" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="506" font-size="16" font-weight="normal" text-anchor="start">c+5</text>
+<text x="663" y="506" font-size="17" font-weight="normal" text-anchor="start">saved IN1</text>
+<rect x="550" y="513" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="513" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="534" font-size="16" font-weight="normal" text-anchor="start">c+4</text>
+<text x="663" y="534" font-size="17" font-weight="normal" text-anchor="start">saved IN2</text>
+<rect x="550" y="541" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="541" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="562" font-size="16" font-weight="normal" text-anchor="start">c+3</text>
+<text x="663" y="562" font-size="17" font-weight="normal" text-anchor="start">saved BAF</text>
+<rect x="550" y="569" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="569" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="590" font-size="16" font-weight="normal" text-anchor="start">c+2</text>
+<text x="663" y="590" font-size="17" font-weight="normal" text-anchor="start">saved CS</text>
+<rect x="550" y="597" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="597" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="618" font-size="16" font-weight="normal" text-anchor="start">c+1</text>
+<text x="663" y="618" font-size="17" font-weight="normal" text-anchor="start">saved DS</text>
+<rect x="550" y="625" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="625" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="646" font-size="16" font-weight="normal" text-anchor="start">c</text>
+<text x="663" y="646" font-size="17" font-weight="normal" text-anchor="start">free</text>
+<rect x="550" y="653" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="653" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="674" font-size="16" font-weight="normal" text-anchor="start">c-1</text>
+<text x="663" y="674" font-size="17" font-weight="normal" text-anchor="start">no live frame here</text>
+<rect x="550" y="681" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="653" y="681" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="559" y="702" font-size="16" font-weight="normal" text-anchor="start">c-2</text>
+<text x="663" y="702" font-size="17" font-weight="normal" text-anchor="start">no live frame here</text>
+<rect x="550" y="710" width="450" height="83" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="562" y="736" font-size="17" font-weight="normal" text-anchor="start">C returned: BAF=c; MOVE BAF SP → c</text>
+<text x="562" y="758" font-size="17" font-weight="normal" text-anchor="start">Six POPs: SP → c+6; segments restored</text>
+<text x="1013" y="461" font-size="14" font-weight="normal" text-anchor="end">SP</text>
+<path d="M 1010 471 L 1001 471" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M 1026 510 L 1041 510 L 1041 744 L 1001 744" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="1008" y="701" font-size="15" font-weight="normal" text-anchor="start">POP</text>
+<text x="1076" y="72" font-size="21" font-weight="bold" text-anchor="start">3. RTI resumes context</text>
+<text x="1076" y="107" font-size="17" font-weight="bold" text-anchor="start">Kernel stack · higher addresses at top</text>
+<rect x="1076" y="122" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="122" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="143" font-size="16" font-weight="normal" text-anchor="start">K</text>
+<text x="1189" y="143" font-size="17" font-weight="normal" text-anchor="start">not reset or selected by ISR</text>
+<rect x="1076" y="150" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="150" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="171" font-size="16" font-weight="normal" text-anchor="start">K-1</text>
+<text x="1189" y="171" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="178" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="178" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="199" font-size="16" font-weight="normal" text-anchor="start">K-2</text>
+<text x="1189" y="199" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="206" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="206" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="227" font-size="16" font-weight="normal" text-anchor="start">K-3</text>
+<text x="1189" y="227" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="234" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="234" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="255" font-size="16" font-weight="normal" text-anchor="start">K-4</text>
+<text x="1189" y="255" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="262" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="262" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="283" font-size="16" font-weight="normal" text-anchor="start">K-5</text>
+<text x="1189" y="283" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="290" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="290" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="311" font-size="16" font-weight="normal" text-anchor="start">K-6</text>
+<text x="1189" y="311" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<rect x="1076" y="318" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="318" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="339" font-size="16" font-weight="normal" text-anchor="start">K-7</text>
+<text x="1189" y="339" font-size="17" font-weight="normal" text-anchor="start">live kernel work, if interrupted</text>
+<text x="1076" y="414" font-size="17" font-weight="bold" text-anchor="start">User-process stack · grows downward</text>
+<rect x="1076" y="429" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="429" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="450" font-size="16" font-weight="normal" text-anchor="start">c+7</text>
+<text x="1189" y="450" font-size="17" font-weight="normal" text-anchor="start">saved PC (P)</text>
+<rect x="1076" y="457" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="457" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="478" font-size="16" font-weight="normal" text-anchor="start">c+6</text>
+<text x="1189" y="478" font-size="17" font-weight="normal" text-anchor="start">saved ACC</text>
+<rect x="1076" y="485" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="485" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="506" font-size="16" font-weight="normal" text-anchor="start">c+5</text>
+<text x="1189" y="506" font-size="17" font-weight="normal" text-anchor="start">saved IN1</text>
+<rect x="1076" y="513" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="513" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="534" font-size="16" font-weight="normal" text-anchor="start">c+4</text>
+<text x="1189" y="534" font-size="17" font-weight="normal" text-anchor="start">saved IN2</text>
+<rect x="1076" y="541" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="541" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="562" font-size="16" font-weight="normal" text-anchor="start">c+3</text>
+<text x="1189" y="562" font-size="17" font-weight="normal" text-anchor="start">saved BAF</text>
+<rect x="1076" y="569" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="569" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="590" font-size="16" font-weight="normal" text-anchor="start">c+2</text>
+<text x="1189" y="590" font-size="17" font-weight="normal" text-anchor="start">saved CS</text>
+<rect x="1076" y="597" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="597" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="618" font-size="16" font-weight="normal" text-anchor="start">c+1</text>
+<text x="1189" y="618" font-size="17" font-weight="normal" text-anchor="start">saved DS</text>
+<rect x="1076" y="625" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="625" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="646" font-size="16" font-weight="normal" text-anchor="start">c</text>
+<text x="1189" y="646" font-size="17" font-weight="normal" text-anchor="start">free</text>
+<rect x="1076" y="653" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="653" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="674" font-size="16" font-weight="normal" text-anchor="start">c-1</text>
+<text x="1189" y="674" font-size="17" font-weight="normal" text-anchor="start">no live frame here</text>
+<rect x="1076" y="681" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="1179" y="681" width="347" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1085" y="702" font-size="16" font-weight="normal" text-anchor="start">c-2</text>
+<text x="1189" y="702" font-size="17" font-weight="normal" text-anchor="start">no live frame here</text>
+<rect x="1076" y="710" width="450" height="83" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="1088" y="736" font-size="17" font-weight="normal" text-anchor="start">SP = c+7 = S0; PC = P+1</text>
+<text x="1088" y="758" font-size="17" font-weight="normal" text-anchor="start">Boundary unchanged throughout</text>
+<text x="1539" y="433" font-size="14" font-weight="normal" text-anchor="end">SP</text>
+<path d="M 1536 443 L 1527 443" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M 1552 443 L 1567 443 L 1567 744 L 1527 744" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="1534" y="701" font-size="15" font-weight="normal" text-anchor="start">RTI</text>
+<text x="24" y="830" font-size="17" font-weight="normal" text-anchor="start">Yellow: saved   Purple: PC   Blue: active registers   Gray: inactive / discarded   Solid arrows: transfers / execution   Dashed: pointers</text>
+</g></svg>

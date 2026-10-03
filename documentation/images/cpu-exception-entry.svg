@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="630" viewBox="0 0 1300 630" role="img" aria-labelledby="title desc">
+<title id="title">CPU exception abandons the faulting stack</title>
+<desc id="desc">Only a PC is saved automatically. BAF temporarily holds old CS, SP resets to the kernel stack, and the handler receives old CS minus kernel CS. No register restoration returns to the faulting context.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#192c38">
+<text x="24" y="32" font-size="23" font-weight="bold" text-anchor="start">CPU exception: replace the faulting context instead of restoring it</text>
+<text x="24" y="75" font-size="21" font-weight="bold" text-anchor="start">1. Automatic entry, preserve CS</text>
+<text x="24" y="113" font-size="18" font-weight="bold" text-anchor="start">Kernel stack · higher addresses at top</text>
+<rect x="24" y="135" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="135" width="457" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="156" font-size="16" font-weight="normal" text-anchor="start">K</text>
+<text x="137" y="156" font-size="17" font-weight="normal" text-anchor="start">initial free cell</text>
+<rect x="24" y="163" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="163" width="457" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="184" font-size="16" font-weight="normal" text-anchor="start">K-1</text>
+<text x="137" y="184" font-size="17" font-weight="normal" text-anchor="start">unused</text>
+<rect x="24" y="191" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="191" width="457" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="212" font-size="16" font-weight="normal" text-anchor="start">K-2</text>
+<text x="137" y="212" font-size="17" font-weight="normal" text-anchor="start">unused</text>
+<rect x="24" y="219" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="219" width="457" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="240" font-size="16" font-weight="normal" text-anchor="start">K-3</text>
+<text x="137" y="240" font-size="17" font-weight="normal" text-anchor="start">unused</text>
+<text x="24" y="297" font-size="18" font-weight="bold" text-anchor="start">Faulting stack (user case shown)</text>
+<rect x="24" y="320" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="320" width="457" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="341" font-size="16" font-weight="normal" text-anchor="start">S0</text>
+<text x="137" y="341" font-size="17" font-weight="normal" text-anchor="start">saved PC = faulting PC − 1</text>
+<rect x="24" y="348" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="127" y="348" width="457" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="33" y="369" font-size="16" font-weight="normal" text-anchor="start">S0−1</text>
+<text x="137" y="369" font-size="17" font-weight="normal" text-anchor="start">free after automatic entry</text>
+<rect x="24" y="423" width="560" height="138" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="449" font-size="18" font-weight="normal" text-anchor="start">SP = S0−1; BAF = old CS</text>
+<text x="36" y="472" font-size="18" font-weight="normal" text-anchor="start">No six-register frame is created.</text>
+<text x="36" y="495" font-size="18" font-weight="normal" text-anchor="start">PC is already in exception entry.</text>
+<text x="674" y="75" font-size="21" font-weight="bold" text-anchor="start">2. Fresh kernel call frame</text>
+<text x="674" y="113" font-size="18" font-weight="bold" text-anchor="start">Kernel stack · higher addresses at top</text>
+<rect x="674" y="135" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="135" width="457" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="156" font-size="16" font-weight="normal" text-anchor="start">K</text>
+<text x="787" y="156" font-size="17" font-weight="normal" text-anchor="start">old CS − kernel CS (argument)</text>
+<rect x="674" y="163" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="163" width="457" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="184" font-size="16" font-weight="normal" text-anchor="start">K-1</text>
+<text x="787" y="184" font-size="17" font-weight="normal" text-anchor="start">0: unreachable return address</text>
+<rect x="674" y="191" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="191" width="457" height="28" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="212" font-size="16" font-weight="normal" text-anchor="start">K-2</text>
+<text x="787" y="212" font-size="17" font-weight="normal" text-anchor="start">saved BAF = old CS (C prologue)</text>
+<rect x="674" y="219" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="219" width="457" height="28" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="240" font-size="16" font-weight="normal" text-anchor="start">K-3</text>
+<text x="787" y="240" font-size="17" font-weight="normal" text-anchor="start">C locals / free SP ← BAF</text>
+<text x="1247" y="223" font-size="14" font-weight="normal" text-anchor="end">BAF</text>
+<path d="M 1246 233 L 1235 233" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="674" y="297" font-size="18" font-weight="bold" text-anchor="start">Faulting stack (user case shown)</text>
+<rect x="674" y="320" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="320" width="457" height="28" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="341" font-size="16" font-weight="normal" text-anchor="start">S0</text>
+<text x="787" y="341" font-size="17" font-weight="normal" text-anchor="start">saved PC = faulting PC − 1</text>
+<rect x="674" y="348" width="103" height="28" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<rect x="777" y="348" width="457" height="28" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="683" y="369" font-size="16" font-weight="normal" text-anchor="start">S0−1</text>
+<text x="787" y="369" font-size="17" font-weight="normal" text-anchor="start">free after automatic entry</text>
+<rect x="674" y="423" width="560" height="138" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="686" y="449" font-size="18" font-weight="normal" text-anchor="start">SP first = K; CS/DS = kernel</text>
+<text x="686" y="472" font-size="18" font-weight="normal" text-anchor="start">C prologue: BAF=K−3; SP below locals</text>
+<text x="686" y="495" font-size="18" font-weight="normal" text-anchor="start">Boundary: 0 during switch, then kernel</text>
+<text x="686" y="518" font-size="18" font-weight="normal" text-anchor="start">Kernel panic or process exit → dispatcher</text>
+<path d="M 595 67 L 650 67" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<text x="24" y="608" font-size="18" font-weight="normal" text-anchor="start">Old CS is a segment value, saved before BAF becomes a C-frame pointer · no return to the fault PC</text>
+</g></svg>
