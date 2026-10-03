@@ -1,60 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="540" viewBox="0 0 1440 540" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="404" viewBox="0 0 1440 404" role="img" aria-labelledby="title desc">
   <title id="title">TSL DS ACC 2: atomic access to one SRAM word</title>
-  <desc id="desc">One contiguous RETI address-space rectangle is divided into EPROM, periphery, and SRAM regions. Yellow highlights SRAM in the overview and the target word in the expanded SRAM detail; all other regions and cells are neutral. The detail has adjacent, equally sized 32-bit word cells separated by lines. DS is 0x80000040, and offset 2 selects the cell at 0x80000042. TSL DS ACC 2 copies that cell's old value 0 into ACC and changes the same cell to 1 atomically. Neighboring cells remain unchanged.</desc>
-  <rect width="1440" height="540" fill="white"/>
+  <desc id="desc">Four adjacent, equally sized 32-bit SRAM word cells are separated by lines, with omitted memory at both ends. DS is 0x80000040, and offset 2 selects the cell at 0x80000042. TSL DS ACC 2 copies that cell's old value 0 into ACC and changes the same cell to 1 atomically. Neighboring cells remain unchanged.</desc>
+  <rect width="1440" height="404" fill="white"/>
   <g font-family="DejaVu Sans, sans-serif" fill="#172536">
     <text x="60" y="42" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="bold">TSL DS ACC 2</text>
     <text x="420" y="42" font-size="26">Test and set one SRAM word</text>
     <text x="60" y="78" font-family="DejaVu Sans Mono, monospace" font-size="21">DS = 0x80000040; DS + 2 = 0x80000042</text>
 
-    <!-- A single memory-map outline; the regions share dividing lines. -->
-    <path d="M60 104 H390 V208 H60 Z" fill="#f1f5f9"/>
-    <path d="M390 104 H720 V208 H390 Z" fill="#f1f5f9"/>
-    <path d="M720 104 H1380 V208 H720 Z" fill="#fff2b2"/>
-    <rect x="60" y="104" width="1320" height="104" fill="none" stroke="#475569" stroke-width="2"/>
-    <path d="M390 104 V208 M720 104 V208" fill="none" stroke="#475569" stroke-width="2"/>
-    <g text-anchor="middle">
-      <text x="225" y="145" font-size="24" font-weight="bold">00: EPROM</text>
-      <text x="555" y="145" font-size="24" font-weight="bold">01: periphery</text>
-      <text x="1050" y="145" font-size="24" font-weight="bold">10 / 11: SRAM</text>
-      <g font-family="DejaVu Sans Mono, monospace" font-size="17">
-        <text x="225" y="181">0x00000000..0x3fffffff</text>
-        <text x="555" y="181">0x40000000..0x7fffffff</text>
-        <text x="1050" y="181">0x80000000..0xffffffff</text>
-      </g>
-    </g>
-
-    <text x="60" y="258" font-size="24" font-weight="bold">SRAM detail</text>
-    <text x="270" y="258" font-size="21">Each cell is one 32-bit word; addresses increase by 1 per cell.</text>
+    <text x="60" y="122" font-size="24" font-weight="bold">SRAM cells</text>
+    <text x="270" y="122" font-size="21">Each cell is one 32-bit word; addresses increase by 1 per cell.</text>
     <!-- One SRAM outline with equal-width word cells, plus omitted memory at both ends. -->
-    <rect x="60" y="282" width="1320" height="132" fill="#f1f5f9"/>
-    <path d="M720 282 H1005 V414 H720 Z" fill="#fff2b2"/>
-    <rect x="60" y="282" width="1320" height="132" fill="none" stroke="#475569" stroke-width="2"/>
-    <path d="M150 282 V414 M435 282 V414 M720 282 V414 M1005 282 V414 M1290 282 V414" fill="none" stroke="#475569" stroke-width="2"/>
+    <rect x="60" y="146" width="1320" height="132" fill="#f1f5f9"/>
+    <path d="M720 146 H1005 V278 H720 Z" fill="#fff2b2"/>
+    <rect x="60" y="146" width="1320" height="132" fill="none" stroke="#475569" stroke-width="2"/>
+    <path d="M150 146 V278 M435 146 V278 M720 146 V278 M1005 146 V278 M1290 146 V278" fill="none" stroke="#475569" stroke-width="2"/>
     <g text-anchor="middle">
-      <text x="105" y="358" font-size="32">…</text>
-      <text x="1335" y="358" font-size="32">…</text>
+      <text x="105" y="222" font-size="32">…</text>
+      <text x="1335" y="222" font-size="32">…</text>
       <g font-size="23" font-weight="bold">
-        <text x="292.5" y="314">DS + 0 (base)</text>
-        <text x="577.5" y="314">DS + 1</text>
-        <text x="862.5" y="314">DS + 2 (target)</text>
-        <text x="1147.5" y="314">DS + 3</text>
+        <text x="292.5" y="178">DS + 0 (base)</text>
+        <text x="577.5" y="178">DS + 1</text>
+        <text x="862.5" y="178">DS + 2 (target)</text>
+        <text x="1147.5" y="178">DS + 3</text>
       </g>
       <g font-family="DejaVu Sans Mono, monospace" font-size="21">
-        <text x="292.5" y="348">0x80000040</text>
-        <text x="577.5" y="348">0x80000041</text>
-        <text x="862.5" y="348">0x80000042</text>
-        <text x="1147.5" y="348">0x80000043</text>
+        <text x="292.5" y="212">0x80000040</text>
+        <text x="577.5" y="212">0x80000041</text>
+        <text x="862.5" y="212">0x80000042</text>
+        <text x="1147.5" y="212">0x80000043</text>
       </g>
       <g font-size="21">
-        <text x="292.5" y="389">unchanged</text>
-        <text x="577.5" y="389">unchanged</text>
-        <text x="862.5" y="391" font-size="30" font-weight="bold" fill="#8a5a00">0 → 1</text>
-        <text x="1147.5" y="389">unchanged</text>
+        <text x="292.5" y="253">unchanged</text>
+        <text x="577.5" y="253">unchanged</text>
+        <text x="862.5" y="255" font-size="30" font-weight="bold" fill="#8a5a00">0 → 1</text>
+        <text x="1147.5" y="253">unchanged</text>
       </g>
     </g>
-    <text x="60" y="462" font-size="23">1. Copy the old target value into ACC: <tspan font-weight="bold">ACC = 0</tspan></text>
-    <text x="750" y="462" font-size="23">2. Set that same SRAM cell to <tspan font-weight="bold">1</tspan>.</text>
-    <text x="60" y="510" font-size="22" font-weight="bold">One atomic instruction: no interrupt or process switch between the read and write.</text>
+    <text x="60" y="326" font-size="23">1. Copy the old target value into ACC: <tspan font-weight="bold">ACC = 0</tspan></text>
+    <text x="750" y="326" font-size="23">2. Set that same SRAM cell to <tspan font-weight="bold">1</tspan>.</text>
+    <text x="60" y="374" font-size="22" font-weight="bold">One atomic instruction: no interrupt or process switch between the read and write.</text>
   </g>
 </svg>

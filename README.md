@@ -311,9 +311,16 @@ space,but it gives a useful scale for the available memory.
 ### RETI execution model
 [\[↓ TOC\]](#contents)
 
-The RETI memory map determines where the bootloader, peripherals, and PicoOS
-runtime execute. The CPU selects one of these address spaces from the two
-highest address bits:
+The RETI memory map separates bootloader code in EPROM, memory-mapped
+peripherals, and PicoOS runtime storage in SRAM. The CPU uses 32-bit word
+addresses and selects a region from the two highest address bits. The diagram
+shows the complete address space. SRAM covers both `10` and `11`, so its range
+is twice as large as either of the other regions. These widths describe
+address ranges rather than installed memory capacity:
+
+![RETI address space with EPROM and periphery each occupying one quarter and SRAM occupying one half](documentation/images/reti-memory-map.svg)
+
+PicoOS uses the three regions as follows:
 
 | High bits | Address space | PicoOS use |
 | --- | --- | --- |
@@ -1506,28 +1513,9 @@ A condition adds one guard instruction. Comments contribute no instructions.
 Thus the recorded positions already include the sizes of instructions that
 have not yet been expanded.
 
-The complete illustrative program below contains the three labeled blocks
-used in the diagram, in their final order, before pseudoinstruction expansion:
-
-```reti
-entry:
-    PUSH BAF
-    LOADI32 ACC done
-    JUMP32 done
-
-work:
-    PUSH ACC
-    POP IN1
-    LOADI32 ACC 7
-
-done:
-    POP BAF
-```
-
-The following code strip shows the same blocks after expansion. Their widths
-represent their expanded sizes. The jump in `entry` targets `done`, skipping
-`work`; the address of `done` still depends on the lengths of both preceding
-blocks:
+The following code strip shows three blocks in final instruction order.
+Their widths represent their expanded sizes. The jump in `entry` targets
+`done`, whose address depends on the lengths of both preceding blocks:
 
 ![Expanded code blocks and the jump to done](documentation/images/pseudoinstruction-blocks.svg)
 
@@ -1759,15 +1747,19 @@ vectors rather than a special emulator API. Periphery offset `n` has address
 `0x40000000 + n`, while kernel/process code uses absolute SRAM addresses based
 at `0x80000000`.
 
-The two most significant address bits select one of three regions. The emulator
-documentation calls the `01` region **periphery**. The table places the
-implemented periphery cells within the complete RETI address space without
+The emulator documentation calls the `01` region **periphery**. The map
+places this region between EPROM and SRAM:
+
+![RETI address space with periphery between EPROM and SRAM](documentation/images/reti-periphery-memory-map.svg)
+
+The table places the implemented periphery cells within the complete RETI
+address space without
 implying that the unimplemented addresses contain registers:
 
 | Address range | Top-bit prefix | RETI region | Implemented PicoOS use |
 | --- | --- | --- | --- |
 | `0x00000000..0x3fffffff` | `00` | EPROM | Bootloader code and data |
-| `0x40000000..0x7fffffff` | `01` | Periphery | Offsets `0..16`, through `0x40000010`, are implemented memory-mapped registers |
+| **`0x40000000..0x7fffffff`** | **`01`** | **Periphery** | **Offsets `0..16`, through `0x40000010`, are implemented memory-mapped registers** |
 | `0x80000000..0xffffffff` | `10` or `11` | SRAM | Kernel image, process images, heaps, stacks, and shared data |
 
 Older RETI memory maps could label the middle region as the
@@ -1820,11 +1812,11 @@ TSL DS ACC 2
 # After:  ACC = 0 and M[DS + 2] = 1
 ```
 
-The diagram places this access in the RETI memory map and then expands four
-adjacent SRAM cells. Addresses count 32-bit words, so offset `2` advances two
-cells, not two bytes:
+The diagram shows four adjacent SRAM cells and the target at `DS + 2`
+changing from `0` to `1`. Addresses count 32-bit words, so offset `2` advances
+two cells, not two bytes:
 
-![TSL DS ACC 2 in the RETI memory map, with contiguous SRAM word cells and the target changing from 0 to 1](documentation/images/tsl-memory-layout.svg)
+![TSL DS ACC 2 accessing adjacent SRAM word cells with the target changing from 0 to 1](documentation/images/tsl-memory-layout.svg)
 
 `ACC` always receives the exact previous word, with no conversion to a boolean.
 For example, an old value of `7` returns `7` and still becomes `1` in memory.

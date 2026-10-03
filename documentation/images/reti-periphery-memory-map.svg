@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="190" viewBox="0 0 1440 190" role="img" aria-labelledby="title desc">
+  <title id="title">RETI address space: memory-mapped periphery</title>
+  <desc id="desc">The complete RETI address space has EPROM with prefix 00, periphery with prefix 01, and SRAM with prefix 10 or 11. The periphery region spans 0x40000000 through 0x7fffffff. SRAM is twice as wide as EPROM or periphery because it covers two top-bit prefixes. Only periphery offsets 0 through 16 are implemented memory-mapped registers.</desc>
+  <rect width="1440" height="190" fill="white"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#172536">
+    <text x="60" y="42" font-size="26" font-weight="bold">RETI address space</text>
+    <!-- Shared boundaries, with region widths in the ratio 1:1:2. -->
+    <rect x="60" y="66" width="1320" height="104" fill="#f1f5f9"/>
+    <path d="M390 66 H720 V170 H390 Z" fill="#fff2b2"/>
+    <rect x="60" y="66" width="1320" height="104" fill="none" stroke="#475569" stroke-width="2"/>
+    <path d="M390 66 V170 M720 66 V170" fill="none" stroke="#475569" stroke-width="2"/>
+    <g text-anchor="middle">
+      <text x="225" y="107" font-size="24" font-weight="bold">00: EPROM</text>
+      <text x="555" y="107" font-size="24" font-weight="bold">01: periphery</text>
+      <text x="1050" y="107" font-size="24" font-weight="bold">10 / 11: SRAM</text>
+      <g font-family="DejaVu Sans Mono, monospace" font-size="17">
+        <text x="225" y="143">0x00000000..0x3fffffff</text>
+        <text x="555" y="143">0x40000000..0x7fffffff</text>
+        <text x="1050" y="143">0x80000000..0xffffffff</text>
+      </g>
+    </g>
+  </g>
+</svg>
