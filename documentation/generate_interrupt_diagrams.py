@@ -81,166 +81,216 @@ def empty_kernel():
 
 
 def columns(name, title, stages, description):
-    fig = Figure(24 + 526*len(stages), 850, title, description)
+    # Resumable frames need two rows. The shorter exception frames fit one
+    # wide row without the unused space of a second row.
+    compact = len(stages) == 4
+    count = 4 if compact else min(3, len(stages))
+    rows = (len(stages) + count - 1) // count
+    stride = 650 if compact else 880
+    registers_y = 530 if compact else 754
+    fig = Figure(24 + 526 * count, 60 + stride * rows, title, description)
     fig.text(24, 30, title, 23, True)
     for i, stage in enumerate(stages):
-        x = 24 + i * 526
-        fig.text(x, 72, stage["title"], 21, True)
-        if i < len(stages)-1:
-            fig.arrow([(x + 461, 64), (x + 504, 64)])
-        fig.text(x, 107, "Kernel stack · higher addresses at top", 17, True)
-        cells(fig, x, 122, stage["kernel"])
-        fig.text(x, 414, stage.get("stack", "User-process stack") + " · grows downward", 17, True)
-        cells(fig, x, 429, stage["user"])
-        fig.box(x, 710, 450, 83, "active", stage["regs"], 17)
-        if "pointer" in stage:
-            row, label = stage["pointer"]
-            top = 429 + row * 28 + 14
-            fig.text(x + 463, top - 10, label, 14, anchor="end")
-            fig.arrow([(x + 460, top), (x + 451, top)], True)
-        if "kernel_pointer" in stage:
-            row, label = stage["kernel_pointer"]
-            top = 122 + row * 28 + 14
-            fig.text(x + 463, top - 10, label, 14, anchor="end")
-            fig.arrow([(x + 460, top), (x + 451, top)], True)
-        if "transfer" in stage:
-            if stage["transfer"] == "c":
-                fig.arrow([(x + 451, 740), (x + 495, 740), (x + 495, 136), (x + 451, 136)])
+        x = 24 + (i % count) * 526
+        dy = (i // count) * stride
+        fig.text(x, dy + 72, stage['title'], 21, True)
+        if i < len(stages)-1 and i % count < count-1:
+            fig.arrow([(x + 461, dy + 64), (x + 504, dy + 64)])
+        elif i < len(stages)-1:
+            fig.text(24, dy + 865, 'Continue with the next numbered state in the row below ↓', 17, True)
+        fig.text(x, dy + 107, 'Kernel stack · higher addresses at top', 17, True)
+        cells(fig, x, dy + 122, stage['kernel'])
+        fig.text(x, dy + 414, stage.get('stack', 'User-process stack') + ' · grows downward', 17, True)
+        cells(fig, x, dy + 429, stage['user'])
+        fig.box(x, dy + registers_y, 450, 96, 'active', stage['regs'], 17)
+        for key, origin in [('pointer', 429), ('kernel_pointer', 122)]:
+            if key in stage:
+                row, label = stage[key]
+                top = dy + origin + row * 28 + 14
+                fig.text(x + 463, top - 10, label, 14, anchor='end')
+                fig.arrow([(x + 460, top), (x + 451, top)], True)
+        if stage.get('transfer'):
+            if stage['transfer'] == 'c':
+                fig.arrow([(x + 451, dy + 780), (x + 495, dy + 780),
+                           (x + 495, dy + 136), (x + 451, dy + 136)])
             else:
-                # Brackets cover ACC/IN1 and their two kernel argument cells.
                 for top in (150, 457):
-                    fig.parts.append(f'<path d="M {x+451} {top} h 10 v 56 h -10" '
+                    fig.parts.append(f'<path d="M {x+451} {dy+top} h 10 v 56 h -10" '
                                      'fill="none" stroke="#27617b" stroke-width="2"/>')
-                fig.arrow([(x + 462, 485), (x + 495, 485), (x + 495, 178), (x + 463, 178)])
-            fig.text(x + 458, 389, stage["transfer"], 16)
-        if stage.get("restore"):
-            fig.arrow([(x + 476, 510), (x + 491, 510), (x + 491, 744), (x + 451, 744)])
-            fig.text(x + 458, 701, "POP", 15)
-        if stage.get("rti"):
-            fig.arrow([(x + 476, 443), (x + 491, 443), (x + 491, 744), (x + 451, 744)])
-            fig.text(x + 458, 701, "RTI", 15)
-    fig.text(24, 830, "Yellow: saved   Purple: PC   Blue: active registers   Gray: inactive / discarded   Solid arrows: transfers / execution   Dashed: pointers", 17)
+                fig.arrow([(x + 462, dy + 485), (x + 495, dy + 485),
+                           (x + 495, dy + 178), (x + 463, dy + 178)])
+            fig.text(x + 458, dy + 389, stage['transfer'], 16)
+        if stage.get('restore') or stage.get('rti'):
+            start = 443 if stage.get('rti') else 510
+            fig.arrow([(x + 476, dy + start), (x + 491, dy + start),
+                       (x + 491, dy + 790), (x + 451, dy + 790)])
+            fig.text(x + 458, dy + 738, 'RTI' if stage.get('rti') else 'POP', 15)
+    fig.text(24, 40 + stride * rows,
+             'Yellow: saved   Purple: PC   Blue: active registers   Gray: discarded   Solid arrows: transfers / execution   Dashed: pointers', 17)
     fig.save(name)
 
 
+def helper_kernel(return_name, saved_baf='c'):
+    return [('K', return_name, 'pc'), ('K-1', f'saved caller BAF = {saved_baf}', 'saved'),
+            ('K-2', 'free at helper prologue ← BAF/SP', 'free'),
+            ('…', 'nested calls / temporaries below', 'unused')]
+
+
 def syscall_entry():
-    prepared = [("K", "c → caller_context", "saved"),
-                ("K-1", "M[c+5] → argument", "saved"),
-                ("K-2", "M[c+6] → syscall_number", "saved"),
-                ("K-3", "syscall_interrupt_return address", "pc"),
-                ("K-4", "free ← SP", "free")] + [
-                    (f"K-{i}", "not occupied yet", "unused") for i in range(5, 8)]
-    callee = prepared[:4] + [("K-4", "saved caller BAF = c", "saved"),
-                            ("K-5", "first local ← BAF", "active"),
-                            ("K-6", "further locals / temporaries", "unused"),
-                            ("…", "free SP below allocated locals", "free")]
-    columns("syscall-entry.svg", "Syscall entry: save the process, then prepare a kernel C call", [
-        dict(title="1. Six registers saved", kernel=empty_kernel(), user=context(),
-             regs="SP = c = S0 − 7, BAF = c\nCS/DS still user values; PC in ISR", pointer=(7, "SP/BAF")),
-        dict(title="2. Kernel call prepared", kernel=prepared, user=context("1 (default result)"),
-             regs="SP = K − 4, BAF = c\nCS = kernel CS, DS = kernel DS", pointer=(7, "BAF"), transfer="args", kernel_pointer=(4, "SP")),
-        dict(title="3. handle_syscall prologue", kernel=callee, user=context("1 (default result)"),
-             regs="BAF = K − 5; SP below locals\nargs: BAF+3, +4, +5; saved c: +1", kernel_pointer=(5, "BAF"))],
-        "The six process registers remain at c+1 through c+6. Only the syscall selector, argument and context pointer enter the kernel call frame. The callee saves c and changes BAF to K-5.")
+    arguments = [('K', 'c → caller_context', 'saved'),
+                 ('K-1', 'M[c+5] → argument', 'saved'),
+                 ('K-2', 'M[c+6] → syscall_number', 'saved'),
+                 ('K-3', 'free ← SP', 'free')]
+    prepared = arguments[:3] + [('K-3', 'syscall_interrupt_return address', 'pc'),
+                                ('K-4', 'free ← SP', 'free')]
+    callee = prepared[:4] + [('K-4', 'saved caller BAF = c', 'saved'),
+                            ('K-5', 'free at C prologue ← BAF/SP', 'free'),
+                            ('…', 'expression temporaries below', 'unused')]
+    columns('syscall-entry.svg', 'Syscall entry: save the process, then prepare a kernel C call', [
+        dict(title='1. Save interrupted context', kernel=empty_kernel(), user=context(),
+             regs='SP=c=S0−7; BAF still user BAF\nCS/DS still user; PC in syscall ISR\nM[c+7]=INT PC; six registers saved', pointer=(7, 'SP')),
+        dict(title='2. Select fresh kernel stack', kernel=empty_kernel(), user=context(),
+             regs='BAF=c; IN1=0 → boundary=0\nCS/DS=kernel; SP=K\nNext: activate_kernel_stack_boundary', pointer=(7, 'BAF'), kernel_pointer=(0, 'SP')),
+        dict(title='3. Temporary boundary call', kernel=helper_kernel('boundary-call continuation'), user=context(),
+             regs='Prologue: BAF=SP=K−2; M[K−1]=c\nNested calls then write kernel boundary\nEpilogue restores BAF=c, SP=K', kernel_pointer=(2, 'BAF')),
+        dict(title='4. Copy syscall arguments', kernel=arguments, user=context(),
+             regs='BAF=c; SP=K−3; CS/DS=kernel\nIN2=M[c+5] → PUSH, then M[c+6] → PUSH\nOriginal saved IN2 still at c+4', pointer=(7, 'BAF'), kernel_pointer=(3, 'SP'), transfer='args'),
+        dict(title='5. Set result; prepare return', kernel=prepared, user=context('1 (default result)'),
+             regs='IN2=1 → M[c+4]; BAF=c; SP=K−4\nACC=handle_syscall address → PC\nReturn continuation is at K−3', pointer=(7, 'BAF'), kernel_pointer=(4, 'SP')),
+        dict(title='6. handle_syscall prologue', kernel=callee, user=context('1 (default result)'),
+             regs='Prologue: BAF=SP=K−5; no C locals\nargs: BAF+3, +4, +5; saved c at +1\nExpressions use cells below this SP', kernel_pointer=(5, 'BAF'))],
+        'The six process registers and interrupt PC stay on the user stack. The kernel boundary helper temporarily saves c, then restores it before argument copies. IN2 is overwritten only after argument and selector have been pushed. The C prologue saves c again at K-4.')
 
 
 def syscall_restore():
-    scratch = [("K", "old caller_context argument", "unused"),
-               ("K-1", "old syscall argument", "unused"),
-               ("K-2", "old syscall selector", "unused"),
-               ("K-3", "c (reschedule-check argument)", "saved"),
-               ("K-4", "consumed restore return address", "unused"),
-               ("K-5", "discarded C frame", "unused"),
-               ("…", "discarded temporaries", "unused"),
-               ("", "no process register frame here", "unused")]
-    columns("syscall-restore.svg", "Normal syscall restoration: the registers come from the user stack", [
-        dict(title="1. Reschedule check returned", kernel=scratch, user=context("syscall result"),
-             regs="SP = K − 4, BAF = c\nCS/DS = kernel; boundary = kernel", pointer=(7, "BAF"), kernel_pointer=(4, "SP")),
-        dict(title="2. Select process stack", kernel=scratch, user=context("syscall result"),
-             regs="MOVE BAF SP → SP=c, BAF=c\nBoundary helper returns here; CS/DS=kernel", pointer=(7, "SP/BAF")),
-        dict(title="3. Six POPs restore registers", kernel=scratch, user=context("syscall result", consumed=True),
-             regs="SP = c+6; BAF = saved user BAF\nIN2 = result; DS/CS = saved user values", pointer=(1, "SP"), restore=True),
-        dict(title="4. RTI consumes saved PC", kernel=scratch, user=context("syscall result", returned=True),
-             regs="SP = c+7 = S0; PC = P+1\nBoundary = process; execution resumes", pointer=(0, "SP"), rti=True)],
-        "MOVE BAF SP discards the kernel call frame. A C helper writes the process boundary on the user stack, then six POPs restore the registers and RTI reads M[c+7].")
+    scratch = [('K', 'old caller_context argument', 'unused'),
+               ('K-1', 'old syscall argument', 'unused'),
+               ('K-2', 'old syscall selector', 'unused'),
+               ('K-3', 'c (reschedule-check argument)', 'saved'),
+               ('K-4', 'consumed restore return address', 'unused'),
+               ('K-5', 'discarded C frame', 'unused'),
+               ('…', 'discarded temporaries', 'unused')]
+    helper = context('syscall result')[:7] + [
+        ('c', 'boundary-call continuation address', 'pc'),
+        ('c-1', 'saved caller BAF = c', 'saved'),
+        ('c-2', 'free at helper prologue ← BAF/SP', 'free'),
+        ('…', 'nested boundary calls below', 'unused')]
+    columns('syscall-restore.svg', 'Normal syscall restoration: the registers come from the user stack', [
+        dict(title='1. Reschedule check returned', kernel=scratch, user=context('syscall result'),
+             regs='SP=K−4; BAF=c\nCS/DS and boundary still kernel\nResult is safe at M[c+4]', pointer=(7, 'BAF'), kernel_pointer=(4, 'SP')),
+        dict(title='2. Select process stack', kernel=scratch, user=context('syscall result'),
+             regs='MOVE BAF SP → SP=c; BAF=c\nCS/DS still kernel\nBoundary still kernel before C call', pointer=(7, 'SP/BAF')),
+        dict(title='3. Temporary boundary call', kernel=scratch, user=helper,
+             regs='Prologue: BAF=SP=c−2; saved c at c−1\nResult intact at c+4; CS/DS=kernel\nNested calls then write process boundary', pointer=(9, 'BAF')),
+        dict(title='4. Helper epilogue returned', kernel=scratch, user=context('syscall result'),
+             regs='BAF=c, SP=c; boundary=process\nCS/DS still kernel\nTemporary C cells are no longer live', pointer=(7, 'SP/BAF')),
+        dict(title='5. Restore six registers', kernel=scratch, user=context('syscall result', consumed=True),
+             regs='SP=c+6; BAF=saved user BAF\nIN2=result; CS/DS=saved user values\nOnly saved PC remains live at c+7', pointer=(1, 'SP'), restore=True),
+        dict(title='6. RTI consumes saved PC', kernel=scratch, user=context('syscall result', returned=True),
+             regs='SP=c+7=S0; PC=P+1\nBoundary remains process\nResume instruction after INT 0', pointer=(0, 'SP'), rti=True)],
+        'SP first leaves the kernel call frame for c. The process-boundary C helper then changes BAF to c-2 and saves c at c-1 before restoring both pointers. POP BAF restores the original user frame pointer, and RTI consumes the PC at c+7.')
 
 
 def timer_entry():
-    kernel_call = [("K", "timer_interrupt_after_reschedule_request", "pc"),
-                   ("K-1", "saved c in helper prologue", "saved"),
-                   ("K-2", "helper locals / free SP", "free")] + [
-                       (f"K-{i}", "not occupied by this helper", "unused") for i in range(3, 8)]
-    dispatch = [("K", "c → caller_context argument", "saved"),
-                ("K-1", "0: unreachable return address", "pc"),
-                ("K-2", "free ← SP", "free")] + [
-                    (f"K-{i}", "not occupied yet", "unused") for i in range(3, 8)]
-    columns("timer-entry.svg", "Timer process path: preserve the interrupted frame, then schedule", [
-        dict(title="1. Save, then classify PC", kernel=empty_kernel(), user=context(),
-             regs="SP = c; BAF still interrupted BAF\nCS/DS = kernel; ACC = M[c+7] − DS", pointer=(7, "SP")),
-        dict(title="2. Switch stack, request", kernel=kernel_call, user=context(),
-             regs="SP first = K; BAF first = c\nC helper: BAF = K−2; request = true", kernel_pointer=(2, "BAF")),
-        dict(title="3. Dispatcher call prepared", kernel=dispatch, user=context(),
-             regs="SP = K−2, BAF = c\nNext C prologue: saved c at K−2; BAF=K−3", pointer=(7, "BAF"), transfer="c", kernel_pointer=(2, "SP"))],
-        "On the user branch BAF preserves c while SP switches to K. The request helper returns with BAF=c, then the dispatcher copies the six saved registers into the PCB activation. The kernel branch instead retains the interrupted stack.")
+    dispatch = [('K', 'c → caller_context argument', 'saved'),
+                ('K-1', '0: unreachable return address', 'pc'),
+                ('K-2', 'free ← SP', 'free')]
+    callee = dispatch[:2] + [('K-2', 'saved caller BAF = c', 'saved'),
+                            ('K-3', 'first local ← BAF', 'active'),
+                            ('…', 'locals / temporaries, then free SP', 'unused')]
+    columns('timer-entry.svg', 'Timer process path: preserve the interrupted frame, then schedule', [
+        dict(title='1. Save, then classify PC', kernel=empty_kernel(), user=context(),
+             regs='SP=c; BAF still interrupted BAF\nCS/DS=kernel; ACC=M[c+7]−DS\nNonnegative → process branch', pointer=(7, 'SP')),
+        dict(title='2. Select fresh kernel stack', kernel=empty_kernel(), user=context(),
+             regs='BAF=c; IN1=0 → boundary=0\nSP=K; CS/DS already kernel\nNext: activate_kernel_stack_boundary', pointer=(7, 'BAF'), kernel_pointer=(0, 'SP')),
+        dict(title='3. Temporary boundary call', kernel=helper_kernel('boundary-call continuation'), user=context(),
+             regs='Prologue: BAF=SP=K−2; saved c at K−1\nNested calls then write kernel boundary\nEpilogue restores BAF=c, SP=K', kernel_pointer=(2, 'BAF')),
+        dict(title='4. Record scheduling request', kernel=helper_kernel('timer after-request continuation'), user=context(),
+             regs='Request-helper BAF=K−2, SP=K−2\nreschedule_requested=true\nEpilogue restores BAF=c, SP=K', kernel_pointer=(2, 'SP/BAF')),
+        dict(title='5. Dispatcher call prepared', kernel=dispatch, user=context(),
+             regs='SP=K−2, BAF=c; CS/DS=kernel\nPUSH c, then unreachable return 0\nNext: dispatcher_switch_from_context', pointer=(7, 'BAF'), transfer='c', kernel_pointer=(2, 'SP')),
+        dict(title='6. Save activation in C', kernel=callee, user=context(),
+             regs='C prologue: BAF=K−3; SP below locals\ncaller_context=c is at BAF+3\nCopy c[1..6] into current PCB activation', kernel_pointer=(3, 'BAF'))],
+        'The user branch preserves c in BAF, disables checking while SP switches, and temporarily creates two helper frames on the kernel stack before dispatching. Saved register cells stay on the process stack until copied to its PCB. The kernel branch keeps its interrupted stack instead.')
 
 
 def borrowed_stack():
-    unused = [("K", "not reset or selected by ISR", "unused")] + [
-        (f"K-{i}", "live kernel work, if interrupted", "unused") for i in range(1, 8)]
-    called = context()
-    called[7:] = [("c", "uart/dma_interrupt_return address", "pc"),
-                  ("c-1", "saved caller BAF = c", "saved"),
-                  ("c-2", "C locals / free SP ← BAF", "active")]
-    columns("interrupt-borrowed-stack.svg", "UART / DMA: keep the interrupted stack and return to the same context", [
-        dict(title="1. Save and call C handler", kernel=unused, user=called,
-             regs="Before C: BAF=c, SP=c−1; CS/DS=kernel\nC prologue: BAF=c−2; SP below locals", pointer=(9, "BAF")),
-        dict(title="2. C returns; restore frame", kernel=unused, user=context(consumed=True),
-             regs="C returned: BAF=c; MOVE BAF SP → c\nSix POPs: SP → c+6; segments restored", pointer=(1, "SP"), restore=True),
-        dict(title="3. RTI resumes context", kernel=unused, user=context(returned=True),
-             regs="SP = c+7 = S0; PC = P+1\nBoundary unchanged throughout", pointer=(0, "SP"), rti=True)],
-        "UART and DMA use identical save/call/restore sequences. Their C return address is at c and their saved caller BAF at c-1 below the displayed register frame. If kernel work was interrupted, that same frame is on the kernel stack rather than the user stack.")
+    unused = [('K', 'not reset or selected by this ISR', 'unused'),
+              ('…', 'kernel frames, if kernel interrupted', 'unused')]
+    called = context()[:7] + [('c', 'uart/dma_interrupt_return address', 'pc'),
+                             ('c-1', 'saved caller BAF = c', 'saved'),
+                             ('c-2', 'C locals / free SP ← BAF', 'active'),
+                             ('…', 'nested calls / temporaries below', 'unused')]
+    columns('interrupt-borrowed-stack.svg', 'UART / DMA: keep the interrupted stack and restore the same context', [
+        dict(title='1. Save interrupted registers', kernel=unused, user=context(),
+             regs='SP=c=S0−7; BAF=c\nCS/DS=kernel; boundary unchanged\nNext: PUSH return address at c', pointer=(7, 'SP/BAF')),
+        dict(title='2. Call device C handler', kernel=unused, user=called,
+             regs='Before C: SP=c−1; BAF=c\nC frame: BAF=c−2; locals/temps below\nUART: 4 locals; DMA: 0 locals', pointer=(9, 'BAF')),
+        dict(title='3. Return to saved frame', kernel=unused, user=context(),
+             regs='C epilogue: BAF=c, SP=c\nMOVE BAF SP keeps SP=c\nCS/DS=kernel; saved frame still live', pointer=(7, 'SP/BAF')),
+        dict(title='4. Restore six registers', kernel=unused, user=context(consumed=True),
+             regs='Six POPs: SP=c+6; BAF=original BAF\nCS/DS and general registers restored\nSaved PC still live at c+7', pointer=(1, 'SP'), restore=True),
+        dict(title='5. RTI resumes context', kernel=unused, user=context(returned=True),
+             regs='SP=c+7=S0; PC=P+1\nBoundary unchanged throughout\nResume user code or interrupted kernel work', pointer=(0, 'SP'), rti=True)],
+        'UART and DMA have identical stack mechanics. The example shows user code interrupted. For a kernel interruption, all displayed active cells belong to the live kernel stack. Separate states preserve c before POP BAF replaces it with the original frame pointer. The timer kernel return shares states 4 and 5, with SP already equal to c.')
 
 
 def memory_map():
-    f = Figure(1640, 660, "Interrupt-controller initialization in the RETI memory map",
-               "EPROM, periphery and SRAM in address order. Two int[3] arrays in kernel .data write mapping cells 3-5 and priority cells 6-8. The separate function-pointer table occupies .ivt.")
-    f.text(24, 32, "Interrupt-controller initialization: global arrays in SRAM → six periphery cells", 23, True)
-    f.text(24, 68, "Increasing absolute addresses →   Layout widths are schematic", 18)
-    f.box(24, 90, 205, 535, "unused")
-    f.text(36, 120, "EPROM", 23, True)
-    f.text(36, 154, "0x00000000\n… 0x3fffffff\n\nBootloader", 18)
-    f.box(249, 90, 530, 535, "free")
-    f.text(263, 120, "Periphery · 0x40000000 … 0x7fffffff", 20, True)
-    f.text(267, 161, "… UART cells 0–2 …", 18)
-    labels = ["timer mapping = 1", "DMA/custom mapping = 4", "UART mapping = 2",
-              "timer priority = 1", "DMA/custom priority = 1", "UART priority = 2"]
-    for i, label in enumerate(labels):
-        f.box(264, 188+i*49, 480, 49, "active")
-        f.text(275, 219+i*49, f"0x4000000{i+3:x}   {label}", 18)
-    f.text(267, 524, "… timer, boundary, exception, DMA …", 18)
-    f.text(267, 570, "255 disables a device mapping.\nInitialization writes 255/0 before assignment.", 17)
-    f.box(850, 90, 766, 535, "free")
-    f.text(867, 120, "SRAM · 0x80000000 … 0xffffffff", 21, True)
-    f.box(868, 143, 728, 343, "kernel")
-    f.text(880, 171, "Kernel region", 20, True)
-    f.box(884, 185, 694, 220, "free")
-    f.text(896, 213, "Kernel image", 19, True)
-    f.box(896, 230, 174, 152, "pc", ".ivt\nfunction pointers\n[5]", 17)
-    f.box(1070, 230, 123, 152, "unused", ".text\nISRs + C", 17)
-    f.box(1193, 230, 371, 152, "saved", ".data · global int[3] arrays", 17)
-    f.text(1204, 300, "interrupt_device_isrs\n[1, 4, 2]\ninterrupt_device_priorities\n[1, 1, 2]", 17)
-    f.box(884, 417, 345, 52, "kernel", "Kernel heap", 18)
-    f.box(1229, 417, 349, 52, "kernel", "Kernel stack", 18)
-    f.box(868, 506, 728, 100, "unused", "Process and Shared Data Heap\nProcess images (each .text/.data/heap/stack) + shared data", 18)
-    # Separate buses group the three writes without crossings through labels.
-    f.arrow([(1193, 318), (1174, 318), (1174, 393), (820, 393), (820, 213), (746, 213)])
-    for y in [262, 311]:
-        f.arrow([(820, y), (746, y)])
-    f.arrow([(1193, 362), (1180, 362), (1180, 410), (795, 410), (795, 360), (746, 360)])
-    f.arrow([(795, 409), (746, 409)])
-    f.arrow([(795, 410), (795, 458), (746, 458)])
-    f.text(863, 645, "interrupt_controller_initialize writes the mapping and priority cells", 16)
-    f.save("interrupt-controller-initialization.svg")
+    f = Figure(1720, 800, 'Interrupt-controller initialization in the RETI memory map',
+               'EPROM, periphery and SRAM in address order. Individual entries of two int[3] arrays in kernel .data write the six controller registers. The kernel image contains .ivt, .text and .data, followed by kernel heap and stack. Process and shared data occupy the remaining heap.')
+    f.text(24, 38, 'Interrupt-controller initialization', 28, True)
+    f.text(1455, 38, 'Addresses →', 21)
+    # Context stays unfilled. Only the cells taking part in the writes use color.
+    f.box(24, 90, 205, 690, 'free')
+    f.text(36, 125, 'EPROM', 23, True)
+    f.text(36, 160, '0x00000000', 18)
+    f.text(36, 215, 'Bootloader', 21)
+    f.box(249, 90, 540, 690, 'free')
+    f.text(263, 125, 'Periphery', 23, True)
+    f.text(263, 160, '0x40000000', 18)
+    f.text(267, 215, '…', 22)
+    f.text(267, 267, 'Controller registers', 22, True)
+    f.text(275, 329, 'ISR mapping', 21, True)
+    f.text(275, 493, 'Priority', 21, True)
+    f.text(267, 674, '…', 22)
+    f.box(910, 90, 786, 690, 'free')
+    f.text(924, 125, 'SRAM', 23, True)
+    f.text(1470, 125, '0x80000000', 18)
+    f.box(924, 143, 758, 580, 'free')
+    f.text(938, 174, 'Kernel', 22, True)
+    f.box(936, 188, 734, 460, 'free')
+    f.text(950, 216, 'Kernel image', 21, True)
+    f.box(950, 229, 240, 42, 'free', '.ivt', 21)
+    f.box(1190, 229, 466, 42, 'free', '.text', 21)
+    f.box(950, 281, 706, 353, 'free')
+    f.text(964, 308, '.data', 21, True)
+    f.text(964, 329, 'interrupt_device_isrs', 19)
+    f.text(964, 493, 'interrupt_device_priorities', 19)
+    rows = []
+    for i in range(6):
+        index = i % 3
+        value = [1,4,2,1,1,2][i]
+        top = (343 if i < 3 else 507) + index * 40
+        fill = 'active' if i < 3 else 'saved'
+        device = ['Timer', 'DMA', 'UART'][index]
+        f.box(264, top, 510, 40, fill)
+        f.text(275, top+28, f'0x4000000{i+3:x}', 21)
+        f.text(482, top+28, device, 21)
+        f.text(744, top+28, str(value), 23, True, anchor='end')
+        f.box(964, top, 678, 40, fill)
+        f.text(980, top+28, f'[{index}] = {value}', 23)
+        rows.append(top + 20)
+    f.box(936, 665, 367, 42, 'free', 'Kernel heap', 21)
+    f.box(1303, 665, 367, 42, 'free', 'Kernel stack', 21)
+    f.box(924, 737, 758, 32, 'free', 'Process and Shared Data Heap', 20)
+    # Neutral arrows keep the emphasis on the matching source/destination cells.
+    f.parts.append('<defs><marker id="write-arrow" viewBox="0 0 10 10" refX="9" '
+                   'refY="5" markerWidth="7" markerHeight="7" orient="auto">'
+                   '<path d="M 0 0 L 10 5 L 0 10 z" fill="#526472"/></marker></defs>')
+    for y in rows:
+        f.parts.append(f'<path d="M 964 {y} L 776 {y}" fill="none" '
+                       'stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>')
+    f.save('interrupt-controller-initialization.svg')
 
 
 def timer_memory():
@@ -269,34 +319,27 @@ def timer_memory():
 
 
 def exception_entry():
-    f = Figure(1300, 630, "CPU exception abandons the faulting stack",
-               "Only a PC is saved automatically. BAF temporarily holds old CS, SP resets to the kernel stack, and the handler receives old CS minus kernel CS. No register restoration returns to the faulting context.")
-    f.text(24, 32, "CPU exception: replace the faulting context instead of restoring it", 23, True)
-    for i in range(2):
-        x = 24 + i*650
-        f.text(x, 75, ["1. Automatic entry, preserve CS", "2. Fresh kernel call frame"][i], 21, True)
-        f.text(x, 113, "Kernel stack · higher addresses at top", 18, True)
-        rows = [("K", "initial free cell", "free"), ("K-1", "unused", "unused"),
-                ("K-2", "unused", "unused"), ("K-3", "unused", "unused")]
-        if i:
-            rows = [("K", "old CS − kernel CS (argument)", "saved"),
-                    ("K-1", "0: unreachable return address", "pc"),
-                    ("K-2", "saved BAF = old CS (C prologue)", "saved"),
-                    ("K-3", "C locals / free SP ← BAF", "active")]
-        cells(f, x, 135, rows, 560)
-        if i:
-            f.text(x+573, 223, "BAF", 14, anchor="end")
-            f.arrow([(x+572, 233), (x+561, 233)], True)
-        f.text(x, 297, "Faulting stack (user case shown)", 18, True)
-        cells(f, x, 320, [("S0", "saved PC = faulting PC − 1", "pc"),
-                         ("S0−1", "free after automatic entry", "free")], 560)
-        f.box(x, 423, 560, 138, "active", [
-            "SP = S0−1; BAF = old CS\nNo six-register frame is created.\nPC is already in exception entry.",
-            "SP first = K; CS/DS = kernel\nC prologue: BAF=K−3; SP below locals\nBoundary: 0 during switch, then kernel\nKernel panic or process exit → dispatcher"
-        ][i], 18)
-    f.arrow([(595, 67), (650, 67)])
-    f.text(24, 608, "Old CS is a segment value, saved before BAF becomes a C-frame pointer · no return to the fault PC", 18)
-    f.save("cpu-exception-entry.svg")
+    old = [('S0', 'saved PC = faulting PC − 1', 'pc'),
+           ('S0−1', 'free after automatic entry', 'free')]
+    helper = helper_kernel('boundary-call continuation', 'old CS')
+    abandoned = [(address, value, 'unused') for address, value, _ in old]
+    call = [('K', 'old CS − kernel CS (argument)', 'saved'),
+            ('K-1', '0: unreachable return address', 'pc'),
+            ('K-2', 'saved caller BAF = old CS', 'saved'),
+            ('K-3', 'local cause ← BAF', 'active'),
+            ('K-4', 'local kernel_exception', 'active'),
+            ('K-5', 'free SP after reserving two locals', 'free'),
+            ('…', 'expression temporaries and calls', 'unused')]
+    columns('cpu-exception-entry.svg', 'CPU exception: abandon the faulting context and prepare a kernel handler', [
+        dict(title='1. Preserve interrupted CS', kernel=empty_kernel(), user=old, stack='Faulting user-process stack',
+             regs='SP=S0−1; BAF=old CS (a value)\nOnly PC was saved automatically\nNo six-register resumable frame', pointer=(1, 'SP')),
+        dict(title='2. Select fresh kernel stack', kernel=empty_kernel(), user=abandoned, stack='Abandoned user-process stack',
+             regs='IN1=0 → boundary=0; SP=K\nCS/DS=kernel; BAF still old CS\nThe old stack is no longer used', kernel_pointer=(0, 'SP')),
+        dict(title='3. Temporary boundary call', kernel=helper, user=abandoned, stack='Abandoned user-process stack',
+             regs='Prologue: BAF=SP=K−2; old CS at K−1\nNested calls then write kernel boundary\nEpilogue: SP=K, BAF=old CS', kernel_pointer=(2, 'BAF')),
+        dict(title='4. Enter exception C handler', kernel=call, user=abandoned, stack='Abandoned user-process stack',
+             regs='Difference is pushed before C uses BAF\nC prologue: BAF=K−3; SP=K−5\nKernel panic or process exit → dispatcher', kernel_pointer=(3, 'BAF'))],
+        'The user-fault case is shown. BAF holds old CS, not a pointer, until a C prologue uses it. The temporary boundary helper saves and restores that value before it is used for the CS difference. No register frame or interrupt-return path is restored for the faulting context.')
 
 
 def scheduled_return():

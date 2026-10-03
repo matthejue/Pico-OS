@@ -1,66 +1,85 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="660" viewBox="0 0 1640 660" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1720" height="800" viewBox="0 0 1720 800" role="img" aria-labelledby="title desc">
 <title id="title">Interrupt-controller initialization in the RETI memory map</title>
-<desc id="desc">EPROM, periphery and SRAM in address order. Two int[3] arrays in kernel .data write mapping cells 3-5 and priority cells 6-8. The separate function-pointer table occupies .ivt.</desc>
+<desc id="desc">EPROM, periphery and SRAM in address order. Individual entries of two int[3] arrays in kernel .data write the six controller registers. The kernel image contains .ivt, .text and .data, followed by kernel heap and stack. Process and shared data occupy the remaining heap.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif" fill="#192c38">
-<text x="24" y="32" font-size="23" font-weight="bold" text-anchor="start">Interrupt-controller initialization: global arrays in SRAM → six periphery cells</text>
-<text x="24" y="68" font-size="18" font-weight="normal" text-anchor="start">Increasing absolute addresses →   Layout widths are schematic</text>
-<rect x="24" y="90" width="205" height="535" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
-<text x="36" y="120" font-size="23" font-weight="bold" text-anchor="start">EPROM</text>
-<text x="36" y="154" font-size="18" font-weight="normal" text-anchor="start">0x00000000</text>
-<text x="36" y="177" font-size="18" font-weight="normal" text-anchor="start">… 0x3fffffff</text>
-<text x="36" y="200" font-size="18" font-weight="normal" text-anchor="start"></text>
-<text x="36" y="223" font-size="18" font-weight="normal" text-anchor="start">Bootloader</text>
-<rect x="249" y="90" width="530" height="535" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
-<text x="263" y="120" font-size="20" font-weight="bold" text-anchor="start">Periphery · 0x40000000 … 0x7fffffff</text>
-<text x="267" y="161" font-size="18" font-weight="normal" text-anchor="start">… UART cells 0–2 …</text>
-<rect x="264" y="188" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="219" font-size="18" font-weight="normal" text-anchor="start">0x40000003   timer mapping = 1</text>
-<rect x="264" y="237" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="268" font-size="18" font-weight="normal" text-anchor="start">0x40000004   DMA/custom mapping = 4</text>
-<rect x="264" y="286" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="317" font-size="18" font-weight="normal" text-anchor="start">0x40000005   UART mapping = 2</text>
-<rect x="264" y="335" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="366" font-size="18" font-weight="normal" text-anchor="start">0x40000006   timer priority = 1</text>
-<rect x="264" y="384" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="415" font-size="18" font-weight="normal" text-anchor="start">0x40000007   DMA/custom priority = 1</text>
-<rect x="264" y="433" width="480" height="49" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="275" y="464" font-size="18" font-weight="normal" text-anchor="start">0x40000008   UART priority = 2</text>
-<text x="267" y="524" font-size="18" font-weight="normal" text-anchor="start">… timer, boundary, exception, DMA …</text>
-<text x="267" y="570" font-size="17" font-weight="normal" text-anchor="start">255 disables a device mapping.</text>
-<text x="267" y="592" font-size="17" font-weight="normal" text-anchor="start">Initialization writes 255/0 before assignment.</text>
-<rect x="850" y="90" width="766" height="535" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
-<text x="867" y="120" font-size="21" font-weight="bold" text-anchor="start">SRAM · 0x80000000 … 0xffffffff</text>
-<rect x="868" y="143" width="728" height="343" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="880" y="171" font-size="20" font-weight="bold" text-anchor="start">Kernel region</text>
-<rect x="884" y="185" width="694" height="220" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
-<text x="896" y="213" font-size="19" font-weight="bold" text-anchor="start">Kernel image</text>
-<rect x="896" y="230" width="174" height="152" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
-<text x="908" y="256" font-size="17" font-weight="normal" text-anchor="start">.ivt</text>
-<text x="908" y="278" font-size="17" font-weight="normal" text-anchor="start">function pointers</text>
-<text x="908" y="300" font-size="17" font-weight="normal" text-anchor="start">[5]</text>
-<rect x="1070" y="230" width="123" height="152" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
-<text x="1082" y="256" font-size="17" font-weight="normal" text-anchor="start">.text</text>
-<text x="1082" y="278" font-size="17" font-weight="normal" text-anchor="start">ISRs + C</text>
-<rect x="1193" y="230" width="371" height="152" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
-<text x="1205" y="256" font-size="17" font-weight="normal" text-anchor="start">.data · global int[3] arrays</text>
-<text x="1204" y="300" font-size="17" font-weight="normal" text-anchor="start">interrupt_device_isrs</text>
-<text x="1204" y="322" font-size="17" font-weight="normal" text-anchor="start">[1, 4, 2]</text>
-<text x="1204" y="344" font-size="17" font-weight="normal" text-anchor="start">interrupt_device_priorities</text>
-<text x="1204" y="366" font-size="17" font-weight="normal" text-anchor="start">[1, 1, 2]</text>
-<rect x="884" y="417" width="345" height="52" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="896" y="443" font-size="18" font-weight="normal" text-anchor="start">Kernel heap</text>
-<rect x="1229" y="417" width="349" height="52" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="1241" y="443" font-size="18" font-weight="normal" text-anchor="start">Kernel stack</text>
-<rect x="868" y="506" width="728" height="100" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
-<text x="880" y="532" font-size="18" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
-<text x="880" y="555" font-size="18" font-weight="normal" text-anchor="start">Process images (each .text/.data/heap/stack) + shared data</text>
-<path d="M 1193 318 L 1174 318 L 1174 393 L 820 393 L 820 213 L 746 213" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<path d="M 820 262 L 746 262" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<path d="M 820 311 L 746 311" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<path d="M 1193 362 L 1180 362 L 1180 410 L 795 410 L 795 360 L 746 360" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<path d="M 795 409 L 746 409" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<path d="M 795 410 L 795 458 L 746 458" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<text x="863" y="645" font-size="16" font-weight="normal" text-anchor="start">interrupt_controller_initialize writes the mapping and priority cells</text>
+<text x="24" y="38" font-size="28" font-weight="bold" text-anchor="start">Interrupt-controller initialization</text>
+<text x="1455" y="38" font-size="21" font-weight="normal" text-anchor="start">Addresses →</text>
+<rect x="24" y="90" width="205" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="125" font-size="23" font-weight="bold" text-anchor="start">EPROM</text>
+<text x="36" y="160" font-size="18" font-weight="normal" text-anchor="start">0x00000000</text>
+<text x="36" y="215" font-size="21" font-weight="normal" text-anchor="start">Bootloader</text>
+<rect x="249" y="90" width="540" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="263" y="125" font-size="23" font-weight="bold" text-anchor="start">Periphery</text>
+<text x="263" y="160" font-size="18" font-weight="normal" text-anchor="start">0x40000000</text>
+<text x="267" y="215" font-size="22" font-weight="normal" text-anchor="start">…</text>
+<text x="267" y="267" font-size="22" font-weight="bold" text-anchor="start">Controller registers</text>
+<text x="275" y="329" font-size="21" font-weight="bold" text-anchor="start">ISR mapping</text>
+<text x="275" y="493" font-size="21" font-weight="bold" text-anchor="start">Priority</text>
+<text x="267" y="674" font-size="22" font-weight="normal" text-anchor="start">…</text>
+<rect x="910" y="90" width="786" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="924" y="125" font-size="23" font-weight="bold" text-anchor="start">SRAM</text>
+<text x="1470" y="125" font-size="18" font-weight="normal" text-anchor="start">0x80000000</text>
+<rect x="924" y="143" width="758" height="580" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="938" y="174" font-size="22" font-weight="bold" text-anchor="start">Kernel</text>
+<rect x="936" y="188" width="734" height="460" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="950" y="216" font-size="21" font-weight="bold" text-anchor="start">Kernel image</text>
+<rect x="950" y="229" width="240" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="962" y="255" font-size="21" font-weight="normal" text-anchor="start">.ivt</text>
+<rect x="1190" y="229" width="466" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="1202" y="255" font-size="21" font-weight="normal" text-anchor="start">.text</text>
+<rect x="950" y="281" width="706" height="353" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="964" y="308" font-size="21" font-weight="bold" text-anchor="start">.data</text>
+<text x="964" y="329" font-size="19" font-weight="normal" text-anchor="start">interrupt_device_isrs</text>
+<text x="964" y="493" font-size="19" font-weight="normal" text-anchor="start">interrupt_device_priorities</text>
+<rect x="264" y="343" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="371" font-size="21" font-weight="normal" text-anchor="start">0x40000003</text>
+<text x="482" y="371" font-size="21" font-weight="normal" text-anchor="start">Timer</text>
+<text x="744" y="371" font-size="23" font-weight="bold" text-anchor="end">1</text>
+<rect x="964" y="343" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="371" font-size="23" font-weight="normal" text-anchor="start">[0] = 1</text>
+<rect x="264" y="383" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="411" font-size="21" font-weight="normal" text-anchor="start">0x40000004</text>
+<text x="482" y="411" font-size="21" font-weight="normal" text-anchor="start">DMA</text>
+<text x="744" y="411" font-size="23" font-weight="bold" text-anchor="end">4</text>
+<rect x="964" y="383" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="411" font-size="23" font-weight="normal" text-anchor="start">[1] = 4</text>
+<rect x="264" y="423" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="451" font-size="21" font-weight="normal" text-anchor="start">0x40000005</text>
+<text x="482" y="451" font-size="21" font-weight="normal" text-anchor="start">UART</text>
+<text x="744" y="451" font-size="23" font-weight="bold" text-anchor="end">2</text>
+<rect x="964" y="423" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="451" font-size="23" font-weight="normal" text-anchor="start">[2] = 2</text>
+<rect x="264" y="507" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="535" font-size="21" font-weight="normal" text-anchor="start">0x40000006</text>
+<text x="482" y="535" font-size="21" font-weight="normal" text-anchor="start">Timer</text>
+<text x="744" y="535" font-size="23" font-weight="bold" text-anchor="end">1</text>
+<rect x="964" y="507" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="535" font-size="23" font-weight="normal" text-anchor="start">[0] = 1</text>
+<rect x="264" y="547" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="575" font-size="21" font-weight="normal" text-anchor="start">0x40000007</text>
+<text x="482" y="575" font-size="21" font-weight="normal" text-anchor="start">DMA</text>
+<text x="744" y="575" font-size="23" font-weight="bold" text-anchor="end">1</text>
+<rect x="964" y="547" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="575" font-size="23" font-weight="normal" text-anchor="start">[1] = 1</text>
+<rect x="264" y="587" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="275" y="615" font-size="21" font-weight="normal" text-anchor="start">0x40000008</text>
+<text x="482" y="615" font-size="21" font-weight="normal" text-anchor="start">UART</text>
+<text x="744" y="615" font-size="23" font-weight="bold" text-anchor="end">2</text>
+<rect x="964" y="587" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="980" y="615" font-size="23" font-weight="normal" text-anchor="start">[2] = 2</text>
+<rect x="936" y="665" width="367" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="948" y="691" font-size="21" font-weight="normal" text-anchor="start">Kernel heap</text>
+<rect x="1303" y="665" width="367" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="1315" y="691" font-size="21" font-weight="normal" text-anchor="start">Kernel stack</text>
+<rect x="924" y="737" width="758" height="32" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="936" y="763" font-size="20" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
+<defs><marker id="write-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#526472"/></marker></defs>
+<path d="M 964 363 L 776 363" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 403 L 776 403" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 443 L 776 443" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 527 L 776 527" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 567 L 776 567" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 607 L 776 607" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
 </g></svg>

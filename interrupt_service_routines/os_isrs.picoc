@@ -44,9 +44,9 @@ void timer_interrupt(void) {
     asm(KERNEL_CS_START_ASM);
     asm(KERNEL_DS_START_ASM);
 
-    // Interrupt entry saved the return PC before the six register pushes.
-    // Kernel .text lies below kernel DS. Process images lie above kernel DS.
-    // Test the saved PC, not the current CS, which entry/return may be changing.
+    // Six saved registers put the automatic return PC at SP + 7.
+    // DS is now kernel .data's start: kernel code is below it, process code above.
+    // Test saved PC because CS may still be changing on kernel entry/return.
     asm("LOADIN SP ACC 7"); // Saved return PC at SP + 7
     asm("SUB ACC DS"); // Saved PC minus the kernel .data start
     asm("JUMP32>= timer_interrupt_process"); // Nonnegative: process context
@@ -61,7 +61,7 @@ void timer_interrupt(void) {
 
 __attribute__((naked))
 void timer_interrupt_kernel_return(void) {
-    // The pending request is consumed when this kernel work returns to a process
+    // The request stays pending while the interrupted kernel instructions resume
     asm("POP DS");
     asm("POP CS");
     asm("POP BAF");
@@ -73,7 +73,7 @@ void timer_interrupt_kernel_return(void) {
 
 __attribute__((naked))
 void timer_interrupt_process(void) {
-    // BAF keeps old_sp while loading kernel CS, DS and SP
+    // BAF preserves caller_context while SP switches to the kernel stack
     asm("MOVE SP BAF");
     asm("LOADI IN1 0");
     write_stack_heap_boundary_from_in1();
