@@ -79,6 +79,13 @@ git_diff_workspace_*.pdf
 output.txt
 raw_output.txt
 .fast_shell_output.txt
+# Local specifications, agent instructions, and section drafts
+current_specification*
+AGENTS.md
+[Ss]ection_*.md
+[Ss]ection *.md
+[Ss]ection_*/
+[Ss]ection */
 README.pdf
 .bak/documentation/ChatGPT-Filesystem_Functions_Explanation.md
 .bak/documentation/ChatGPT-Filesystem_Functions_Explanation.md
