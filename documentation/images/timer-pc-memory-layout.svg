@@ -4,7 +4,7 @@
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif" fill="#192c38">
-<text x="24" y="32" font-size="23" font-weight="bold" text-anchor="start">Timer classification: kernel code precedes kernel DS; user code follows it</text>
+<text x="24" y="32" font-size="23" font-weight="bold" text-anchor="start">Timer classification: kernel execution below kernel DS, user processes above it</text>
 <text x="24" y="66" font-size="18" font-weight="normal" text-anchor="start">SRAM offsets increase left to right · widths are schematic</text>
 <rect x="24" y="86" width="1125" height="170" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
 <text x="36" y="113" font-size="20" font-weight="bold" text-anchor="start">Kernel region</text>
@@ -33,6 +33,6 @@
 <text x="1177" y="204" font-size="18" font-weight="normal" text-anchor="start">Shared-data payloads</text>
 <path d="M 416 296 L 416 228" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
 <text x="428" y="283" font-size="18" font-weight="bold" text-anchor="start">kernel DS = 0x80009f3e</text>
-<text x="24" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC &lt; kernel DS → kernel path</text>
-<text x="974" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC ≥ kernel DS → process path</text>
+<text x="24" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC &lt; kernel DS → kernel execution</text>
+<text x="910" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC &gt; kernel DS → user process</text>
 </g></svg>

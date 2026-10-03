@@ -1,7 +1,8 @@
 """Generate the contiguous, editable memory layouts used in README Section 3.
 
 All widths are illustrative. Cells share one divider, and only stored pointers
-get arrows. The grouping bands are part of the same memory rectangle.
+get arrows. Dashed lines expand a payload into its internal layout. The grouping
+bands are part of the same memory rectangle.
 """
 
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ ALLOCATED = "#deecff"
 FREE = "#e5f3de"
 MUTED = "#f0f3f6"
 FOCUS = "#9c3d15"
+HEAP_EMPHASIS = "#ffd08a"
 POINTER = "#405ea8"
 METADATA = "#785099"
 ADDRESS = "#26715b"
@@ -36,7 +38,7 @@ class Cell:
 
 
 class Diagram:
-    def __init__(self, slug, title, description, cells, bands=()):
+    def __init__(self, slug, title, description, cells, bands=(), *, emphasized_heaps=()):
         self.slug = slug
         self.title = title
         self.description = description
@@ -74,13 +76,19 @@ class Diagram:
             self.parts.append(labels)
             x += cell.width
         # Fill the hierarchy bands, then draw each boundary exactly once.
+        emphasized_regions = []
         for level, groups in enumerate(bands):
             y = TOP + CELL_HEIGHT + level * BAND_HEIGHT
             for first, last, label, fill in groups:
                 x, width = self.span(first, last)
+                emphasized = label in emphasized_heaps
+                if emphasized:
+                    fill = HEAP_EMPHASIS
+                    emphasized_regions.append((first, last))
                 self.parts.append(self.rect(x, y, width, BAND_HEIGHT, fill))
                 self.parts.append(self.text(x + width / 2, y + 20, label, size=15,
-                                            bold=True, max_width=width - 8))
+                                            bold=True, max_width=width - 8,
+                                            color=FOCUS if emphasized else "#172b3a"))
                 if x != LEFT:
                     self.parts.append(self.path(f"M {x} {y} v {BAND_HEIGHT}", LINE))
             self.parts.append(self.path(f"M {LEFT} {y} H {self.right}", LINE))
@@ -90,6 +98,8 @@ class Diagram:
             self.parts.append(self.path(f"M {x} {TOP} v {CELL_HEIGHT}", LINE))
         self.parts.append(self.rect(LEFT, TOP, self.right - LEFT, self.bottom - TOP,
                                     "none", stroke=LINE, stroke_width=1.5))
+        for first, last in emphasized_regions:
+            self.highlight(first, last)
 
     @staticmethod
     def rect(x, y, width, height, fill, stroke="none", stroke_width=1):
@@ -143,8 +153,16 @@ class Diagram:
         if below:
             self.height = max(self.height, lane + 60)
 
-    def chain(self, prefix, count=4):
+    def chain(self, prefix, count=4, *, below=False):
         names = [prefix + chr(65 + i) for i in range(count)]
+        if below:
+            lane = self.bottom + 35
+            for source, target in zip(names, names[1:]):
+                self.arrow(source, target, "next", lane=lane, below=True)
+            self.parts.append(self.text(self.center(names[-1]), lane + 32,
+                                        "next = NULL", size=13, color=POINTER))
+            self.height = max(self.height, lane + 75)
+            return
         for source, target in zip(names, names[1:]):
             left, right = self.center(source), self.center(target)
             self.parts.append(self.path(
@@ -160,6 +178,28 @@ class Diagram:
         x, width = self.span(first, last)
         self.parts.append(self.rect(x, TOP, width, CELL_HEIGHT + BAND_HEIGHT,
                                     "none", stroke=FOCUS, stroke_width=3))
+
+    def expand(self, source, detail, first, last, caption):
+        """Expand one payload below the SRAM row, without implying a pointer."""
+        scale = (self.right - LEFT) / (detail.right - LEFT)
+        detail_top = self.bottom + 330
+        dx = LEFT * (1 - scale)
+        dy = detail_top - TOP * scale
+        source_x, source_width = self.positions[source]
+        source_bottom = TOP + CELL_HEIGHT
+        detail_x, detail_width = detail.span(first, last)
+        target_left = dx + detail_x * scale
+        target_right = target_left + detail_width * scale
+        self.parts.append(
+            f'<path d="M {source_x} {source_bottom} L {target_left} {detail_top} '
+            f'M {source_x + source_width} {source_bottom} L {target_right} {detail_top}" '
+            'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
+        self.parts.append(self.text(LEFT, self.bottom + 50, caption,
+                                    size=16, bold=True, anchor="start"))
+        self.parts.append(
+            f'<g transform="translate({dx} {dy}) scale({scale})">'
+            + "\n".join(detail.parts) + '</g>')
+        self.height = int(detail_top + (detail.bottom - TOP) * scale) + 85
 
     def save(self):
         width = self.right + LEFT
@@ -204,7 +244,8 @@ def blocks(prefix, payloads, header_width=80, payload_width=170):
 def sram(slug, title, description, *, data=(".data", "global data"),
          kernel_payloads=None, outer_payloads=None, focus=None,
          data_width=270, kernel_payload_width=170, outer_payload_width=175,
-         kernel_header_width=70, outer_header_width=75):
+         kernel_header_width=70, outer_header_width=75, heap_links_below=False,
+         emphasize_heaps=False, show_heap_links=True):
     cells = [Cell("ivt", 70, (".ivt", "5 cells"), MUTED),
              Cell("text", 100, (".text", "kernel code"), MUTED),
              Cell("data", data_width, tuple(data), MUTED)]
@@ -230,23 +271,28 @@ def sram(slug, title, description, *, data=(".data", "global data"),
         [("ivt", "stack", "Kernel", MUTED),
          (first_o, last_o, "After the Kernel region", MUTED)],
     ]
-    diagram = Diagram(slug, title, description, cells, bands)
-    if kernel_payloads:
-        diagram.chain("k", len(kernel_payloads))
-    if outer_payloads:
-        diagram.chain("o", len(outer_payloads))
+    diagram = Diagram(slug, title, description, cells, bands,
+                      emphasized_heaps=("Kernel Heap", "Process and Shared Data Heap")
+                      if emphasize_heaps else ())
+    if kernel_payloads and show_heap_links:
+        diagram.chain("k", len(kernel_payloads), below=heap_links_below)
+    if outer_payloads and show_heap_links:
+        diagram.chain("o", len(outer_payloads), below=heap_links_below)
     if focus:
         diagram.highlight(*( (first_k, last_k) if focus == "kernel" else (first_o, last_o)))
     return diagram
 
 
-def process(slug, expanded=False):
-    cells = [Cell("outer_header", 90, ("Outer Block", "Header A"), HEADER,
-                  "common/heap.header#L5"),
-             Cell("ivt", 100, ("optional", ".ivt"), MUTED),
-             Cell("text", 165, (".text", "program + libraries"), MUTED),
-             Cell("data", 220, (".data", "global data", "process_heap"), MUTED,
-                  "library/stdlib/malloc.picoc#L6")]
+def process_layout(slug, expanded=False, *, include_outer_header=True, highlight_heap=True,
+                   emphasize_heap=False):
+    cells = ([Cell("outer_header", 90, ("Outer Block", "Header A"), HEADER,
+                   "common/heap.header#L5")] if include_outer_header else [])
+    cells.extend([
+        Cell("ivt", 100, ("optional", ".ivt"), MUTED),
+        Cell("text", 165, (".text", "program + libraries"), MUTED),
+        Cell("data", 220, (".data", "global data", "process_heap"), MUTED,
+             "library/stdlib/malloc.picoc#L6"),
+    ])
     payloads = ([("Payload A", "application object"),
                  ("Free Payload B",),
                  ("Payload C", "library object"),
@@ -258,23 +304,171 @@ def process(slug, expanded=False):
     first, last = "uA", "up" + chr(64 + len(payloads))
     cells.append(Cell("stack", 260, ("User Process Stack", "arguments + saved state", "grows ←"), MUTED))
     bands = [
-        [("outer_header", "outer_header", "Metadata", HEADER),
-         ("ivt", "data", "User Process Image", MUTED),
+        [("ivt", "data", "User Process Image", MUTED),
          (first, last, "User Process Heap", ALLOCATED),
          ("stack", "stack", "User Process Stack", MUTED)],
-        [("outer_header", "outer_header", "Outer header", HEADER),
-         ("ivt", "stack", "Process Payload A · one allocation in the Process and Shared Data Heap", MUTED)],
+        [("ivt", "stack", "Process Payload A · one allocation in the Process and Shared Data Heap", MUTED)],
     ]
+    if include_outer_header:
+        bands[0].insert(0, ("outer_header", "outer_header", "Metadata", HEADER))
+        bands[1].insert(0, ("outer_header", "outer_header", "Outer header", HEADER))
     diagram = Diagram(slug, "Inside Process Payload A" if not expanded else "Per-process User Process Heap",
                       "An outer header is followed by one Process Payload. Only optional .ivt, .text and .data "
                       "belong to the User Process Image. The User Process Heap and User Process Stack follow it. "
                       "process_heap is a global in process .data and its first_block points to an inner heap header.",
-                      cells, bands)
+                      cells, bands, emphasized_heaps=("User Process Heap",) if emphasize_heap else ())
     diagram.arrow("data", "uA", "process_heap.first_block", lane=175)
     diagram.chain("u", len(payloads))
-    if expanded:
+    if expanded and highlight_heap:
         diagram.highlight(first, last)
-    diagram.save()
+    return diagram
+
+
+def process(slug, expanded=False):
+    process_layout(slug, expanded).save()
+
+
+def shared_memory_list():
+    """Show the shared-memory registry in SRAM and as the same logical list."""
+    entries = [
+        ("Shared Memory Entry 1", "SharedMemoryEntry", "id = 2", "name · address",
+         "reference_count = 2", "unlink_requested = false", "next"),
+        ("Shared Memory Entry 2", "SharedMemoryEntry", "id = 1", "name · address",
+         "reference_count = 1", "unlink_requested = false", "next = NULL"),
+    ]
+    fig = sram(
+        "shared-list", "Global shared-memory registry within SRAM",
+        "The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. "
+        "SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and "
+        "its copied name occupy separate Kernel Heap payloads. name points to the corresponding "
+        "string, skipping allocator headers. Entry 1 has two attachments and Entry 2 has one. "
+        "Both are named and unlink_requested is false. Below SRAM, the same two entry objects "
+        "appear as a logical registry list with the same global head and next link. Dashed "
+        "lines identify those objects across the two views. Allocator pointer arrows are omitted.",
+        data=(".data · kernel globals", "shared_memory_list_head"),
+        kernel_payloads=[entries[0], ("Entry 1 name string", '"shared-alpha"'),
+                         entries[1], ("Entry 2 name string", '"shared-beta"')],
+        data_width=300, kernel_payload_width=230, show_heap_links=False,
+    )
+    fig.arrow("data", "kpA", "shared_memory_list_head", lane=150, source_shift=-35)
+    fig.arrow("kpA", "kpC", "next", lane=225, color=METADATA, source_shift=60,
+              target_shift=60)
+    for source, target in (("kpA", "kpB"), ("kpC", "kpD")):
+        fig.arrow(source, target, "name", lane=275, color=ADDRESS, source_shift=-50)
+    fig.highlight("data", "data")
+    for key in ("kpA", "kpC"):
+        x, width = fig.positions[key]
+        fig.parts.append(fig.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
+                                  stroke_width=3))
+
+    lower_y = fig.bottom + 250
+    lower_height = 156
+    root_x, root_width = LEFT, 350
+    fig.parts.append(fig.text(LEFT, fig.bottom + 55,
+                              "Same two SharedMemoryEntry objects shown as the registry list",
+                              size=17, bold=True, anchor="start"))
+    fig.parts.append(fig.rect(root_x, lower_y, root_width, lower_height, MUTED,
+                              stroke=FOCUS, stroke_width=3))
+    fig.parts.append(fig.text(root_x + root_width / 2, lower_y + 55,
+                              "Kernel registry global", size=16, bold=True))
+    fig.parts.append(fig.text(root_x + root_width / 2, lower_y + 85,
+                              "shared_memory_list_head", size=14))
+    node_width = 420
+    node_xs = (650, 1400)
+    for number, (source, x) in enumerate(zip(("kpA", "kpC"), node_xs), start=1):
+        lines = (f"Shared Memory Entry {number}", "SharedMemoryEntry", f"id = {3 - number}",
+                 f"reference_count = {3 - number}", "unlink_requested = false",
+                 "next = NULL" if number == 2 else "next")
+        fig.parts.append(
+            f'<path d="M {fig.center(source)} {fig.bottom} L {x + node_width / 2} {lower_y}" '
+            'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
+        fig.parts.append(fig.rect(x, lower_y, node_width, lower_height, ALLOCATED,
+                                  stroke=FOCUS, stroke_width=3))
+        labels = "".join(fig.text(x + node_width / 2, lower_y + 26 + index * 21,
+                                  value, size=15, bold=index == 0)
+                         for index, value in enumerate(lines))
+        fig.parts.append(f'<a href="../../kernel/shared_memory.header#L8">{labels}</a>')
+    root_center = root_x + root_width / 2
+    first_center = node_xs[0] + node_width / 2
+    lane = fig.bottom + 130
+    fig.parts.append(fig.path(
+        f"M {root_center} {lower_y} V {lane + 12} Q {root_center} {lane} "
+        f"{root_center + 12} {lane} H {first_center - 12} Q {first_center} {lane} "
+        f"{first_center} {lane + 12} V {lower_y - 3}", POINTER, arrow=True))
+    fig.parts.append(fig.rect(410, lane - 13, 220, 18, "white"))
+    fig.parts.append(fig.text(520, lane + 1, "shared_memory_list_head", size=14,
+                              color=POINTER))
+    edge_y = lower_y + 130
+    first_right = node_xs[0] + node_width
+    fig.parts.append(fig.path(f"M {first_right} {edge_y} H {node_xs[1] - 3}",
+                              METADATA, arrow=True))
+    fig.parts.append(fig.text((first_right + node_xs[1]) / 2, edge_y - 12,
+                              "next", size=14, color=METADATA))
+    fig.height = lower_y + lower_height + 85
+    fig.save()
+
+
+def shared_memory_mappings():
+    """Connect PCB attachment lists to registry entries and their shared data."""
+    mapping = sram(
+        "shared-mappings", "From PCB attachments through shared entries to shared data",
+        "All seven depicted metadata objects are separate Kernel Heap payloads. In kernel .data, "
+        "active_process reaches PCB 1 and shared_memory_list_head reaches Entry 1. PCB 1 links "
+        "Shared Memory Attachment 1 then 2, referencing Shared Memory Entry 1 then 2. "
+        "PCB 2 links Shared Memory Attachment 3, also referencing Entry 1. Entry 1 has reference_count 2 "
+        "and Entry 2 has reference_count 1. Both have unlink_requested false. Entries are linked "
+        "by SharedMemoryEntry.next. address reaches Shared Data Payloads A and C, while PCB "
+        "base_address reaches Process Payloads B and D. Every object pointer reaches a payload, "
+        "never an allocator header. Copied name strings and allocator pointer arrows are omitted.",
+        data=(".data · kernel globals", "active_process", "shared_memory_list_head"),
+        kernel_payloads=[
+            ("PCB 1", "ProcessControlBlock", "shared_memory_attachments", "base_address", "next"),
+            ("PCB 2", "ProcessControlBlock", "shared_memory_attachments", "base_address", "next = NULL"),
+            ("Shared Memory", "Attachment 1", "SharedMemoryAttachment", "entry", "next"),
+            ("Shared Memory", "Attachment 2", "SharedMemoryAttachment", "entry", "next = NULL"),
+            ("Shared Memory", "Attachment 3", "SharedMemoryAttachment", "entry", "next = NULL"),
+            ("Shared Memory Entry 1", "SharedMemoryEntry", "id = 2", "address",
+             "reference_count = 2", "unlink_requested = false", "next"),
+            ("Shared Memory Entry 2", "SharedMemoryEntry", "id = 1", "address",
+             "reference_count = 1", "unlink_requested = false", "next = NULL"),
+        ],
+        outer_payloads=[("Shared Data Payload A", "shared cells"),
+                        ("Process Payload B", "PCB 1's user process"),
+                        ("Shared Data Payload C", "shared cells"),
+                        ("Process Payload D", "PCB 2's user process")],
+        data_width=280, kernel_payload_width=220, outer_payload_width=175,
+        kernel_header_width=60, outer_header_width=65, show_heap_links=False,
+    )
+    mapping.arrow("data", "kpF", "shared_memory_list_head", lane=90, source_shift=-40,
+                  target_shift=40, label_x=1020)
+    mapping.arrow("data", "kpA", "active_process", lane=125, source_shift=45)
+    mapping.arrow("kpA", "kpB", "next", lane=220, color=METADATA, source_shift=65,
+                  target_shift=65)
+    mapping.arrow("kpA", "kpC", "shared_memory_attachments", lane=165,
+                  color=METADATA, source_shift=-70, target_shift=-50, label_x=740)
+    mapping.arrow("kpB", "kpE", "shared_memory_attachments", lane=200,
+                  color=METADATA, source_shift=-70, label_x=1170)
+    mapping.arrow("kpC", "kpD", "next", lane=245, color=METADATA, source_shift=50,
+                  target_shift=50)
+    mapping.arrow("kpF", "kpG", "next", lane=245, color=METADATA, source_shift=65,
+                  target_shift=65)
+    mapping.arrow("kpF", "opA", "address", lane=165, color=ADDRESS, source_shift=-65)
+    mapping.arrow("kpG", "opC", "address", lane=200, color=ADDRESS, source_shift=-65)
+    for source, target, lane, shift in (("kpC", "kpF", 565, -65),
+                                        ("kpD", "kpG", 605, 0),
+                                        ("kpE", "kpF", 645, 65)):
+        mapping.arrow(source, target, "entry", lane=lane, color=METADATA, below=True,
+                      target_shift=shift)
+    mapping.arrow("kpA", "opB", "base_address", lane=695, color=ADDRESS, below=True,
+                  source_shift=-60, label_x=2400)
+    mapping.arrow("kpB", "opD", "base_address", lane=735, color=ADDRESS, below=True,
+                  source_shift=60, label_x=2900)
+    mapping.highlight("data", "data")
+    for key in ("kpA", "kpB", "kpC", "kpD", "kpE", "kpF", "kpG"):
+        x, width = mapping.positions[key]
+        mapping.parts.append(mapping.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
+                                          stroke_width=3))
+    mapping.save()
 
 
 def main():
@@ -300,19 +494,39 @@ def main():
     overview = sram("sram-overview", "SRAM layout and heap hierarchy",
                     "Kernel .ivt, .text and .data are adjacent linked sections. The Kernel Heap follows "
                     "the Kernel Image, then the Kernel Stack. The Process and Shared Data Heap follows "
-                    "the entire Kernel region. Each heap contains three illustrative blocks linked by next, "
-                    "with a free payload behind its final header. Both kernel heap "
-                    "descriptors and process-list and shared-memory roots are globals in kernel .data.",
+                    "the entire Kernel region. Dashed lines expand Process Payload A into its User Process Image, "
+                    "User Process Heap and User Process Stack, excluding the outer header. All three heaps "
+                    "contain four illustrative blocks linked by BlockHeader.next. Kernel payloads A, B and C "
+                    "contain PCB 1 (struct ProcessControlBlock), its binary_path string (PCB-owned path copy), "
+                    "and a Shared Memory Entry (struct SharedMemoryEntry); payload D is free. "
+                    "Dashed lines connect the bottom corners of the blue Process Payload A box to its "
+                    "expanded layout. Orange outlines and orange grouping bands mark "
+                    "the Kernel Heap, Process and Shared Data Heap, and nested User Process Heap. "
+                    "Process Payload C belongs to another process and outer Payload D is free. "
+                    "Both kernel-managed heap descriptors and list roots "
+                    "are globals in kernel .data; process_heap is in the process's own .data.",
                     data=(".data · global data", "kernel_heap", "process_shared_data_heap",
                           "process_list_head", "active_process", "shared_memory_list_head"),
-                    kernel_payloads=[("Payload A", "kernel objects"),
-                                     ("Payload B", "kernel objects"),
-                                     ("Free Payload C",)],
-                    outer_payloads=[("Process Payload A",), ("Shared Data Payload B",),
-                                    ("Free Payload C",)],
-                    data_width=280, outer_payload_width=200)
+                    kernel_payloads=[("Payload A", "PCB 1", "struct", "ProcessControlBlock"),
+                                     ("Payload B", "binary_path string", "PCB-owned path copy"),
+                                     ("Payload C", "Shared Memory Entry", "struct", "SharedMemoryEntry"),
+                                     ("Free Payload D",)],
+                    outer_payloads=[("Process Payload A", "one user process", "image · heap · stack"),
+                                    ("Shared Data Payload B", "shared cells", "shared by processes"),
+                                    ("Process Payload C", "another user process", "image · heap · stack"),
+                                    ("Free Payload D",)],
+                    data_width=280, kernel_payload_width=210, outer_payload_width=200,
+                    emphasize_heaps=True)
     overview.arrow("data", "kA", "kernel_heap.first_block", lane=195, source_shift=-55)
     overview.arrow("data", "oA", "process_shared_data_heap.first_block", lane=135, source_shift=55)
+    detail = process_layout("overview-process-payload", expanded=True,
+                            include_outer_header=False, highlight_heap=False,
+                            emphasize_heap=True)
+    overview.expand("opA", detail, "ivt", "stack",
+                    "Expand Process Payload A · outer Block Header A stays in the SRAM row")
+    overview.parts.append(overview.text(LEFT, overview.height - 42,
+                                       "Orange outlines and bands: the three heap regions",
+                                       size=14, color=FOCUS, anchor="start"))
     overview.save()
     process("process-payload")
 
@@ -365,41 +579,8 @@ def main():
     shared.save()
     process("user-heap", expanded=True)
 
-    mapping = sram("shared-mappings", "Two processes, three mappings, two Shared Data Payloads",
-                   "All seven depicted metadata objects are separate Kernel Heap payloads. PCB 1 links "
-                   "Shared Memory Attachment 1 then 2, referencing Shared Memory Entry 1 then 2. "
-                   "PCB 2 links Shared Memory Attachment 3, also referencing Entry 1. Entry 1 has reference_count 2 "
-                   "and Entry 2 has reference_count 1. Entries are linked by next from the independent global "
-                   "shared_memory_list_head in kernel .data. address reaches each corresponding Shared Data Payload.",
-                   data=(".data · global data", "process_shared_data_heap", "shared_memory_list_head"),
-                   kernel_payloads=[("PCB 1",), ("PCB 2", "next = NULL"),
-                                    ("Shared Memory", "Attachment 1"),
-                                    ("Shared Memory", "Attachment 2", "next = NULL"),
-                                    ("Shared Memory", "Attachment 3", "next = NULL"),
-                                    ("Shared Memory", "Entry 1", "reference_count = 2"),
-                                    ("Shared Memory", "Entry 2", "reference_count = 1", "next = NULL")],
-                   outer_payloads=[("Shared Data", "Payload A"), ("Process", "Payload B"),
-                                   ("Shared Data", "Payload C"), ("Process", "Payload D")],
-                   data_width=280, kernel_payload_width=155, outer_payload_width=120,
-                   kernel_header_width=60, outer_header_width=65,
-                   focus="kernel")
-    mapping.arrow("data", "kpF", "shared_memory_list_head", lane=90, source_shift=-40, label_x=720)
-    mapping.arrow("data", "oA", "process_shared_data_heap.first_block", lane=125,
-                  source_shift=45, label_x=1650)
-    mapping.arrow("kpA", "kpB", "next", lane=220, color=METADATA)
-    mapping.arrow("kpA", "kpC", "shared_memory_attachments", lane=165,
-                  color=METADATA, label_x=740)
-    mapping.arrow("kpB", "kpE", "shared_memory_attachments", lane=200,
-                  color=METADATA, label_x=1020)
-    mapping.arrow("kpC", "kpD", "next", lane=245, color=METADATA)
-    mapping.arrow("kpF", "kpG", "next", lane=245, color=METADATA)
-    mapping.arrow("kpF", "opA", "address", lane=165, color=ADDRESS)
-    mapping.arrow("kpG", "opC", "address", lane=200, color=ADDRESS)
-    for source, target, lane in [("kpC", "kpF", 565), ("kpD", "kpG", 605), ("kpE", "kpF", 645)]:
-        mapping.arrow(source, target, "entry", lane=lane, color=METADATA, below=True)
-    mapping.arrow("kpA", "opB", "base_address", lane=695, color=ADDRESS, below=True, label_x=1950)
-    mapping.arrow("kpB", "opD", "base_address", lane=735, color=ADDRESS, below=True, label_x=2370)
-    mapping.save()
+    shared_memory_list()
+    shared_memory_mappings()
 
 
 if __name__ == "__main__":

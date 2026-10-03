@@ -140,33 +140,130 @@ class Figure:
         (OUTPUT / f"process-{self.slug}.svg").write_text(svg)
 
 
-def process_list():
-    fig = sram("process-list", "Global process list within SRAM",
-               "Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and "
-               "Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Global "
-               "process_list_head, process_list_tail and active_process point to heap-allocated PCBs. "
-               "Four schematic neighboring blocks contain PCB 1, its working_directory string, PCB 2 "
-               "and PCB 3. BlockHeader.next links A, B, C, D, NULL. ProcessControlBlock.next links "
-               "PCB 1, PCB 2, PCB 3, NULL, skipping the directory allocation.",
-               data=(".data · kernel globals", "kernel_heap", "process_list_head",
-                     "process_list_tail", "active_process"),
-               kernel_payloads=[("Payload A", "PCB 1", "next"),
-                                ("Payload B", "working_directory", "PCB 1 owns this string"),
-                                ("Payload C", "PCB 2", "next"),
-                                ("Payload D", "PCB 3", "next = NULL")],
-               kernel_payload_width=210, data_width=310)
-    fig.arrow("data", "kA", "kernel_heap.first_block", lane=80, source_shift=-90, label_x=480)
-    fig.arrow("data", "kpA", "process_list_head", lane=115, source_shift=-35, label_x=590)
-    fig.arrow("data", "kpD", "process_list_tail", lane=150, source_shift=20, label_x=1250)
-    fig.arrow("data", "kpC", "active_process", lane=185, source_shift=95, label_x=1030)
-    fig.arrow("kpA", "kpC", "next", lane=560, color=METADATA, below=True)
-    fig.arrow("kpC", "kpD", "next", lane=560, color=METADATA, below=True)
-    fig.arrow("kpA", "kpB", "working_directory", lane=610, color=ADDRESS, below=True)
-    fig.highlight("data", "data")
-    for key in ("kpA", "kpC", "kpD"):
+def process_list_diagram(slug, *, with_payloads=False):
+    """Show process-list records in SRAM, optionally with their outer payloads."""
+    data = (".data · kernel globals", "kernel_heap", "process_list_head",
+            "process_list_tail", "active_process")
+    kernel_payloads = [("Payload A", "PCB 1", "ProcessControlBlock", "next", "working_directory"),
+                       ("Payload B", "working_directory", "PCB 1 owns this string"),
+                       ("Payload C", "PCB 2", "ProcessControlBlock", "next"),
+                       ("Payload D", "PCB 3", "ProcessControlBlock", "next = NULL")]
+    outer_payloads = None
+    title = "Global process list within SRAM"
+    description = (
+        "Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and "
+        "Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Global "
+        "process_list_head, process_list_tail and active_process point to PCB 1, PCB 3 and PCB 2. "
+        "Four schematic neighboring Kernel Heap blocks contain PCB 1, its working_directory string, "
+        "PCB 2 and PCB 3. Above SRAM, ProcessControlBlock.next links PCB 1, PCB 2, PCB 3, NULL, "
+        "skipping the directory allocation. The working_directory arrow also stays above SRAM. ")
+    if with_payloads:
+        title = "From PCBs to Process Payloads in SRAM"
+        data = (".data · kernel globals", "global data")
+        kernel_payloads = [("Payload A", "PCB 1", "ProcessControlBlock", "base_address"),
+                           ("Payload B", "Shared Memory Entry", "SharedMemoryEntry", "address"),
+                           ("Payload C", "PCB 2", "ProcessControlBlock", "base_address")]
+        outer_payloads = [("Process Payload A", "PCB 1's user process", "image · heap · stack"),
+                          ("Shared Data Payload B", "shared cells"),
+                          ("Process Payload C", "PCB 2's user process", "image · heap · stack")]
+        description = (
+            "Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and "
+            "Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Each depicted "
+            "heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain PCB 1 "
+            "and PCB 2. Kernel Heap Payload B contains one SharedMemoryEntry. "
+            "The PCBs' base_address fields reach Process Payloads "
+            "A and C. The entry's address reaches Shared Data Payload B. All three addresses identify "
+            "payload cells immediately after the corresponding outer headers.")
+    else:
+        data = (".data · kernel globals", "process_list_head", "process_list_tail", "active_process")
+        description += (
+            "Below SRAM, the same three PCB objects appear as a logical process list. "
+            "process_list_head reaches PCB 1, process_list_tail reaches PCB 3, and active_process "
+            "reaches PCB 2 in both views. PCB next links connect 1 to 2 to 3 to NULL. Dashed lines "
+            "identify the same PCB objects across the two views. Allocator pointer arrows are omitted.")
+    fig = sram(slug, title, description, data=data, kernel_payloads=kernel_payloads,
+               outer_payloads=outer_payloads, kernel_payload_width=210,
+               outer_payload_width=210, data_width=310, show_heap_links=False)
+    if with_payloads:
+        for source, target, lane in (("kpA", "opA", 80), ("kpC", "opC", 150)):
+            fig.arrow(source, target, "base_address", lane=lane, color=ADDRESS,
+                      source_shift=-55)
+        fig.arrow("kpB", "opB", "address", lane=115, color=ADDRESS, source_shift=-55)
+    else:
+        fig.arrow("data", "kpA", "process_list_head", lane=175, source_shift=-35,
+                  target_shift=5, label_x=590)
+        fig.arrow("data", "kpD", "process_list_tail", lane=205,
+                  source_shift=20, label_x=1390)
+        fig.arrow("data", "kpC", "active_process", lane=245, source_shift=95,
+                  label_x=1030)
+        fig.arrow("kpA", "kpC", "next", lane=225, color=METADATA,
+                  source_shift=55, target_shift=55)
+        fig.arrow("kpC", "kpD", "next", lane=225, color=METADATA,
+                  source_shift=55, target_shift=55)
+        fig.arrow("kpA", "kpB", "working_directory", lane=275, color=ADDRESS)
+        fig.highlight("data", "data")
+    for key in (("kpA", "kpB", "kpC") if with_payloads else ("kpA", "kpC", "kpD")):
         x, w = fig.positions[key]
         fig.parts.append(fig.rect(x, 310, w, 156, "none", stroke=FOCUS, stroke_width=3))
+    return fig
+
+
+def process_list():
+    fig = process_list_diagram("process-list")
+    add_logical_process_list(fig)
     fig.save()
+
+
+def add_logical_process_list(fig):
+    """Project the PCB allocations into a list without allocator cells."""
+    lower_y = fig.bottom + 250
+    logical = Figure("logical-process-list", "", "", width=fig.right + 32)
+    logical.parts.clear()
+    logical.box(32, lower_y, 330, 110, MUTED)
+    logical.cells["roots"] = (32, lower_y, 330, 110)
+    logical.label(197, lower_y + 25, "Kernel process-list globals", size=16, bold=True)
+    for index, (label, line) in enumerate((("process_list_head", 16), ("process_list_tail", 17),
+                                          ("active_process", 18))):
+        logical.label(197, lower_y + 49 + index * 21, label,
+                      link=f"kernel/process/process.picoc#L{line}")
+    for number, x in enumerate((550, 1070, 1590), start=1):
+        key = f"pcb{number}"
+        logical.row(lower_y, 110, [
+            (key, 300, (f"PCB {number}", "ProcessControlBlock",
+                        "next = NULL" if number == 3 else "next"),
+             ALLOCATED, "kernel/process/process.header#L31"),
+        ], x=x)
+        logical.focus(key)
+        source = ("kpA", "kpC", "kpD")[number - 1]
+        logical.parts.append(
+            f'<path d="M {fig.center(source)} {fig.bottom} L {x + 150} {lower_y}" '
+            'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
+    logical.focus("roots")
+    for target, label, lane, shift in (("pcb1", "process_list_head", fig.bottom + 70, -60),
+                                       ("pcb3", "process_list_tail", fig.bottom + 115, 0),
+                                       ("pcb2", "active_process", fig.bottom + 160, 60)):
+        logical.arrow("roots", target, label, lane, source_shift=shift)
+    for source, target in (("pcb1", "pcb2"), ("pcb2", "pcb3")):
+        x, y, width, _ = logical.cells[source]
+        target_x, _, _, _ = logical.cells[target]
+        x += width
+        arrow_y = y + 78
+        logical.parts.append(
+            f'<path d="M {x} {arrow_y} C {x + 45} {arrow_y}, '
+            f'{target_x - 45} {arrow_y}, {target_x} {arrow_y}" '
+            f'fill="none" stroke="{METADATA}" stroke-width="2" '
+            f'marker-end="url(#{METADATA[1:]})"/>')
+        logical.label((x + target_x) / 2, arrow_y - 12, "next", size=14, color=METADATA,
+                      link="kernel/process/process.header#L53")
+    logical.box(32, fig.bottom + 34, 720, 30, "white", "none")
+    logical.label(32, fig.bottom + 55, "Same three PCB objects shown as the process list",
+                  size=17, bold=True, anchor="start")
+    fig.parts.extend(logical.parts)
+    fig.height = lower_y + 110 + 85
+
+
+def process_payload_links():
+    process_list_diagram("process-payload-links", with_payloads=True).save()
 
 
 def placement():
@@ -349,50 +446,52 @@ def run_setup():
 
 
 def initial_example():
-    f = Figure("initial-stack-example", "Concrete initial stack · user/add.bin, arguments 2 and 3",
-               "Every box is one 32-bit RETI cell. E is base_address plus size minus 36. "
+    f = Figure("initial-stack-example", "Concrete initial stack · add.bin · two arguments · two environment variables",
+               "Every box is one 32-bit RETI cell. E is base_address plus size minus 29. "
                "The first nine cells contain the entry PC, argc, three argument pointers and NULL, "
-               "two environment pointers and NULL. Higher cells contain user/add.bin, 2, 3, ADD=1 "
-               "and X=0 with a zero cell after every string. argv is E+2 and envp is E+6. "
-               "SP is E-1 and BAF is E-2. String rows expand the following contiguous string area "
-               "in increasing address order, rather than being separate allocations.", width=1760, height=855)
-    f.label(32, 92, "Stack grows ← toward lower addresses · SP = E − 1 · BAF = E − 2 · H = E + 35",
+               "two environment pointers and NULL. Higher cells contain add.bin, 2, 3, X=1 "
+               "and Y=0 with a zero cell after every string. argv is E+2 and envp is E+6. "
+               "Their pointers address E+9, E+17, E+19, E+21 and E+25 respectively. "
+               "SP is E-1 and BAF is E-2. Read rows in order, with increasing addresses to the right "
+               "and stack growth to the left. All cells belong to the same contiguous stack.",
+               width=1264, height=640)
+    f.label(32, 92, "Stack grows ← toward decreasing addresses · read rows in order · every box is one 32-bit cell",
             anchor="start", size=16)
     cells = [
-        ("entry", 180, ("E + 0", "entry PC", "activation.cs − 1"), MUTED),
-        ("argc", 160, ("E + 1", "argc = 3", "value"), ALLOCATED),
-        ("argv0", 185, ("E + 2 · argv[0]", "E + 9", "address of path"), ALLOCATED),
-        ("argv1", 185, ("E + 3 · argv[1]", "E + 22", "address of 2"), ALLOCATED),
-        ("argv2", 185, ("E + 4 · argv[2]", "E + 24", "address of 3"), ALLOCATED),
-        ("argvnull", 160, ("E + 5", "argv[3] = NULL", "0x00000000"), MUTED),
-        ("env0", 200, ("E + 6 · envp[0]", "E + 26", "address of ADD=1"), ALLOCATED),
-        ("env1", 200, ("E + 7 · envp[1]", "E + 32", "address of X=0"), ALLOCATED),
-        ("envnull", 190, ("E + 8", "envp[2] = NULL", "0x00000000"), MUTED),
+        ("entry", 100, ("E", "entry PC", "cs − 1"), MUTED),
+        ("argc", 100, ("E + 1", "argc", "3"), ALLOCATED),
+        ("argv0", 100, ("E + 2", "argv[0]", "E + 9"), ALLOCATED),
+        ("argv1", 100, ("E + 3", "argv[1]", "E + 17"), ALLOCATED),
+        ("argv2", 100, ("E + 4", "argv[2]", "E + 19"), ALLOCATED),
+        ("argvnull", 100, ("E + 5", "argv[3]", "NULL = 0"), MUTED),
+        ("env0", 100, ("E + 6", "envp[0]", "E + 21"), ALLOCATED),
+        ("env1", 100, ("E + 7", "envp[1]", "E + 25"), ALLOCATED),
+        ("envnull", 100, ("E + 8", "envp[2]", "NULL = 0"), MUTED),
     ]
-    f.row(140, 110, cells)
-    f.band("argv0", "argvnull", 250, "argv = E + 2 · address of argv[0]")
-    f.band("env0", "envnull", 250, "envp = E + 6 = argv + argc + 1")
+    f.row(120, 90, cells)
+    f.band("argv0", "argvnull", 210, "argv = E + 2")
+    f.band("env0", "envnull", 210, "envp = E + 6")
 
     def string_row(y, start, values, title):
         f.label(32, y - 15, title, anchor="start", size=16, bold=True)
         row = []
         for index, value in enumerate(values):
             offset = start + index
-            row.append((f"s{offset}", 116, (f"E + {offset}", f"0x{ord(value):08x}",
-                                            "'\\0'" if value == "\0" else repr(value)), ALLOCATED))
-        f.row(y, 88, row)
+            character = "'\\0'" if value == "\0" else repr(value)
+            row.append((f"s{offset}", 100, (f"E + {offset}", f"{character} = {ord(value)}"),
+                        MUTED if value == "\0" else ALLOCATED))
+        f.row(y, 72, row)
 
-    string_row(410, 9, "user/add.bin\0", "Path string · argv[0] points to its first cell")
-    string_row(605, 22, "2\0" + "3\0" + "ADD=1\0" + "X=0\0",
-               "Arguments, then environment strings · one cell per character, including each terminator")
-    f.arrow("argv0", "s9", "argv[0]", 330, below=True, source_shift=-20)
-    f.around_row("argv1", "s22", "argv[1]", 1580, 320, 520, ADDRESS)
-    f.around_row("argv2", "s24", "argv[2]", 1620, 340, 540, ADDRESS)
-    f.around_row("env0", "s26", "envp[0]", 1660, 360, 560, METADATA)
-    f.around_row("env1", "s32", "envp[1]", 1700, 380, 580, METADATA)
-    f.label(32, 752, "The string rows expand E + 9…E + 35 in the same allocation. Every pointer is an absolute SRAM cell address.",
-            anchor="start", size=16)
-    f.label(32, 786, "No separate argv or envp pointer cell is stored. The last X=0 terminator overwrites the preliminary entry PC at H.",
+    string_row(300, 9, "add.bin\0", "Copied executable path")
+    f.band("s9", "s16", 372, 'argv[0] → "add.bin\\0"')
+    string_row(462, 17, "2\0" + "3\0" + "X=1\0" + "Y=0\0",
+               "Two argument strings, then two environment strings")
+    for first, last, label in ((17, 18, 'argv[1] → "2\\0"'),
+                               (19, 20, 'argv[2] → "3\\0"'),
+                               (21, 24, 'envp[0] → "X=1\\0"'),
+                               (25, 28, 'envp[1] → "Y=0\\0"')):
+        f.band(f"s{first}", f"s{last}", 534, label)
+    f.label(32, 612, "E = base_address + size − 29 · H = E + 28 · saved SP = E − 1 · saved BAF = E − 2",
             anchor="start", size=16)
     f.save()
 
@@ -438,6 +537,7 @@ def inheritance():
 def main():
     OUTPUT.mkdir(exist_ok=True)
     process_list()
+    process_payload_links()
     placement()
     load_transfer()
     load_complete()
