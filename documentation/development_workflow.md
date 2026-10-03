@@ -91,15 +91,15 @@ hello PicoOS
 
 `load` creates a PCB whose state attribute is `NEW`. `run` prepares its initial
 arguments, changes the state attribute to `READY`, and waits for the foreground
-process. [Section 4.4, Process states and transitions](../README.md#44-process-states-and-transitions)
-and [Section 4.5, Loading and starting a process](../README.md#45-loading-and-starting-a-process)
+process. [`4.1.1 Process States and Transitions`](../README.md#411-process-states-and-transitions)
+and [`4.3 Loading and Starting a Process`](../README.md#43-loading-and-starting-a-process)
 connect these shell operations to the kernel structures.
 
 ## Build and run targets
 
 The following table records the Make targets used for firmware development.
 Test targets remain with their execution model in
-[Section 13.2.1, Make targets](../README.md#1321-make-targets).
+[`14.2.1 Make targets`](../README.md#1421-make-targets).
 
 | Command | Actual behavior |
 | --- | --- |
@@ -142,6 +142,8 @@ GitHub release asset.
 
 ## Documentation diagrams
 
-Follow the [visualization guidelines](visualization_guidelines.md) when editing
-README diagrams. They cover presentation layouts, choosing Mermaid or SVG,
-implementation checks, and a short rendering review.
+Keep README diagrams wide, use boxes with sharp corners, and use consistent
+labels across related figures. Show relationships from the implementation and
+keep the diagrams readable on presentation slides. Use Mermaid for flowcharts
+and SVG for precise memory layouts, then render the result to check text and
+arrows.

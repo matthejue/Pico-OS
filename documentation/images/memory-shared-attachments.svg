@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="3549" height="705" viewBox="0 0 3549 705" role="img" aria-labelledby="title desc">
-<title id="title">From PCB attachments through shared entries to shared data</title>
-<desc id="desc">All seven depicted metadata objects are separate Kernel Heap payloads. In kernel .data, active_process reaches PCB 1 and shared_memory_list_head reaches Entry 1. PCB 1 links Shared Memory Attachment 1 then 2, referencing Shared Memory Entry 1 then 2. PCB 2 links Shared Memory Attachment 3, also referencing Entry 1. Entry 1 has reference_count 2 and Entry 2 has reference_count 1. Both have unlink_requested false. Entries are linked by SharedMemoryEntry.next. address reaches Shared Data Payloads A and C. Every object pointer reaches a payload, never an allocator header. Copied name strings, allocator pointer arrows, and PCB base_address arrows are omitted.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="2849" height="1360" viewBox="0 0 2849 1360" role="img" aria-labelledby="title desc">
+<title id="title">Per-process shared-memory attachment lists within SRAM</title>
+<desc id="desc">Two PCBs, three SharedMemoryAttachment objects and two SharedMemoryEntry objects occupy seven separate Kernel Heap payloads. PCB 1 links Attachment 1 then Attachment 2, which reference Entry 1 and Entry 2. PCB 2 links Attachment 3, which also references Entry 1. Entry 1 has reference_count 2 and Entry 2 has reference_count 1. Both entries have unlink_requested false. The global shared_memory_list_head reaches Entry 1 and SharedMemoryEntry.next reaches Entry 2. Below SRAM, the same seven objects are repeated as two per-process attachment lists. Dashed lines identify the same objects across views, not additional allocations or stored pointers. The Process and Shared Data Heap is one box. Name strings, other kernel allocations and payload address arrows are omitted.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
-<rect width="3549" height="705" fill="white"/>
+<rect width="2849" height="1360" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="21" font-weight="bold" fill="#172b3a">From PCB attachments through shared entries to shared data</text><text x="32" y="55" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="32" y="28" text-anchor="start" font-size="21" font-weight="bold" fill="#172b3a">Per-process shared-memory attachment lists within SRAM</text><text x="32" y="55" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
@@ -13,11 +13,11 @@
 <rect x="482" y="310" width="60" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
 <a href="../../common/heap.header#L5"><text x="512.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="512.0" y="384.0" text-anchor="middle" font-size="10.080645161290322" font-weight="normal" fill="#172b3a">Header A</text><text x="512.0" y="405.0" text-anchor="middle" font-size="7.331378299120234" font-weight="normal" fill="#172b3a">size · free</text><text x="512.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
 <rect x="542" y="310" width="220" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<a href="../../kernel/process/process.header#L31"><text x="652.0" y="352.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">PCB 1</text><text x="652.0" y="373.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="652.0" y="394.5" text-anchor="middle" font-size="13.548387096774194" font-weight="normal" fill="#172b3a">shared_memory_attachments</text><text x="652.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">base_address</text><text x="652.0" y="436.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<a href="../../kernel/process/process.header#L31"><text x="652.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">PCB 1</text><text x="652.0" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="652.0" y="405.0" text-anchor="middle" font-size="13.548387096774194" font-weight="normal" fill="#172b3a">shared_memory_attachments</text><text x="652.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
 <rect x="762" y="310" width="60" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
 <a href="../../common/heap.header#L5"><text x="792.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="792.0" y="384.0" text-anchor="middle" font-size="10.080645161290322" font-weight="normal" fill="#172b3a">Header B</text><text x="792.0" y="405.0" text-anchor="middle" font-size="7.331378299120234" font-weight="normal" fill="#172b3a">size · free</text><text x="792.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
 <rect x="822" y="310" width="220" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<a href="../../kernel/process/process.header#L31"><text x="932.0" y="352.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">PCB 2</text><text x="932.0" y="373.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="932.0" y="394.5" text-anchor="middle" font-size="13.548387096774194" font-weight="normal" fill="#172b3a">shared_memory_attachments</text><text x="932.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">base_address</text><text x="932.0" y="436.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next = NULL</text></a>
+<a href="../../kernel/process/process.header#L31"><text x="932.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">PCB 2</text><text x="932.0" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="932.0" y="405.0" text-anchor="middle" font-size="13.548387096774194" font-weight="normal" fill="#172b3a">shared_memory_attachments</text><text x="932.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next = NULL</text></a>
 <rect x="1042" y="310" width="60" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
 <a href="../../common/heap.header#L5"><text x="1072.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="1072.0" y="384.0" text-anchor="middle" font-size="10.080645161290322" font-weight="normal" fill="#172b3a">Header C</text><text x="1072.0" y="405.0" text-anchor="middle" font-size="7.331378299120234" font-weight="normal" fill="#172b3a">size · free</text><text x="1072.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
 <rect x="1102" y="310" width="220" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
@@ -40,22 +40,8 @@
 <a href="../../kernel/shared_memory.header#L8"><text x="2332.0" y="331.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Shared Memory Entry 2</text><text x="2332.0" y="352.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">SharedMemoryEntry</text><text x="2332.0" y="373.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">id = 1</text><text x="2332.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">address</text><text x="2332.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">reference_count = 1</text><text x="2332.0" y="436.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">unlink_requested = false</text><text x="2332.0" y="457.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next = NULL</text></a>
 <rect x="2442" y="310" width="115" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="2499.5" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Kernel</text><text x="2499.5" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Stack</text><text x="2499.5" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">grows ←</text>
-<rect x="2557" y="310" width="65" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
-<a href="../../common/heap.header#L5"><text x="2589.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="2589.5" y="384.0" text-anchor="middle" font-size="11.088709677419354" font-weight="normal" fill="#172b3a">Header A</text><text x="2589.5" y="405.0" text-anchor="middle" font-size="8.064516129032258" font-weight="normal" fill="#172b3a">size · free</text><text x="2589.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="2622" y="310" width="175" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<text x="2709.5" y="384.0" text-anchor="middle" font-size="11.554621848739496" font-weight="bold" fill="#172b3a">Shared Data Payload A</text><text x="2709.5" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">shared cells</text>
-<rect x="2797" y="310" width="65" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
-<a href="../../common/heap.header#L5"><text x="2829.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="2829.5" y="384.0" text-anchor="middle" font-size="11.088709677419354" font-weight="normal" fill="#172b3a">Header B</text><text x="2829.5" y="405.0" text-anchor="middle" font-size="8.064516129032258" font-weight="normal" fill="#172b3a">size · free</text><text x="2829.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="2862" y="310" width="175" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<text x="2949.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Process Payload B</text><text x="2949.5" y="405.0" text-anchor="middle" font-size="13.306451612903226" font-weight="normal" fill="#172b3a">PCB 1&#x27;s user process</text>
-<rect x="3037" y="310" width="65" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
-<a href="../../common/heap.header#L5"><text x="3069.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="3069.5" y="384.0" text-anchor="middle" font-size="11.088709677419354" font-weight="normal" fill="#172b3a">Header C</text><text x="3069.5" y="405.0" text-anchor="middle" font-size="8.064516129032258" font-weight="normal" fill="#172b3a">size · free</text><text x="3069.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="3102" y="310" width="175" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<text x="3189.5" y="384.0" text-anchor="middle" font-size="11.554621848739496" font-weight="bold" fill="#172b3a">Shared Data Payload C</text><text x="3189.5" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">shared cells</text>
-<rect x="3277" y="310" width="65" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
-<a href="../../common/heap.header#L5"><text x="3309.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="3309.5" y="384.0" text-anchor="middle" font-size="11.088709677419354" font-weight="normal" fill="#172b3a">Header D</text><text x="3309.5" y="405.0" text-anchor="middle" font-size="8.064516129032258" font-weight="normal" fill="#172b3a">size · free</text><text x="3309.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="3342" y="310" width="175" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
-<text x="3429.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Process Payload D</text><text x="3429.5" y="405.0" text-anchor="middle" font-size="13.306451612903226" font-weight="normal" fill="#172b3a">PCB 2&#x27;s user process</text>
+<rect x="2557" y="310" width="260" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="2687.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Process and</text><text x="2687.0" y="394.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Shared Data Heap</text><text x="2687.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">process + shared data</text>
 <rect x="32" y="466" width="450" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="257.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Kernel Image</text>
 <rect x="482" y="466" width="1960" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
@@ -64,16 +50,16 @@
 <rect x="2442" y="466" width="115" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="2499.5" y="486" text-anchor="middle" font-size="13.112745098039216" font-weight="bold" fill="#172b3a">Kernel Stack</text>
 <path d="M 2442 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<rect x="2557" y="466" width="960" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
-<text x="3037.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Process and Shared Data Heap</text>
+<rect x="2557" y="466" width="260" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="2687.0" y="486" text-anchor="middle" font-size="13.235294117647056" font-weight="bold" fill="#172b3a">Process and Shared Data Heap</text>
 <path d="M 2557 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 32 466 H 3517" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 466 H 2817" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <rect x="32" y="496" width="2525" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="1294.5" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Kernel</text>
-<rect x="2557" y="496" width="960" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
-<text x="3037.0" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">After the Kernel region</text>
+<rect x="2557" y="496" width="260" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="2687.0" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">After the Kernel region</text>
 <path d="M 2557 496 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 32 496 H 3517" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 496 H 2817" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 102 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 202 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 482 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
@@ -92,14 +78,7 @@
 <path d="M 2222 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 2442 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 2557 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 2622 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 2797 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 2862 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 3037 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 3102 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 3277 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<path d="M 3342 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
-<rect x="32" y="310" width="3485" height="216" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="32" y="310" width="2785" height="216" fill="none" stroke="#43576a" stroke-width="1.5"/>
 <path d="M 302.0 310 V 102 Q 302.0 90 314.0 90 H 2080.0 Q 2092.0 90 2092.0 102 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
 <rect x="921.0" y="77" width="198" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1020" y="91" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">shared_memory_list_head</text>
@@ -121,12 +100,6 @@
 <path d="M 2117.0 310 V 257 Q 2117.0 245 2129.0 245 H 2385.0 Q 2397.0 245 2397.0 257 V 307" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
 <rect x="2234.0" y="232" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="2257.0" y="246" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">next</text>
-<path d="M 1987.0 310 V 177 Q 1987.0 165 1999.0 165 H 2697.5 Q 2709.5 165 2709.5 177 V 307" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<rect x="2313.25" y="152" width="70" height="18" fill="white" stroke="none" stroke-width="1"/>
-<text x="2348.25" y="166" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">address</text>
-<path d="M 2267.0 310 V 212 Q 2267.0 200 2279.0 200 H 3177.5 Q 3189.5 200 3189.5 212 V 307" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<rect x="2693.25" y="187" width="70" height="18" fill="white" stroke="none" stroke-width="1"/>
-<text x="2728.25" y="201" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">address</text>
 <path d="M 1212.0 526 V 553 Q 1212.0 565 1224.0 565 H 1975.0 Q 1987.0 565 1987.0 553 V 529" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
 <rect x="1572.5" y="552" width="54" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1599.5" y="566" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">entry</text>
@@ -143,6 +116,49 @@
 <rect x="1382" y="310" width="220" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="1662" y="310" width="220" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="1942" y="310" width="220" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
-<rect x="2222" y="310" width="220" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/><text x="32" y="685" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
+<rect x="2222" y="310" width="220" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<path d="M 652.0 526 L 157.0 870" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 932.0 526 L 157.0 1120" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 1212.0 526 L 800.0 870" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 1492.0 526 L 1450.0 870" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 1772.0 526 L 800.0 1120" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 2052.0 526 L 2190.0 870" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<path d="M 2332.0 526 L 2600.0 1120" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
+<rect x="32" y="690" width="1180" height="60" fill="white" stroke="none" stroke-width="1"/>
+<text x="32" y="710" text-anchor="start" font-size="19" font-weight="bold" fill="#172b3a">Same seven objects shown as two per-process attachment lists</text>
+<text x="32" y="739" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Dashed lines: same objects in both views, not stored pointers or extra allocations</text>
+<rect x="32" y="870" width="250" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/process/process.header#L31"><text x="157.0" y="919.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">PCB 1</text><text x="157.0" y="941.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="157.0" y="963.0" text-anchor="middle" font-size="15.35483870967742" font-weight="normal" fill="#172b3a">shared_memory_attachments</text></a>
+<rect x="32" y="1120" width="250" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/process/process.header#L31"><text x="157.0" y="1169.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">PCB 2</text><text x="157.0" y="1191.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="157.0" y="1213.0" text-anchor="middle" font-size="15.35483870967742" font-weight="normal" fill="#172b3a">shared_memory_attachments</text></a>
+<rect x="650" y="870" width="300" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/shared_memory.header#L17"><text x="800.0" y="919.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Shared Memory Attachment 1</text><text x="800.0" y="941.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">SharedMemoryAttachment</text><text x="800.0" y="963.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">entry · next</text></a>
+<rect x="1300" y="870" width="300" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/shared_memory.header#L17"><text x="1450.0" y="919.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Shared Memory Attachment 2</text><text x="1450.0" y="941.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">SharedMemoryAttachment</text><text x="1450.0" y="963.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">entry · next = NULL</text></a>
+<rect x="650" y="1120" width="300" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/shared_memory.header#L17"><text x="800.0" y="1169.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Shared Memory Attachment 3</text><text x="800.0" y="1191.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">SharedMemoryAttachment</text><text x="800.0" y="1213.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">entry · next = NULL</text></a>
+<rect x="2030" y="870" width="320" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="2190.0" y="897.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text><text x="2190.0" y="919.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">SharedMemoryEntry · id = 2</text><text x="2190.0" y="941.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">reference_count = 2</text><text x="2190.0" y="963.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">unlink_requested = false</text><text x="2190.0" y="985.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="2440" y="1120" width="320" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="2600.0" y="1147.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Shared Memory Entry 2</text><text x="2600.0" y="1169.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">SharedMemoryEntry · id = 1</text><text x="2600.0" y="1191.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">reference_count = 1</text><text x="2600.0" y="1213.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">unlink_requested = false</text><text x="2600.0" y="1235.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">next = NULL</text></a>
+<path d="M 282 935 H 647" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="345.5" y="905" width="241" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="466" y="922" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">shared_memory_attachments</text>
+<path d="M 282 1185 H 647" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="345.5" y="1155" width="241" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="466" y="1172" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">shared_memory_attachments</text>
+<path d="M 950 935 H 1297" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="1099.0" y="905" width="52" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="1125" y="922" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">next</text>
+<path d="M 800 870 V 800 H 2190 V 867" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="1739.5" y="777" width="61" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="1770" y="794" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">entry</text>
+<path d="M 1450 1000 V 1060 H 1822 Q 1830 1048 1838 1060 H 2600 V 1117" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="2249.5" y="1037" width="61" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="2280" y="1054" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">entry</text>
+<path d="M 950 1185 H 1830 V 935 H 2027" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="1889.5" y="905" width="61" height="23" fill="white" stroke="none" stroke-width="1"/>
+<text x="1920" y="922" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">entry</text>
+<text x="650" y="1300" text-anchor="start" font-size="16" font-weight="normal" fill="#172b3a">Entry 1: Attachment 1 + Attachment 3 = 2 mappings   ·   Entry 2: Attachment 2 = 1 mapping</text><text x="32" y="1340" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
 </g>
 </svg>

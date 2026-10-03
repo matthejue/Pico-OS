@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2354" height="611" viewBox="0 0 2354 611" role="img" aria-labelledby="title desc">
 <title id="title">From PCBs to Process Payloads in SRAM</title>
-<desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Each depicted heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain PCB 1 and PCB 2. Kernel Heap Payload B contains one SharedMemoryEntry. The PCBs&#x27; base_address fields reach Process Payloads A and C. The entry&#x27;s address reaches Shared Data Payload B. All three addresses identify payload cells immediately after the corresponding outer headers.</desc>
+<desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Each depicted heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain PCB 1 and PCB 2. Kernel Heap Payload B contains one SharedMemoryEntry. The PCBs&#x27; base_address fields reach Process Payloads A and C. Both addresses identify payload cells immediately after the corresponding outer headers.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
 <rect width="2354" height="611" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
@@ -76,9 +76,6 @@
 <path d="M 1192.0 310 V 162 Q 1192.0 150 1204.0 150 H 2205.0 Q 2217.0 150 2217.0 162 V 307" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
 <rect x="1649.5" y="137" width="110" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1704.5" y="151" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">base_address</text>
-<path d="M 912.0 310 V 127 Q 912.0 115 924.0 115 H 1920.0 Q 1932.0 115 1932.0 127 V 307" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<rect x="1387.0" y="102" width="70" height="18" fill="white" stroke="none" stroke-width="1"/>
-<text x="1422.0" y="116" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">address</text>
 <rect x="582" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="862" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="1142" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/><text x="32" y="591" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>

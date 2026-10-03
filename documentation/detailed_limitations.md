@@ -1,7 +1,7 @@
 # Detailed limitations
 
 This page retains the implementation-specific limitations that were removed
-from the short [README limitations overview](../README.md#17-limitations). It
+from the short [`17. Limitations`](../README.md#17-limitations). It
 explains the mechanisms behind them without making the overview harder to
 scan.
 
@@ -23,11 +23,12 @@ Signal delivery and terminal input use deliberately small global mechanisms.
 They demonstrate the relevant operating-system concepts, but do not implement
 full POSIX job control or independent terminal queues.
 
-- [Six fixed-action signals](../README.md#64-process-signals) and one
-  [foreground/input owner](../README.md#1251-foreground-processes-background-processes-and-job-control-signals)
-  replace full job control.
-- One [global terminal ring and wait queue](../README.md#72-global-terminal-input-buffer)
-  serves per-process pending input reads.
+- Six fixed-action signals and one foreground/input owner replace full job
+  control. See [`7.2 Process Signals`](../README.md#72-process-signals) and
+  [`12.5.1 Foreground processes, background processes, and job-control signals`](../README.md#1251-foreground-processes-background-processes-and-job-control-signals).
+- One global terminal ring and wait queue serve per-process pending input
+  reads, as explained in
+  [`8.2 Global terminal input buffer`](../README.md#82-global-terminal-input-buffer).
 
 ## Host-backed append writes
 
@@ -38,5 +39,7 @@ host-backed file concurrently.
 
 ## Pipelines
 
-The shell supports one [sequential, file-backed pipeline](../README.md#127-sequential-file-backed-pipelines)
-per command. It has no streaming kernel pipes.
+The shell supports one sequential, file-backed pipeline per command. It has no
+streaming kernel pipes. See
+[`12.7 Sequential file-backed pipelines`](../README.md#127-sequential-file-backed-pipelines)
+for its execution model.

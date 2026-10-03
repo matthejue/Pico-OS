@@ -172,7 +172,7 @@ def process_list_diagram(slug, *, with_payloads=False):
             "heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain PCB 1 "
             "and PCB 2. Kernel Heap Payload B contains one SharedMemoryEntry. "
             "The PCBs' base_address fields reach Process Payloads "
-            "A and C. The entry's address reaches Shared Data Payload B. All three addresses identify "
+            "A and C. Both addresses identify "
             "payload cells immediately after the corresponding outer headers.")
     else:
         data = (".data · kernel globals", "process_list_head", "process_list_tail", "active_process")
@@ -188,7 +188,6 @@ def process_list_diagram(slug, *, with_payloads=False):
         for source, target, lane in (("kpA", "opA", 80), ("kpC", "opC", 150)):
             fig.arrow(source, target, "base_address", lane=lane, color=ADDRESS,
                       source_shift=-55)
-        fig.arrow("kpB", "opB", "address", lane=115, color=ADDRESS, source_shift=-55)
     else:
         fig.arrow("data", "kpA", "process_list_head", lane=175, source_shift=-35,
                   target_shift=5, label_x=590)
@@ -453,7 +452,8 @@ def initial_example():
                "and Y=0 with a zero cell after every string. argv is E+2 and envp is E+6. "
                "Their pointers address E+9, E+17, E+19, E+21 and E+25 respectively. "
                "SP is E-1 and BAF is E-2. Read rows in order, with increasing addresses to the right "
-               "and stack growth to the left. All cells belong to the same contiguous stack.",
+               "and stack growth to the left. Continuation arrows connect E+8 to E+9 and E+16 to E+17. "
+               "All cells belong to the same contiguous stack.",
                width=1264, height=640)
     f.label(32, 92, "Stack grows ← toward decreasing addresses · read rows in order · every box is one 32-bit cell",
             anchor="start", size=16)
@@ -491,6 +491,23 @@ def initial_example():
                                (21, 24, 'envp[0] → "X=1\\0"'),
                                (25, 28, 'envp[1] → "Y=0\\0"')):
         f.band(f"s{first}", f"s{last}", 534, label)
+
+    def continuation(source, target, label, lane):
+        """Join consecutive memory cells across a line break in the drawing."""
+        x, y, w, h = f.cells[source]
+        tx, ty, _, th = f.cells[target]
+        sx, sy, ty = x + w, y + h / 2, ty + th / 2
+        right, left, radius = sx + 24, 12, 12
+        path = (f"M {sx} {sy} H {right-radius} Q {right} {sy} {right} {sy+radius} "
+                f"V {lane-radius} Q {right} {lane} {right-radius} {lane} "
+                f"H {left+radius} Q {left} {lane} {left} {lane+radius} "
+                f"V {ty-radius} Q {left} {ty} {left+radius} {ty} H {tx}")
+        f.parts.append(f'<path d="{path}" fill="none" stroke="{FOCUS}" stroke-width="3" '
+                       f'marker-end="url(#{FOCUS[1:]})"/>')
+        f.label((left + right) / 2, lane - 8, label, size=15, bold=True, color=FOCUS)
+
+    continuation("envnull", "s9", "Next memory cell: E + 8 → E + 9", 266)
+    continuation("s16", "s17", "Next memory cell: E + 16 → E + 17", 428)
     f.label(32, 612, "E = base_address + size − 29 · H = E + 28 · saved SP = E − 1 · saved BAF = E − 2",
             anchor="start", size=16)
     f.save()
