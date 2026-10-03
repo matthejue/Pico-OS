@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2039" height="670" viewBox="0 0 2039 670" role="img" aria-labelledby="title desc">
+<title id="title">Global process list within SRAM</title>
+<desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Global process_list_head, process_list_tail and active_process point to heap-allocated PCBs. Four schematic neighboring blocks contain PCB 1, its working_directory string, PCB 2 and PCB 3. BlockHeader.next links A, B, C, D, NULL. ProcessControlBlock.next links PCB 1, PCB 2, PCB 3, NULL, skipping the directory allocation.</desc>
+<defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
+<rect width="2039" height="670" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif">
+<text x="32" y="28" text-anchor="start" font-size="21" font-weight="bold" fill="#172b3a">Global process list within SRAM</text><text x="32" y="55" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
+<rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
+<rect x="202" y="310" width="310" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="357.0" y="352.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.data · kernel globals</text><text x="357.0" y="373.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">kernel_heap</text><text x="357.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">process_list_head</text><text x="357.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">process_list_tail</text><text x="357.0" y="436.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">active_process</text>
+<rect x="512" y="310" width="70" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="547.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="547.0" y="384.0" text-anchor="middle" font-size="12.096774193548388" font-weight="normal" fill="#172b3a">Header A</text><text x="547.0" y="405.0" text-anchor="middle" font-size="8.79765395894428" font-weight="normal" fill="#172b3a">size · free</text><text x="547.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="582" y="310" width="210" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="687.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload A</text><text x="687.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">PCB 1</text><text x="687.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text>
+<rect x="792" y="310" width="70" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="827.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="827.0" y="384.0" text-anchor="middle" font-size="12.096774193548388" font-weight="normal" fill="#172b3a">Header B</text><text x="827.0" y="405.0" text-anchor="middle" font-size="8.79765395894428" font-weight="normal" fill="#172b3a">size · free</text><text x="827.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="862" y="310" width="210" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="967.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload B</text><text x="967.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">working_directory</text><text x="967.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">PCB 1 owns this string</text>
+<rect x="1072" y="310" width="70" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="1107.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="1107.0" y="384.0" text-anchor="middle" font-size="12.096774193548388" font-weight="normal" fill="#172b3a">Header C</text><text x="1107.0" y="405.0" text-anchor="middle" font-size="8.79765395894428" font-weight="normal" fill="#172b3a">size · free</text><text x="1107.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="1142" y="310" width="210" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="1247.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload C</text><text x="1247.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">PCB 2</text><text x="1247.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text>
+<rect x="1352" y="310" width="70" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="1387.0" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="1387.0" y="384.0" text-anchor="middle" font-size="12.096774193548388" font-weight="normal" fill="#172b3a">Header D</text><text x="1387.0" y="405.0" text-anchor="middle" font-size="8.79765395894428" font-weight="normal" fill="#172b3a">size · free</text><text x="1387.0" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="1422" y="310" width="210" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="1527.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload D</text><text x="1527.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">PCB 3</text><text x="1527.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next = NULL</text>
+<rect x="1632" y="310" width="115" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1689.5" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Kernel</text><text x="1689.5" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Stack</text><text x="1689.5" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">grows ←</text>
+<rect x="1747" y="310" width="260" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1877.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Process and</text><text x="1877.0" y="394.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Shared Data Heap</text><text x="1877.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">process + shared data</text>
+<rect x="32" y="466" width="480" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="272.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Kernel Image</text>
+<rect x="512" y="466" width="1120" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1072.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Kernel Heap</text>
+<path d="M 512 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="1632" y="466" width="115" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1689.5" y="486" text-anchor="middle" font-size="13.112745098039216" font-weight="bold" fill="#172b3a">Kernel Stack</text>
+<path d="M 1632 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="1747" y="466" width="260" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1877.0" y="486" text-anchor="middle" font-size="13.235294117647056" font-weight="bold" fill="#172b3a">Process and Shared Data Heap</text>
+<path d="M 1747 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 466 H 2007" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="32" y="496" width="1715" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="889.5" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Kernel</text>
+<rect x="1747" y="496" width="260" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1877.0" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">After the Kernel region</text>
+<path d="M 1747 496 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 496 H 2007" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 102 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 202 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 512 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 582 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 792 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 862 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1072 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1142 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1352 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1422 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1632 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1747 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="32" y="310" width="1975" height="216" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 547.0 310 C 547.0 260, 827.0 260, 827.0 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="664.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="687.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
+<path d="M 827.0 310 C 827.0 260, 1107.0 260, 1107.0 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="944.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="967.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
+<path d="M 1107.0 310 C 1107.0 260, 1387.0 260, 1387.0 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="1224.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="1247.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
+<text x="1387.0" y="298" text-anchor="middle" font-size="13" font-weight="normal" fill="#405ea8">next = NULL</text>
+<path d="M 267.0 310 V 92 Q 267.0 80 279.0 80 H 535.0 Q 547.0 80 547.0 92 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="381.0" y="67" width="198" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="480" y="81" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">kernel_heap.first_block</text>
+<path d="M 322.0 310 V 127 Q 322.0 115 334.0 115 H 675.0 Q 687.0 115 687.0 127 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="515.0" y="102" width="150" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="590" y="116" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">process_list_head</text>
+<path d="M 377.0 310 V 162 Q 377.0 150 389.0 150 H 1515.0 Q 1527.0 150 1527.0 162 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="1175.0" y="137" width="150" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="1250" y="151" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">process_list_tail</text>
+<path d="M 452.0 310 V 197 Q 452.0 185 464.0 185 H 1235.0 Q 1247.0 185 1247.0 197 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="967.0" y="172" width="126" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="1030" y="186" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">active_process</text>
+<path d="M 687.0 526 V 548 Q 687.0 560 699.0 560 H 1235.0 Q 1247.0 560 1247.0 548 V 529" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="944.0" y="547" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="967.0" y="561" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">next</text>
+<path d="M 1247.0 526 V 548 Q 1247.0 560 1259.0 560 H 1515.0 Q 1527.0 560 1527.0 548 V 529" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
+<rect x="1364.0" y="547" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="1387.0" y="561" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">next</text>
+<path d="M 687.0 526 V 598 Q 687.0 610 699.0 610 H 955.0 Q 967.0 610 967.0 598 V 529" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
+<rect x="752.0" y="597" width="150" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="827.0" y="611" text-anchor="middle" font-size="14" font-weight="normal" fill="#26715b">working_directory</text>
+<rect x="202" y="310" width="310" height="186" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<rect x="582" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<rect x="1142" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
+<rect x="1422" y="310" width="210" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/><text x="32" y="650" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
+</g>
+</svg>

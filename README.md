@@ -120,7 +120,7 @@ enable it. Direct memory access lets the emulated DMA device copy an executable
 from UART into SRAM while the CPU can schedule other work. This reduces CPU
 copying and avoids repeated polling syscalls during process loading. Choose it
 when studying the asynchronous device path, or answer no to use the simpler
-polling path. [Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
+polling path. [`4.4.1 Loading a Process (load library call)`](#441-loading-a-process-load-library-call)
 compares both paths, and [Section 2.7, DMA completion interrupt path](#27-dma-completion-interrupt-path)
 explains how a completed transfer wakes the waiting process.
 
@@ -420,20 +420,22 @@ lectures follow.
 1. [Processes and process lifecycle](#4-processes-and-process-lifecycle)
    - [4.1 Global process list and current process](#41-global-process-list-and-current-process)
    - [4.2 Process control block fields](#42-process-control-block-fields)
-   - [4.3 Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack)
-      - [4.3.1 Code, data, heap, and stack placement](#431-code-data-heap-and-stack-placement)
+      - [4.2.1 Process States and Transitions](#421-process-states-and-transitions)
+   - [4.3 Initial User Process Stack](#43-initial-user-process-stack)
+      - [4.3.1 User Process Stack Placement](#431-user-process-stack-placement)
       - [4.3.2 Initial `argc`, `argv`, and `envp`](#432-initial-argc-argv-and-envp)
-   - [4.4 Process states and transitions](#44-process-states-and-transitions)
-   - [4.5 Loading and starting a process](#45-loading-and-starting-a-process)
-      - [4.5.1 Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
-      - [4.5.2 Changing a completed image from `NEW` to `READY`](#452-changing-a-completed-image-from-new-to-ready)
-   - [4.6 Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection)
-      - [4.6.1 Parent-child creation, inherited state, and orphaning](#461-parent-child-creation-inherited-state-and-orphaning)
-         - [4.6.1.1 Environment inheritance and loading-bar policy](#4611-environment-inheritance-and-loading-bar-policy)
-      - [4.6.2 Recording termination status](#462-recording-termination-status)
-      - [4.6.3 Parent collection and final removal](#463-parent-collection-and-final-removal)
-   - [4.7 Process list, PCB metadata, and lifecycle function reference](#47-process-list-pcb-metadata-and-lifecycle-function-reference)
-   - [4.8 Process-loader and run-setup function reference](#48-process-loader-and-run-setup-function-reference)
+         - [4.3.2.1 Concrete initial-stack example](#4321-concrete-initial-stack-example)
+   - [4.4 Loading and Starting a Process](#44-loading-and-starting-a-process)
+      - [4.4.1 Loading a Process (`load` library call)](#441-loading-a-process-load-library-call)
+         - [4.4.1.1 Load function reference](#4411-load-function-reference)
+      - [4.4.2 Starting a Process (`run` library call)](#442-starting-a-process-run-library-call)
+         - [4.4.2.1 Parent-to-child inheritance](#4421-parent-to-child-inheritance)
+            - [4.4.2.1.1 Environment origin and propagation](#44211-environment-origin-and-propagation)
+            - [4.4.2.1.2 Loading-bar environment variable](#44212-loading-bar-environment-variable)
+         - [4.4.2.2 Run function reference](#4422-run-function-reference)
+         - [4.4.2.3 Recording termination status](#4423-recording-termination-status)
+         - [4.4.2.4 Parent collection and final removal](#4424-parent-collection-and-final-removal)
+   - [4.5 Process list, PCB metadata, and lifecycle function reference](#45-process-list-pcb-metadata-and-lifecycle-function-reference)
 1. [Scheduling and context switching](#5-scheduling-and-context-switching)
    - [5.1 Scheduler implementation](#51-scheduler-implementation)
       - [5.1.1 Algorithm and Round Robin comparison](#511-algorithm-and-round-robin-comparison)
@@ -1259,7 +1261,7 @@ the initial environment through
 [`initialize_environment()`](library/stdlib/env.picoc#L97), calls the
 application's [`main()`](library/start/start.picoc#L4), and passes its result to
 [`exit()`](library/stdlib/exit.picoc#L3). The initial userspace stack is shown
-in [Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack).
+in [`4.3 Initial User Process Stack`](#43-initial-user-process-stack).
 PicoOS [`libstart`](library/start/libstart.picoc) is therefore a small
 counterpart to the startup support normally supplied with `libc`: it prepares
 runtime state before calling [`main()`](library/start/start.picoc#L4) and turns
@@ -1632,7 +1634,7 @@ uses `read-range` to obtain the header and encoded payload. Both loaders
 consume the five header words and copy only the encoded RETI words to SRAM.
 The allocated Process Payload contains the linked User Process Image followed
 by the User Process Heap and User Process Stack. The runtime loading modes are described in
-[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
+[`4.4.1 Loading a Process (load library call)`](#441-loading-a-process-load-library-call).
 
 ### 1.1.9 Generated memory constants for the bootloader and kernel
 [\[↑ TOC\]](#contents)
@@ -3752,7 +3754,7 @@ userspace asks for the heap start, and
 [`process_heap_size()`](kernel/process/process.picoc#L424) supplies its size.
 [`libstart`](library/start/libstart.picoc) initializes the descriptor before
 calling the program. There is no MMU or later address translation.
-[`4.3.1 Code, data, heap, and stack placement`](#431-code-data-heap-and-stack-placement)
+[`4.3.1 User Process Stack Placement`](#431-user-process-stack-placement)
 explains how header defaults determine the allocation size, and
 [`4.3.2 Initial argc, argv, and envp`](#432-initial-argc-argv-and-envp)
 explains the initial stack contents.
@@ -4402,12 +4404,11 @@ internal lifecycle helpers, with library callers listed before kernel callers.
 # 4. Processes and process lifecycle
 [\[↑ TOC\]](#contents)
 
-The memory regions from the previous chapter become useful when the kernel
-treats each executing program as a process. A process combines a program's
-memory with the identity, resources, saved registers, and state that let the
-operating system manage it independently. The sections first describe the
-process list, PCB, image, and states, then follow loading, startup,
-parent-child relationships, termination, and final removal.
+A process combines a program's memory with the identity, resources, saved
+registers, and [`state`](kernel/process/process.header#L33) that let the operating system manage it independently.
+The preceding memory chapter establishes where these objects live. This
+chapter connects the global process list and PCB fields to process states,
+the initial stack, loading, starting, inheritance, termination, and collection.
 
 ## 4.1 Global process list and current process
 [\[↑ TOC\]](#contents)
@@ -4431,32 +4432,19 @@ heap, immediately after that allocation's block header. The final PCB's
 [`next`](kernel/process/process.header#L53) is `NULL`. The tail and active
 pointers refer into the same list and do not own additional PCB copies.
 
-```mermaid
-flowchart LR
-    subgraph DATA["Kernel .data"]
-        HEAD["process_list_head"]
-        TAIL["process_list_tail"]
-        ACTIVE["active_process"]
-    end
+![Kernel globals and two distinct linked structures inside the SRAM hierarchy, with Block Headers A–D, PCB 1–3, and a real working-directory allocation](documentation/images/memory-process-list.svg)
 
-    subgraph HEAP["Kernel heap"]
-        direction LR
-        H1["BlockHeader"] --- P1["PCB 1<br/>pid · state · next"]
-        P1 --- OTHER1["other kernel allocations"]
-        OTHER1 --- H2["BlockHeader"] --- P2["PCB 2<br/>pid · state · next"]
-        P2 --- OTHER2["other kernel allocations"]
-        OTHER2 --- H3["BlockHeader"] --- P3["PCB 3<br/>pid · state · next=NULL"]
-    end
-
-    HEAD --> P1
-    P1 -->|next| P2
-    P2 -->|next| P3
-    TAIL --> P3
-    ACTIVE --> P2
-```
-
-The diagram uses three PCBs to show the relationships. Runtime allocation order
-may place unrelated kernel-heap blocks between PCB payloads, as shown, and
+The diagram is a schematic four-block allocator layout, not a boot-time
+allocation trace. Other kernel allocations are omitted. Block Headers A–D
+are each immediately followed by Payload A–D. Payload B contains the real
+[`working_directory`](kernel/process/process.header#L39) string allocated by
+[`copy_process_path()`](kernel/process/process.picoc#L70) for PCB 1.
+The allocator's [`BlockHeader.next`](common/heap.header#L8) links the headers in
+physical address order and terminates with `NULL`. Independently, the PCB's
+[`next`](kernel/process/process.header#L53) links PCB 1 to PCB 2, skipping that
+directory block, then to PCB 3 and `NULL`. The directory pointer and list roots
+reach their payloads, never allocator headers.
+Runtime allocation order and block widths vary, and
 [`active_process`](kernel/process/process.picoc#L18) may be `NULL` or point to a
 different list member.
 
@@ -4472,7 +4460,7 @@ slot. [`remove_process()`](kernel/process/process.picoc#L209) walks from the
 head to find the PCB and its predecessor, then bypasses it by changing either
 the head pointer or the predecessor's list link. It moves the tail pointer when
 the final node is removed and updates the active-process pointer if it referred
-to that node. [Section 4.6.3, Parent collection and final removal](#463-parent-collection-and-final-removal)
+to that node. [`4.4.2.4 Parent collection and final removal`](#4424-parent-collection-and-final-removal)
 explains when removal is allowed and which resources are released.
 [Section 6.1, Wait Queue Structure and Intrusive PCB Links](#61-wait-queue-structure-and-intrusive-pcb-links)
 explains the separate unlinking required if the PCB is also in a wait queue.
@@ -4489,8 +4477,8 @@ explains how the scheduler traverses this list.
 A Process Control Block (PCB), implemented as
 [`struct ProcessControlBlock`](kernel/process/process.header#L31), is the
 kernel's record for one process. Its fields keep identity, Process Payload
-metadata, resource pointers, saved CPU state, and
-wait/signal state together while the process moves through its lifecycle. The
+metadata, resource pointers, saved registers, and wait/signal bookkeeping
+together while the process moves through its lifecycle. The
 following definition and attribute table show the complete layout and connect
 each field to its initializers and consumers:
 
@@ -4533,15 +4521,15 @@ struct ProcessControlBlock {
 | [`binary_path`](kernel/process/process.header#L38) | PCB-owned executable path without the leading `/`, it exists while the process is [`NEW`](kernel/process/process.header#L12), supplies the later [`argv[0]`](kernel/process/process_arguments.picoc#L184) copy, and remains the kernel's stable name for process listings | First initialized by [`create_process()`](kernel/process/process.picoc#L89), copied by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), printed by [`list_processes()`](kernel/process/process.picoc#L32), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`working_directory`](kernel/process/process.header#L39) | PCB-owned absolute PicoOS path, copied from the parent or initialized to `/` for PID 1 | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through copying, read by [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), replaced by [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), freed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`activation`](kernel/process/process.header#L40) | Embedded saved CPU context needed later by the dispatcher, [Section 5.2, Saved process activation](#52-saved-process-activation) explains its fields | First initialized by [`create_process()`](kernel/process/process.picoc#L89), later maintained by [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182), and [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
-| [`file_descriptors`](kernel/process/process.header#L42) | Pointer to this process's descriptor table; [Section 8.2, Containment and reference relationships](#82-containment-and-reference-relationships) shows the wrapper, entry array, and path references | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), inherited by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), destroyed by [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`file_descriptors`](kernel/process/process.header#L42) | Pointer to this process's descriptor table. [Section 8.2, Containment and reference relationships](#82-containment-and-reference-relationships) shows the wrapper, entry array, and path references | First initialized by [`create_process()`](kernel/process/process.picoc#L89) through [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), inherited by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), destroyed by [`remove_process()`](kernel/process/process.picoc#L209) |
 | [`waiting_status_ptr`](kernel/process/process.header#L44) | Pointer into this process’s suspended userspace [`waitpid()`](library/sys/wait/wait.picoc#L14) frame | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), set by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), written and cleared by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) or [`notify_process_stopped()`](kernel/signal.picoc#L23) |
 | [`waiters`](kernel/process/process.header#L46) | Embedded FIFO queue of processes waiting for this process | First initialized by [`create_process()`](kernel/process/process.picoc#L89), filled by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), drained by [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) or [`notify_process_stopped()`](kernel/signal.picoc#L23) |
 | [`waiting_queue_ptr`](kernel/process/process.header#L48), [`wait_next`](kernel/process/process.header#L51) | Queue containing this PCB and its intrusive successor link | First initialized by [`create_process()`](kernel/process/process.picoc#L89), maintained by [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`enqueue_terminal_reader()`](kernel/filesystem/terminal.picoc#L61), [`wakeup_wait_queue()`](kernel/process/process.picoc#L395), and [`remove_from_wait_queue()`](kernel/process/process.picoc#L176) |
 | [`next`](kernel/process/process.header#L53) | Link in the global process list | First initialized/linked by [`create_process()`](kernel/process/process.picoc#L89), traversed by [`scheduler_next_process()`](kernel/scheduler.picoc#L12) and [`find_process_by_pid()`](kernel/process/process.picoc#L162), unlinked by [`remove_process()`](kernel/process/process.picoc#L209) |
-| [`shared_memory_attachments`](kernel/process/process.header#L55) | Head of this process's mapping-record list; each record references a shared-memory entry as shown in [Section 8.2, Containment and reference relationships](#82-containment-and-reference-relationships) | First initialized by [`create_process()`](kernel/process/process.picoc#L89), extended by [`map_shared_memory()`](kernel/shared_memory.picoc#L130), released by [`remove_process()`](kernel/process/process.picoc#L209) through [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) |
+| [`shared_memory_attachments`](kernel/process/process.header#L55) | Head of this process's mapping-record list. Each record references a shared-memory entry as shown in [Section 8.2, Containment and reference relationships](#82-containment-and-reference-relationships) | First initialized by [`create_process()`](kernel/process/process.picoc#L89), extended by [`map_shared_memory()`](kernel/shared_memory.picoc#L130), released by [`remove_process()`](kernel/process/process.picoc#L209) through [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172) |
 | [`parent_pid`](kernel/process/process.header#L57), [`parent_death_signal`](kernel/process/process.header#L59) | Creator PID and optional signal delivered when that parent terminates | First initialized by [`create_process()`](kernel/process/process.picoc#L89), parent-death setting changed by [`set_parent_death_signal()`](kernel/signal.picoc#L137), used by [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) |
 | [`exit_status`](kernel/process/process.header#L60) | Status retained while the process is a zombie | First initialized to 0 by [`create_process()`](kernel/process/process.picoc#L89), set by [`terminate_process()`](kernel/process/process.picoc#L304), collected by [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
-| [`stop_signal`](kernel/process/process.header#L61), [`stopped_from_state`](kernel/process/process.header#L62), [`pending_termination_signal`](kernel/process/process.header#L63) | Signal state for stopped and deferred termination paths | First initialized by [`create_process()`](kernel/process/process.picoc#L89), used by [`stop_process()`](kernel/signal.picoc#L37), [`continue_process()`](kernel/signal.picoc#L50), [`send_signal_to_process()`](kernel/signal.picoc#L75), and [`prepare_process_termination()`](kernel/signal.picoc#L126) |
+| [`stop_signal`](kernel/process/process.header#L61), [`stopped_from_state`](kernel/process/process.header#L62), [`pending_termination_signal`](kernel/process/process.header#L63) | Signal bookkeeping for stopped and deferred termination paths | First initialized by [`create_process()`](kernel/process/process.picoc#L89), used by [`stop_process()`](kernel/signal.picoc#L37), [`continue_process()`](kernel/signal.picoc#L50), [`send_signal_to_process()`](kernel/signal.picoc#L75), and [`prepare_process_termination()`](kernel/signal.picoc#L126) |
 | [`pending_terminal_read_buffer`](kernel/process/process.header#L65), [`pending_terminal_read_count`](kernel/process/process.header#L66) | Userspace request retained while a terminal read is blocked or stopped | First initialized to `NULL`/0 by [`create_process()`](kernel/process/process.picoc#L89), set by [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), consumed by [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) or [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L84) |
 | [`pending_load`](kernel/process/process.header#L68) | Executable metadata, paths, progress, and reserved Process and Shared Data Heap region while this process is between load chunks | First initialized to `NULL` by [`create_process()`](kernel/process/process.picoc#L89), set by [`begin_process_load()`](kernel/process/process_loader.picoc#L109), advanced by [`continue_process_load()`](kernel/process/process_loader.picoc#L227), cleared by [`finish_process_load()`](kernel/process/process_loader.picoc#L90) or [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) |
 
@@ -4560,104 +4548,64 @@ explains the copy on the User Process Stack used for `argv[0]`. The separate
 available to [`list_processes()`](kernel/process/process.picoc#L32) even if userspace later changes
 `argv[0]`, it is therefore neither an alias of `argv[0]` nor redundant storage.
 
-## 4.3 Process image and initial userspace stack
+### 4.2.1 Process States and Transitions
 [\[↑ TOC\]](#contents)
 
-The User Process Image contains the linked optional `.ivt`, `.text`, and
-`.data` sections. Its enclosing Process Payload also reserves the User Process
-Heap and User Process Stack. `.text` contains executable instructions and
-`.data` holds global data. With the PicoC-Compiler
-[`-O1` option](../PicoC-Compiler/README.md#command-line-options), values known
-at compile time are written directly into `.data` or `.ivt`.
-
-The compiler records the layout in `program.sections`. RETI-Emulator uses it
-when assembling `program.bin` to prepend the five-word header described in
-[`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header).
-The loader consumes the header to size the Process Payload and initialize the
-PCB's address fields, copying only the following linked program words into the
-User Process Image. Run setup writes the initial arguments and environment to
-the User Process Stack before execution begins.
-
-### 4.3.1 Code, data, heap, and stack placement
-[\[↑ TOC\]](#contents)
-
-[`3.2.1 Inside Process Payload A`](#321-inside-process-payload-a) shows the
-linked User Process Image, User Process Heap, and User Process Stack as
-adjacent regions in one [`PSDMalloc()`](kernel/psdmalloc.picoc#L20) allocation.
-The PCB's [`base_address`](kernel/process/process.header#L34) reaches the start
-of that payload, while [`size`](kernel/process/process.header#L35) records the
-requested total cell count. The heap lies outside the linked image, and the
-stack lies beyond the heap. The active stack-boundary register protects the
-final heap cell as the stack grows toward lower addresses.
-
-The binary header determines the size of this complete region. If its
-[`heap_size`](kernel/process/process_loader.picoc#L120) word is `-1`, the loader
-uses the 1000-cell
-[`DEFAULT_PROCESS_HEAP_CELLS`](kernel/process/process_loader.header#L6) value.
-If [`stack_start`](kernel/process/process_loader.picoc#L121) is `-1`,
-[`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28) places
-the highest stack offset 1000 cells after the first cell beyond the heap. The
-offset is inclusive, so the allocation contains 1001 cells above the heap. An
-explicit stack offset is rejected if it overlaps the heap. The effective stack
-offset plus one becomes the size passed to
-[`PSDMalloc()`](kernel/psdmalloc.picoc#L20), so code, data, heap, and stack occupy
-one allocation rather than separate blocks.
-
-### 4.3.2 Initial `argc`, `argv`, and `envp`
-[\[↑ TOC\]](#contents)
-
-Once those regions have been placed and the image has been loaded,
-[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) writes this layout
-directly into the User Process Stack at the high end of its Process Payload:
-
-| Order | Contents |
-| --- | --- |
-| 1 | Entry PC used by the first `RTI` |
-| 2 | [`argc`](kernel/process/process_arguments.picoc#L131) |
-| 3 | [`argv[]`](kernel/process/process_arguments.picoc#L173) pointers and terminating `NULL` |
-| 4 | [`envp[]`](kernel/process/process_arguments.picoc#L141) pointers and terminating `NULL` |
-| 5 | Copied binary path, arguments, and environment strings |
-
-All pointers in the tables are absolute SRAM addresses. [`argv[0]`](kernel/process/process_arguments.picoc#L184) points to a
-copy of [`binary_path`](kernel/process/process.header#L38), the supplied argument string supplies later entries,
-[`envp`](kernel/process/process_arguments.picoc#L141) begins immediately after [`argv[argc] == NULL`](kernel/process/process_arguments.picoc#L180). The entry cell contains
-[`activation.cs`](kernel/process/process.header#L27) - 1 because the first `RTI` advances to the real entry. The
-saved `SP` points to the free cell below it, while `BAF` is chosen so naked
-[`_start()`](library/start/start.picoc#L14) observes [`argc`](kernel/process/process_arguments.picoc#L131) and [`argv`](kernel/process/process_arguments.picoc#L173) in normal argument positions.
-
-Arguments and the initial environment are stored on the User Process Stack
-inside its Process Payload. Userspace [`libstart`](library/start/libstart.picoc) later clones the environment into
-the process heap, so parent and child environment arrays become independent.
-
-## 4.4 Process states and transitions
-[\[↑ TOC\]](#contents)
-
-Process states show where each process is in its lifecycle: whether it can run,
-is waiting or stopped, or has finished. The operating system uses them to
+The PCB's [`state`](kernel/process/process.header#L33) field shows where
+each process is in its lifecycle: whether it can run, is waiting or stopped, or has finished. The operating system uses these states to
 decide which processes the scheduler may select and which lifecycle work is
 still pending. The table lists PicoOS's six states and their numeric values.
 
 | State | Numeric value | Meaning | Typical transition |
 | --- | --- | --- | --- |
-| [`NEW`](kernel/process/process.header#L12) | 0 | Complete image and PCB exist but initial run state is incomplete | Completed process load |
+| [`NEW`](kernel/process/process.header#L12) | 0 | Loaded image and PCB exist, but the final startup layout is not yet prepared | Completed process load |
 | [`READY`](kernel/process/process.header#L13) | 1 | Eligible for the scheduler | Run setup, queue wakeup, or [`SIGCONT`](common/signal.header#L6) |
 | [`RUNNING`](kernel/process/process.header#L14) | 2 | Activation is loaded into the CPU | Dispatcher |
 | [`BLOCKED`](kernel/process/process.header#L15) | 3 | PCB is linked into one wait queue | Terminal read, DMA completion wait, [`waitpid()`](library/sys/wait/wait.picoc#L14), or [`sleep()`](library/unistd/blocking.picoc#L9) |
 | [`STOPPED`](kernel/process/process.header#L16) | 4 | Suspended by [`SIGSTOP`](common/signal.header#L7), [`SIGTSTP`](common/signal.header#L8), or [`SIGTTIN`](common/signal.header#L9) | Signal subsystem |
 | [`ZOMBIE`](kernel/process/process.header#L17) | 5 | Terminated status retained for a parent | [`terminate_process()`](kernel/process/process.picoc#L304) |
 
+[`NEW`](kernel/process/process.header#L12) distinguishes a loaded process from
+one whose arguments, environment, descriptor inheritance, and final stack
+[`activation`](kernel/process/process.header#L40) have been prepared. It is also the one-shot start guard in
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241).
+Reusing [`READY`](kernel/process/process.header#L13) would expose the preliminary
+stack to the scheduler. [`BLOCKED`](kernel/process/process.header#L15) represents
+a wait operation and can be changed to [`READY`](kernel/process/process.header#L13) by a wakeup, while
+[`STOPPED`](kernel/process/process.header#L16) represents signal suspension and
+can be resumed by [`SIGCONT`](common/signal.header#L6). Neither supplies the start guard without additional
+bookkeeping. A distinct [`NEW`](kernel/process/process.header#L12) [`state`](kernel/process/process.header#L33) is a useful implementation choice, rather
+than a universal operating-system requirement. Another design could use an
+explicit startup-complete flag or keep unstarted processes outside the list.
+
+This distinction describes the normal load/run path. The signal helpers do
+not enforce startup completion: [`stop_process()`](kernel/signal.picoc#L37)
+also accepts [`NEW`](kernel/process/process.header#L12), and
+[`continue_process()`](kernel/signal.picoc#L50) selects
+[`READY`](kernel/process/process.header#L13) unless a
+[`BLOCKED`](kernel/process/process.header#L15) wait remains. A stop/continue
+sequence can therefore make an unstarted process schedulable without run setup.
+
+Setting [`state`](kernel/process/process.header#L33) to
+[`READY`](kernel/process/process.header#L13) makes a process eligible for
+[`scheduler_can_run()`](kernel/scheduler.picoc#L4). That helper also accepts
+[`RUNNING`](kernel/process/process.header#L14), allowing the current process
+to be selected again if no other process can run. Selection does not require
+a separate ready queue, and [`READY`](kernel/process/process.header#L13) does not mean execution begins immediately.
+
 [`ZOMBIE`](kernel/process/process.header#L17) separates the end of execution
 from final removal. It records that execution has ended while the parent may
-still need to collect the termination status. The additional state also keeps
+still need to collect the termination status. The additional [`state`](kernel/process/process.header#L33) also keeps
 the terminated process outside the
 [`READY`](kernel/process/process.header#L13) and
 [`RUNNING`](kernel/process/process.header#L14) states accepted by
 [`scheduler_next_process()`](kernel/scheduler.picoc#L12), so the scheduler does
-not select it for execution. [Section 4.6, Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection)
-explains status retention, parent notification, and final removal.
+not select it for execution. [`4.4.2.3 Recording termination status`](#4423-recording-termination-status)
+and [`4.4.2.4 Parent collection and final removal`](#4424-parent-collection-and-final-removal)
+explain status retention, parent notification, and final removal.
 
-The state diagram shows the usual load/run, blocking, signal, and termination
-paths. Removal ends the PCB's lifetime rather than assigning another state
+The [`state`](kernel/process/process.header#L33) diagram shows the usual load/run, blocking, signal, and termination
+paths. Removal ends the PCB's lifetime rather than assigning another [`state`](kernel/process/process.header#L33)
 value. [Section 5, Scheduling and context switching](#5-scheduling-and-context-switching)
 explains the [`READY`](kernel/process/process.header#L13) and
 [`RUNNING`](kernel/process/process.header#L14) transitions, while
@@ -4680,71 +4628,323 @@ stateDiagram-v2
     STOPPED --> BLOCKED: SIGCONT while still queued
     STOPPED --> READY: SIGCONT when wait is satisfied
     STOPPED --> STOPPED: pending terminal read without input ownership
-    NEW --> ZOMBIE: termination
-    READY --> ZOMBIE: unload or fatal signal
+    NEW --> ZOMBIE: termination or unload
+    READY --> ZOMBIE: termination or signal
     RUNNING --> ZOMBIE: exit or fatal signal
     BLOCKED --> ZOMBIE: fatal signal
     STOPPED --> ZOMBIE: fatal signal
-    ZOMBIE --> [*]: waitpid collection or orphan cleanup
+    ZOMBIE --> [*]: collection, orphan cleanup, or unload
 ```
 
-## 4.5 Loading and starting a process
+## 4.3 Initial User Process Stack
 [\[↑ TOC\]](#contents)
 
-Before a process can execute, the User Process Image described in
-[Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack) must be loaded into
-memory. The loader reserves one contiguous region, copies the linked sections,
-and leaves the header-defined heap and stack space in place, establishing the
-layout from which execution will begin. It then creates the PCB and sets the
-initial code, data, stack, and frame register values. Run setup builds the
-initial userspace stack, and [`init_process_heap()`](library/stdlib/malloc.picoc#L18)
-initializes the reserved heap when the process first starts. The dispatcher
-later restores the saved register values before transferring control to the
-process, as described in
-[Section 5.4, Restoring the selected process and returning with `RTI`](#54-restoring-the-selected-process-and-returning-with-rti).
+The initial stack is the argument, environment, and entry-PC layout prepared
+for the first dispatch of a user process. It becomes complete inside
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125),
+during [`run()`](library/unistd/process.picoc#L31), before
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+sets the PCB's [`state`](kernel/process/process.header#L33) to
+[`READY`](kernel/process/process.header#L13). After a successful
+[`load()`](library/unistd/process.picoc#L17), only a preliminary entry PC exists.
+The two phases are shown in
+[`4.4 Loading and Starting a Process`](#44-loading-and-starting-a-process).
 
-### 4.5.1 Executable transfer with polling or DMA
+### 4.3.1 User Process Stack Placement
 [\[↑ TOC\]](#contents)
 
-Loading and starting are deliberately separate operations. Every successful
-userspace [`load()`](library/unistd/process.picoc#L17) first reads and validates
-the binary header, reserves the complete Process Payload, and stores the partial
-load in the caller's PCB. The payload is then received using polling or DMA.
-Boot-time loading uses the continuous transfer in
-[Section 10.1, Loading the kernel from the EPROM bootloader](#101-loading-the-kernel-from-the-eprom-bootloader).
+The highlighted stack below belongs to one user process inside one allocator
+payload in the Process and Shared Data Heap. It follows that process's User
+Process Image and User Process Heap, as established in
+[`3.2.1 Inside Process Payload A`](#321-inside-process-payload-a).
+Every other user process has its own corresponding image, heap, and stack in
+another Process Payload. The outer block header lies outside each payload.
 
-Without DMA, [`load()`](library/unistd/process.picoc#L17) re-enters the kernel
-for each payload chunk of at most 1 KiB. Each syscall requests the next file
-range from the host, copies it into the reserved image, and updates progress.
-The wrapper continues until the final chunk creates the new PCB and returns
-its PID.
+![Complete SRAM expanded into one Process Payload, with only its User Process Stack highlighted](documentation/images/process-stack-placement.svg)
 
-With DMA, the loader requests the whole payload once and blocks the caller
-while the device copies it. The completion interrupt wakes the caller, whose
-next continuation syscall verifies the transfer and creates the PCB.
+The PCB's [`base_address`](kernel/process/process.header#L34) identifies the
+payload's first cell. Its [`size`](kernel/process/process.header#L35) includes
+the image and both runtime regions. The highest stack cell is therefore
+`H = base_address + size - 1`. The stack grows toward lower addresses, with
+the final heap cell serving as its boundary.
 
-Both transfer modes end with a loaded User Process Image and a PCB whose state is
-[`NEW`](kernel/process/process.header#L12).
-[Section 4.5.2, Changing a completed image from `NEW` to `READY`](#452-changing-a-completed-image-from-new-to-ready) continues
-from the returned PID with the separate run setup.
+The five-word binary header, explained in
+[`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header),
+determines the reservation. A heap-size word of `-1` selects
+[`DEFAULT_PROCESS_HEAP_CELLS`](kernel/process/process_loader.header#L6),
+currently 1000 cells. A stack-start word of `-1` makes
+[`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28)
+choose `heap_start + heap_size + DEFAULT_PROCESS_STACK_CELLS`, with
+[`DEFAULT_PROCESS_STACK_CELLS`](kernel/process/process_loader.header#L7)
+currently 1000. This is an inclusive highest offset, so the default reserves
+1001 cells beyond the heap. An explicit offset below the first cell beyond the
+heap is rejected. The loader adds one to the effective offset to obtain the
+allocation size.
 
-[`ProcessLoad`](kernel/process/process_loader.picoc#L14) is a temporary kernel
-structure used while userspace [`load()`](library/unistd/process.picoc#L17) asks
-the kernel to receive an executable. [`begin_process_load()`](kernel/process/process_loader.picoc#L109)
-stores its pointer in the calling process's
-[`pending_load`](kernel/process/process.header#L68) PCB field. Its allocations
-and their lifetimes are included in
-[Section 8.1, Memory layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-and-lifetimes).
-Later load syscall requests follow that pointer to reuse the validated header,
-reserved image address, transfer progress, and copied path. Completion or
-cancellation clears the pointer and frees the structure. The field table shows
-which values describe the process being created and which exist only to resume
-the transfer.
+### 4.3.2 Initial `argc`, `argv`, and `envp`
+[\[↑ TOC\]](#contents)
+
+The preceding placement diagram identifies the User Process Stack. Run setup
+now fills its high-address end with the startup values. These values occupy
+the stack inside the Process Payload, rather than the binary-derived User
+Process Image. That image contains only optional `.ivt`, `.text`, and `.data`.
+The linked program words are copied during loading, while
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125)
+writes the following runtime layout during starting.
+
+Let `A = argc` include the executable path, let `M` count the environment
+entries, and let `R` be the total startup cell count. The first occupied cell
+is `E = base_address + size - R`. Each address increment of one selects one
+**32-bit RETI cell**, including for characters and pointers. The table reads
+from **lower addresses at the top to higher addresses at the bottom**.
+The stack grows in the opposite direction, toward addresses below `E`.
+
+| Cell address or range, increasing downward | Stored value | Relationship |
+| --- | --- | --- |
+| `E` | [`activation.cs`](kernel/process/process.header#L27) minus 1 | Entry PC consumed by the first `RTI` |
+| `E + 1` | [`argc`](kernel/process/process_arguments.picoc#L131) = `A` | Integer value, excluding the pointer sentinel |
+| `E + 2` | [`argv[0]`](kernel/process/process_arguments.picoc#L184) | Absolute address of the copied executable-path string |
+| `E + 3 ... E + A + 1` | [`argv[1] ... argv[A-1]`](kernel/process/process_arguments.picoc#L200) | Absolute addresses of the separately copied argument strings, this range is empty when `A = 1` |
+| `E + A + 2` | [`argv[A] = NULL`](kernel/process/process_arguments.picoc#L180) | Zero pointer sentinel |
+| `E + A + 3 ... E + A + M + 2` | [`envp[0] ... envp[M-1]`](kernel/process/process_arguments.picoc#L225) | Absolute addresses of copied `NAME=value` strings, empty when `M = 0` |
+| `E + A + M + 3` | [`envp[M] = NULL`](kernel/process/process_arguments.picoc#L181) | Zero pointer sentinel |
+| Starting at `S = E + A + M + 4` | Characters of the [`binary_path`](kernel/process/process.header#L38) copy, then `\0` | [`argv[0]`](kernel/process/process_arguments.picoc#L184) points to `S`. The path is normalized without the leading `/` |
+| Immediately after the path | Characters of argument 1, then `\0`, ... characters of argument `A-1`, then `\0` | Each argument pointer addresses the first cell of its string |
+| Immediately after the last argument | Characters of environment entry 0, then `\0`, ... entry `M-1`, then `\0` | Each entry is a single `NAME=value` string. `=` is a stored character, not a pointer boundary |
+| `H = base_address + size - 1` | Last string's `\0` | Final occupied cell, also when only the executable path is present |
+
+Here [`argv`](kernel/process/process_arguments.picoc#L140) means the address
+`E + 2` of the first argument-pointer cell. It is **not** a separate cell
+containing a pointer to a second array. Likewise,
+[`envp`](kernel/process/process_arguments.picoc#L141) is the address
+`argv + argc + 1` of the first environment-pointer cell. Both pointer arrays
+and all referenced strings reside on the child stack. The kernel reads the
+caller's strings and writes new pointers to the child's string copies.
+
+The setup uses the existing stack reservation and does not enlarge the
+Process Payload or check that the startup data fits above the heap boundary.
+The size calculation includes the entry PC, the count, both arrays and their
+sentinels, and every string terminator:
+
+```text
+R = 1 + 1 + A + 1 + M + 1
+    + cells(binary_path including its terminator)
+    + cells(all argument strings including their terminators)
+    + cells(all environment strings including their terminators)
+```
+
+After writing the strings,
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125)
+saves [`activation.sp`](kernel/process/process.header#L25) as `E - 1` and
+[`activation.baf`](kernel/process/process.header#L26) as `E - 2`. The first
+`RTI` consumes `M[E]` and advances to the entry instruction. The naked
+[`_start()`](library/start/start.picoc#L14) reads the count at `BAF + 3` and
+takes the address of the first pointer at `BAF + 4`.
+[`start_process()`](library/start/start.picoc#L7) finds the environment with
+`argv + argc + 1`, initializes the User Process Heap, and calls
+[`initialize_environment()`](library/stdlib/env.picoc#L97) to copy the initial
+environment into an independent heap-backed array and strings before
+calling the application's entry function.
+
+The relevant memory-layout comparison is the **System V ABI, Intel386
+Architecture Processor Supplement, Process Initialization**, specifically
+[Figure 3-31, Initial Process Stack](https://refspecs.linuxbase.org/elf/abi386-4.pdf#page=54).
+PicoOS uses the same increasing-address order for the count, argument
+pointers, null sentinel, environment pointers, and null sentinel. Its RETI
+adaptation adds an entry-PC cell below the count, uses cell addresses and
+one 32-bit cell per character, omits the auxiliary vector, and uses its own
+register and executable format. PicoOS also packs the strings in path,
+argument, then environment order, while the Intel386 ABI leaves their order
+unspecified. This is a **System V-style adaptation**, not Intel386 ABI
+compliance.
+
+[POSIX.1-2024 `exec`](https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html)
+and its [environment-variable convention](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html)
+define the source-level count, null-terminated pointer arrays, and `NAME=value`
+strings. They do not prescribe this physical stack arrangement. PicoOS
+shares those basic representations, but its separate
+[`load()`](library/unistd/process.picoc#L17) and
+[`run()`](library/unistd/process.picoc#L31) API is not POSIX `exec` and does not
+establish POSIX conformance.
+
+<!-- Presentation: mention the System V Intel386 initial-process-stack comparison,
+     distinguish POSIX source-level conventions, and explain the RETI adaptations. -->
+
+#### 4.3.2.1 Concrete initial-stack example
+[\[↑ TOC\]](#contents)
+
+This small program uses the supported [`atoi()`](library/stdlib/atoi.picoc#L4)
+and [`getenv()`](library/stdlib/env.picoc#L115) functions. Save it as
+`user/add.picoc` and link it with the standard
+[`libstart`](library/start/libstart.picoc) and
+[`libstdlib`](library/stdlib/libstdlib.picoc) runtime to produce `user/add.bin`.
+It adds the two single-digit arguments only when `ADD` has the value `1`:
+
+```c
+#include "../library/stdlib/stdlib.header"
+
+int main(int argc, char **argv) {
+    char *enabled = getenv("ADD");
+
+    if (argc == 3 && enabled != NULL &&
+        enabled[0] == '1' && enabled[1] == '\0') {
+        return atoi(argv[1]) + atoi(argv[2]);
+    }
+    return 0;
+}
+```
+
+A launcher in `user/` supplies exactly two environment entries and the raw
+argument string. `X=0` is deliberately unused. The explicit array replaces the
+caller's environment for this child, making the complete example independent
+of the shell's settings. [`waitpid()`](library/sys/wait/wait.picoc#L14) collects
+the result, so this launcher returns `5` after a successful start:
+
+```c
+#include "../library/unistd/unistd.header"
+#include "../library/sys/wait/wait.header"
+
+int main(void) {
+    char *environment[3];
+    int pid;
+
+    environment[0] = "ADD=1";
+    environment[1] = "X=0";
+    environment[2] = NULL;
+    pid = load("/user/add.bin");
+    if (pid == 0) {
+        return 0;
+    }
+    if (!run(pid, "2 3", environment)) {
+        unload(pid);
+        return 0;
+    }
+    return waitpid(pid);
+}
+```
+
+For these exact strings, `A = 3`, `M = 2`, and `R = 36`. The path takes
+13 cells, the two arguments take 4 cells, and the environment strings take
+10 cells. Use the symbolic absolute address
+`E = base_address + size - 36` throughout the figure. Each drawn box is
+one real 32-bit cell, and each string's terminating zero is shown. The string
+rows expand the consecutive string area after the pointer arrays.
+
+![Every initial stack cell for user/add.bin with arguments 2 and 3, ADD=1 and unused X=0, including absolute pointers, ASCII values, terminators, and stack direction](documentation/images/process-initial-stack-example.svg)
+
+The pointers are `argv = E + 2`, `envp = E + 6`, `argv[0] = E + 9`,
+`argv[1] = E + 22`, `argv[2] = E + 24`, `envp[0] = E + 26`, and
+`envp[1] = E + 32`. The saved `SP` is `E - 1` and saved `BAF` is `E - 2`.
+The last zero at `E + 35 = H` overwrites the preliminary entry PC placed there
+during loading. The usable entry PC is now at `E`, below the argument count.
+
+## 4.4 Loading and Starting a Process
+[\[↑ TOC\]](#contents)
+
+The library-facing [`load()`](library/unistd/process.picoc#L17) and
+[`run()`](library/unistd/process.picoc#L31) calls separate receiving a program
+from preparing it to execute. Their syscall wrappers reach
+[`load_process_chunk()`](kernel/process/process_loader.picoc#L292) and
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+through [`handle_syscall()`](kernel/syscall.picoc#L16). The kernel performs the
+memory and PCB work. The dispatcher later restores the saved [`activation`](kernel/process/process.header#L40),
+as explained in
+[`5.4 Restoring the selected process and returning with RTI`](#54-restoring-the-selected-process-and-returning-with-rti).
+
+### 4.4.1 Loading a Process (`load` library call)
+[\[↑ TOC\]](#contents)
+
+Loading establishes the process allocation and kernel record. The userspace
+load path has the following responsibilities:
+
+- Resolve the executable path against the caller's working directory and check
+  the returned file size and five-word header response.
+- Apply the heap and stack defaults, reject a stack start overlapping the heap,
+  and reserve one complete Process Payload with
+  [`PSDMalloc()`](kernel/psdmalloc.picoc#L20).
+- Retain a temporary [`ProcessLoad`](kernel/process/process_loader.picoc#L14)
+  through the caller's [`pending_load`](kernel/process/process.header#L68),
+  receive the linked program words by polling or DMA, and report requested progress.
+- After the transfer finishes, call
+  [`create_process()`](kernel/process/process.picoc#L89) to allocate the PCB,
+  assign its PID, set [`state`](kernel/process/process.header#L33) to
+  [`NEW`](kernel/process/process.header#L12), record memory fields and the
+  copied binary path, initialize saved registers, queues, signal bookkeeping,
+  and a fresh standard descriptor table.
+- Record the loader's PID as [`parent_pid`](kernel/process/process.header#L57),
+  copy [`parent_death_signal`](kernel/process/process.header#L59) and the
+  [`working_directory`](kernel/process/process.header#L39), then write the
+  preliminary entry PC into the highest stack cell.
+- Append the PCB at the process-list tail, clear the caller's pending-load
+  pointer, free temporary load metadata, and return the new PID.
+
+The linked User Process Image contains optional `.ivt`, `.text`, and `.data`.
+The loader consumes the five-word header separately, as described in
+[`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header).
+It copies only the following program words into the beginning of the Process
+Payload. The reserved User Process Heap remains uninitialized until
+[`init_process_heap()`](library/stdlib/malloc.picoc#L18) runs in userspace.
+
+The first visual step shows where those words travel. The host sends the
+binary response through UART RX. EPROM holds the bootloader, the peripheral
+region contains UART, interrupt-controller and timer registers, CPU exception
+and stack-boundary registers, and optional DMA registers, and SRAM holds the
+kernel and process allocations. Arrows for data movement are dashed,
+while stored-pointer arrows are solid.
+
+![EPROM, the complete peripheral mapping, and SRAM with CPU-polling and DMA transfer paths into the newly allocated User Process Image, while the caller owns ProcessLoad](documentation/images/process-load-transfer.svg)
+
+Without DMA, [`begin_process_load()`](kernel/process/process_loader.picoc#L109)
+issues `file-size <path>` and `read-range 0 20 <path>` to inspect the header.
+Subsequent [`continue_process_load()`](kernel/process/process_loader.picoc#L227)
+calls request payload ranges of at most 256 words, or 1 KiB in the host file.
+[`receive_word()`](common/uart_protocol.picoc#L7) assembles four UART bytes into
+one 32-bit value, which the CPU stores in one SRAM cell. The wrapper repeats
+the syscall between chunks, allowing normal syscall-return scheduling.
+
+With the emulator's `--dma` option,
+[`begin_process_load()`](kernel/process/process_loader.picoc#L109) still reads
+the header through CPU polling, then requests the whole payload in one range.
+[`start_dma_uart_receive()`](kernel/dma.picoc#L18) programs UART RX as the source,
+SRAM as the destination, and the payload's word count. It blocks the **caller**
+on [`dma_waiters`](kernel/dma.picoc#L6), allowing other processes to run.
+The DMA interrupt reaches [`handle_dma_interrupt()`](kernel/dma.picoc#L40) and
+wakes the caller. Its next load syscall checks completion and creates the
+child PCB. A rejected transfer cancels the partial allocation and returns 0.
+The interrupt and register details are in
+[`2.7 DMA completion interrupt path`](#27-dma-completion-interrupt-path).
+
+The second step begins after all program words have arrived. The previous
+tail PCB receives [`next`](kernel/process/process.header#L53) pointing to the
+new PCB, and [`process_list_tail`](kernel/process/process.picoc#L17) advances.
+For an initially empty list,
+[`process_list_head`](kernel/process/process.picoc#L16) also becomes the new PCB.
+[`next_process_id`](kernel/process/process.picoc#L19) advances at creation.
+The new process remains in [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12).
+
+![Completed load with the child PCB appended in the kernel heap, state NEW, fresh descriptors, initialized activation fields, and only one preliminary entry-PC cell on its stack](documentation/images/process-load-complete.svg)
+
+The post-load stack is **not empty**.
+[`create_process()`](kernel/process/process.picoc#L89) writes
+`M[H] = activation.cs - 1`, where `H = base_address + size - 1`, and saves
+[`activation.sp`](kernel/process/process.header#L25) as `H - 1` and
+[`activation.baf`](kernel/process/process.header#L26) as `H`. It initializes
+[`activation.cs`](kernel/process/process.header#L27) to `base_address + code_start`,
+[`activation.ds`](kernel/process/process.header#L28) to `base_address + data_start`,
+and the three general saved registers to 0. The remaining reserved stack cells
+are uninitialized. No argument count, pointer arrays, or environment copies
+exist yet.
+
+[`ProcessLoad`](kernel/process/process_loader.picoc#L14) keeps the validated
+metadata and transfer progress while the library wrapper returns to userspace
+between syscalls. The following table identifies its fields and users.
+Its storage and lifetime are also shown in
+[`8.1 Memory layout, allocation sources, and lifetimes`](#81-memory-layout-allocation-sources-and-lifetimes).
 
 | Field | Meaning | Used by |
 | --- | --- | --- |
 | [`ProcessLoad.base_address`](kernel/process/process_loader.picoc#L15) | Absolute start of the reserved Process and Shared Data Heap region | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), used by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227), [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
-| [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16) | Total reserved cells for code, data, heap, stack, and startup values | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
+| [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16) | Total reserved cells for the User Process Image, User Process Heap, and User Process Stack | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
 | [`ProcessLoad.code_start`](kernel/process/process_loader.picoc#L17), [`ProcessLoad.data_start`](kernel/process/process_loader.picoc#L18) | Linked code- and data-segment offsets from the binary header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
 | [`ProcessLoad.heap_start`](kernel/process/process_loader.picoc#L19), [`ProcessLoad.heap_size`](kernel/process/process_loader.picoc#L20) | Resolved userspace heap offset and cell count | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
 | [`ProcessLoad.payload_word_count`](kernel/process/process_loader.picoc#L21) | Encoded program words after the five-word header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), bounds both DMA and polling transfers in [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) and [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
@@ -4753,158 +4953,190 @@ the transfer.
 | [`ProcessLoad.uses_dma`](kernel/process/process_loader.picoc#L24) | Whether the reserved image is being filled by one DMA transfer rather than polling chunks | First initialized to `false` and set to `true` by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), checked by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
 | [`ProcessLoad.path`](kernel/process/process_loader.picoc#L25) | Kernel-owned absolute binary path used by later range requests and copied into the completed PCB | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), read by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), freed by [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) |
 
-The caller PCB's [`pending_load`](kernel/process/process.header#L68) pointer
-tracks the partial image allocation until the transfer finishes or is
-cancelled. [`cancel_process_load()`](kernel/process/process_loader.picoc#L76)
-releases that allocation, the copied path, and the temporary
-[`ProcessLoad`](kernel/process/process_loader.picoc#L14). The PCB that
-represents the new process is created only after the last chunk arrives.
+[`finish_process_load()`](kernel/process/process_loader.picoc#L90) clears the
+caller's [`pending_load`](kernel/process/process.header#L68) and frees the
+metadata and copied host path after creating the child.
+[`cancel_process_load()`](kernel/process/process_loader.picoc#L76) instead
+cancels a busy DMA transfer if needed and frees the partial Process Payload
+as well as those temporary allocations. The child PCB does not exist during
+transfer, so it cannot yet participate in scheduling or the process list.
 
-### 4.5.2 Changing a completed image from `NEW` to `READY`
+Boot-time init loading uses the kernel-only
+[`load_process()`](kernel/process/process_loader.picoc#L305), which requests
+`load <path>` and receives a continuous stream. Its shared
+[`receive_words_to_sram()`](common/sram_loader.picoc#L6) either polls UART or
+starts DMA and polls the DMA status until completion. With no running user
+caller yet, this path does not block on the userspace DMA wait queue. Both
+loading paths finish through the same
+[`create_process()`](kernel/process/process.picoc#L89).
+
+#### 4.4.1.1 Load function reference
 [\[↑ TOC\]](#contents)
 
-Completing [`load_process()`](kernel/process/process_loader.picoc#L305) or
-[`load_process_chunk()`](kernel/process/process_loader.picoc#L292) creates a new
-PCB with its state set to [`NEW`](kernel/process/process.header#L12). The later
-[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-inherits descriptor values, writes the initial stack, and changes it to
-[`READY`](kernel/process/process.header#L13). This state makes the process
-available to [`scheduler_next_process()`](kernel/scheduler.picoc#L12) for
-selection.
+These kernel functions receive the executable, maintain transfer ownership,
+and create the PCB. The syscall-backed operation appears first, followed by
+its internal helpers and the boot-time variant. Run setup has its own table in
+[`4.4.2.2 Run function reference`](#4422-run-function-reference).
 
-Creation first gives every PCB a new standard descriptor table. A completed
-[`load()`](library/unistd/process.picoc#L17) therefore does not yet inherit the
-caller's descriptors. When a process later calls
-[`run()`](library/unistd/process.picoc#L31),
-[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-deep-copies the running caller's inheritable entries, destroys the child's
-initial table, and installs the copy before changing the child to `READY`.
-The copy always includes standard descriptors 0–2. Slots 3 and 4 are copied
-only when they contain descriptors created by [`open()`](library/fcntl/fcntl.picoc#L5),
-while the shell's reserved save slots 5–7 stay free. PID 1 has no running
-caller and keeps its initial standard table. This timing is why shell
-redirection must be installed before [`run()`](library/unistd/process.picoc#L31),
-not merely before the child is first scheduled. [Section 7.6, File-descriptor creation, inheritance, duplication, and cleanup](#76-file-descriptor-creation-inheritance-duplication-and-cleanup)
-explains the descriptor-table details. Parent-child metadata is established
-during PCB creation and is covered next in
-[Section 4.6.1, Parent-child creation, inherited state, and orphaning](#461-parent-child-creation-inherited-state-and-orphaning).
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Positive PID when complete, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L48) (-1) while work remains | Starts or resumes the caller-owned load. Successful completion creates a PCB with [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12) | [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`current_process()`](kernel/process/process.picoc#L62)<br>**Host requests:** `file-size <path>` and `read-range <offset> <count> <path>` through helpers | **Library functions:** [`load()`](library/unistd/process.picoc#L17) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> |
+| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | PID on success, 0 on rejected path, missing/short header, invalid stack placement, or exhausted process memory | Kernel boot-time continuous transfer. Reserves the Process Payload, receives the image, and creates the PCB | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`create_process()`](kernel/process/process.picoc#L89), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_host_request()`](common/uart_protocol.picoc#L82)<br>**Host requests:** `load <path>` | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) in `kernel/kernel.picoc` |
+| [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) | PID for an empty payload, continuation status after transfer setup, or 0 on path/header/allocation/transfer failure | Reads the header, reserves memory, allocates [`ProcessLoad`](kernel/process/process_loader.picoc#L14) and its path, sets [`caller.pending_load`](kernel/process/process.header#L68), initializes progress, and optionally starts blocking DMA | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`copy_process_path()`](kernel/process/process.picoc#L70), [`current_process()`](kernel/process/process.picoc#L62), [`dma_is_active()`](common/dma.picoc#L17), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`kmalloc()`](kernel/kmalloc.picoc#L23), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43)<br>**Host requests:** `file-size <path>`, `read-range 0 20 <path>`, optional whole-payload `read-range 20 <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
+| [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) | PID on completion, continuation status while DMA is busy or polling work remains, or 0 on transfer failure | Checks DMA status or polls up to 256 payload words, advances [`loaded_word_count`](kernel/process/process_loader.picoc#L22) and progress, completes or cancels the load | [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`dma_transfer_status()`](common/dma.picoc#L21), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58)<br>**Host requests:** Polling `read-range <offset> <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
+| [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) | New PID | Creates the child PCB after transfer, clears [`owner.pending_load`](kernel/process/process.header#L68), and frees temporary load metadata and its copied path | [`create_process()`](kernel/process/process.picoc#L89), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
+| [`create_process(base_address, size, code_start, data_start, heap_start, heap_size, binary_path)`](kernel/process/process.picoc#L89) | PCB pointer. Kernel-heap exhaustion halts the OS through allocation checks | Assigns PID and [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12), records memory fields, initializes [`activation`](kernel/process/process.header#L40), queues and signals, creates standard descriptors, copies paths and parent-derived metadata, writes the preliminary entry PC, and appends the PCB | [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), [`current_process()`](kernel/process/process.picoc#L62), [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`copy_process_path(path)`](kernel/process/process.picoc#L70) | New kernel-owned string pointer | Allocates and copies a path including its terminator | [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`create_process()`](kernel/process/process.picoc#L89), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128) |
+| [`loaded_process_stack_start(heap_start, heap_size, stack_start)`](kernel/process/process_loader.picoc#L28) | Highest process-relative stack offset, or [`PSDMALLOC_INVALID_START`](kernel/psdmalloc.header#L3) for overlap | Resolves the default highest stack offset or checks an explicit offset, no memory writes | None | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) | No return value | Cancels busy DMA if needed, clears [`process.pending_load`](kernel/process/process.header#L68), frees the partial Process Payload and temporary metadata | [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`dma_transfer_status()`](common/dma.picoc#L21), [`free_process_load()`](kernel/process/process_loader.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) | No return value | Frees the temporary kernel-owned host path and [`ProcessLoad`](kernel/process/process_loader.picoc#L14) | [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`finish_process_load()`](kernel/process/process_loader.picoc#L90) |
+| [`drain_process_words(payload_word_count, show_loading_bar)`](kernel/process/process_loader.picoc#L40) | No return value | Consumes a rejected continuous payload so UART remains synchronized, optionally reports progress | [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`drain_process_bytes(byte_count)`](kernel/process/process_loader.picoc#L62) | No return value | Consumes unexpected positive range-response data so UART remains synchronized | [`receive_byte_over_uart()`](kernel/uart_hardware.picoc#L24) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
 
-## 4.6 Parent-child relationships, termination, and collection
+The directly linked transfer helper is shared by bootloader and kernel:
+
+| Kernel / Library Function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`receive_words_to_sram(base_address, word_count, show_loading_bar)`](common/sram_loader.picoc#L6) (Shared/Common) | No return value | Receives word_count cells at base_address. Polls UART without DMA, otherwise starts DMA and busy-waits for its status, updates requested loading progress | [`dma_is_active()`](common/dma.picoc#L17), [`dma_transfer_status()`](common/dma.picoc#L21), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305)<br>**Bootloader functions:** [`boot_main()`](boot/bootloader.picoc#L41) |
+
+### 4.4.2 Starting a Process (`run` library call)
 [\[↑ TOC\]](#contents)
 
-Parent-child metadata determines who may collect a termination status and when
-a terminated PCB can be deleted. Unix literature calls that final status
-collection and deletion *reaping*; this section uses the clearer term
-*collection*. It covers relationship creation, inherited state, termination, the two important
-[`waitpid()`](library/sys/wait/wait.picoc#L14) orderings, and final resource
-release. Detailed wait-queue and signal mechanics are in
-[Section 6, Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes).
+Starting completes the loaded process's execution setup. The run path has
+these responsibilities, in this order:
 
-### 4.6.1 Parent-child creation, inherited state, and orphaning
+- Package the PID and argument-string pointer in a
+  [`RunProcessRequest`](common/syscall.header#L55). A `NULL` environment
+  argument selects the caller's [`current_environment()`](library/stdlib/env.picoc#L6),
+  while an explicit pointer array supplies a replacement environment.
+- Find the PCB and require [`state`](kernel/process/process.header#L33) to be
+  [`NEW`](kernel/process/process.header#L12). A missing PID or another [`state`](kernel/process/process.header#L33) returns `false`.
+- If a current process exists, deep-copy its inheritable descriptor entries,
+  destroy the child's preliminary standard table, and replace
+  [`file_descriptors`](kernel/process/process.header#L42).
+- Count and parse the raw argument string, copy the executable path, arguments,
+  and selected environment into the child User Process Stack, build the
+  pointer arrays and sentinels, and write the new entry-PC cell.
+- Set [`activation.sp`](kernel/process/process.header#L25) and
+  [`activation.baf`](kernel/process/process.header#L26) to refer to this layout,
+  then set [`state`](kernel/process/process.header#L33) to
+  [`READY`](kernel/process/process.header#L13) and return `true`.
+
+The following figure uses the same SRAM and child allocation as the completed
+load figure. It highlights the changed PCB fields, replacement descriptor
+table, and stack. The child heap remains reserved until userspace startup.
+
+![Run changes inside the same SRAM layout: inherited descriptor table, copied caller arguments and environment, new stack and activation pointers, and state NEW to READY](documentation/images/process-run-setup.svg)
+
+The argument pointer initially refers to a string in the caller's memory.
+For the shell, [`command_arguments()`](user/shell.picoc#L426) separates the
+command name from the raw remainder of its command buffer.
+[`run_process()`](user/shell.picoc#L1034) expands variables into its local
+[`expanded_arguments`](user/shell.picoc#L1044) stack array, applies redirections,
+and calls [`run(pid, expand_variables(...), NULL)`](library/unistd/process.picoc#L31).
+[`11.4 Command parsing, expansion, and execution`](#114-command-parsing-expansion-and-execution)
+traces the shell parsing. The kernel then splits the supplied remainder into
+space/tab-separated tokens, preserves whitespace inside matching single or
+double quotes, and removes those matching quote characters while copying.
+The shell does not hand the kernel a prebuilt argument-pointer array.
+
+The kernel consumes [`RunProcessRequest.arguments`](common/syscall.header#L57)
+and [`RunProcessRequest.environment`](common/syscall.header#L58) while setting
+up the child. It creates pointers to the child's own copies rather than
+retaining the caller's string pointers. The complete final stack is in
+[`4.3.2 Initial argc, argv, and envp`](#432-initial-argc-argv-and-envp).
+The former entry-PC cell at the highest address is overwritten by the final
+string terminator, so the usable entry PC moves to `E` below the count.
+
+The final [`state`](kernel/process/process.header#L33) assignment makes the process eligible for scheduler selection,
+as explained in
+[`4.2.1 Process States and Transitions`](#421-process-states-and-transitions).
+Run setup updates the saved stack and frame registers, rather than immediately
+loading them into the CPU. The child's code/data segment values and general
+saved registers were initialized during loading. Its list membership and
+parent metadata already exist, and the run helper does not modify the
+process-list globals. A subsequent dispatch restores its [`activation`](kernel/process/process.header#L40), enters
+[`_start()`](library/start/start.picoc#L14), initializes the process heap, and
+clones its stack environment into heap storage before application execution.
+
+#### 4.4.2.1 Parent-to-child inheritance
 [\[↑ TOC\]](#contents)
 
-The parent relationship is established when
-[`create_process()`](kernel/process/process.picoc#L89) creates the PCB, not when
-the new process first runs. If [`current_process()`](kernel/process/process.picoc#L62)
-returns a PCB, the new PCB receives that process's
-[`pid`](kernel/process/process.header#L32) as its
-[`parent_pid`](kernel/process/process.header#L57). It also inherits
-[`parent_death_signal`](kernel/process/process.header#L59) and receives a copy
-of the parent's [`working_directory`](kernel/process/process.header#L39). PID 1
-is created without a current process, so its parent PID is 0 and its working
-directory starts as `/`. [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations)
-explains how that copied path is used and changed.
+Inheritance spans PCB creation during loading and execution setup during
+starting. This subsection gathers the parent-derived data in one place.
+PicoOS does not perform a general `fork()`-style copy of the parent PCB or
+memory. The table distinguishes copied values, independent objects, and the
+caller-selected environment.
 
-Creation and [`run()`](library/unistd/process.picoc#L31) initialize child state at different times.
-The table distinguishes copied state from independently created state, there is no general
-`fork()`-style PCB or address-space copy.
-
-| Child state | Source and time | Relationship to parent afterward |
+| Child field or resource | Source and time | Relationship to parent afterward |
 | --- | --- | --- |
-| [`parent_pid`](kernel/process/process.header#L57) | Parent PID recorded by [`create_process()`](kernel/process/process.picoc#L89) | Identifies the parent until orphaning, not a shared object |
-| [`working_directory`](kernel/process/process.header#L39) | Kernel-heap string copied by [`create_process()`](kernel/process/process.picoc#L89) | Independent copy, a later [`chdir()`](library/unistd/working_directory.picoc#L4) changes only the calling process |
-| [`parent_death_signal`](kernel/process/process.header#L59) | Integer copied by [`create_process()`](kernel/process/process.picoc#L89) | Later [`prctl()`](library/sys/prctl/prctl.picoc#L14) changes only that process and what its future children inherit |
-| [`file_descriptors`](kernel/process/process.header#L42) | Fresh standard table at creation, replaced by a deep copy of the caller's current standard descriptors and opened-file entries in slots 3–4 when [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) handles [`run()`](library/unistd/process.picoc#L31) | Entry fields, offsets, and path strings are independent, reserved save slots 5–7 remain only in the caller, and changes after the copy do not propagate |
-| Initial environment | [`run()`](library/unistd/process.picoc#L31) uses the caller's current environment unless an explicit array is supplied, [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) copies the selected strings into the child image | [`libstart`](library/start/libstart.picoc) later copies them into the child's userspace heap |
-| Executable image, [`binary_path`](kernel/process/process.header#L38), PID, activation, queues, signal state, and shared-memory attachment list | Created or initialized for the child rather than inherited | Separate child-owned state, shared-memory attachments are not inherited |
+| [`parent_pid`](kernel/process/process.header#L57) | Loader's PID recorded by [`create_process()`](kernel/process/process.picoc#L89) during load completion | Identifies the parent until orphaning, not a shared PCB pointer |
+| [`working_directory`](kernel/process/process.header#L39) | Kernel-heap string copied by [`create_process()`](kernel/process/process.picoc#L89) | Independent path allocation, a later [`chdir()`](library/unistd/working_directory.picoc#L4) changes only its caller |
+| [`parent_death_signal`](kernel/process/process.header#L59) | Integer copied from the loader by [`create_process()`](kernel/process/process.picoc#L89) | Later [`prctl()`](library/sys/prctl/prctl.picoc#L14) changes only the caller and what its future children inherit |
+| [`file_descriptors`](kernel/process/process.header#L42) | Fresh standard table during loading, replaced during [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) with a deep copy from the current run caller | Table, entry fields, offsets, and path strings are independent. Standard slots 0–2 are copied, slots 3–4 are copied only for opened regular-file entries, and reserved shell save slots 5–7 remain free in the child |
+| Initial environment | [`run()`](library/unistd/process.picoc#L31) selects the caller's current environment for a `NULL` argument, or the explicitly supplied array | [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) copies strings to the child stack, then [`initialize_environment()`](library/stdlib/env.picoc#L97) copies them into the child's heap after dispatch |
 
-Because the working-directory copy occurs at process creation but descriptor and environment copies
-occur at [`run()`](library/unistd/process.picoc#L31), changes made between
-[`load()`](library/unistd/process.picoc#L17) and [`run()`](library/unistd/process.picoc#L31) affect
-the latter two but not the already copied directory. The complete directory lifecycle and path
-normalization are in [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations).
+The figure distinguishes stored references from copying operations. Parent
+and child PCBs and their path and descriptor allocations are kernel-heap
+objects. Solid curved arrows show pointer fields, and dashed arrows show
+copying at the indicated lifecycle phase. Separate descriptor entries and
+path strings are explained in
+[`7.6 File-descriptor creation, inheritance, duplication, and cleanup`](#76-file-descriptor-creation-inheritance-duplication-and-cleanup).
 
-When a parent terminates,
-[`orphan_and_signal_children()`](kernel/process/process.picoc#L279) changes each
-direct child's [`parent_pid`](kernel/process/process.header#L57) to 0. It removes
-a child that is already a zombie because no parent remains to collect its
-status. A live child instead receives its configured parent-death signal when
-that value is nonzero. [Section 6.2, Process Signals](#62-process-signals) explains the
-signal state and delivery rules.
+![Parent and child PCBs with independent directory strings and descriptor tables in contiguous kernel-heap blocks, distinguishing stored pointers from load-time and run-time copies](documentation/images/process-inheritance.svg)
 
-#### 4.6.1.1 Environment inheritance and loading-bar policy
+Working-directory and parent-death settings are snapshots of the **loader**
+at PCB creation. Descriptor entries and the default environment are snapshots
+of the **run caller** at starting. The run helper validates the target's
+[`state`](kernel/process/process.header#L33) but does not verify that the caller is its recorded parent. Normally
+one process calls both APIs, as init and the shell do. Changes to that
+caller's directory between loading and starting leave the existing child's
+directory unchanged, while changes to its descriptors or environment affect
+run setup. Shell redirections must therefore be installed before
+[`run()`](library/unistd/process.picoc#L31).
+
+The executable, [`binary_path`](kernel/process/process.header#L38), new PID,
+[`activation`](kernel/process/process.header#L40), embedded wait queues, stop/termination bookkeeping, and
+[`shared_memory_attachments`](kernel/process/process.header#L55) are initialized
+for the child, rather than inherited. Shared-memory attachments are not
+copied. PID 1 has no current parent, so its parent PID and parent-death setting
+are 0, its directory is `/`, and its fresh standard descriptor table is kept.
+The directory lifecycle is explained in
+[`7.9 PicoOS paths, working directories, and host operations`](#79-picoos-paths-working-directories-and-host-operations).
+
+##### 4.4.2.1.1 Environment origin and propagation
 [\[↑ TOC\]](#contents)
 
-Environment inheritance occurs when a child is started, rather than when its
-PCB is created. A `NULL` environment argument to
-[`run()`](library/unistd/process.picoc#L31) selects the caller's current
-[`environ`](library/stdlib/env.picoc#L4). An explicit array replaces that
-choice. The kernel copies the selected pointer table and strings into the
-child's initial stack through
-[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125).
-[`start_process()`](library/start/start.picoc#L7) then calls
-[`initialize_environment()`](library/stdlib/env.picoc#L97) to create independent
-heap-backed strings and an array in the child. Parent changes afterward do not
-propagate. The initial stack layout is in
-[`Section 4.3.2, Initial argc, argv, and envp`](#432-initial-argc-argv-and-envp).
+The first populated userspace environment originates in
+[`init`](system/init.picoc), not in the kernel or shell. The kernel has no
+persistent environment object. Its [`main()`](kernel/kernel.picoc#L31)
+loads init with [`load_process()`](kernel/process/process_loader.picoc#L305)
+and calls [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+directly with a [`RunProcessRequest`](common/syscall.header#L55) containing
+`arguments = NULL` and `environment = NULL`. This uses the same kernel start
+helper reached by the user library wrapper, without invoking that wrapper or
+inheriting an environment from a kernel process. It then activates the timer
+and dispatches init. The full boot path is in
+[`10.2.1 Loading init and entering normal execution`](#1021-loading-init-and-entering-normal-execution).
 
-Loading bars provide a concrete example of that inheritance. The
-[`loading_bar_enabled`](config/config.header#L5) flag is compiled separately
-into bootloader, kernel, and init. The bootloader uses its copy for the kernel
-transfer, and the kernel uses its copy for loading init. Neither creates a
-userspace environment variable. Init starts the userspace policy after reading
-[`config/environment.txt`](config/environment.txt). Its complete entry function
-shows the environment setting and the subsequent loading/start/wait cycle:
+Init's initial stack contains its path as the only argument, the argument
+sentinel, and an empty environment sentinel. Its linked
+[`environ`](library/stdlib/env.picoc#L4) starts as `NULL`.
+[`start_process()`](library/start/start.picoc#L7) initializes the heap and
+[`initialize_environment()`](library/stdlib/env.picoc#L97) creates an empty
+heap-backed array containing one `NULL` pointer. Init's
+[`read_environment()`](system/init.picoc#L19) then opens
+[`config/environment.txt`](config/environment.txt), reads at most 256 cells,
+parses each `NAME=value` entry, and stores it with
+[`setenv(name, value, true)`](library/stdlib/env.picoc#L126).
+Malformed entries, allocation/read failures, and a full buffer fail init
+startup. The current file supplies `PATH=/user`. Init adds the loading-bar
+setting next when configured, then loads and starts the shell.
 
-```c
-int main(void) {
-    int shell_pid;
-
-    if (!read_environment()) {
-        return 1;
-    }
-    if (loading_bar_enabled) {
-        if (setenv(
-                LOADING_BAR_ENVIRONMENT_VARIABLE,
-                "true",
-                true
-            ) != 0) {
-            init_write_error("init: could not configure loading bar\n");
-            return 1;
-        }
-    }
-
-    while (true) {
-        shell_pid = load("./user/shell.bin");
-        if (shell_pid == 0) {
-            init_write_error("init: could not load shell\n");
-            return 1;
-        }
-
-        if (!run(shell_pid, NULL, NULL)) {
-            init_write_error("init: could not start shell\n");
-            return 1;
-        }
-
-        waitpid(shell_pid);
-    }
-}
-```
-
-[`read_environment()`](system/init.picoc#L19) reads and parses `NAME=value`
-entries, calling [`setenv(name, value, true)`](library/stdlib/env.picoc#L126)
-for each. Its complete implementation shows where those initial values come
-from before init adds [`PICOOS_LOADING_BAR`](common/loading_bar.header#L5):
+The configuration reader below shows the actual file access, parsing,
+setting calls, and cleanup. Each [`setenv()`](library/stdlib/env.picoc#L126)
+copies the parsed name and value before the temporary input buffer is freed:
 
 ```c
 bool read_environment(void) {
@@ -4989,11 +5221,10 @@ bool read_environment(void) {
 }
 ```
 
-The setter creates a heap-backed `NAME=value` string. The storage helper
-replaces an existing string or extends the null-terminated
-[`environ`](library/stdlib/env.picoc#L4) array. The lookup returns a pointer to
-the value part, or `NULL` when absent. These complete functions show the
-setting and lookup path used by the loading policy:
+The complete setter and its storage helper show the heap ownership described
+above. [`store_environment_variable()`](library/stdlib/env.picoc#L67) replaces
+an existing string or resizes [`environ`](library/stdlib/env.picoc#L4) for a new
+entry, preserving the final `NULL` sentinel:
 
 ```c
 int setenv(char *name, char *value, bool overwrite) {
@@ -5056,73 +5287,57 @@ int store_environment_variable(char *variable, int name_length) {
     environ[environment_index + 1] = NULL;
     return 0;
 }
-
-char *getenv(char *name) {
-    int name_length = environment_variable_length(name);
-    int index = environment_variable_index(name, name_length);
-
-    if (index == -1) {
-        return NULL;
-    }
-
-    return environ[index] + name_length + 1;
-}
 ```
 
-Both [`load()`](library/unistd/process.picoc#L17) and
-[`read()`](library/unistd/io.picoc#L6) test **presence**, not the string value.
-Even a present value of `false` enables a bar. Their complete wrappers below
-show the environment lookup, request initialization, and repeated syscalls.
-The loading choice comes from the caller's environment before the child has
-started. Kernel transfer progress then reads the respective request's
-`show_loading_bar` field:
+The **first inheritance step** is init's
+[`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31). The shell receives a
+stack copy of init's environment and obtains its own heap copy on startup.
+Its subsequent [`run()`](library/unistd/process.picoc#L31) calls pass its
+current environment to applications in the same way. The diagram assumes no
+process changes its environment except in the two explicitly modified
+branches. Each inheritance arrow uses the default `NULL` selection.
 
-```c
-int load(char *path) {
-    struct LoadProcessRequest request;
-    int result;
-
-    request.path = path;
-    request.show_loading_bar =
-        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
-    result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
-    while (result == SYSCALL_LOAD_PROCESS_CONTINUE) {
-        result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
-    }
-    return result;
-}
-
-int read(int file_descriptor, void *buffer, int count) {
-    struct IoRequest request;
-    int result;
-
-    request.file_descriptor = file_descriptor;
-    request.buffer = (char *)buffer;
-    request.count = count;
-    request.protect_uart_control = false;
-    request.show_loading_bar =
-        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
-    request.transferred = 0;
-    request.complete = false;
-
-    while (!request.complete) {
-        result = invoke_syscall(SYSCALL_READ, (int)&request);
-        if (result <= 0) {
-            if (result < 0 && request.transferred == 0) {
-                return -1;
-            }
-            return request.transferred;
-        }
-        request.transferred = request.transferred + result;
-    }
-    return request.transferred;
-}
+```mermaid
+flowchart LR
+    K["Kernel<br/>no environment object"] -->|direct kernel start helper| I0["Init startup<br/>empty environment"]
+    C["config/environment.txt<br/>PATH=/user"] -->|read_environment and setenv| I["Init heap environment<br/>PATH=/user<br/>PICOOS_LOADING_BAR=true when enabled"]
+    I0 -->|read configuration| I
+    I -->|run shell, NULL environment| S["Shell heap environment<br/>independent copies"]
+    S -->|run child, NULL environment| U["Unchanged branch<br/>keeps inherited environment"]
+    U -->|run child, NULL environment| UC["Child receives<br/>unchanged values"]
+    S -->|run child, NULL environment| R["Removal branch<br/>unsetenv PICOOS_LOADING_BAR"]
+    R -->|run child, NULL environment| RC["Child receives PATH<br/>loading-bar variable absent"]
+    S -->|run child, NULL environment| M["Change branch<br/>setenv PATH, /user:/test, true"]
+    M -->|run child, NULL environment| MC["Child receives<br/>PATH=/user:/test"]
 ```
 
-The inheritance choice happens in [`run()`](library/unistd/process.picoc#L31),
-not in [`load()`](library/unistd/process.picoc#L17). The wrapper passes the
-selected environment to the kernel, and startup copies it into the child's
-heap before calling its application entry:
+The modification branches correspond to the actual library calls
+[`unsetenv("PICOOS_LOADING_BAR")`](library/stdlib/env.picoc#L157) and
+[`setenv("PATH", "/user:/test", true)`](library/stdlib/env.picoc#L126).
+[`setenv()`](library/stdlib/env.picoc#L126) allocates one `NAME=value` string,
+replacing an existing entry or extending the null-terminated pointer array.
+[`getenv()`](library/stdlib/env.picoc#L115) returns the address of its value
+part, or `NULL` when absent. [`unsetenv()`](library/stdlib/env.picoc#L157)
+frees the removed string and shifts the remaining pointers and final sentinel.
+Neither operation changes the parent or already-started children. Future
+children receive the modified environment when started with the default
+selection. An explicit environment array can instead replace that selection,
+as in
+[`4.3.2.1 Concrete initial-stack example`](#4321-concrete-initial-stack-example).
+The remaining environment operations are listed in
+[`9.2.7.3 Environment operations in env.picoc`](#9273-environment-operations-in-envpicoc).
+
+The complete library and startup functions make the two copies visible.
+[`run()`](library/unistd/process.picoc#L31) selects the source array through
+[`current_environment()`](library/stdlib/env.picoc#L6). Kernel
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+passes it to [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125),
+which builds the child stack shown in
+[`4.3.2 Initial argc, argv, and envp`](#432-initial-argc-argv-and-envp).
+After dispatch, [`start_process()`](library/start/start.picoc#L7) reaches
+[`initialize_environment()`](library/stdlib/env.picoc#L97) and
+[`copy_environment_variable()`](library/stdlib/env.picoc#L20), so the child's
+heap holds new strings rather than pointers into the parent's memory:
 
 ```c
 bool run(int pid, char *arguments, char **environment) {
@@ -5168,14 +5383,7 @@ void initialize_environment(char **environment) {
     }
     environ[count] = NULL;
 }
-```
 
-The complete [`copy_environment_variable()`](library/stdlib/env.picoc#L20)
-helper makes the independent ownership explicit. Each
-string is newly allocated, including its terminator, rather than sharing the
-parent's string pointer:
-
-```c
 char *copy_environment_variable(char *variable) {
     int length = environment_variable_length(variable);
     int index = 0;
@@ -5194,16 +5402,47 @@ char *copy_environment_variable(char *variable) {
 }
 ```
 
-The kernel installs the child stack in
-[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125),
-called by [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
-after it validates the requested child. That caller is explained in
-[`Section 4.5.2, Changing a completed image from NEW to READY`](#452-changing-a-completed-image-from-new-to-ready).
-The complete stack-preparation function below shows the size calculation,
-child pointer tables, copied argument and environment strings, and final
-activation values. Its environment pointers address the child's copies:
+The kernel part of the chain below makes the first copy concrete.
+[`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+uses the supplied request, then calls
+[`store_process_arguments()`](kernel/process/process_arguments.picoc#L125)
+before setting the child's state to `READY`. The latter's excerpt preserves
+all environment sizing, pointer construction, string copies, and activation
+updates. Only argument-token parsing is omitted, since it is independent of
+environment inheritance:
 
 ```c
+bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
+    struct ProcessControlBlock *process;
+    struct FileDescriptorTable *file_descriptors;
+
+    // Only a newly created process can be started
+    process = find_process_by_pid(request->pid);
+    if (process == NULL ||
+        process->state != PROCESS_STATE_NEW) {
+        return false;
+    }
+
+    if (current_process() != NULL) {
+        file_descriptors = inherit_file_descriptors(
+            current_process()->file_descriptors
+        );
+        destroy_file_descriptor_table(process->file_descriptors);
+        process->file_descriptors = file_descriptors;
+    }
+
+    // Arguments and environment must be placed on the process stack first
+    store_process_arguments(
+        process,
+        request->arguments,
+        request->environment
+    );
+
+    // This makes the process eligible for scheduling
+    process->state = PROCESS_STATE_READY;
+    return true;
+}
+
 void store_process_arguments(
     struct ProcessControlBlock *process,
     char *arguments,
@@ -5228,9 +5467,7 @@ void store_process_arguments(
     int environment_index = 0;
     int path_cells;
     int environment_string_cells = 0;
-    // Current position in the original argument string
-    int source_index = 0;
-    char quote;
+    // ... Argument-token parser locals.
 
     // Counts the arguments, environment strings, and cells needed for the
     // initial process argument layout
@@ -5269,40 +5506,7 @@ void store_process_arguments(
         process->binary_path
     );
 
-    // Parses each whitespace-separated argument and copies it into process
-    // memory while adding a pointer to it in the argv table
-    while (arguments != NULL && arguments[source_index] != '\0') {
-        // Skips separators before the next argument
-        while (process_argument_is_space(arguments[source_index])) {
-            source_index = source_index + 1;
-        }
-
-        if (arguments[source_index] != '\0') {
-            // Stores a pointer to the separately stored copy of this argument
-            argv[argument_index] = string_target;
-            argument_index = argument_index + 1;
-
-            quote = '\0';
-            while (arguments[source_index] != '\0' &&
-                   (quote != '\0' ||
-                    !process_argument_is_space(arguments[source_index]))) {
-                if (quote == '\0' &&
-                    process_argument_is_quote(arguments[source_index])) {
-                    quote = arguments[source_index];
-                } else if (arguments[source_index] == quote) {
-                    quote = '\0';
-                } else {
-                    *string_target = arguments[source_index];
-                    string_target = string_target + 1;
-                }
-                source_index = source_index + 1;
-            }
-
-            // Terminates the copied argument as a C string
-            *string_target = '\0';
-            string_target = string_target + 1;
-        }
-    }
+    // ... Parse/copy argument tokens and advance string_target past them.
 
     environment_index = 0;
     while (environment_index < environment_count) {
@@ -5321,16 +5525,128 @@ void store_process_arguments(
 }
 ```
 
-The resulting chain is init's environment → shell's initial stack → shell's
-heap, then shell's environment → application's initial stack → application's
-heap. No persistent kernel environment object is shared along that chain.
+##### 4.4.2.1.2 Loading-bar environment variable
+[\[↑ TOC\]](#contents)
 
-[`cat`](user/cat.picoc#L104), [`cp`](user/cp.picoc#L16), and
-[`sed`](user/sed.picoc#L67) remove the variable from their own environment before
-repeated file reads. The excerpt keeps the surrounding `cat` entry and the
-relevant read loop visible. [`copy_file_descriptor()`](user/cat.picoc#L35) requests up to 64 cells on
-each iteration, so the removal prevents repeated progress bars among file
-contents:
+[`PICOOS_LOADING_BAR`](common/loading_bar.header#L5) is a concrete policy
+propagated through that environment chain. The
+[`loading_bar_enabled`](config/config.header#L5) flag is separately compiled
+into bootloader, kernel, and init. The bootloader uses its copy while receiving
+the kernel, and the kernel uses its copy while receiving init. Those early
+transfers do not create a userspace environment variable. Init reads the
+configuration before adding this setting. Its complete
+[`main()`](system/init.picoc#L100) shows the call to
+[`read_environment()`](system/init.picoc#L19), the conditional
+[`setenv()`](library/stdlib/env.picoc#L126), and the subsequent shell
+load/start/wait cycle:
+
+```c
+int main(void) {
+    int shell_pid;
+
+    if (!read_environment()) {
+        return 1;
+    }
+    if (loading_bar_enabled) {
+        if (setenv(
+                LOADING_BAR_ENVIRONMENT_VARIABLE,
+                "true",
+                true
+            ) != 0) {
+            init_write_error("init: could not configure loading bar\n");
+            return 1;
+        }
+    }
+
+    while (true) {
+        shell_pid = load("./user/shell.bin");
+        if (shell_pid == 0) {
+            init_write_error("init: could not load shell\n");
+            return 1;
+        }
+
+        if (!run(shell_pid, NULL, NULL)) {
+            init_write_error("init: could not start shell\n");
+            return 1;
+        }
+
+        waitpid(shell_pid);
+    }
+}
+```
+
+The subsequent init-to-shell and shell-to-application start operations copy
+that entry. Both [`load()`](library/unistd/process.picoc#L17) and
+[`read()`](library/unistd/io.picoc#L6) test its **presence**, not its value.
+Even a value of `false` enables progress output. The wrappers write the
+result of `getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL` into
+[`LoadProcessRequest.show_loading_bar`](common/syscall.header#L52) or
+[`IoRequest.show_loading_bar`](common/file.header#L36). The kernel reads
+those request fields when receiving an executable or host-file data.
+Loading a child uses the caller's policy before that child has started.
+
+The complete lookup and wrappers connect the environment entry to both
+request fields. [`getenv()`](library/stdlib/env.picoc#L115) returns `NULL` only
+when the name is absent. [`load()`](library/unistd/process.picoc#L17) reuses its
+request for continuation calls, while [`read()`](library/unistd/io.picoc#L6)
+tracks transferred cells and completion:
+
+```c
+char *getenv(char *name) {
+    int name_length = environment_variable_length(name);
+    int index = environment_variable_index(name, name_length);
+
+    if (index == -1) {
+        return NULL;
+    }
+
+    return environ[index] + name_length + 1;
+}
+
+int load(char *path) {
+    struct LoadProcessRequest request;
+    int result;
+
+    request.path = path;
+    request.show_loading_bar =
+        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
+    result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
+    while (result == SYSCALL_LOAD_PROCESS_CONTINUE) {
+        result = invoke_syscall(SYSCALL_LOAD_PROCESS, (int)&request);
+    }
+    return result;
+}
+
+int read(int file_descriptor, void *buffer, int count) {
+    struct IoRequest request;
+    int result;
+
+    request.file_descriptor = file_descriptor;
+    request.buffer = (char *)buffer;
+    request.count = count;
+    request.protect_uart_control = false;
+    request.show_loading_bar =
+        getenv(LOADING_BAR_ENVIRONMENT_VARIABLE) != NULL;
+    request.transferred = 0;
+    request.complete = false;
+
+    while (!request.complete) {
+        result = invoke_syscall(SYSCALL_READ, (int)&request);
+        if (result <= 0) {
+            if (result < 0 && request.transferred == 0) {
+                return -1;
+            }
+            return request.transferred;
+        }
+        request.transferred = request.transferred + result;
+    }
+    return request.transferred;
+}
+```
+
+[`cat`](user/cat.picoc#L104) disables bars before selecting its input path.
+Its entry and [`copy_file_descriptor()`](user/cat.picoc#L35) loop below show
+why subsequent reads see the removal:
 
 ```c
 int main(int argc, char **argv) {
@@ -5377,10 +5693,19 @@ int copy_file_descriptor(int file_descriptor) {
 }
 ```
 
-[`unsetenv()`](library/stdlib/env.picoc#L157) frees the calling process's
-heap-backed entry and shifts the remaining pointers, including the final
-`NULL`, over the removed slot. Its complete implementation shows why later
-lookups no longer find the variable:
+Its [`copy_file_descriptor()`](user/cat.picoc#L35) loop calls
+[`read()`](library/unistd/io.picoc#L6) repeatedly with
+[`CAT_BUFFER_SIZE`](user/cat.picoc#L9), currently 64 cells. A progress bar for
+each host-file read would interrupt the displayed file contents. Removing
+the variable makes those reads request no bar. It also disables bars for any
+later loads by that process. The shell and init retain their own copies.
+[`cp`](user/cp.picoc#L16) and [`sed`](user/sed.picoc#L67) apply the same policy
+before repeated file reads. The shell's bar while initially loading cat is
+controlled by the shell environment, so cat's later removal cannot suppress it.
+
+The complete [`unsetenv()`](library/stdlib/env.picoc#L157) implementation
+frees the calling process's string and shifts its pointer array. The inherited
+copies in init and the shell are independent and remain valid:
 
 ```c
 int unsetenv(char *name) {
@@ -5401,13 +5726,28 @@ int unsetenv(char *name) {
 }
 ```
 
-Because the child owns its environment copies, this removal does not change
-init or the shell. Subsequent calls to
-[`read()`](library/unistd/io.picoc#L6) therefore set `show_loading_bar = false`.
-The environment library's other operations are listed in
-[`Section 9.2.7.3, Environment operations in env.picoc`](#9273-environment-operations-in-envpicoc).
+#### 4.4.2.2 Run function reference
+[\[↑ TOC\]](#contents)
 
-### 4.6.2 Recording termination status
+These functions validate the start request and construct its stack layout.
+The syscall-backed start helper appears before its internal parsing and copying
+helpers. Descriptor-copy implementation details remain in
+[`7.6 File-descriptor creation, inheritance, duplication, and cleanup`](#76-file-descriptor-creation-inheritance-duplication-and-cleanup).
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`mark_process_ready_with_arguments(request)`](kernel/process/process_arguments.picoc#L241) | true after setup, false for missing PID or [`state`](kernel/process/process.header#L33) other than [`NEW`](kernel/process/process.header#L12) | Copies current caller descriptors when present, writes the child stack, updates [`activation.sp`](kernel/process/process.header#L25) and [`activation.baf`](kernel/process/process.header#L26), then sets [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13). Init keeps its original table because no current process exists | [`current_process()`](kernel/process/process.picoc#L62), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99), [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) | **Library functions:** [`run()`](library/unistd/process.picoc#L31) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16), [`main()`](kernel/kernel.picoc#L31) in `kernel/kernel.picoc` |
+| <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> |
+| [`store_process_arguments(process, arguments, environment)`](kernel/process/process_arguments.picoc#L125) | No return value | Copies path, tokens, and selected NAME=value strings into the child User Process Stack, writes entry PC/count/arrays/NULL sentinels, and saves [`activation.sp`](kernel/process/process.header#L25) and [`activation.baf`](kernel/process/process.header#L26) | [`copy_process_string()`](kernel/process/process_arguments.picoc#L113), [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5), [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`process_environment_count()`](kernel/process/process_arguments.picoc#L89), [`process_string_cell_count()`](kernel/process/process_arguments.picoc#L103) | **Kernel functions:** [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) |
+| [`process_argument_token_count(arguments)`](kernel/process/process_arguments.picoc#L14) | Number of argument tokens, 0 for NULL | Reads the raw string, treating space/tab outside matching quotes as separators | [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5) | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`process_argument_string_cell_count(arguments)`](kernel/process/process_arguments.picoc#L51) | Copied argument characters plus one terminator per token, 0 for NULL | Counts the exact argument-string cells after matching quote removal | [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5) | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`process_argument_is_space(value)`](kernel/process/process_arguments.picoc#L5) | true for space or tab, otherwise false | Classifies one input character, no writes | None | **Kernel functions:** [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`process_argument_is_quote(value)`](kernel/process/process_arguments.picoc#L9) | true for single or double quote, otherwise false | Classifies one input character, no writes | None | **Kernel functions:** [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`process_environment_count(environment)`](kernel/process/process_arguments.picoc#L89) | Number of entries before NULL, 0 for NULL array | Reads the selected environment pointer array | None | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`process_string_cell_count(value)`](kernel/process/process_arguments.picoc#L103) | Number of character cells including the zero terminator | Reads one null-terminated string | None | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+| [`copy_process_string(target, source)`](kernel/process/process_arguments.picoc#L113) | Address of the first cell after the copied zero terminator | Copies a string and its terminator to the destination stack area | None | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
+
+#### 4.4.2.3 Recording termination status
 [\[↑ TOC\]](#contents)
 
 A normal [`exit()`](library/stdlib/exit.picoc#L3), fatal signal or CPU exception,
@@ -5419,36 +5759,46 @@ terminating process's children, stores the supplied status in
 [`ZOMBIE`](kernel/process/process.header#L17), and wakes the process's
 [`waiters`](kernel/process/process.header#L46). Section
 [6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid) traces the
-status pointer and wakeup; [Section 6.2.1, Supported signals and fixed
+status pointer and wakeup. [Section 6.2.1, Supported signals and fixed
 actions](#621-supported-signals-and-fixed-actions) and [Section 2.8, CPU
 exceptions and runtime errors](#28-cpu-exceptions-and-runtime-errors) define
 the non-normal status values.
 
 For normal completion, [`start_process()`](library/start/start.picoc#L7) passes
 the application entry point's return value to
-[`exit()`](library/stdlib/exit.picoc#L3); explicit unloading uses the success
+[`exit()`](library/stdlib/exit.picoc#L3). Explicit unloading uses the success
 status and then forces removal.
 
-### 4.6.3 Parent collection and final removal
+When a parent terminates,
+[`orphan_and_signal_children()`](kernel/process/process.picoc#L279) changes each
+direct child's [`parent_pid`](kernel/process/process.header#L57) to 0. It
+immediately removes children already in [`state`](kernel/process/process.header#L33)
+[`ZOMBIE`](kernel/process/process.header#L17). A live child instead receives its
+configured [`parent_death_signal`](kernel/process/process.header#L59) if nonzero.
+PicoOS does not reparent these children to init.
+[`6.2 Process Signals`](#62-process-signals) explains delivery and deferred
+termination. Final status collection and deletion are often called *reaping*
+in Unix literature. The next subsection follows both collection orderings.
+
+#### 4.4.2.4 Parent collection and final removal
 [\[↑ TOC\]](#contents)
 
 The order of [`waitpid()`](library/sys/wait/wait.picoc#L14) and child
 termination decides which kernel path deletes the child PCB. Deletion is not a
 later dispatcher task in either case.
 
-| Lifecycle order | Status handoff and child state | Who deletes the child PCB, and when |
+| Lifecycle order | Status handoff and child [`state`](kernel/process/process.header#L33) | Who deletes the child PCB, and when |
 | --- | --- | --- |
-| Parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) while child is alive | [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) links the parent PCB into the child's [`waiters`](kernel/process/process.header#L46) queue and blocks it. Child termination writes through the parent's [`waiting_status_ptr`](kernel/process/process.header#L44) and wakes it. | [`terminate_process()`](kernel/process/process.picoc#L304) calls [`remove_process()`](kernel/process/process.picoc#L209) directly after the status handoff because [`process_has_waiting_parent()`](kernel/process/process.picoc#L249) was true. Deletion occurs inside termination, not during later dispatch; for self-exit it precedes the [`exit_process()`](kernel/process/process.picoc#L430) dispatch. |
-| Child terminates before parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) | The complete child PCB remains [`ZOMBIE`](kernel/process/process.header#L17), retaining [`pid`](kernel/process/process.header#L32), [`parent_pid`](kernel/process/process.header#L57), [`exit_status`](kernel/process/process.header#L60), and owned resources. | The later syscall reaches [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), which copies [`exit_status`](kernel/process/process.header#L60) to the stack-local status and immediately calls [`remove_process()`](kernel/process/process.picoc#L209) before returning. |
-| No live parent remains | No future caller can collect the status. | [`terminate_process()`](kernel/process/process.picoc#L304) removes an orphan immediately; [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) also removes children that were already zombies when their parent terminates. |
+| Parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) while child is alive | [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) links the parent PCB into the child's [`waiters`](kernel/process/process.header#L46) queue and blocks it. Child termination writes through the parent's [`waiting_status_ptr`](kernel/process/process.header#L44) and wakes it. | [`terminate_process()`](kernel/process/process.picoc#L304) calls [`remove_process()`](kernel/process/process.picoc#L209) directly after the status handoff because [`process_has_waiting_parent()`](kernel/process/process.picoc#L249) was true. Deletion occurs inside termination, not during later dispatch. For self-exit it precedes the [`exit_process()`](kernel/process/process.picoc#L430) dispatch. |
+| Child terminates before parent calls [`waitpid()`](library/sys/wait/wait.picoc#L14) | The complete child PCB remains allocated with [`state`](kernel/process/process.header#L33) set to [`ZOMBIE`](kernel/process/process.header#L17), retaining [`pid`](kernel/process/process.header#L32), [`parent_pid`](kernel/process/process.header#L57), [`exit_status`](kernel/process/process.header#L60), and owned resources. | The later syscall reaches [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), which copies [`exit_status`](kernel/process/process.header#L60) to the stack-local status and immediately calls [`remove_process()`](kernel/process/process.picoc#L209) before returning. |
+| No live parent remains | No future caller can collect the status. | [`terminate_process()`](kernel/process/process.picoc#L304) removes an orphan immediately. [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) also removes children that were already zombies when their parent terminates. |
 
 PicoOS keeps the complete zombie PCB because it has no smaller exit-status
 record. Section [6.1.2, Child Waiting with `waitpid`](#612-child-waiting-with-waitpid)
 shows where the suspended request lives, how the child-owned queue reaches the
 parent, and how the resumed call returns the status.
 
-Explicit unloading also removes an uncollected zombie, and the test reset
-helper removes selected PCBs directly. Final removal unlinks the PCB from its
+Explicit unloading also removes an uncollected zombie. Final removal unlinks the PCB from its
 wait queue and the process list, releases shared-memory attachments, and calls
 [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) for any
 unfinished load. A retained zombie can therefore retain the partial image of
@@ -5461,49 +5811,34 @@ explains how releasing the attachments affects shared-memory entries.
 table, and frees the PCB-owned paths and the PCB with
 [`kfree()`](kernel/kmalloc.picoc#L38).
 
-## 4.7 Process list, PCB metadata, and lifecycle function reference
+## 4.5 Process list, PCB metadata, and lifecycle function reference
 [\[↑ TOC\]](#contents)
 
-Process management is split between global process-list operations, PCB
-metadata, and lifecycle operations collected here and the loading and
-run-setup operations in the next section. This table covers traversal and
-updates of the global process list, process heap queries, process state,
-parent-child relationships, and final PCB removal. Wait-queue operations have
-their own reference in
-[Section 6, Blocking, wait queues, signals, and mutexes](#6-blocking-wait-queues-signals-and-mutexes).
+These kernel operations manage process-list roots, lookups, metadata queries,
+termination, and final removal. Loading-specific operations are collected in
+[`4.4.1.1 Load function reference`](#4411-load-function-reference), and starting
+operations in [`4.4.2.2 Run function reference`](#4422-run-function-reference).
+Wait-queue operations have their separate reference in
+[`6.1.3 Wait Queue Function Reference`](#613-wait-queue-function-reference).
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`find_process_by_pid(pid)`](kernel/process/process.picoc#L162), [`list_processes(void)`](kernel/process/process.picoc#L32) | Return a PCB or `NULL`, list function returns no value | Read/traverse the process list, the list function writes each PID/path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217)<br>**Host requests from `list_processes`:** regular-file descriptor 1 uses `write-at <offset> <path>`, optional append `file-size <path>`, then `write stdout`, a copied terminal-stderr entry uses `write stderr` then `write stdout`, terminal-stdout/null output needs none | **Library functions:** [`list_processes()`](library/unistd/process.picoc#L51)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) (for [`list_processes()`](kernel/process/process.picoc#L32)) |
-| [`terminate_process(process, status)`](kernel/process/process.picoc#L304), [`exit_process(status)`](kernel/process/process.picoc#L430), [`unload_process_by_pid(pid)`](kernel/process/process.picoc#L328) | Termination returns no value, [`exit_process()`](kernel/process/process.picoc#L430) does not return normally, unload returns `true` on removal, `false` for a missing or current PID | Store status, set the PCB state to [`ZOMBIE`](kernel/process/process.header#L17), wake waiters, and remove the PCB when permitted | [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`process_has_waiting_parent()`](kernel/process/process.picoc#L249), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261), [`remove_process()`](kernel/process/process.picoc#L209), [`terminate_process()`](kernel/process/process.picoc#L304), [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`shutdown()`](kernel/kernel.picoc#L15) | **Library functions:** [`unload()`](library/unistd/process.picoc#L47)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) (for [`unload_process_by_pid()`](kernel/process/process.picoc#L328))<br>**CPU exceptions:** via [`handle_cpu_exception()`](kernel/exception.picoc#L70) (for [`exit_process()`](kernel/process/process.picoc#L430)) |
-| [`process_heap_start(void)`](kernel/process/process.picoc#L418), [`process_heap_size(void)`](kernel/process/process.picoc#L424) | Return current process's absolute heap start or heap size | Read current PCB memory fields only | [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`malloc()`](library/stdlib/malloc.picoc#L35)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-|  |  |  |  |  |
-| [`initialize_process_table(void)`](kernel/process/process.picoc#L21) | Returns no value | Resets process-list globals and the next PID | — | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`create_process(base_address, size, code_start, data_start, heap_start, heap_size, binary_path)`](kernel/process/process.picoc#L89) | Returns a PCB pointer, kernel-heap exhaustion halts the OS | Allocates and initializes a PCB, paths, descriptor table, embedded queues, and list link, copies the parent's working directory or uses `/` when there is no parent | [`kmalloc()`](kernel/kmalloc.picoc#L23), [`current_process()`](kernel/process/process.picoc#L62), [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35) | **Kernel functions:** [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`first_process(void)`](kernel/process/process.picoc#L28), [`current_process(void)`](kernel/process/process.picoc#L62) | Return the head or active PCB, possibly `NULL` | Read process-list globals only | — | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L146), [`create_process()`](kernel/process/process.picoc#L89), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L163), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`exit_process()`](kernel/process/process.picoc#L430), [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156), [`handle_syscall()`](kernel/syscall.picoc#L16), [`list_processes()`](kernel/process/process.picoc#L32), [`load_process_chunk()`](kernel/process/process_loader.picoc#L292), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`process_heap_size()`](kernel/process/process.picoc#L424), [`process_heap_start()`](kernel/process/process.picoc#L418), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268), [`send_signal_to_process()`](kernel/signal.picoc#L75), [`set_foreground_process()`](kernel/signal.picoc#L148), [`set_parent_death_signal()`](kernel/signal.picoc#L137), [`terminal_input_process()`](kernel/signal.picoc#L178), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
-| [`set_current_process(process)`](kernel/process/process.picoc#L66) | Returns no value | Replaces the active PCB global | — | **Kernel functions:** [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
-| [`remove_process(process)`](kernel/process/process.picoc#L209) | Returns no value | Final destructor: unlinks queues/list and releases image, attachments, descriptor table, strings, and PCB | [`remove_from_wait_queue()`](kernel/process/process.picoc#L176), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`terminate_process()`](kernel/process/process.picoc#L304), [`unload_process_by_pid()`](kernel/process/process.picoc#L328), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
-| [`orphan_and_signal_children(parent)`](kernel/process/process.picoc#L279), [`wake_parent_waiting_for_process(process, status)`](kernel/process/process.picoc#L261) | Return no value | Update child parent fields or parent wait status/queue | [`remove_process()`](kernel/process/process.picoc#L209), [`send_signal_to_process()`](kernel/signal.picoc#L75), [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
-
-## 4.8 Process-loader and run-setup function reference
-[\[↑ TOC\]](#contents)
-
-Loading reserves memory, copies the executable image, and creates the PCB that
-represents the new process with its state set to
-[`NEW`](kernel/process/process.header#L12). Run setup later installs inherited
-descriptors and startup data, then changes the process state to
-[`READY`](kernel/process/process.header#L13) so the scheduler may select it.
-The table separates the operations that prepare the image and create the PCB
-from the operations that make the represented process eligible for scheduling.
-
-| Kernel function | Return value / status | Effects | Calls | Called by |
-| --- | --- | --- | --- | --- |
-| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Returns a positive PID on completion, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L48) (-1) while work remains | Starts or advances the caller's load, DMA blocks for the full payload, polling receives at most 1 KiB per continuation, creates a [`NEW`](kernel/process/process.header#L12) PCB on completion | [`current_process()`](kernel/process/process.picoc#L62), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227)<br>**Host requests:** `file-size <path>`, then one or more `read-range <offset> <count> <path>` requests | **Library functions:** [`load()`](library/unistd/process.picoc#L17)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`mark_process_ready_with_arguments(request)`](kernel/process/process_arguments.picoc#L241) | Returns `true` after run setup, `false` for a missing PID or a PCB that is not [`NEW`](kernel/process/process.header#L12) | Installs inherited descriptors, stores startup data, and changes [`NEW`](kernel/process/process.header#L12) to [`READY`](kernel/process/process.header#L13) | [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`current_process()`](kernel/process/process.picoc#L62), [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) | **Library functions:** [`run()`](library/unistd/process.picoc#L31)<br>**System calls:** via [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-|  |  |  |  |  |
-| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | Returns PID, or 0 on failure | Resolves the boot-time path from PicoOS `/`, performs the continuous transfer, and creates a [`NEW`](kernel/process/process.header#L12) PCB | [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`receive_word()`](common/uart_protocol.picoc#L7), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`create_process()`](kernel/process/process.picoc#L89)<br>**Host request:** `load <path>` | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
-| [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) | Returns no value | Cancels an active DMA load if necessary, clears the caller's pending-load pointer and frees the partial image, copied path, and metadata | [`dma_transfer_status()`](common/dma.picoc#L21), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`free_process_load()`](kernel/process/process_loader.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`remove_process()`](kernel/process/process.picoc#L209) |
-| [`store_process_arguments(process, arguments, environment)`](kernel/process/process_arguments.picoc#L125) | Returns no value | Writes initial stack/tables/strings into the image and sets activation [`sp`](kernel/process/process.header#L25)/[`baf`](kernel/process/process.header#L26) | [`process_argument_token_count()`](kernel/process/process_arguments.picoc#L14), [`process_environment_count()`](kernel/process/process_arguments.picoc#L89), [`process_string_cell_count()`](kernel/process/process_arguments.picoc#L103), [`process_argument_string_cell_count()`](kernel/process/process_arguments.picoc#L51), [`copy_process_string()`](kernel/process/process_arguments.picoc#L113), [`process_argument_is_space()`](kernel/process/process_arguments.picoc#L5), [`process_argument_is_quote()`](kernel/process/process_arguments.picoc#L9) | **Kernel functions:** [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241) |
+| [`list_processes(void)`](kernel/process/process.picoc#L32) | No return value | Traverses the process list and writes each PID and stable binary path through descriptor 1 | [`first_process()`](kernel/process/process.picoc#L28), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_append_decimal()`](common/uart_protocol.picoc#L26), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217)<br>**Host requests:** Output through a regular file uses `write-at <offset> <path>`, optional append `file-size <path>`, then `write stdout`. Terminal stderr uses `write stderr`, then `write stdout`. Terminal stdout or null needs no host request | **Library functions:** [`list_processes()`](library/unistd/process.picoc#L51) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**User applications:** [`main()`](user/ps.picoc#L11) in `user/ps.picoc` |
+| [`unload_process_by_pid(pid)`](kernel/process/process.picoc#L328) | true after removal, false for a missing or currently active PID | Terminates with success status and forces final removal, including an uncollected zombie | [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`remove_process()`](kernel/process/process.picoc#L209), [`terminate_process()`](kernel/process/process.picoc#L304) | **Library functions:** [`unload()`](library/unistd/process.picoc#L47) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`exit_process(status)`](kernel/process/process.picoc#L430) | Does not return normally | Terminates the current process and dispatches another process, shuts down if none remain | [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`shutdown()`](kernel/kernel.picoc#L15), [`terminate_process()`](kernel/process/process.picoc#L304) | **Library functions:** [`exit()`](library/stdlib/exit.picoc#L3) via the syscall<br>**Kernel functions:** [`handle_cpu_exception()`](kernel/exception.picoc#L70), [`handle_process_heap_full_exception()`](kernel/exception.picoc#L82), [`handle_syscall()`](kernel/syscall.picoc#L16)<br>**CPU exceptions:** through [`handle_cpu_exception()`](kernel/exception.picoc#L70) |
+| [`process_heap_start(void)`](kernel/process/process.picoc#L418) | Absolute current-process heap address | Adds [`base_address`](kernel/process/process.header#L34) to [`heap_start`](kernel/process/process.header#L36), no writes | [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`init_process_heap()`](library/stdlib/malloc.picoc#L18) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`process_heap_size(void)`](kernel/process/process.picoc#L424) | Current-process heap cell count | Reads [`heap_size`](kernel/process/process.header#L37), no writes | [`current_process()`](kernel/process/process.picoc#L62) | **Library functions:** [`init_process_heap()`](library/stdlib/malloc.picoc#L18) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> |
+| [`initialize_process_table(void)`](kernel/process/process.picoc#L21) | No return value | Clears head, tail, and [`active_process`](kernel/process/process.picoc#L18), resets [`next_process_id`](kernel/process/process.picoc#L19) to 1 | None | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) in `kernel/kernel.picoc` |
+| [`first_process(void)`](kernel/process/process.picoc#L28) | Head PCB pointer or NULL | Reads [`process_list_head`](kernel/process/process.picoc#L16) | None | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), [`list_processes()`](kernel/process/process.picoc#L32) in `kernel/process/process.picoc`, [`scheduler_next_process()`](kernel/scheduler.picoc#L12) |
+| [`current_process(void)`](kernel/process/process.picoc#L62) | Current PCB pointer or NULL | Reads [`active_process`](kernel/process/process.picoc#L18) | None | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L146), [`create_process()`](kernel/process/process.picoc#L89), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43), [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L163), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`exit_process()`](kernel/process/process.picoc#L430), [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156), [`handle_syscall()`](kernel/syscall.picoc#L16), [`load_process_chunk()`](kernel/process/process_loader.picoc#L292), [`map_shared_memory()`](kernel/shared_memory.picoc#L130), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`process_heap_size()`](kernel/process/process.picoc#L424), [`process_heap_start()`](kernel/process/process.picoc#L418), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268), [`send_signal_to_process()`](kernel/signal.picoc#L75), [`set_foreground_process()`](kernel/signal.picoc#L148) in `kernel/signal.picoc`, [`set_parent_death_signal()`](kernel/signal.picoc#L137), [`terminal_input_process()`](kernel/signal.picoc#L178), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
+| [`set_current_process(process)`](kernel/process/process.picoc#L66) | No return value | Replaces [`active_process`](kernel/process/process.picoc#L18) | None | **Kernel functions:** [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
+| [`find_process_by_pid(pid)`](kernel/process/process.picoc#L162) | Matching PCB pointer or NULL | Traverses [`process_list_head`](kernel/process/process.picoc#L16) through PCB next | None | **Kernel functions:** [`handle_terminal_signal_character()`](kernel/signal.picoc#L192), [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241), [`send_signal_by_pid()`](kernel/signal.picoc#L108), [`set_foreground_process()`](kernel/signal.picoc#L148) in `kernel/signal.picoc`, [`terminal_input_process()`](kernel/signal.picoc#L178), [`terminate_process()`](kernel/process/process.picoc#L304), [`unload_process_by_pid()`](kernel/process/process.picoc#L328), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
+| [`terminate_process(process, status)`](kernel/process/process.picoc#L304) | No return value, no effect for NULL or an existing zombie | Handles children, records [`exit_status`](kernel/process/process.header#L60), sets [`state`](kernel/process/process.header#L33) [`ZOMBIE`](kernel/process/process.header#L17), hands off status and wakes [`waiters`](kernel/process/process.header#L46), removes the PCB when no parent remains or its waiting parent received the status | [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`process_has_waiting_parent()`](kernel/process/process.picoc#L249), [`remove_process()`](kernel/process/process.picoc#L209), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) | **Kernel functions:** [`exit_process()`](kernel/process/process.picoc#L430), [`kill_process()`](kernel/signal.picoc#L71), [`unload_process_by_pid()`](kernel/process/process.picoc#L328) |
+| [`remove_process(process)`](kernel/process/process.picoc#L209) | No return value, no effect when absent from the list | Unlinks queue and process-list membership, adjusts list roots, releases shared mappings, cancels partial loading, frees Process Payload, descriptor objects, PCB-owned strings and PCB | [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`destroy_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L118), [`kfree()`](kernel/kmalloc.picoc#L38), [`release_process_shared_memory()`](kernel/shared_memory.picoc#L172), [`remove_from_wait_queue()`](kernel/process/process.picoc#L176) | **Kernel functions:** [`orphan_and_signal_children()`](kernel/process/process.picoc#L279), [`terminate_process()`](kernel/process/process.picoc#L304), [`unload_process_by_pid()`](kernel/process/process.picoc#L328), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
+| [`orphan_and_signal_children(parent)`](kernel/process/process.picoc#L279) | No return value | Sets direct children [`parent_pid`](kernel/process/process.header#L57) to 0, removes existing zombies, signals live children when [`parent_death_signal`](kernel/process/process.header#L59) is nonzero | [`remove_process()`](kernel/process/process.picoc#L209), [`send_signal_to_process()`](kernel/signal.picoc#L75) | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
+| [`process_has_waiting_parent(process)`](kernel/process/process.picoc#L249) | true when the recorded parent is in the child [`waiters`](kernel/process/process.header#L46) queue, otherwise false | Scans the child [`waiters`](kernel/process/process.header#L46) queue through [`wait_next`](kernel/process/process.header#L51) | None | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
+| [`wake_parent_waiting_for_process(process, status)`](kernel/process/process.picoc#L261) | No return value | Writes the status through the parent [`waiting_status_ptr`](kernel/process/process.header#L44) when supplied, clears that pointer, and wakes all child [`waiters`](kernel/process/process.header#L46) | [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Kernel functions:** [`terminate_process()`](kernel/process/process.picoc#L304) |
 
 # 5. Scheduling and context switching
 [\[↑ TOC\]](#contents)
@@ -6165,7 +6500,7 @@ The local status variable remains valid because the parent's userspace stack
 is suspended while it is blocked. If the child exits before the call, it
 remains a [`ZOMBIE`](kernel/process/process.header#L17) with
 [`exit_status`](kernel/process/process.header#L60) until collected, as described
-in [Section 4.6.3, Parent collection and final removal](#463-parent-collection-and-final-removal).
+in [`4.4.2.4 Parent collection and final removal`](#4424-parent-collection-and-final-removal).
 Invalid PIDs and non-children produce `-1`. Exact-child waiting matters to
 [`init`](system/init.picoc#L100) and the
 [`shell`](user/shell.picoc#L1448) because a state change in another child must
@@ -6311,7 +6646,7 @@ path through [`kill_process()`](kernel/signal.picoc#L71). The
 [`SIGKILL`](common/signal.header#L5) by default, then yields after an accepted
 request. A signal status is `128 + signal_number`, normal exit passes the
 application's return value. CPU exceptions and explicit unloading supply the
-statuses described in [Section 4.6.2, Recording termination status](#462-recording-termination-status).
+statuses described in [`4.4.2.3 Recording termination status`](#4423-recording-termination-status).
 
 `Ctrl-C` follows the terminal-specific path in
 [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals):
@@ -6348,7 +6683,7 @@ If the parent has not waited yet, the child remains a zombie and preserves
 [`waitpid()`](library/sys/wait/wait.picoc#L14) returns that value and reaps the
 child. Final removal unlinks the PCB from any wait queue and releases its
 remaining resources as detailed in
-[Section 4.6.3, Parent collection and final removal](#463-parent-collection-and-final-removal).
+[`4.4.2.4 Parent collection and final removal`](#4424-parent-collection-and-final-removal).
 
 ### 6.2.4 Fixed PicoOS signal actions compared with Unix
 [\[↑ TOC\]](#contents)
@@ -7407,7 +7742,7 @@ periphery registers are not additional kernel-global allocations.
 | [`foreground_process_target`](kernel/signal.picoc#L12) | `int` | Signed process ID for terminal control: 0 means no registered owner, positive ID permits terminal signal delivery, negative ID retains input ownership while suppressing that delivery. It is not a PCB pointer |
 | [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART service-routine indices `{1, 4, 2}` copied into periphery configuration. They are not function pointers |
 | [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART priorities `{1, 1, 2}` used during controller initialization |
-| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. This kernel-image copy controls the init transfer. The separately linked bootloader and init images each have their own copy, as explained in [Section 4.6.1.1, Environment inheritance and loading-bar policy](#4611-environment-inheritance-and-loading-bar-policy) |
+| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. This kernel-image copy controls the init transfer. The separately linked bootloader and init images each have their own copy, as explained in [`4.4.2.1.2 Loading-bar environment variable`](#44212-loading-bar-environment-variable) |
 | [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) | `void (*[OS_INTERRUPT_VECTOR_COUNT])(void)` (5 entries) | `.ivt` array of syscall, timer, UART, exception and DMA handler addresses. The CPU reads these to enter kernel `.text` |
 
 The following example shows three PCBs and the three global pointers into the
@@ -8477,7 +8812,7 @@ Each valid record is copied into the process heap by
 `PATH=/user`. After reading it, init's separately compiled
 [`loading_bar_enabled`](config/config.header#L5) flag causes init to add
 [`PICOOS_LOADING_BAR=true`](common/loading_bar.header#L5). The variable's complete origin and child-inheritance
-path are explained in [Section 4.6.1.1, Environment inheritance and loading-bar policy](#4611-environment-inheritance-and-loading-bar-policy). The function
+path are explained in [`4.4.2.1.2 Loading-bar environment variable`](#44212-loading-bar-environment-variable). The function
 table relates configuration parsing and shell restarts to the libraries init uses.
 
 | Init function | Return value / status | Library functions |
@@ -8548,7 +8883,7 @@ exact child before starting another session. The userspace
 [`load()`](library/unistd/process.picoc#L17) wrapper invokes
 [`load_process_chunk()`](kernel/process/process_loader.picoc#L292), its separate
 polling and DMA flows are shown in
-[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
+[`4.4.1 Loading a Process (load library call)`](#441-loading-a-process-load-library-call).
 
 ### 10.3.4 Shell startup
 [\[↑ TOC\]](#contents)
@@ -8920,7 +9255,7 @@ For an external command, [`eval()`](user/shell.picoc#L1224) loads the image
 through [`load_from_path()`](user/shell.picoc#L1186), then calls
 [`run_process()`](user/shell.picoc#L1034) to expand arguments, apply redirections,
 and start the new process. Image transfer is described in
-[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
+[`4.4.1 Loading a Process (load library call)`](#441-loading-a-process-load-library-call).
 A foreground command receives terminal ownership while the shell waits for
 its exit or stop status, as explained in
 [Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals).
@@ -10240,7 +10575,7 @@ behind each topic, these are teaching mechanisms, with no deadline guarantees.
 
 | Real-time operating-systems lecture topic | What students can inspect in PicoOS |
 | --- | --- |
-| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`ProcessControlBlock`](kernel/process/process.header#L31) list, [Section 4.6, Parent-child relationships, termination, and collection](#46-parent-child-relationships-termination-and-collection) explains why termination and removal are separate steps |
+| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`ProcessControlBlock`](kernel/process/process.header#L31) list, [`4.4.2.4 Parent collection and final removal`](#4424-parent-collection-and-final-removal) explains why termination and removal are separate steps |
 | Scheduling and dispatching | The scheduler chooses a ready process, the dispatcher saves and restores its activation record |
 | [`waitpid()`](library/sys/wait/wait.picoc#L14), [`sleep()`](library/unistd/blocking.picoc#L9), and [`wakeup()`](library/unistd/blocking.picoc#L19) | A process blocks in a wait queue until a child, mutex, or other event wakes it |
 | Mutexes | [`mutex_lock()`](library/mutex/mutex.picoc#L18) blocks a contending process and [`mutex_unlock()`](library/mutex/mutex.picoc#L25) wakes a waiting process |
@@ -10387,7 +10722,7 @@ explanation.
 - non-preemptive kernel execution and deferred rescheduling, as explained in
   [Section 2.5.2, Kernel non-preemption and deferred rescheduling](#252-kernel-non-preemption-and-deferred-rescheduling)
 - fixed/default process heap and stack sizing with no dynamic stack growth, as
-  described in [Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack)
+  described in [`4.3 Initial User Process Stack`](#43-initial-user-process-stack)
 - limited formatting and scanning, shell parsing, and standard-library subsets,
   as described in [Section 9.2.9, stdio: streams, formatting, and scanning](#929-stdio-streams-formatting-and-scanning),
   [Section 11.4, Command parsing, expansion, and execution](#114-command-parsing-expansion-and-execution), and
@@ -10408,7 +10743,7 @@ explanation.
 [\[↑ TOC\]](#contents)
 
 [`hexyl`](https://github.com/sharkdp/hexyl) helps connect the process-image layout from
-[Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack) to the bytes in a
+[`3.2.1 Inside Process Payload A`](#321-inside-process-payload-a) to the bytes in a
 generated `.bin` file. Each RETI word occupies four file bytes in big-endian
 order. The first five words form a **20-byte loader header**, followed by the
 image payload. The table gives byte offsets for finding those header words,
