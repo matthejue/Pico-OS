@@ -4,6 +4,24 @@ This guide covers building and running PicoOS from a source checkout. Readers
 who only want to run a published version should use the release-archive steps
 in the main [README](../README.md#build-and-run).
 
+## Export the README as PDF
+
+The VS Code task `PicoOS: Create README PDF` runs the same export as this
+command from the repository root:
+
+```console
+$ make readme-pdf
+```
+
+The export requires Pandoc, XeLaTeX, Chromium, Yarn, and the DejaVu Serif and
+DejaVu Sans Mono fonts. The target installs Mermaid CLI into the ignored
+`.readme-pdf/` directory when needed. The
+[`Mermaid filter`](readme_pdf_mermaid.lua) renders diagrams as vector PDFs
+using the [`rendering configuration`](readme_pdf_mermaid.json), then XeLaTeX
+embeds them into `README.pdf`. The
+[`PDF header`](readme_pdf_header.tex) selects fonts and allows long code lines
+to wrap without changing the Markdown source.
+
 ## Build and boot from source
 
 The build expects `picoc_compiler`, `reti_emulator`, and `make` on `PATH`.
@@ -121,3 +139,9 @@ launcher/download-script variants at the archive root. The tagged-release job
 in [`.github/workflows/build.yml`](../.github/workflows/build.yml) performs the
 same release-tree build and verification, then publishes that archive as a
 GitHub release asset.
+
+## Documentation diagrams
+
+Follow the [visualization guidelines](visualization_guidelines.md) when editing
+README diagrams. They cover presentation layouts, choosing Mermaid or SVG,
+implementation checks, and a short rendering review.

@@ -17,6 +17,7 @@ README.txt
 *.ast
 *.rast
 *.json
+!documentation/readme_pdf_mermaid.json
 kernel/kernel.overview
 !/.vscode/
 !/.vscode/settings.json

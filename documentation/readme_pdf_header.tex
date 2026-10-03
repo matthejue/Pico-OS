@@ -1,4 +1,19 @@
 \usepackage{array}
 \usepackage{booktabs,longtable}
+\usepackage{fvextra}
+\usepackage{adjustbox}
+\newfontfamily\pdfcodefont{DejaVu Sans Mono}
+\newfontfamily\pdfsymbolfont{DejaVu Serif}
+\usepackage{newunicodechar}
+\AtBeginDocument{%
+  \newunicodechar{≥}{{\pdfsymbolfont\char"2265}}%
+  \newunicodechar{′}{{\pdfsymbolfont\char"2032}}%
+}
+% Leave room for the enclosing paragraph. A graphic as tall as \textheight
+% can prevent the page from being shipped out when line wrapping is active.
+\renewcommand{\pandocbounded}[1]{\adjustbox{max totalsize={\linewidth}{0.90\textheight}}{#1}}
+% Keep long compiler commands and generated headers inside the page while
+% preserving their single-line form in the Markdown source.
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines,breakanywhere,formatcom=\pdfcodefont}
 \setlength{\emergencystretch}{3em}
 \renewcommand{\arraystretch}{1.15}

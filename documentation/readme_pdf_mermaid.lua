@@ -1,14 +1,15 @@
 local output_directory = os.getenv("MERMAID_OUTPUT_DIR")
 local mermaid_cli = os.getenv("MERMAID_CLI") or ".readme-pdf/node_modules/.bin/mmdc"
+local mermaid_config = os.getenv("MERMAID_CONFIG") or "documentation/readme_pdf_mermaid.json"
 local diagram_number = 0
 local contents_targets = {}
 local contents_target_aliases = {
-    ["114-selecting-a-startup-function-with--c----startup-source"] = "#114-selecting-a-startup-function-with--c---startup-source",
-    ["1141-default-compiler-generated-_start"] = "#1141-default-compiler-generated-start",
+    ["115-selecting-a-startup-function-with--c----startup-source"] = "#115-selecting-a-startup-function-with--c---startup-source",
+    ["1151-default-compiler-generated-_start"] = "#1151-default-compiler-generated-start",
 }
 
 local function shell_quote(value)
-    return "'" .. value:gsub("'", "'\\\"'\\\"'") .. "'"
+    return "'" .. value:gsub("'", "'\"'\"'") .. "'"
 end
 
 function Header(header)
@@ -40,14 +41,17 @@ function CodeBlock(block)
     diagram_number = diagram_number + 1
     local basename = output_directory .. "/mermaid-" .. diagram_number
     local input_path = basename .. ".mmd"
-    local image_path = basename .. ".png"
+    -- Chromium prints Mermaid's SVG directly into a tightly cropped vector
+    -- PDF. XeLaTeX embeds that PDF without rasterizing labels or graph edges.
+    local image_path = basename .. ".pdf"
     local input_file = assert(io.open(input_path, "w"))
     input_file:write(block.text)
     input_file:close()
 
-    local command = mermaid_cli ..
+    local command = shell_quote(mermaid_cli) ..
         " --input " .. shell_quote(input_path) ..
         " --output " .. shell_quote(image_path) ..
+        " --configFile " .. shell_quote(mermaid_config) ..
         " --backgroundColor transparent"
     local success, _, status = os.execute(command)
     if not success then
@@ -75,7 +79,9 @@ function Table(table)
     latex = latex:gsub("\\textbf{([^}]*:)}", "\\newline\\textbf{%1}")
     latex = latex:gsub("(&%s*)\\newline", "%1")
     latex = latex:gsub("@{}[lcr]+@{}", columns)
-    return pandoc.RawBlock("latex", latex)
+    -- A longtable can break between rows, but never inside a row. Dense
+    -- function references need a smaller font to keep one row on the page.
+    return pandoc.RawBlock("latex", "\\begingroup\n\\footnotesize\n" .. latex .. "\n\\endgroup")
 end
 
 function Pandoc(document)

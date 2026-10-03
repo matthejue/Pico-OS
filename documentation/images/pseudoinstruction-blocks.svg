@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="245" viewBox="0 0 1100 245" role="img" aria-labelledby="title desc">
+<title id="title">Pseudoinstruction sizes determine label positions</title><desc id="desc">Entry contains 10 real instructions after expansion, work 7 and done 2. JUMP32 in entry skips work to done at offset 17. Blocks are proportional to their instruction counts.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#334155"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#172536">
+<polyline points="300,100 300,45 900,45 900,100" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<text x="600" y="30" font-size="23" text-anchor="middle" font-weight="bold" fill="#172536">JUMP32 done</text>
+<rect x="50" y="100" width="500" height="85" fill="#eaf4ff" stroke="#475569" stroke-width="2"/>
+<text x="300.0" y="134.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">entry</text>
+<text x="300.0" y="164.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">10 words</text>
+<polyline points="100,170 100,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="150,170 150,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="200,170 200,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="250,170 250,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="300,170 300,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="350,170 350,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="400,170 400,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="450,170 450,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="500,170 500,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<rect x="550" y="100" width="350" height="85" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="725.0" y="134.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">work</text>
+<text x="725.0" y="164.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">7 words</text>
+<polyline points="600,170 600,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="650,170 650,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="700,170 700,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="750,170 750,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="800,170 800,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<polyline points="850,170 850,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<rect x="900" y="100" width="100" height="85" fill="#fff2b2" stroke="#475569" stroke-width="2"/>
+<text x="950.0" y="134.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">done</text>
+<text x="950.0" y="164.5" font-size="21" text-anchor="middle" font-weight="normal" fill="#172536">2 words</text>
+<polyline points="950,170 950,185" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter"/>
+<text x="50" y="218" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">0</text>
+<text x="550" y="218" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">10</text>
+<text x="900" y="218" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">17</text>
+<text x="1000" y="218" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">19</text>
+<text x="50" y="243" font-size="17" text-anchor="start" font-weight="normal" fill="#172536">Instruction offsets after expansion</text>
+</g></svg>

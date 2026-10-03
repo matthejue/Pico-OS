@@ -50,25 +50,23 @@ repositories form the path from PicoC source to an executing operating system:
 - PicoOS provides the EPROM bootloader, kernel, libraries, init process, shell,
   user programs, and tests
 
-The following diagram follows source files through assembly and runtime loading.
-The three emphasized boxes are the main systems a reader encounters. The
-bootloader loads the kernel, then the kernel loader loads user programs.
+The overview separates compilation and assembly from booting. PicoOS source
+code written in PicoC provides two images: an EEPROM-resident bootloader and a
+kernel loaded into SRAM. The PicoC-Compiler links their RETI programs, and the
+RETI-Emulator both assembles the kernel binary and executes the bootloader.
+Reusable `.reti_blocks` and `.st` files can be linked with the source. Optional
+memory headers generated with `-k eprom` or `-k sram` supply constants for the
+corresponding source. They are separate from the linked `.sections` metadata.
 
-```mermaid
-flowchart LR
-    SRC["PicoOS Source"]:::focus --> CPL["PicoC Compiler"]:::focus
-    CPL --> ASM["linked RETI assembly"]
-    CPL --> SEC[".sections and generated memory constants"]
-    ASM --> EMU["RETI Emulator"]:::focus
-    SEC --> EMU
-    EMU --> BIN["five-word header + encoded .bin payload"]
-    HOST["UART host service"] -->|serves .bin files| BOOT["EPROM bootloader / kernel process loader"]
-    BIN --> HOST
-    BOOT -->|copy payload| SRAM["kernel/process images in SRAM"]
-    SRAM --> K["PicoOS kernel and userspace"]
+![PicoOS build and boot overview](documentation/images/picoos-build-boot.svg)
 
-    classDef focus fill:#fff2b2,stroke:#8a5a00,stroke-width:4px,color:#111
-```
+`-e` loads the RETI boot program into the emulator's EEPROM, called EPROM in
+its options and source. It does not preload the kernel into SRAM. The
+bootloader requests the separately assembled kernel binary through UART,
+consumes its header, copies its payload into SRAM, and starts the kernel. The
+exact formats and header-generation options are explained in
+[`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header)
+and [`1.1.9 Generated memory constants for the bootloader and kernel`](#119-generated-memory-constants-for-the-bootloader-and-kernel).
 
 The table below identifies what each part passes to the next, including runtime
 requests that are separate from the generated build files.
@@ -212,60 +210,14 @@ adapter. The prices below are the example parts-list prices used for this
 design, including VAT. They were last checked at DigiKey Germany on 12 August
 2026, component and shipping prices can change.
 
-The simplified circuit-style view below shows both the external wiring and the
-internal paths required by PicoOS. Both SRAM chips receive the same address and
-control signals. Their separate lower and upper 16-bit data buses form one
-32-bit SRAM datapath shared by the RETI CPU and DMA controller. UART remains an
-8-bit serial connection to the host, while FPGA logic assembles four received
-bytes into each 32-bit DMA word.
+The circuit view shows the host connection, FPGA logic, and the two SRAM chips
+in one system. The CPU and DMA controller share a 32-bit SRAM interface.
+Both chips receive the same address and control signals, while their separate
+16-bit data buses supply the lower and upper halves of each word. UART carries
+8-bit bytes, with a receive buffer assembling four bytes for each DMA word.
+The CPU configures the peripherals through memory-mapped I/O.
 
-```mermaid
-flowchart LR
-    subgraph FPGA["Alchitry Cu V2 FPGA"]
-        RETI["32-bit RETI CPU"]:::logic
-        INTC["Interrupt controller"]:::logic
-        TIMER["Instruction timer"]:::logic
-        UART["UART controller<br/>byte RX / TX"]:::logic
-        RXWORD["DMA receive buffer<br/>4 bytes → 32-bit word"]:::logic
-        DMA["UART-to-SRAM DMA controller<br/>registers 12–16"]:::logic
-        SRAMCTRL["SRAM controller<br/>CPU / DMA bus arbiter"]:::logic
-
-        RETI -->|mapping and priority MMIO| INTC
-        INTC -->|selected hardware interrupt| RETI
-        RETI -->|timer interval MMIO| TIMER
-        TIMER -->|timer interrupt request| INTC
-        RETI <-->|UART send, receive, and status MMIO| UART
-        UART -->|receive-ready when CPU owns receive path| INTC
-        UART -->|received bytes when DMA owns receive path| RXWORD
-        RXWORD -->|word and ready handshake| DMA
-        RETI <-->|DMA configuration and status MMIO| DMA
-        DMA -->|completion or error interrupt request| INTC
-        RETI -->|instruction and data request| SRAMCTRL
-        SRAMCTRL -->|read data and CPU ready| RETI
-        DMA -->|write address, data, and request| SRAMCTRL
-        SRAMCTRL -->|DMA grant| DMA
-    end
-
-    AC["A[17:0] address bus<br/>CE, OE, WE, and byte enables"]:::bus
-    LOW["SRAM 0<br/>256K × 16 bit<br/>lower word"]:::memory
-    HIGH["SRAM 1<br/>256K × 16 bit<br/>upper word"]:::memory
-    ADAPTER["CH340C USB-to-UART<br/>adapter"]:::adapter
-    HOST["Host USB"]:::host
-
-    SRAMCTRL -->|shared address and control lines| AC
-    AC --> LOW
-    AC --> HIGH
-    SRAMCTRL ==>|"lower data bus D[15:0]"| LOW
-    SRAMCTRL ==>|"upper data bus D[31:16]"| HIGH
-    UART <-->|"TX / RX, 8-bit serial bytes"| ADAPTER
-    ADAPTER <-->|USB| HOST
-
-    classDef logic fill:#eaf4ff,stroke:#174a7e,stroke-width:2px,color:#111
-    classDef memory fill:#fff8dc,stroke:#7a5b00,stroke-width:3px,color:#111
-    classDef adapter fill:#edf9ed,stroke:#266b2e,stroke-width:2px,color:#111
-    classDef host fill:#f5f5f5,stroke:#555,stroke-width:2px,color:#111
-    classDef bus fill:#fff,stroke:#444,stroke-width:1px,color:#111
-```
+![Intended physical hardware: host, FPGA, and shared SRAM](documentation/images/intended-hardware.svg)
 
 The UART interrupt line reports receive-ready events to the interrupt
 controller. Typed terminal characters commonly cause those events, but the
@@ -274,19 +226,10 @@ same interrupt can be caused by bytes returned by the companion host program.
 When DMA owns a receive transfer, the receive buffer supplies complete words
 to DMA instead of requiring the CPU to poll and copy each word.
 
-The DMA connections match the implemented PicoOS interface:
-
-| Connection | Required behavior |
-| --- | --- |
-| CPU to DMA | Memory-mapped registers 12 through 16 expose DMA availability, UART source address, SRAM destination, word count, and status/control. |
-| UART receive buffer to DMA | Four serial bytes form one 32-bit word and a ready handshake permits one transfer step. The supported source is the UART receive address. |
-| DMA to SRAM arbiter | DMA presents a sequential SRAM write address, 32-bit data, and a request. The arbiter grants either the CPU or DMA access because the asynchronous SRAM has one shared interface. |
-| DMA to interrupt controller | Completion or error raises the custom/DMA interrupt request. PicoOS maps it to interrupt service routine-table entry 4 with priority 1. |
-| UART to interrupt controller | Receive-ready raises the UART interrupt request. PicoOS maps it to interrupt service routine-table entry 2 with priority 2. |
-
-No extra external component is required for DMA. The DMA controller, receive
-word buffer, interrupt paths, and SRAM arbitration are FPGA logic. The existing
-SRAM and USB-to-UART pins remain unchanged.
+The DMA controller, receive word buffer, interrupt paths, and SRAM arbitration
+are FPGA logic using the existing SRAM and USB-to-UART connections. The
+detailed [DMA connections](documentation/dma_connections.md) describe how this
+logic connects to the PicoOS interface.
 
 - **FPGA: [Alchitry Cu V2](https://www.digikey.de/short/8cmz0qnc) with Lattice
   iCE40-HX8K** ([board schematic](https://cdn.sparkfun.com/assets/2/f/9/9/3/CuSchematic.pdf),
@@ -328,14 +271,21 @@ This excludes USB cables, wires, connectors, a printed circuit board, other
 interconnection hardware, and shipping. In the rest of this README, PCB means
 *process control block* unless the hardware context says otherwise.
 
-PicoOS has no resident storage device or filesystem. In emulator use, the UART
-host request protocol asks `reti_emulator` to access files in the host directory
-where it is running, with that directory exposed as PicoOS `/`, see [Section 7.9, PicoOS paths, working directories, and host operations](#79-picoos-paths-working-directories-and-host-operations).
-On the physical FPGA, a companion host program must read
-the same requests from the USB serial port, perform the requested operations
-on the host filesystem, and return byte counts and file data over UART. This
-is how the same bootloader, kernel file interface, and user programs can work
-with either the emulator or a physical RETI implementation.
+The physical setup is not yet used. During development, the RETI-Emulator
+provides the UART controller and host services, displaying UART terminal output
+in the terminal from which it was started. PicoOS has no resident storage
+device or filesystem. The emulator exposes its launch directory as PicoOS `/`,
+with the files and directories recursively below it forming the host filesystem
+sandbox. Repeated `..` components stop at this root, and symbolic links cannot
+provide a route outside it.
+
+On the physical FPGA, a companion host program must instead interpret requests
+from the USB serial port, perform the sandboxed filesystem operations, and
+return results or file data over UART. The architecture and current emulator
+replacement are shown in
+[`1.2.3 UART host-service protocol`](#123-uart-host-service-protocol). PicoOS path
+handling is explained in
+[`7.9 PicoOS paths, working directories, and host operations`](#79-picoos-paths-working-directories-and-host-operations).
 
 The generated binaries also show why 1 MiB is a plausible memory size for the
 project. The example sizes below come from the generated files currently in
@@ -389,9 +339,8 @@ lectures follow.
       - [1.1.4 Placing globals in `.ivt` with `section("ivt")`](#114-placing-globals-in-ivt-with-sectionivt)
       - [1.1.5 Selecting a startup function with `-C` / `--startup-source`](#115-selecting-a-startup-function-with--c----startup-source)
          - [1.1.5.1 Default compiler-generated `_start`](#1151-default-compiler-generated-_start)
-         - [1.1.5.2 Supplying a custom startup function](#1152-supplying-a-custom-startup-function)
-         - [1.1.5.3 PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence)
-         - [1.1.5.4 Startup functions used by PicoOS images](#1154-startup-functions-used-by-picoos-images)
+         - [1.1.5.2 PicoOS `libstart` startup sequence](#1152-picoos-libstart-startup-sequence)
+         - [1.1.5.3 Startup functions used by PicoOS images](#1153-startup-functions-used-by-picoos-images)
       - [1.1.6 Program sections, interrupt-vector entries, and linker placement](#116-program-sections-interrupt-vector-entries-and-linker-placement)
       - [1.1.7 RETI pseudoinstructions](#117-reti-pseudoinstructions)
          - [1.1.7.1 Interrupt-safe `PUSH` and `POP`](#1171-interrupt-safe-push-and-pop)
@@ -610,7 +559,7 @@ following compiler features were added to provide those capabilities.
 | Preprocessing | `#include`, include paths, `#pragma once`, object-like macros, line splicing, dependency output, and optional syntax checking |
 | Multiple translation units | Per-file compilation, symbol merging, cross-file calls/globals, and final program-wide linking |
 | Reusable build artifacts | `.reti_blocks` and `.st` retain lowered code, symbols, data, startup, and debug metadata for later links |
-| Automatic artifact reuse | Source/header hashes and compiler options decide whether an unchanged unit can be reused, Make dependency files expose the same inputs |
+| Automatic artifact reuse | Source/header hashes and compiler options decide whether an unchanged compiled file can be reused, Make dependency files expose the same inputs |
 | Broader PicoC syntax | `typedef`, casts, mixed declarations/statements, postfix increment, array-size inference, and compile-time integer simplification |
 | Pointer support | Pointer returns, `void *`, typed pointer arithmetic, dereference/member conditions, and compatible forward/repeated struct declarations |
 | Function pointers | Declarations, arrays, assignments, indirect calls, and statically emitted function addresses |
@@ -638,8 +587,8 @@ compiler accepted one PicoC file and transformed it directly into one RETI
 program. It used Lark to parse the source and a transformer to create the
 PicoC AST, its [passes](https://github.com/matthejue/PicoC-Compiler/blob/master/src/passes.py)
 and [AST transformer](https://github.com/matthejue/PicoC-Compiler/blob/master/src/ast_transformers.py)
-show the following lowering sequence. The boxed final group runs once for that
-one input file and produces that file's RETI program.
+show the following left-to-right lowering sequence. The boxed compilation
+group runs once for that input file and produces its RETI program.
 
 ```mermaid
 flowchart LR
@@ -670,17 +619,19 @@ For the added preprocessing, separate compilation, typing, and linking
 features, this pipeline was extended before and after the per-file passes.
 Preprocessing resolves includes, macros, and line splicing before parsing. The
 new symbol and typing passes check names, declarations, and types before
-ANF and RETI lowering. A final program-wide linker merges compiled units, their symbols, and
-startup code before resolving final addresses. The diagram below shows where
-these additions surround the per-file lowering sequence.
+ANF and RETI lowering. A program-wide linker combines the compiled code and
+global symbols and inserts startup code before resolving final addresses.
+The second diagram highlights the added preprocessing, symbol and typing
+passes, and the merge/startup step in yellow. Other phases retain the neutral
+style so the changes can be compared with the previous pipeline.
 
 ```mermaid
 flowchart LR
-    source["PicoC source"]
+    source["PicoC source files"]
 
     subgraph preprocessing["Preprocessing"]
-        preprocessor["Includes, macros, and line splicing"]
-        preprocessed["Preprocessed source"]
+        preprocessor["Includes, macros, and line splicing"]:::added
+        preprocessed["Preprocessed source"]:::added
     end
 
     subgraph frontend["Lexing and parsing"]
@@ -692,23 +643,25 @@ flowchart LR
     subgraph compilation["Per-file compilation passes"]
         shrink["picoc_shrink"]
         blocks["picoc_blocks"]
-        symbol["picoc_symbol"]
-        typing["picoc_typing"]
+        symbol["PicoC symbols<br/>picoc_symbol"]:::added
+        typing["PicoC typing<br/>picoc_typing"]:::added
         anf["picoc_anf"]
         reti_blocks["reti_blocks"]
     end
 
     subgraph linking["Program-wide linking passes"]
-        merge["Merge units, symbols, and startup"]
+        merge["Merge code / global symbols<br/>Insert startup code"]:::added
         patch["reti_patch"]
         reti["reti"]
     end
 
-    output["Flat linked RETI output"]
+    output["Linked RETI program"]
 
     source --> preprocessor --> preprocessed --> tokens --> parse_tree --> ast
     ast --> shrink --> blocks --> symbol --> typing --> anf --> reti_blocks
     reti_blocks --> merge --> patch --> reti --> output
+    classDef added fill:#fff2b2,stroke:#8a5a00,stroke-width:3px,color:#111
+    style preprocessing fill:#fff8dc,stroke:#8a5a00,stroke-width:3px,color:#111
 ```
 
 ### 1.1.2 Separate compilation, reusable artifacts, and linking
@@ -719,29 +672,75 @@ and Clang use `-c` to turn one `.c` file, with its included `.h` headers, into
 an `.o` object file. Similarly, `picoc_compiler -c` turns one `.picoc` file,
 with its included `.header` files, into paired `.reti_blocks` and `.st` files.
 The former contains the lowered RETI blocks, the latter is a JSON symbol table
-used when later linking units. A conventional `.o` file stores its symbol table
-inside the object file instead. The illustrative commands below compare both
-compile-and-link workflows, the `example/` paths stand for your own source files.
+used when later linking compiled files. A conventional `.o` file stores its symbol table
+inside the object file instead. The example uses PicoOS's
+[`libstring.picoc`](library/string/libstring.picoc), which includes
+[`string.picoc`](library/string/string.picoc) and the shared string helpers,
+and [`basic_string.picoc`](test/basic_string.picoc). The GCC commands use the
+names of equivalent C versions to illustrate the comparison. Those `.c` files
+are not part of this repository. The PicoC link also uses the test's existing
+[`libstdlib`](library/stdlib/libstdlib.picoc) and
+[`libstdio`](library/stdio/libstdio.picoc) dependencies, compiled alongside
+the string library and test:
 
 ```console
-$ gcc -c -O2 example/c/main.c example/c/math.c
-$ ls example/c
-main.c  main.h  main.o  math.c  math.h  math.o
+$ gcc -c -O2 libstring.c basic_string.c
+$ ls -1 basic_string.o libstring.o
+basic_string.o
+libstring.o
 
-$ picoc_compiler -c -O1 example/picoc/main.picoc example/picoc/math.picoc
-$ ls example/picoc
-main.header  main.picoc  main.reti_blocks  main.st  math.header  math.picoc  math.reti_blocks  math.st
+$ gcc -o basic_string basic_string.o libstring.o
+$ ls -1 basic_string
+basic_string
 
-$ gcc -o binary/c-example example/c/main.o example/c/math.o
-$ picoc_compiler -O1 -o binary/picoc-example.reti \
-    example/picoc/main.reti_blocks example/picoc/math.reti_blocks
-$ ls binary
-c-example  picoc-example.reti  picoc-example.sections
+$ picoc_compiler -c -O1 library/string/libstring.picoc test/basic_string.picoc \
+    library/stdlib/libstdlib.picoc library/stdio/libstdio.picoc
+$ ls -1 library/string/libstring.{reti_blocks,st} test/basic_string.{reti_blocks,st}
+library/string/libstring.reti_blocks
+library/string/libstring.st
+test/basic_string.reti_blocks
+test/basic_string.st
+
+$ picoc_compiler -O1 -o binary/basic_string.reti test/basic_string.reti_blocks \
+    library/string/libstring.reti_blocks library/stdlib/libstdlib.reti_blocks \
+    library/stdio/libstdio.reti_blocks
+$ ls -1 binary/basic_string.{reti,sections}
+binary/basic_string.reti
+binary/basic_string.sections
+```
+
+The GCC diagram follows one object file from separate compilation into the
+later link. Further object files can be supplied in the same way:
+
+```mermaid
+flowchart TB
+    SRC["libstring.c + included .h headers"] --> COMPILE["gcc -c -O2 libstring.c"]
+    COMPILE --> OBJ["libstring.o"]
+    OBJ --> LINK["gcc -o basic_string libstring.o basic_string.o ..."]
+    MORE["basic_string.o, ..."] --> LINK
+    LINK --> OUT["basic_string<br/>executable binary"]
+```
+
+The corresponding PicoC diagram uses the verified `.reti_blocks` / `.st` pair.
+There is no generated auxiliary `.c` file. Passing `libstring.reti_blocks` makes the
+compiler automatically read the matching `libstring.st` from the same directory.
+Each further `.reti_blocks` input likewise needs its corresponding `.st` file:
+
+```mermaid
+flowchart TB
+    SRC["libstring.picoc<br/>includes string.picoc / shared helpers"] --> COMPILE["picoc_compiler -c -O1 libstring.picoc"]
+    COMPILE --> OBJ["libstring.reti_blocks"]
+    COMPILE --> SYMBOLS["libstring.st<br/>JSON symbol table"]
+    OBJ --> LINK["picoc_compiler -O1 -o basic_string.reti<br/>libstring.reti_blocks basic_string.reti_blocks ..."]
+    SYMBOLS -.->|automatically read with libstring.reti_blocks| LINK
+    MORE["basic_string.reti_blocks, ..."] --> LINK
+    LINK --> RETI["basic_string.reti"]
+    LINK --> SECTIONS["basic_string.sections"]
 ```
 
 The `-o` option selects the path and name of the linked executable: the native
-`binary/c-example` in the C command and the final linked RETI assembly
-`binary/picoc-example.reti` in the PicoC command. PicoC's paired artifacts
+`basic_string` in the C command and the final linked RETI assembly
+`binary/basic_string.reti` in the PicoC command. PicoC's paired artifacts
 keep the lowered code and linker metadata independently inspectable and
 reusable. The PicoC/RETI toolchain keeps the accompanying metadata in separate
 JSON-like files: `.st` holds linker symbols, `.sections` holds the linked
@@ -763,33 +762,53 @@ the frame-free functions used for low-level control transfers.
 #### 1.1.3.1 Stack-frame layout and caller cleanup
 [\[↑ TOC\]](#contents)
 
-The called function saves and restores `BAF`, while the call site uses a
-generated continuation-block label as its return address. Arguments are
-evaluated and pushed from right to left. Their total size is calculated from
-the actual call, and the caller releases that argument space after the callee
-returns.
+The called function saves and restores `BAF`. Its caller pushes a generated
+continuation-block address and removes the argument cells after the return.
+For `func(arg1, arg2)`, the compiler evaluates and pushes `arg2` first, then
+`arg1`. This is the compiler's actual evaluation order, rather than a general
+C guarantee.
 
-Multi-cell arrays and structs occupy their complete width. A struct passed by
-value uses its base cell as its logical address, so member access and
-forwarding use the correct stack cells. The table below lists the layout from
-higher to lower addresses and shows which side manages each cell.
+The stack grows toward lower addresses. The table shows a two-cell argument
+area for the current call inside a larger stack. Italic rows provide a simple
+caller frame with one argument, one local, and one temporary expression value.
+The caller's frame pointer is written as `caller BAF` to distinguish it from
+the current `BAF`:
 
-| Address relative to `BAF` | Contents | Managed by |
+| Address direction / position | Contents | Managed by |
 | --- | --- | --- |
-| `BAF + 4` | Second argument or first variadic argument | Caller |
-| `BAF + 3` | First argument | Caller |
-| `BAF + 2` | Return address | Caller |
-| `BAF + 1` | Saved previous `BAF` | Callee |
-| `BAF` | First local variable | Callee |
-| `BAF - 1` | Later local variable | Callee |
-| `SP` | Free cell below the occupied stack | Current stack boundary |
+| **Higher addresses ↑** | *Earlier stack contents* | *Earlier calls* |
+| *`caller BAF + 3`* | *Caller function's argument* | *Caller's caller* |
+| *`caller BAF + 2`* | *Caller function's return address* | *Caller's caller* |
+| *`caller BAF + 1`* | *Frame pointer saved on entry to the caller* | *Caller function's own frame* |
+| *`caller BAF`* | *Caller function's local variable* | *Caller function's own frame* |
+| *`caller BAF - 1`* | *Temporary expression value retained across this call* | *Caller function's expression evaluation* |
+| **`BAF + 4`** | **Second argument (`arg2`)** | **Caller, for this call** |
+| **`BAF + 3`** | **First argument (`arg1`)** | **Caller, for this call** |
+| **`BAF + 2`** | **Return address to the caller's continuation block** | **Caller, for this call** |
+| **`BAF + 1`** | **Saved `caller BAF`** | **Current callee** |
+| **`BAF`** | **First local variable, if present** | **Current callee** |
+| **`BAF - 1`, ...** | **Further locals and temporary expression values** | **Current callee** |
+| **`SP`** | **Free cell immediately below occupied stack cells** | **Current stack boundary** |
+| **Lower addresses ↓** | **Direction of stack growth** | |
 
-Thus `asm("LOADIN BAF ACC 3")` reads the first argument. PicoOS
-[`printf()`](library/stdio/stdio.picoc#L354) starts its variadic arguments at
-`BAF + 4`, while [`fprintf()`](library/stdio/stdio.picoc#L346) starts them at
-`BAF + 5`. The later [Section 1.1.7.1, Interrupt-safe `PUSH` and `POP`](#1171-interrupt-safe-push-and-pop)
-explain how concrete `PUSH` and `POP` instructions protect these live cells if
-an interrupt arrives between their two machine instructions.
+For these one-cell arguments, `arg1` is always at `BAF + 3` and `arg2` at
+`BAF + 4`. Multi-cell arrays and structs occupy their complete width, so later
+argument offsets increase by those widths. A struct passed by value uses its
+base cell as its logical address for member access and forwarding. A caller
+can retain a temporary value while evaluating an expression such as
+`left + func(arg1, arg2)`, which explains the contextual row above the current
+arguments.
+
+This order helps variadic functions: the callee finds the first argument at
+the fixed offset `BAF + 3`, then advances toward higher addresses through
+successive arguments without knowing their total count first. With the
+opposite arrangement, the first argument would lie at the far end of the
+argument area, requiring its total extent before walking back through it.
+PicoOS [`printf()`](library/stdio/stdio.picoc#L354) starts its variadic arguments
+at `BAF + 4`, while [`fprintf()`](library/stdio/stdio.picoc#L346) starts them at
+`BAF + 5` because it has two fixed arguments.
+[`1.1.7.1 Interrupt-safe PUSH and POP`](#1171-interrupt-safe-push-and-pop)
+explains how stack updates protect occupied cells during interrupts.
 
 #### 1.1.3.2 Shared function epilogue and return values
 [\[↑ TOC\]](#contents)
@@ -823,70 +842,133 @@ int main(void) {
 }
 ```
 
-The `-c` option stops after per-file compilation and writes `.reti_blocks` and
-`.st` artifacts without linking or lowering pseudoinstructions into final RETI
-code. `-C` has a different purpose: it selects a startup source. Compiling the
-example with the verified compile-only option produces the structured output
-below. Only the machine-specific `# @picoc-cache` metadata line is omitted.
+The options have separate jobs: `-c` stops after per-file compilation, `-v`
+adds compiler-generated pattern comments, and `-w` writes the individual pass
+results as side files. `-i` can also print those results to the terminal. `-C`
+instead selects a startup source. Generate the following two representations
+from the same source with:
 
 ```console
-$ picoc_compiler -c -O1 normal-function.picoc
+$ picoc_compiler -c -O1 -v -w normal-function.picoc
 ```
+
+The PicoC ANF output in `normal-function.picoc_anf` is the last PicoC-level
+representation before the `reti_blocks` pass lowers its operations into
+symbolic RETI instruction structures:
+
+```text
+_global_inits:
+add_one:
+  NewStackframe(Num('0'))
+  Exp(StackframeParam(Num('0')))
+  Exp(Num('1'))
+  Exp(BinOp(Stack(Num('2')), Add(), Stack(Num('1'))))
+  Assign(IN2, Stack(Num('1')))
+  Exp(GoTo(Name('add_one_epilogue')))
+add_one_epilogue:
+  RestoreStackframe()
+  RestoreReturnAddress()
+main:
+  NewStackframe(Num('0'))
+  // Call(Name('add_one'), [Num('41')])
+  Exp(Num('41'))
+  SaveReturnAddress(Name('main_cont.3'))
+  Exp(FunRef(Name('add_one')))
+  Exp(GoTo(Stack(Num('1'))))
+main_cont.3:
+  RemoveArguments(Num('1'))
+  Exp(IN2)
+  Assign(IN2, Stack(Num('1')))
+  Exp(GoTo(Name('main_epilogue')))
+main_epilogue:
+  RestoreStackframe()
+  RestoreReturnAddress()
+```
+
+The corresponding `.reti_blocks` output below retains symbolic labels and
+pseudoinstructions. The `-v` comments identify the ANF operation expanded by
+each instruction sequence. Only the machine-specific `# @picoc-cache` line is
+omitted:
 
 ```reti
   .ivt
   .text
 add_one:
+  # NewStackframe(Num('0'))
   PUSH BAF
   MOVE SP BAF
   SUBI SP 0
+  # Exp(StackframeParam(Num('0')))
   LOADIN BAF ACC 3
   PUSH ACC
+  # Exp(Num('1'))
   LOADI ACC 1
   PUSH ACC
+  # Exp(BinOp(Stack(Num('2')), Add(), Stack(Num('1'))))
   LOADIN SP ACC 2
   LOADIN SP IN2 1
   ADD ACC IN2
   STOREIN SP ACC 2
   ADDI SP 1
+  # Assign(IN2, Stack(Num('1')))
   POP IN2
+  # Exp(GoTo(Name('add_one_epilogue')))
   JUMP32 add_one_epilogue
 add_one_epilogue:
+  # RestoreStackframe()
   MOVE BAF SP
   POP BAF
+  # RestoreReturnAddress()
   POP IN1
   MOVE IN1 PC
 main:
+  # NewStackframe(Num('0'))
   PUSH BAF
   MOVE SP BAF
   SUBI SP 0
+  # // Call(Name('add_one'), [Num('41')])
+  # Exp(Num('41'))
   LOADI ACC 41
   PUSH ACC
+  # SaveReturnAddress(Name('main_cont.3'))
   LOADI32 ACC main_cont.3
   ADD ACC CS
   PUSH ACC
+  # Exp(FunRef(Name('add_one')))
   LOADI32 ACC add_one
   ADD ACC CS
   PUSH ACC
+  # Exp(GoTo(Stack(Num('1'))))
   POP ACC
   MOVE ACC PC
 main_cont.3:
+  # RemoveArguments(Num('1'))
   ADDI SP 1
+  # Exp(IN2)
   PUSH IN2
+  # Assign(IN2, Stack(Num('1')))
   POP IN2
+  # Exp(GoTo(Name('main_epilogue')))
   JUMP32 main_epilogue
 main_epilogue:
+  # RestoreStackframe()
   MOVE BAF SP
   POP BAF
+  # RestoreReturnAddress()
   POP IN1
   MOVE IN1 PC
   .data
 ```
 
-The `.text` blocks preserve the prologue, the shared `add_one_epilogue`, the
-symbolic `JUMP32` and `LOADI32` operations, and the `main_cont.3` continuation.
-At `main_cont.3`, `ADDI SP 1` releases the argument cell. The surrounding
-`.ivt` and `.data` markers show where the linker will later place the blocks.
+[`NewStackframe`](../PicoC-Compiler/source/picoc_nodes.py#L754) saves the previous `BAF`, installs the new `BAF`, and reserves
+locals. At the call site, [`SaveReturnAddress`](../PicoC-Compiler/source/picoc_nodes.py#L765) pushes the absolute continuation
+address, while [`FunRef`](../PicoC-Compiler/source/picoc_nodes.py#L618) loads the callee address and `GoTo` transfers control.
+The return expression is moved into `IN2` before entering the shared epilogue.
+[`RestoreStackframe`](../PicoC-Compiler/source/picoc_nodes.py#L791) releases the callee's locals and restores `BAF`, then
+[`RestoreReturnAddress`](../PicoC-Compiler/source/picoc_nodes.py#L787) pops the caller's address into `IN1` and transfers
+control through `PC`. Back at `main_cont.3`, [`RemoveArguments`](../PicoC-Compiler/source/picoc_nodes.py#L776) releases the
+single argument cell. Thus callee frame cleanup and caller argument cleanup
+are distinct operations, and `IN2` carries the result across both.
 
 #### 1.1.3.3 Naked functions without a generated frame
 [\[↑ TOC\]](#contents)
@@ -981,8 +1063,8 @@ restores that same layout.
 The `section` attribute controls where a selected global or function is placed
 in the linked image. PicoC currently accepts only `"ivt"` as an explicit
 section name. The source omits the leading dot, while the linked section is
-called `.ivt`. Ordinary functions still go to `.text`, and ordinary global or
-static objects go to `.data`.
+called `.ivt`. Ordinary functions still go to `.text`, and ordinary global variables go to
+`.data`.
 
 The example below gives two one-entry function-pointer tables with identical
 contents. Only `ivt_table` has the attribute. The linker places `.ivt` before
@@ -1052,7 +1134,43 @@ Thus `ivt_table` remains under `.ivt`, `handler` and `main` remain under
 `.text`, and `ordinary_table` remains under `.data`. Both `IVTE handler`
 operations refer to the same label. Linking later resolves the tagged SRAM
 address, but the attribute changes section placement rather than the pointer's
-target.
+target. To see the final numeric words and instruction addresses, link the
+same source with annotations:
+
+```console
+$ picoc_compiler -O1 -v -o section-placement.reti section-placement.picoc
+```
+
+This excerpt from the final `section-placement.reti` shows the resolved
+entries and the first instructions of their handler. `# ...` marks omitted
+startup and other function instructions:
+
+```reti
+# // Block('ivt_table', [])
+2147483668
+# ...
+# // Block('handler', [])
+# NewStackframe(Num('0'))
+SUBI SP 1
+STOREIN SP BAF 1
+MOVE SP BAF
+SUBI SP 0
+# ...
+# // Block('ordinary_table', [])
+2147483668
+```
+
+The handler starts at image word offset `20` in this link. The final `reti`
+pass replaces each `IVTE handler` with `2147483668 = 2^31 + 20 = 0x80000014`,
+an absolute tagged SRAM address. This is an image offset plus the SRAM base,
+not a relative jump distance. The generated kernel
+[`SRAM_BASE`](kernel/memory_constants.header#L1) denotes the same `0x80000000`
+bit pattern as a signed PicoC value. Here `.ivt` occupies one word, so `CS`
+starts at `SRAM_BASE + 1` and the handler's `CS`-relative offset is `19`.
+Adding `CS` to `19` reaches the same address. The `.ivt` entry is at image
+offset `0`, while the identical ordinary table entry is at data offset `45`.
+`IVTE` therefore constructs pointers for an image loaded at the SRAM base,
+rather than relocating them to an arbitrary process-image base.
 
 ### 1.1.5 Selecting a startup function with `-C` / `--startup-source`
 [\[↑ TOC\]](#contents)
@@ -1080,17 +1198,15 @@ void _start(void) {
 The generated entry runs any remaining global initializer code before calling
 `main`, then terminates with `LOADI ACC 0` and `JUMP 0` after `main` returns.
 
-#### 1.1.5.2 Supplying a custom startup function
+#### 1.1.5.2 PicoOS `libstart` startup sequence
 [\[↑ TOC\]](#contents)
 
-The `-C PATH` / `--startup-source PATH` option instead links an additional
-PicoC or compiled `.reti_blocks` startup unit. If that unit defines `_start`,
-the compiler places it first in `.text` and uses it in place of the generated
-default, otherwise, the compiler still creates the default entry. Global
-initializer code precedes either form.
-
-#### 1.1.5.3 PicoOS `libstart` startup sequence
-[\[↑ TOC\]](#contents)
+The `-C PATH` / `--startup-source PATH` option links an additional PicoC source
+or compiled `.reti_blocks` startup file. If it defines
+[`_start()`](library/start/start.picoc#L14), the compiler places that function
+first in `.text` and uses it instead of the generated default. Otherwise it
+still creates the default entry. Remaining global initializer code precedes
+either entry body.
 
 PicoOS selects [`library/start/libstart.picoc`](library/start/libstart.picoc)
 for userspace with `-C library/start/libstart.picoc`. The wrapper records its
@@ -1124,41 +1240,6 @@ void _start(int argc, char *first_argument) {
 }
 ```
 
-The sequence below follows that code from the initial userspace entry to the
-application and back to the kernel. It also shows why [`malloc()`](library/stdlib/malloc.picoc#L35)
-is ready before an application's [`main()`](library/start/start.picoc#L4) begins.
-The heap-bound queries only return addresses and sizes. The linked userspace
-allocator then manages the blocks directly inside the process image. The
-startup portion applies to every PicoOS userspace process. The calls shown
-after `main` begins use the heap exercise from [Section 14.1.2, Exploring
-userspace heap allocation](#1412-exploring-userspace-heap-allocation) as a
-concrete application example.
-
-```mermaid
-sequenceDiagram
-    participant S as Startup library
-    participant H as Userspace heap routines
-    participant E as Environment routines
-    participant A as Application main
-    participant K as Kernel
-    S->>H: init_process_heap()
-    H->>K: Query process heap start and size
-    K-->>H: Return process heap bounds
-    H->>H: heap_init_region()
-    H-->>S: Heap ready
-    S->>E: initialize_environment(initial envp)
-    E->>H: Allocate and copy process environment
-    E-->>S: Environment ready
-    S->>A: main(argc, argv)
-    A->>H: malloc(requested size)
-    H-->>A: Return heap pointer
-    Note over A: Application may also point at a stack object
-    A->>H: free(saved heap pointer)
-    H-->>A: Mark block free and merge adjacent free blocks
-    A-->>S: Return status
-    S->>K: exit(status)
-```
-
 The naked [`_start()`](library/start/start.picoc#L14) sees the initial stack
 exactly as the kernel built it and treats
 [`&first_argument`](library/start/start.picoc#L14) as the start of `argv`.
@@ -1174,12 +1255,17 @@ counterpart to the startup support normally supplied with `libc`: it prepares
 runtime state before calling [`main()`](library/start/start.picoc#L4) and turns
 the return value into an exit status.
 
-#### 1.1.5.4 Startup functions used by PicoOS images
+#### 1.1.5.3 Startup functions used by PicoOS images
 [\[↑ TOC\]](#contents)
 
-The following table distinguishes the entry used for each PicoOS image. The
-init process and shell are userspace programs, so they deliberately use the
-same startup path as every other system or user application.
+The later chapters explain the
+[`boot image in 10.1 Loading the kernel from the EPROM bootloader`](#101-loading-the-kernel-from-the-eprom-bootloader),
+[`kernel image in 10.2 Kernel startup`](#102-kernel-startup),
+[`init process image in 10.3 Init process`](#103-init-process),
+[`shell image in 10.3.4 Shell startup`](#1034-shell-startup), and
+[`user application images in 10.3.5 Loading user applications`](#1035-loading-user-applications).
+The table first identifies the startup function used by each image. Init and
+the shell are userspace programs and use the same entry as user applications.
 
 | Image | `_start` used | Next function |
 | --- | --- | --- |
@@ -1187,7 +1273,7 @@ same startup path as every other system or user application.
 | SRAM kernel | Compiler-generated default `_start`, because the kernel is linked without `-C` | [`main()`](kernel/kernel.picoc#L31) |
 | Init process | [`libstart` `_start()`](library/start/start.picoc#L14), selected with `-C library/start/libstart.picoc` | [`main()`](system/init.picoc#L100) |
 | Shell | [`libstart` `_start()`](library/start/start.picoc#L14), selected with the same `-C` option | [`main()`](user/shell.picoc#L1448) |
-| Other system and user applications | [`libstart` `_start()`](library/start/start.picoc#L14), selected by the common userspace link rule | The application's `main` |
+| User applications | [`libstart` `_start()`](library/start/start.picoc#L14), selected by the common userspace link rule | The application's `main` |
 
 ### 1.1.6 Program sections, interrupt-vector entries, and linker placement
 [\[↑ TOC\]](#contents)
@@ -1201,36 +1287,22 @@ in [Section 1.1.8, Linked `.sections` metadata and the five-word binary header](
 | --- | --- | --- |
 | `.ivt` | Interrupt-vector words and, when requested, low-level functions, it begins at image offset 0 and uses `CS`-relative global references | Add `__attribute__((section("ivt")))` to a global variable, function declaration, or function definition |
 | `.text` | `_start` followed by ordinary functions and their instructions, execution and code labels are relative to `CS` | This is the default for functions |
-| `.data` | Ordinary global and static storage, addressed relative to `DS` | This is the default for global and static variables |
+| `.data` | Ordinary global storage, addressed relative to `DS` | This is the default for global variables |
 
 The source syntax and the minimal `.ivt` versus `.data` output comparison are
 introduced in [Section 1.1.4, Placing globals in `.ivt` with
-`section("ivt")`](#114-placing-globals-in-ivt-with-sectionivt). In the complete
-kernel, PicoOS applies the same attribute to its global
-[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24)
-array at the beginning of the kernel image:
+`section("ivt")`](#114-placing-globals-in-ivt-with-sectionivt). For the complete kernel table and hardware interrupt-entry behavior, see
+[`2.1 RETI interrupt entry and the interrupt vector table`](#21-reti-interrupt-entry-and-the-interrupt-vector-table).
+The kernel's [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24)
+is a useful `.ivt` example: with `-O1`, its five known handler pointers become
+the first five payload words, available immediately after loading. More
+generally, known global scalar, string, struct, array, and function-pointer
+initializers become words in `.data` or the selected `.ivt`. Runtime-dependent
+initializers still run at startup.
 
-```c
-__attribute__((section("ivt")))
-void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
-    syscall_interrupt,
-    timer_interrupt,
-    uart_interrupt,
-    cpu_exception_interrupt,
-    dma_interrupt
-};
-```
-
-With `-O1`, compile-time-known initializers for global scalars, strings,
-structs, arrays, and function pointers are emitted directly as words in
-`.data`, or in `.ivt` when the declaration carries the section attribute.
-Runtime-dependent initializers still execute from startup code. Consequently,
-the five initialized function pointers in
-[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24)
-are already the first five words of the kernel payload when the binary is
-loaded into SRAM. The interrupt hardware can therefore read the vector table
-immediately, before any `_start` code has executed. `IVTE` and the final linker
-patch pass encode those function addresses with the correct SRAM tag.
+<!-- Presentation: Show the interrupt_vector_table PicoC code example from
+2.1 RETI interrupt entry and the interrupt vector table here, rather than
+showing only the README cross-reference. -->
 
 The stack-frame and naked-function rules used by these low-level stubs are
 defined in [Section 1.1.3, System V ABI stack frames and call cleanup](#113-system-v-abi-stack-frames-and-call-cleanup).
@@ -1265,18 +1337,23 @@ resolved only after all compilation units and sections have been combined.
 #### 1.1.7.1 Interrupt-safe `PUSH` and `POP`
 [\[↑ TOC\]](#contents)
 
-The RETI stack grows toward lower addresses. `PUSH` moves `SP` before writing
-the new value, while `POP` reads the value before moving `SP` back:
+The RETI stack grows toward lower addresses, with `SP` pointing to the free
+cell immediately below the occupied cells. The pseudoinstructions encode the
+safe update order once, avoiding mistakes in hand-written stack sequences:
+`PUSH` reserves space before writing, and `POP` reads before releasing it.
 
 | Pseudoinstruction | Expansion |
 | --- | --- |
 | `PUSH ACC` | `SUBI SP 1`<br>`STOREIN SP ACC 1` |
 | `POP ACC` | `LOADIN SP ACC 1`<br>`ADDI SP 1` |
 
-This order matters in PicoOS because a hardware interrupt can occur between
-the two concrete instructions. On a push, the earlier `SP` update protects the
-new stack cell from the interrupt frame. On a pop, the later update keeps the
-still-needed cell protected until it has been read.
+Let the initial stack pointer be `p`. A push first changes `SP` to `p - 1`,
+then writes the value to `SP + 1 = p`. An interrupt between those instructions
+starts its own frame at `p - 1`, so it cannot overwrite the reserved cell at
+`p`. Writing to `p` while `SP` still equals `p` would leave that cell available
+for the interrupt's saved return address. For a pop, the live value at `p + 1`
+must be read while `SP` still equals `p`. Increasing `SP` first would make
+`p + 1` available for an interrupt to overwrite before the load.
 
 The compiler uses these operations for function arguments, return addresses,
 and saved `BAF` values. PicoOS also uses them directly in naked startup and
@@ -1295,21 +1372,49 @@ asm("POP ACC");
 #### 1.1.7.2 Loading 32-bit values with `LOADI32`
 [\[↑ TOC\]](#contents)
 
-`LOADI32 reg operand` provides a full 32-bit value even though the concrete
-`LOADI` instruction has only a signed 22-bit immediate. After resolving a
-symbol, the linker divides the value into a signed upper 22-bit part and an
-unsigned lower 10-bit part, then always emits:
+`LOADI32 reg operand` builds a full 32-bit word from the concrete `LOADI`
+instruction's signed 22-bit immediate. The compiler's
+[`_write_large_immediate_in_register()`](../PicoC-Compiler/source/passes/common.py#L65)
+first resolves the operand to its 32-bit pattern and splits that pattern into
+bits `31..10` and bits `9..0`.
+
+Write the original bits as $b_{31},\ldots,b_0$. The upper field is interpreted
+as a signed two's-complement number, with its own sign bit at position `21`
+(original bit `31`):
+
+$$
+\mathrm{signed\_upper} = -b_{31}2^{21} + \sum_{j=0}^{20} b_{j+10}2^j,
+\qquad
+\mathrm{lower\_bits} = \sum_{j=0}^{9} b_j2^j.
+$$
+
+In code, `unsigned_upper = bits >> 10` initially gives the unsigned upper field.
+If its bit `21` is set, the compiler chooses
+`signed_upper = unsigned_upper - 2^22`, otherwise `signed_upper = unsigned_upper`.
+Thus `signed_upper` is the signed decimal immediate representing that exact 22-bit
+pattern, within `-2097152..2097151`. The linker always emits three instructions:
 
 ```reti
-LOADI reg upper_22_bits
+LOADI reg signed_upper
 MULTI reg 1024
-ORI reg lower_10_bits
+ORI reg lower_bits
 ```
 
-The result is the original 32-bit bit pattern. This works for values such as
-the tagged SRAM base `-2147483648` as well as linked addresses. A code label is
-resolved relative to `CS`, so code that needs the absolute address adds `CS`
-afterward. PicoOS's bootloader uses exactly this sequence conceptually:
+The emulator sign-extends the `LOADI` immediate to 32 bits. Multiplication by
+`1024 = 2^10` moves the upper contribution into bits `31..10` and clears the
+ten low bits. `ORI` then inserts `lower_bits` into those low bits, reconstructing
+the original word. For `0x80000005`, `unsigned_upper = 2097152`,
+`signed_upper = -2097152`, and `lower_bits = 5`:
+
+```reti
+LOADI ACC -2097152
+MULTI ACC 1024
+ORI ACC 5
+```
+
+This also explains the tagged SRAM base `0x80000000`, represented in PicoC as
+`-2147483648`. Code labels are resolved relative to `CS`, so an absolute code
+address requires adding `CS` afterward. The bootloader uses this pattern:
 
 ```c
 asm("LOADI32 ACC start_loaded_kernel");
@@ -1317,22 +1422,56 @@ asm("ADD ACC CS");
 asm("MOVE ACC PC");
 ```
 
-The same pseudoinstruction loads absolute segment and stack values generated
-in the generated [kernel](kernel/memory_constants.header) and
-[bootloader](boot/memory_constants.header) headers, and the compiler itself uses it when constructing
-function pointers and return addresses.
+The same pseudoinstruction loads absolute segment and stack values from the
+generated [kernel](kernel/memory_constants.header) and
+[bootloader](boot/memory_constants.header) headers and constructs function
+addresses and continuation addresses.
+
+As a retrospective implementation note, interpreting the same two 32-bit
+operand patterns as signed two's-complement or unsigned numbers gives
+**identical low 32 product bits**. The full products and their high halves can
+differ. This is why the [RISC-V multiplication specification](https://docs.riscv.org/reference/isa/v20240411/unpriv/m-st-ext.html#_multiplication_operations)
+uses one low-product instruction and distinguishes signedness for the
+high-product instructions.
+
+For this particular 22-bit field, `unsigned_upper` and `signed_upper` are equal
+when bit `21` is zero. Otherwise,
+$\mathrm{unsigned\_upper}-\mathrm{signed\_upper}=2^{22}$, so
+
+$$
+\mathrm{unsigned\_upper}\,2^{10} - \mathrm{signed\_upper}\,2^{10} = 2^{32}.
+$$
+
+The two products therefore have the same low 32 bits. Combining either with
+`lower_bits` would reconstruct the same word **if multiplication is defined modulo
+$2^{32}$**. However, the current assembler requires a signed 22-bit decimal
+`LOADI` operand and rejects `LOADI ACC 2097152`. It also sign-extends that field
+when decoding it. Thus the signed conversion remains necessary for the
+implemented assembly interface.
+
+The emulator's [`MULTI` implementation](../RETI-Emulator/source/interpr.c#L78)
+uses signed `int32_t` multiplication. The chosen `signed_upper` keeps
+`signed_upper * 1024` within `-2147483648..2147482624`, so this reconstruction
+has no signed overflow. Using positive `unsigned_upper` instead would require
+an interface that accepts it and unsigned or explicit modulo arithmetic.
+The bit-pattern identity does not
+justify overflowing signed multiplication in C, whose [expression rules](https://open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf#page=94)
+make an unrepresentable signed result undefined.
 
 #### 1.1.7.3 Long jumps with `JUMP32`
 [\[↑ TOC\]](#contents)
 
 `JUMP32` avoids the signed 22-bit relative-offset limit of the hardware
 `JUMP`. For a symbolic target, the linker builds the target's `CS`-relative
-address in `ACC`, adds `CS`, and moves the absolute result into `PC`:
+address in `ACC`, adds `CS`, and moves the absolute result into `PC`. Here
+`signed_upper` is the signed decimal interpretation of the upper 22-bit field
+and `lower_bits` is the unsigned low ten bits, exactly as derived in
+[`1.1.7.2 Loading 32-bit values with LOADI32`](#1172-loading-32-bit-values-with-loadi32):
 
 ```reti
-LOADI ACC upper_22_bits
+LOADI ACC signed_upper
 MULTI ACC 1024
-ORI ACC lower_10_bits
+ORI ACC lower_bits
 ADD ACC CS
 MOVE ACC PC
 ```
@@ -1352,18 +1491,70 @@ control flow as well as accepting statements such as
 #### 1.1.7.4 Pseudoinstruction expansion during linking
 [\[↑ TOC\]](#contents)
 
-Expansion is split across the two final RETI-side passes so instruction and
-label positions remain correct:
+The final two passes separate changes to instruction counts from resolving
+addresses. The current
+[`reti_patch`](../PicoC-Compiler/source/passes/linking/reti_patch_pass.py)
+pass expands each `PUSH` and `POP` into two instructions, patches large numeric
+immediates, and removes an unconditional jump at a block's end when its target
+is the next block. These operations do not require the target's final address.
 
-1. `reti_patch` expands each `PUSH` and `POP`, removes an unconditional jump to
-   the immediately following block, and then records every block's concrete
-   instruction count and start position.
-2. `reti` resolves program-wide symbols, flattens the blocks, and expands
-   `LOADI32` and `JUMP32` using the now-final section and block addresses.
+It then records each block's effective instruction count, section start, and
+position within that section. Remaining pseudoinstructions are counted by
+their future expansion size: `LOADI32` contributes three instructions, a
+symbolic unconditional `JUMP32` five, and an absolute numeric `JUMP32` four.
+A condition adds one guard instruction. Comments contribute no instructions.
+Thus the recorded positions already include the sizes of instructions that
+have not yet been expanded.
 
-Because inline assembly is parsed into the same AST as compiler-generated
-RETI, these rules and symbolic resolution apply identically to both. No
-pseudoinstruction reaches the emulator or assembled binary.
+The complete illustrative program below contains the three labeled blocks
+used in the diagram, in their final order, before pseudoinstruction expansion:
+
+```reti
+entry:
+    PUSH BAF
+    LOADI32 ACC done
+    JUMP32 done
+
+work:
+    PUSH ACC
+    POP IN1
+    LOADI32 ACC 7
+
+done:
+    POP BAF
+```
+
+The following code strip shows the same blocks after expansion. Their widths
+represent their expanded sizes. The jump in `entry` targets `done`, skipping
+`work`; the address of `done` still depends on the lengths of both preceding
+blocks:
+
+![Expanded code blocks and the jump to done](documentation/images/pseudoinstruction-blocks.svg)
+
+| Block | Symbolic instructions | Real instructions after expansion |
+| --- | --- | ---: |
+| `entry` | `PUSH BAF`, `LOADI32 ACC done`, `JUMP32 done` | `2 + 3 + 5 = 10` |
+| `work` | `PUSH ACC`, `POP IN1`, `LOADI32 ACC 7` | `2 + 2 + 3 = 7` |
+| `done` | `POP BAF` | `2` |
+
+Here `done` begins at offset `10 + 7 = 17`. The symbolic `JUMP32` loads `17`
+into `ACC` and adds `CS`. Counting each pseudoinstruction as just one word
+would instead place `done` at offset `6`, producing the wrong target.
+
+The later [`reti`](../PicoC-Compiler/source/passes/linking/reti_pass.py) pass
+uses those recorded positions to determine `CS`, resolve code labels and
+global symbols, and produce the final flat instruction stream. It expands
+`LOADI32` and `JUMP32` with the resolved numeric values. Expanding a symbolic
+address load or jump during `reti_patch` would require its final operand
+before later blocks and their expansions had been counted. Keeping its
+symbolic operand and counting its known size avoids that circular dependency.
+Numeric `LOADI32` and `JUMP32` use the same late expansion path for consistency,
+although their operands do not themselves depend on labels.
+
+`PUSH` and `POP` can be expanded earlier because neither their operands nor
+their two-instruction sizes depend on label positions. Inline assembly uses
+the same RETI AST and follows the same rules. No pseudoinstruction reaches
+the emulator or assembled binary.
 
 ### 1.1.8 Linked `.sections` metadata and the five-word binary header
 [\[↑ TOC\]](#contents)
@@ -1398,10 +1589,21 @@ they determine, the optional ISR entry need not appear in a userspace file.
 
 The compiler creates this file only at the final link. A compile-only `-c`
 invocation instead creates reusable `.reti_blocks` and `.st` files because no
-complete program layout exists yet. Given `program.reti`, the emulator looks
-for `program.sections` automatically. `-S` is needed only for a differently
-named layout,for example when the EPROM bootloader is running while the TUI
-must display the kernel that will later occupy SRAM.
+complete program layout exists yet.
+
+To produce a loadable binary, run `reti_emulator -a program.reti`. The emulator
+automatically locates `program.sections` beside the input. It assembles the
+instructions, retains raw data words, and uses the metadata to prepend five
+layout words to the resulting `program.bin`. `-S PATH` explicitly selects a
+different metadata file when needed. The diagram continues the compile/link
+workflow with those two distinct inputs:
+
+```mermaid
+flowchart TB
+    RETI["program.reti<br/>linked RETI instructions and data"] --> ASSEMBLE["reti_emulator -a program.reti"]
+    SECTIONS["program.sections<br/>linked layout metadata"] -->|automatically found beside program.reti| ASSEMBLE
+    ASSEMBLE --> BIN["program.bin<br/>five-word big-endian layout header<br/>encoded RETI instructions + data words"]
+```
 
 For example, with the `.sections` values above, assembling an illustrative
 `program.reti` produces this five-word header:
@@ -1415,10 +1617,7 @@ $ hexyl -n 20 program.bin
 └────────┴─────────────────────────┴─────────────────────────┴────────┴────────┘
 ```
 
-When RETI-Emulator runs `-a program.reti`, it reads this metadata while
-assembling the RETI program and prepends the resulting five layout words to
-the encoded RETI words in `program.bin`. This example shows only those first
-20 bytes: five big-endian 32-bit words corresponding to the displayed
+This example shows only the first 20 bytes: five big-endian 32-bit words corresponding to the displayed
 `.sections` values. The [appendix](#appendix-inspecting-bin-files-with-hexyl)
 shows how to inspect other ranges of a `.bin` file.
 
@@ -1441,8 +1640,8 @@ userspace process loader first obtains the byte count with `file-size`, then
 uses `read-range` to obtain the header and encoded payload. Both loaders
 consume the five header words and copy only the encoded RETI words to SRAM.
 The allocated process image therefore contains only the linked program and its
-heap/stack room. The combined transfer and loading sequence appears in
-[Section 4.3, Process image and initial userspace stack](#43-process-image-and-initial-userspace-stack).
+heap/stack room. The runtime loading modes are described in
+[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
 
 ### 1.1.9 Generated memory constants for the bootloader and kernel
 [\[↑ TOC\]](#contents)
@@ -1451,8 +1650,29 @@ The kernel and EPROM bootloader need their own absolute addresses before an
 ordinary runtime object can tell them where they are. The compiler option
 `-k sram` therefore generates [`kernel/memory_constants.header`](kernel/memory_constants.header),
 and `-k eprom` generates [`boot/memory_constants.header`](boot/memory_constants.header).
-These are compile-time interfaces, not tables allocated by PicoOS. The first
-table connects the kernel constants to the state they initialize or restore.
+These are generated C-style header files whose current extension is
+`.header`, rather than `.h`. They are compile-time interfaces, not tables
+allocated by PicoOS. A `-k` invocation performs the layout calculation and
+writes only the header, so the normal compile/link invocation follows with
+that header included by the source. The compiler fixes the filename to
+`memory_constants.header` in the directory selected by `-o`.
+
+The current kernel header is shown below. Its values come from the linked
+kernel layout with a 4,096-cell heap and a 2,715-cell stack:
+
+```c
+#define SRAM_BASE (-2147483647 - 1) // -2^31
+#define SRAM_MAX_ADDRESS_IN_MEMORY_MAP -2147221505 // -2^31 + 2^18 - 1
+#define KERNEL_HEAP_START -2147442151 // -2^31 + heap_start
+#define KERNEL_HEAP_SIZE 4096 // heap_size
+#define PROCESS_MEMORY_START -2147435339 // -2^31 + stack_start + 1
+#define KERNEL_CS_START_ASM "LOADI32 CS -2147483643" // -2^31 + codesegment_start
+#define KERNEL_DS_START_ASM "LOADI32 DS -2147442882" // -2^31 + datasegment_start
+#define KERNEL_SP_START_ASM "LOADI32 SP -2147435340" // -2^31 + stack_start
+#define KERNEL_CS_ACC_ASM "LOADI32 ACC -2147483643" // -2^31 + codesegment_start
+```
+
+The table connects these constants to the state they initialize or restore.
 
 | Kernel constant | Consumer and purpose |
 | --- | --- |
@@ -1464,8 +1684,15 @@ table connects the kernel constants to the state they initialize or restore.
 | [`KERNEL_SP_START_ASM`](kernel/memory_constants.header#L8) | Inline assembly fragment that installs the linked kernel stack start |
 | [`KERNEL_CS_ACC_ASM`](kernel/memory_constants.header#L9) | Generated fragment for loading the kernel code base into `ACC`, currently unused by PicoOS source |
 
-The bootloader constants in the next table establish the temporary context
-used before the kernel image can supply its own segment and stack values.
+The current bootloader header establishes the temporary context before the
+kernel image supplies its own segment and stack values. The code shows the
+generated format, and the following table explains its three constants:
+
+```c
+#define SRAM_MAX_ADDRESS 262143 // 2^18 - 1
+#define EPROM_DS_START_ASM "LOADI32 DS 3165" // datasegment_start
+#define EPROM_STACK_START_ASM "LOADI32 SP -2147221505" // -2^31 + 2^18 - 1
+```
 
 | Bootloader constant | Consumer and purpose |
 | --- | --- |
@@ -1543,7 +1770,7 @@ implying that the unimplemented addresses contain registers:
 | `0x40000000..0x7fffffff` | `01` | Periphery | Offsets `0..16`, through `0x40000010`, are implemented memory-mapped registers |
 | `0x80000000..0xffffffff` | `10` or `11` | SRAM | Kernel image, process images, heaps, stacks, and shared data |
 
-Older operating-systems lecture diagrams could label the middle region as the
+Older RETI memory maps could label the middle region as the
 UART area because it contained only send, receive, and status registers at
 offsets 0 through 2. Those UART registers remain at the start of the region,
 but interrupt-controller, timer, protection, exception, and DMA registers now
@@ -1577,38 +1804,126 @@ emulated hardware protection register.
 ### 1.2.2 Atomic test-and-set with `TSL`
 [\[↑ TOC\]](#contents)
 
-The emulator extension adds `TSL`, short for test and set lock, to the RETI
-instruction set. Its syntax is `TSL S D i`. Register `S` contains a base
-address, `i` is an offset, and `D` receives the old value stored at
-`M[S + i]`. As one atomic instruction, `TSL` reads that value and then writes
-`1` to the same cell:
+The emulator extension adds `TSL`, short for test and set lock, with syntax
+`TSL S D i`. Register `S` contains the base address, `i` is a signed 22-bit
+word offset, and register `D` receives the target cell's previous value. The
+[`interpreter`](../RETI-Emulator/source/interpr.c#L398) first calculates and
+saves the address `S + i`, then reads that cell, writes its old value to `D`,
+and finally writes `1` to the saved address. These steps execute as one atomic
+instruction, with no interrupt or process switch between the read and write.
+
+The example uses a non-zero offset to distinguish the base from the target:
 
 ```reti
-# Before: M[DS + 0] = 0
-TSL DS ACC 0
-# After:  ACC = 0 and M[DS + 0] = 1
+# Before: M[DS + 2] = 0
+TSL DS ACC 2
+# After:  ACC = 0 and M[DS + 2] = 1
 ```
 
-If the cell already contained `1`, `ACC` receives `1` and the memory cell
-remains `1`. Atomicity matters because no other process can access the lock
-between a separate read and write. The assembler, disassembler, interpreter,
-and debugger all recognize the added instruction.
+The diagram places this access in the RETI memory map and then expands four
+adjacent SRAM cells. Addresses count 32-bit words, so offset `2` advances two
+cells, not two bytes:
 
-PicoOS uses the same operation in
-[`testset(lock_addr)`](library/mutex/mutex.picoc#L3) as
-`TSL IN2 ACC 0`. The function returns the old lock value, allowing
-[`mutex_lock(m)`](library/mutex/mutex.picoc#L18) to distinguish acquisition
-from contention. The complete retry, sleeping, wakeup, and lost-wakeup
-limitations are explained in [Section 6.3, Mutex Locking with Test-and-Set and
-Wait Queues](#63-mutex-locking-with-test-and-set-and-wait-queues).
+![TSL DS ACC 2 in the RETI memory map, with contiguous SRAM word cells and the target changing from 0 to 1](documentation/images/tsl-memory-layout.svg)
+
+`ACC` always receives the exact previous word, with no conversion to a boolean.
+For example, an old value of `7` returns `7` and still becomes `1` in memory.
+If the old value is already `1`, it returns `1` and remains `1`. The saved
+address also makes the operation well-defined when `S` and `D` are the same
+register. As with other register-writing instructions, selecting `SP` as the
+destination can trigger stack-overflow protection. If that register write
+fails, the interpreter returns before setting the memory cell. Selecting
+`PC` transfers control to the old cell value without the normal PC increment.
+Neither special case applies to the shown `ACC` destination.
+
+For machine encoding, `TSL` uses the **Store, Move** category, whose type bits
+`I[31,30]` are `10`, and fills mode `10`. The
+[`assembler`](../RETI-Emulator/source/assemble.c#L141) encodes `TSL DS ACC 2`
+with the following fields. Field widths follow their bit counts:
+
+![TSL DS ACC 2 instruction fields](documentation/images/tsl-instruction-format.svg)
+
+The complete machine word is `0xAEC00002`. The immediate field `i` is a signed
+22-bit displacement, here `+2`.
+
+The source and destination field roles vary within this category. For `TSL`,
+`S` is the address base and `D` is the result register. The neighboring modes
+make its position in the encoding explicit:
+
+| Type | Mode `M` | Assembly syntax | Operation |
+| --- | --- | --- | --- |
+| `10` | `00` | `STORE S i` | Store register `S` at the direct, DS-completed address |
+| `10` | `01` | `STOREIN D S i` | Store register `S` at address `D + i` |
+| `10` | `10` | `TSL S D i` | Return `M[S + i]` in `D`, then set that cell to `1` |
+| `10` | `11` | `MOVE S D` | Copy register `S` to register `D` |
+
+PicoOS uses this instruction in
+[`testset(lock_addr)`](library/mutex/mutex.picoc#L3), with `IN2` holding the
+lock's address. The function returns the old word so
+[`mutex_lock(m)`](library/mutex/mutex.picoc#L18) can distinguish acquisition
+from contention. Its retry, sleeping, wakeup, and lost-wakeup limitations are
+explained in
+[`6.3 Mutex Locking with Test-and-Set and Wait Queues`](#63-mutex-locking-with-test-and-set-and-wait-queues).
 
 ### 1.2.3 UART host-service protocol
 [\[↑ TOC\]](#contents)
 
-UART transports bytes only. PicoOS and the emulator place the UART host
-request protocol on top of it. Every host request starts with escape byte 27
-and has the form `<ESC>operation arguments<ESC>/`. The table below lists the
-request forms and the host operation or response each one selects.
+UART transports bytes only. A physical RETI system needs dedicated host-side
+service software to interpret PicoOS requests and connect them to the host
+terminal and filesystem. The UART-to-USB adapter provides the serial transport,
+while the service software provides the protocol behavior. The physical
+architecture below shows requests and responses traversing the same path:
+
+```mermaid
+flowchart LR
+    UART["RETI UART controller"] <-->|"UART bytes<br/>host requests / responses"| ADAPTER["UART-to-USB adapter"]
+    ADAPTER <-->|"USB connection<br/>host requests / responses"| SERVICE
+    subgraph HOST["Host operating system"]
+        SERVICE["Dedicated host-side service software<br/>interpret escape-sequence requests"]
+        TERMINAL["Terminal"]
+        FILES["Sandboxed host filesystem"]
+        SERVICE -->|normal UART output| TERMINAL
+        SERVICE -->|"host request: mkdir, touch, write, ..."| FILES
+        FILES -->|data or result for host response| SERVICE
+    end
+```
+
+The RETI-Emulator replaces both the physical serial path and that dedicated
+service software during current development. It models the UART controller
+and handles the byte stream directly. It does not contain physical USB or
+adapter hardware. The corresponding emulator architecture is:
+
+```mermaid
+%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 45, "wrappingWidth": 300}}}%%
+flowchart LR
+    subgraph HOST["Host operating system"]
+        direction LR
+        subgraph EMU["RETI-Emulator"]
+            direction LR
+            GUEST["PicoOS on<br/>emulated RETI"]
+            UART["Emulated UART<br/>controller"]
+            SERVICE["Built-in<br/>host-service parser"]
+            GUEST <-->|UART send / receive bytes| UART
+            UART <-->|host requests / responses| SERVICE
+        end
+        SERVICE -->|normal UART output| TERMINAL["Host terminal<br/>launches the emulator"]
+        SERVICE -->|sandboxed filesystem operation| FILES["Sandboxed host filesystem<br/>Launch directory = PicoOS /"]
+        FILES -->|data or result| SERVICE
+    end
+```
+
+The terminal and filesystem resources are introduced in
+[`Intended physical hardware`](#intended-physical-hardware). The emulator's
+[`guest_filesystem.c`](../RETI-Emulator/source/guest_filesystem.c) pins the launch
+directory as the sandbox root, with the files and directories recursively
+below it forming PicoOS `/`. It normalizes `..` without going above this root
+and blocks symbolic-link escape paths. Requests can create or modify files and
+directories there or return metadata and file bytes to PicoOS.
+
+Every host request starts with escape byte 27 and has the form
+`<ESC>operation arguments<ESC>/`. Ordinary bytes are displayed in the terminal
+unless an output-selection request has redirected them to a file. The table
+lists each request form and its host operation or response.
 
 | Request form | Result |
 | --- | --- |
@@ -1637,6 +1952,7 @@ request has the file-transfer form below. In this and the following diagram,
 `ESC` denotes the escape byte written as `<ESC>` in the request forms above:
 
 ```mermaid
+%%{init: {"sequence": {"wrap": false, "actorMargin": 60, "width": 180, "height": 45, "messageMargin": 25, "mirrorActors": false, "diagramMarginY": 35}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
 sequenceDiagram
     participant P as PicoOS loader
     participant H as RETI-Emulator host
@@ -1651,6 +1967,7 @@ reads prefix a byte payload with its byte count, while metadata and status
 requests return one big-endian value without a payload:
 
 ```mermaid
+%%{init: {"sequence": {"wrap": false, "actorMargin": 60, "width": 180, "height": 45, "messageMargin": 25, "mirrorActors": false, "diagramMarginY": 35}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
 sequenceDiagram
     participant P as PicoOS
     participant H as RETI-Emulator host
@@ -1701,13 +2018,37 @@ and enter normal or raw UART terminal mode. During continuous execution the
 terminal remains live and each delivered input byte can raise a UART hardware
 interrupt.
 
-The TUI follows live `CS` and `DS` as the bootloader loads the kernel and the
-dispatcher switches processes. Compiler `.debuginfo`, preprocessed source,
-labels, and `.sections` supply the source/section meaning that raw RETI words
-cannot contain themselves. The emulator can therefore show source frames and
-section-aware memory while still executing the same encoded words intended for
-hardware. The machine model, peripherals, and host protocol described above
-provide the state shown in these views.
+The TUI displays all eight CPU registers: `PC`, `IN1`, `IN2`, `ACC`, `SP`,
+`BAF`, `CS`, and `DS`. Its default
+[`watchobjects`](../RETI-Emulator/source/debug/core_debug.c#L69) center the EEPROM
+and SRAM code windows on `PC`, the SRAM data window on `DS`, and the SRAM stack
+window on `SP`. `PC` therefore follows bootloader execution in EEPROM and later
+kernel and process execution in SRAM. The matching address-space window shows
+the active instruction. `CS` and `DS` also determine the live interpretation
+of code and data as the bootloader installs the kernel context and the
+dispatcher restores each process's segments.
+
+The table distinguishes the default views from values that can be selected:
+
+| View | Default tracking | Additional selection |
+| --- | --- | --- |
+| CPU registers | All eight current register values | Select a register to inspect or edit its value |
+| EEPROM / SRAM code | `PC`, in the matching address space | Assign another register or a direct memory address |
+| SRAM data | `DS` | Assign another register or a direct memory address |
+| SRAM stack | `SP` | Assign another register or a direct memory address |
+| Periphery | UART state | Cycle interrupt/timer, exception, and DMA views |
+
+Use `Tab` / `Shift+Tab` to select an address window and `a` to assign any CPU
+register or a direct address as its watchobject. The window then tracks that
+register's pointed-to location, or keeps the selected memory address visible.
+`j` / `k` scroll independently, and `C` centers the view on the watchobject
+again. This is live state inspection rather than a recorded time-series plot.
+
+Compiler `.debuginfo`, preprocessed `.pre` source, labels, and `.sections`
+connect that state to PicoC meaning. The source view uses the executing `PC`
+and code context, while frame information and `BAF` locate arguments, locals,
+saved frame pointers, and return addresses. These views expose the same
+encoded words intended for hardware.
 
 Normal terminal view `v` leaves host signal processing active and returns with
 Escape. Raw view `V` forwards control and escape bytes,including `Ctrl+C`,
@@ -2262,34 +2603,20 @@ The dispatcher copies saved `IN2` from `caller_context[4]` to
 result until it restores that process. Therefore, the result survives because
 it is moved from `IN2` into the saved frame and then into the PCB activation.
 
-The following sequence shows these two outcomes after the syscall handler
-returns.
+The decision below follows the saved result through the two return paths.
 
 ```mermaid
-sequenceDiagram
-    participant U as Userspace wrapper
-    participant I as syscall_interrupt
-    participant K as handle_syscall
-    participant S as Kernel subsystem
-    participant R as syscall_interrupt_return
-    participant D as Dispatcher
-    participant X as syscall_interrupt_restore
-
-    U->>I: INT 0 with selector in ACC and argument in IN1
-    I->>I: Save frame and install kernel context
-    I->>K: Pass selector, argument, caller_context
-    K->>S: Call selector's kernel function
-    S-->>K: Return result
-    K-->>R: Return through assembly continuation
-    R->>R: Store result in saved IN2
-    R->>D: dispatcher_reschedule_if_requested(caller_context)
-    alt Timer requested rescheduling
-        D->>D: Save activation and select next process
-        D-->>U: RTI when caller is selected again
-    else No pending reschedule
-        D-->>X: Return through restoration continuation
-        X-->>U: Restore registers and boundary, RTI
-    end
+%%{init: {"flowchart": {"rankSpacing": 25, "nodeSpacing": 25}}}%%
+flowchart TB
+    RESULT["Syscall handler returns result in IN2"]
+    SAVE["syscall_interrupt_return<br/>Copy result to caller_context[4]"]
+    CHECK{"Rescheduling requested?"}
+    DIRECT["syscall_interrupt_restore<br/>Restore the saved registers and boundary"]
+    DISPATCH["Dispatcher<br/>Save caller_context in the PCB activation<br/>Select and restore a runnable process"]
+    RTI["RTI returns to the restored process<br/>Its saved IN2 contains its syscall result"]
+    RESULT --> SAVE --> CHECK
+    CHECK -->|No| DIRECT --> RTI
+    CHECK -->|Yes| DISPATCH --> RTI
 ```
 
 When [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
@@ -2297,8 +2624,8 @@ runs, it restores the saved registers, including the result in `IN2`, and then
 executes `RTI`. On the dispatcher path, the dispatcher later restores the same
 register values from the PCB and executes `RTI` itself, so
 [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L158)
-is not executed afterward. In short, the restoration stub runs only when the
-syscall handler returns and the rescheduling check also returns normally.
+is not executed afterward. The restoration stub runs only when the syscall
+handler returns and the rescheduling check also returns normally.
 
 #### 2.4.6.2 System-call groups
 [\[↑ TOC\]](#contents)
@@ -2471,6 +2798,7 @@ return continuation calls
 saved process frame, which lets the dispatcher switch safely before `RTI`.
 
 ```mermaid
+%%{init: {"sequence": {"wrap": true}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
 sequenceDiagram
     participant U as Process in syscall
     participant K as Kernel syscall work
@@ -3690,54 +4018,13 @@ int main(int argc, char **argv) {
 }
 ```
 
-The first sequence follows only creation and mapping. It shows the main idea:
-the kernel keeps one shared-memory entry, while each successful mapping adds a
-process-owned attachment and returns the same data address.
-
-```mermaid
-sequenceDiagram
-    participant A as Process A
-    participant B as Process B
-    participant K as Shared-memory subsystem
-    participant M as Shared data region
-
-    A->>K: shm_open("shared-value", 1)
-    K->>M: Create the shared region
-    K-->>A: New numeric ID
-    A->>K: mmap(id)
-    K-->>A: Shared address (one attachment)
-    B->>K: shm_open("shared-value", 1)
-    K-->>B: The existing ID
-    B->>K: mmap(id)
-    K-->>B: The same address (two attachments)
-    Note over A,B: Both processes access the same cells
-```
-
-The launcher then waits for the worker, so the worker's process removal
-releases one attachment before the launcher unlinks the name. The second
-sequence starts at that cleanup and shows why unlinking does not destroy the
-region while the launcher's attachment still exists.
-
-```mermaid
-sequenceDiagram
-    participant A as Launcher process
-    participant B as Worker process
-    participant K as Shared-memory subsystem
-    participant M as Shared data region
-
-    B->>K: Exit and remove process
-    K->>K: Release B attachment and set count to 1
-    A->>K: shm_unlink("shared-value")
-    K->>K: Remove the name and mark unlink requested
-    Note over K,M: A's attachment keeps the region alive
-    A->>K: Exit and remove process
-    K->>K: Release A attachment and set count to 0
-    K->>M: Free the shared region
-    K->>K: Free the entry
-```
+The launcher waits for the worker, whose process removal releases one
+attachment. Unlinking then removes the name, but the launcher's attachment
+keeps the region alive. When the launcher is removed, its last attachment is
+released and the unlinked entry and shared data region are destroyed.
 
 The function table below identifies which kernel operations implement the lookup, attachment, and
-cleanup steps shown above. The syscall-backed operations come first, their **Called by** entries
+cleanup operations. The syscall-backed operations come first, their **Called by** entries
 show the library function that reaches them before their kernel caller. The remaining rows are
 internal kernel operations.
 
@@ -4051,6 +4338,7 @@ explains the [`BLOCKED`](kernel/process/process.header#L15) and
 [`STOPPED`](kernel/process/process.header#L16) transitions.
 
 ```mermaid
+%%{init: {"themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
 stateDiagram-v2
     [*] --> NEW: completed load
     NEW --> READY: run and build initial stack
@@ -4093,74 +4381,19 @@ process, as described in
 Loading and starting are deliberately separate operations. Every successful
 userspace [`load()`](library/unistd/process.picoc#L17) first reads and validates
 the binary header, reserves the complete process image, and stores the partial
-load in the caller's PCB. The following sequence shows only that common setup.
-The two payload-transfer modes are shown separately afterward. Boot-time
-loading instead uses the continuous transfer in
+load in the caller's PCB. The payload is then received using polling or DMA.
+Boot-time loading uses the continuous transfer in
 [Section 10.1, Loading the kernel from the EPROM bootloader](#101-loading-the-kernel-from-the-eprom-bootloader).
 
-```mermaid
-sequenceDiagram
-    participant C as load() wrapper
-    participant K as Kernel loader
-    participant H as RETI-Emulator host service
-    participant M as Process-image memory
-
-    C->>K: Begin load(path)
-    K->>H: Request file size and five-word header
-    H-->>K: Size and header
-    K->>K: Validate layout and resolve heap/stack defaults
-    K->>M: Reserve the complete process image
-    K->>K: Save pending_load in the caller's PCB
-```
-
 Without DMA, [`load()`](library/unistd/process.picoc#L17) re-enters the kernel
-for each bounded payload chunk. The next sequence shows how those short
-syscalls fill the reserved image and eventually create the PCB.
-
-```mermaid
-sequenceDiagram
-    participant C as load() wrapper
-    participant K as Kernel loader
-    participant H as RETI-Emulator host service
-    participant M as Reserved process image
-
-    loop While more than one chunk remains
-        C->>K: Continue load
-        K->>H: Request the next range, at most 1 KiB
-        H-->>K: Payload bytes
-        K->>M: Copy the chunk and update progress
-        K-->>C: Return continue status
-    end
-    C->>K: Continue load for the final chunk
-    K->>H: Request the final range
-    H-->>K: Final payload bytes
-    K->>M: Copy the final chunk
-    K->>K: Create the NEW process
-    K-->>C: Return the new PID
-```
+for each payload chunk of at most 1 KiB. Each syscall requests the next file
+range from the host, copies it into the reserved image, and updates progress.
+The wrapper continues until the final chunk creates the new PCB and returns
+its PID.
 
 With DMA, the loader requests the whole payload once and blocks the caller
 while the device copies it. The completion interrupt wakes the caller, whose
 next continuation syscall verifies the transfer and creates the PCB.
-
-```mermaid
-sequenceDiagram
-    participant C as load() wrapper
-    participant K as Kernel loader and dispatcher
-    participant H as RETI-Emulator host service
-    participant D as DMA device
-    participant M as Reserved process image
-
-    K->>H: Request the complete payload
-    K->>D: Start transfer, block caller, and dispatch
-    H-->>D: Send payload through UART
-    D->>M: Copy words directly into the image
-    D->>K: Raise the completion interrupt
-    K-->>C: Wake and later resume with continue status
-    C->>K: Continue load
-    K->>K: Verify completion and create the NEW process
-    K-->>C: Return the new PID
-```
 
 Both transfer modes end with a complete image and a PCB whose state is
 [`NEW`](kernel/process/process.header#L12).
@@ -4729,45 +4962,14 @@ starts a new process at its first instruction.
 A resumable switch arrives with a timer or syscall frame: immediate userspace
 timer preemption, [`yield()`](library/schedule/schedule.picoc#L4), a blocking
 operation, a DMA load wait, or a deferred request consumed at syscall return.
-The following sequence shows this common context-switch case. Its main point is
-that the dispatcher saves one activation before selecting and restoring the
-next one.
-
-```mermaid
-sequenceDiagram
-    participant A as Outgoing process
-    participant D as Dispatcher
-    participant S as Scheduler
-    participant B as Selected process
-
-    A->>D: Switch with a saved interrupt frame
-    D->>D: Copy the frame into A's PCB activation
-    D->>S: Select the next runnable process
-    S-->>D: B's PCB
-    D->>D: Make B current and mark it RUNNING
-    D-->>B: Restore B's activation and resume through RTI
-```
+The dispatcher saves the outgoing activation before selecting and restoring
+the next process.
 
 Kernel startup and termination are different because there is no outgoing
 activation to preserve. Their shorter path begins directly with
-[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55), as the next
-sequence shows. In both paths,
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55). In both paths,
 [`prepare_process_termination()`](kernel/signal.picoc#L126) may reject a
 scheduler candidate and make the dispatcher select another one before restore.
-
-```mermaid
-sequenceDiagram
-    participant C as Startup or termination path
-    participant D as Dispatcher
-    participant S as Scheduler
-    participant B as Selected process
-
-    C->>D: Start the next process without saving context
-    D->>S: Select a runnable process
-    S-->>D: B's PCB
-    D->>D: Make B current and mark it RUNNING
-    D-->>B: Restore B's activation and resume through RTI
-```
 
 ## 5.5 Dispatcher function reference
 [\[↑ TOC\]](#contents)
@@ -4933,36 +5135,18 @@ return-value handoff to this relationship.
 ### 6.1.1 Blocking with `sleep` and Waking with `wakeup`
 [\[↑ TOC\]](#contents)
 
-The library-facing blocking calls pass an existing queue address directly; they
+The library-facing blocking calls pass an existing queue address directly and
 create no request structure. The possible caller and kernel queue locations are
 compared in [Section 8.4, Wait requests and queue storage](#84-wait-requests-and-queue-storage).
 [`sleep(queue)`](library/unistd/blocking.picoc#L9) is not a timed delay. It invokes [`SYSCALL_SLEEP`](common/syscall.header#L19), appends the
-current PCB to the supplied queue, changes it to [`BLOCKED`](kernel/process/process.header#L15), saves its
+current PCB to the supplied queue, changes its state to [`BLOCKED`](kernel/process/process.header#L15), saves its
 activation, and dispatches. [`wakeup(queue)`](library/unistd/blocking.picoc#L19) invokes [`SYSCALL_WAKEUP`](common/syscall.header#L20) and
-removes at most the FIFO head. The woken PCB becomes [`READY`](kernel/process/process.header#L13), but the caller
+removes at most the FIFO head. The woken PCB's state becomes [`READY`](kernel/process/process.header#L13), but the caller
 keeps running until normal scheduling occurs. If the waiter is also
 [`STOPPED`](kernel/process/process.header#L16), the kernel changes [`stopped_from_state`](kernel/process/process.header#L62) to [`READY`](kernel/process/process.header#L13) and leaves the
-visible state stopped until [`SIGCONT`](common/signal.header#L6). The sequence below shows an ordinary
-blocked waiter: waking it makes it eligible, while the dispatcher determines
-when its suspended call actually resumes.
-
-```mermaid
-sequenceDiagram
-    participant P as Process P
-    participant K as Syscall/kernel queue code
-    participant Q as wait_queue
-    participant D as Dispatcher
-    participant E as Event owner
-
-    P->>K: sleep(&queue), sleep syscall
-    K->>Q: Append P using PCB.wait_next
-    K->>P: RUNNING to BLOCKED
-    K->>D: Save activation and select another process
-    E->>K: wakeup(&queue), wakeup syscall
-    K->>Q: Remove FIFO head and clear intrusive links
-    K->>P: BLOCKED to READY
-    D-->>P: Restore later when selected
-```
+visible state stopped until [`SIGCONT`](common/signal.header#L6). Waking a process
+makes it eligible to run, while the dispatcher determines when its suspended
+call resumes.
 
 ### 6.1.2 Child Waiting with `waitpid`
 [\[↑ TOC\]](#contents)
@@ -5031,70 +5215,21 @@ parent is ready, the scheduler can select it. It resumes its suspended
 [`waitpid()`](library/sys/wait/wait.picoc#L14) call and returns its updated local
 [`status`](library/sys/wait/wait.picoc#L15) value.
 
-The immediate cases do not put the parent on a wait queue. The following
-sequence shows the kernel either collecting an existing zombie or reporting an
-already stopped child before returning directly.
+The immediate cases do not put the parent on a wait queue. The kernel either
+collects an existing zombie or reports an already stopped child before
+returning directly.
 
-```mermaid
-sequenceDiagram
-    participant P as Waiting Parent (P)
-    participant K as Kernel wait handling
-    participant C as Child (C)
-
-    P->>K: waitpid(C.pid), waitpid syscall
-    K->>C: Find PCB and check C.parent_pid matches P.pid
-    alt C is already ZOMBIE
-        K->>C: Read C.exit_status and call remove_process(C)
-        K-->>P: Return exit status directly
-    else C is STOPPED
-        K->>C: Read C.stop_signal
-        K-->>P: Return stopped status directly
-    end
-```
-
-An active child requires a later event to finish the call. The second sequence
-shows the essential asynchronous flow: the kernel retains a pointer to the
-parent's stack-local status, blocks the parent on the child's queue, and writes
-the result before recording that the wait has completed. An ordinary blocked
-parent becomes ready immediately, a stopped parent can resume after
-[`SIGCONT`](common/signal.header#L6).
-
-```mermaid
-sequenceDiagram
-    participant P as Waiting Parent (P)
-    participant K as Kernel wait handling
-    participant C as Active Child (C)
-
-    P->>K: waitpid(C.pid) with request.status pointing to status
-    K->>C: Find PCB and verify C.parent_pid matches P.pid
-    K->>P: Copy request.status to P.waiting_status_ptr
-    K->>C: Call sleep_on_wait_queue with C.waiters
-    K->>P: C.waiters points to P and P.waiting_queue_ptr points back
-    K->>P: Set P.state to BLOCKED
-    Note over P,C: P's suspended userspace frame keeps request and status alive
-    C->>K: terminate_process(C, exit_status) later
-    K->>C: Walk C.waiters from head through PCB.wait_next
-    K->>P: Reach P PCB and write exit_status through P.waiting_status_ptr
-    K->>P: Clear P.waiting_status_ptr
-    K->>C: wakeup_wait_queue on C.waiters advances head and tail
-    K->>P: Clear membership links and set P READY
-    opt C terminated while P was already waiting
-        K->>C: remove_process(C) immediately, before dispatch
-    end
-    K-->>P: Dispatcher later resumes suspended waitpid
-```
-
-The unlink uses the child's queue object, not a search of the global process
-list: [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) removes
-`C.waiters.head`, follows that parent PCB's
-[`wait_next`](kernel/process/process.header#L51), updates `C.waiters.head` and
-`tail`, then clears the parent's
-[`waiting_queue_ptr`](kernel/process/process.header#L48) and `wait_next`.
-Conversely, if the waiting parent itself is deleted first,
-[`remove_process()`](kernel/process/process.picoc#L209) follows
-`P.waiting_queue_ptr` to `C.waiters` and calls
-[`remove_from_wait_queue()`](kernel/process/process.picoc#L176) before freeing
-P, preventing a later child wakeup from dereferencing a freed PCB.
+[`wakeup_wait_queue()`](kernel/process/process.picoc#L395) removes the parent
+from the head of the child's embedded [`waiters`](kernel/process/process.header#L46)
+queue. It follows the parent's [`wait_next`](kernel/process/process.header#L51)
+link, updates the queue's head and tail, then clears the parent's
+[`waiting_queue_ptr`](kernel/process/process.header#L48) and
+[`wait_next`](kernel/process/process.header#L51). If the waiting parent is
+deleted first, [`remove_process()`](kernel/process/process.picoc#L209) follows
+its [`waiting_queue_ptr`](kernel/process/process.header#L48) to the child's
+queue and calls [`remove_from_wait_queue()`](kernel/process/process.picoc#L176)
+before freeing the parent. This prevents a later child wakeup from following a
+freed PCB.
 
 The local status variable remains valid because the parent's userspace stack
 is suspended while it is blocked. If the child exits before the call, it
@@ -5294,27 +5429,8 @@ Unix/Linux permits a process to catch and handle [`SIGINT`](common/signal.header
 cannot be caught, this educational OS deliberately gives both the same fixed
 termination action. Unix/Linux likewise makes [`SIGSTOP`](common/signal.header#L7) uncatchable while
 [`SIGTSTP`](common/signal.header#L8) and [`SIGTTIN`](common/signal.header#L9) can normally be caught or ignored. PicoOS gives all
-three the same fixed stop action. The sequence below highlights the one
-deferred action: destroying a currently running target waits for dispatch,
-whereas stop and continue update PCB state immediately.
-
-```mermaid
-sequenceDiagram
-    participant S as Signal source
-    participant K as Kernel signal code
-    participant P as Target PCB
-    participant D as Dispatcher
-
-    S->>K: kill(pid, signal) or kernel-generated signal
-    alt target is currently RUNNING and must terminate
-        K->>P: Store pending termination signal
-        K->>D: Request rescheduling at the safe return boundary
-        D->>K: prepare_process_termination(P)
-        K->>P: Terminate safely before restore
-    else other target or stop/continue action
-        K->>P: Terminate or update process state immediately
-    end
-```
+three the same fixed stop action. Destroying a currently running target is
+deferred until dispatch, whereas stop and continue update PCB state immediately.
 
 ### 6.2.5 Signal Function Reference
 [\[↑ TOC\]](#contents)
@@ -5357,7 +5473,6 @@ The possible mutex and queue locations are compared in
 [Section 8.4, Wait requests and queue storage](#84-wait-requests-and-queue-storage).
 In a shared-memory data region, both its lock and queue are visible to all
 participants. The kernel still owns the PCBs linked through that queue.
-
 
 The implementation below shows how [`mutex_lock()`](library/mutex/mutex.picoc#L18) retries [`testset()`](library/mutex/mutex.picoc#L3) after
 every wakeup. [`mutex_init()`](library/mutex/mutex.picoc#L12) must initialize both the lock and the embedded
@@ -5716,37 +5831,10 @@ choose among stopped jobs. Per-process pending-read fields remain necessary beca
 reader must retain the userspace destination and requested count until the shell later selects it
 with `fg`.
 
-The sequence below shows [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134) for a
-foreground process: its request is stored in the PCB before dispatch, and
-[`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L213) calls
-[`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) to make that specific
-reader ready. Background reads instead stop with [`SIGTTIN`](common/signal.header#L9), as explained
+Background reads stop with [`SIGTTIN`](common/signal.header#L9), as explained
 in [Section 7.4, Foreground input ownership and terminal-generated signals](#74-foreground-input-ownership-and-terminal-generated-signals).
 [Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals)
 shows how the shell selects and resumes the job.
-
-```mermaid
-sequenceDiagram
-    participant P as Reading process
-    participant K as Descriptor/terminal code
-    participant T as Global Terminal
-    participant D as Dispatcher
-    participant U as UART ISR
-
-    P->>K: read(0, buffer, count)
-    alt input_buffer contains bytes
-        K->>T: Pop up to count bytes
-        K-->>P: Return count immediately
-    else ring is empty
-        K->>P: Store pending buffer/count in PCB
-        K->>T: Enqueue P and mark it BLOCKED
-        K->>D: dispatcher_switch_from_context(frame), save activation
-        U->>T: Enqueue received byte
-        U->>P: Copy bytes and store result in activation.in2
-        U->>P: Clear PCB pending fields, detach from queue, mark READY
-        D-->>P: Restore later and return the saved result
-    end
-```
 
 For a concrete call, consider this PicoC source in a user process:
 
@@ -6048,7 +6136,8 @@ mode. A descriptor whose path is `/device/terminal.dev` reads from the kernel te
 block. A read from `/device/null.dev` returns EOF. Any other file path sends independent ranged host
 requests of at most 1 KiB at [`descriptor->offset`](kernel/filesystem/file_descriptor.header#L17),
 copies returned bytes, and advances the offset. The userspace [`read()`](library/unistd/io.picoc#L6)
-wrapper repeats the read syscall until the requested count, EOF, or an error. If an error follows
+wrapper tracks [`IoRequest.transferred`](common/file.header#L37) and repeats the read syscall until
+the requested count, EOF, or an error. If an error follows
 successful chunks, it returns the count already transferred, it returns `-1` only when nothing was
 read. It does not need to yield between chunks because deferred timer requests are consumed when
 each syscall returns.
@@ -6111,38 +6200,6 @@ validation, offset changes, terminal blocking, and the host requests each functi
 |  |  |  |  |  |
 | [`free_file_descriptor(table)`](kernel/filesystem/filesystem.picoc#L27) | Lowest free slot in 0–4, or `-1` when all ordinary slots are occupied | Reads descriptor kinds without changing the table, slots 5–7 are reserved and never considered | — | **Kernel functions:** [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) |
 | [`write_uart_bytes(buffer, count, protect_uart_control)`](kernel/filesystem/filesystem.picoc#L195) | Returns no value | When protection is enabled, scans for `<ESC>` and starts a counted literal-output region if found, then sends exactly `count` bytes to the selected host destination | [`uart_send_literal_output_command()`](common/uart_protocol.picoc#L112), [`uart_print_character()`](common/uart_protocol.picoc#L21)<br>**Host request:** optional `literal-output <count>` | **Kernel functions:** [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
-
-The sequence diagram follows one regular-file [`read()`](library/unistd/io.picoc#L6) through
-[`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) and
-[`read_regular_file()`](kernel/filesystem/filesystem.picoc#L90). Each syscall returns one chunk, the
-wrapper owns [`IoRequest.transferred`](common/file.header#L37) and decides when to return the
-combined count to its caller.
-
-```mermaid
-sequenceDiagram
-    participant C as Application caller
-    participant A as Userspace read wrapper
-    participant K as Kernel descriptor code
-    participant U as Kernel UART helpers
-    participant E as RETI-Emulator
-    participant H as Host filesystem
-
-    C->>A: read(fd, buffer, count)
-    loop Until count, EOF, or error
-        A->>K: read chunk with IoRequest
-        K->>K: Validate descriptor and remaining count
-        K->>U: Request at most 1 KiB at descriptor.offset
-        U->>E: ESC read-range offset chunk-count absolute-path ESC /
-        E->>H: Open, seek, and read the bounded range
-        H-->>E: Returned data
-        E-->>U: Big-endian returned count and bytes
-        U->>K: Copy at buffer + transferred
-        K->>K: Advance descriptor offset, update completion/progress fields
-        K-->>A: Chunk count and completion flag
-        A->>A: Add chunk count to transferred
-    end
-    A-->>C: Combined count, or -1 if the first chunk failed
-```
 
 ## 7.9 PicoOS paths, working directories, and host operations
 [\[↑ TOC\]](#contents)
@@ -6221,34 +6278,10 @@ which request host validation or file operations.
 | [`system_relative_path(path)`](kernel/filesystem/host_filesystem.picoc#L121) | Pointer to the input path or the text after its leading `/` | Removes the leading `/` for program names and loading labels | — | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`list_processes()`](kernel/process/process.picoc#L32), [`load_process()`](kernel/process/process_loader.picoc#L305) |
 | [`set_process_working_directory(process, path)`](kernel/filesystem/host_filesystem.picoc#L128) | Returns no value | Allocates a new kernel copy, frees old string, and replaces PCB pointer | [`copy_process_path()`](kernel/process/process.picoc#L70), [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163) |
 
-The sequence contrasts [`chdir()`](library/unistd/working_directory.picoc#L4), which calls
-[`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163) and validates with the
-host, with [`getcwd()`](library/unistd/working_directory.picoc#L11), which only copies stored state
-through [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156). The kernel
-returns a status integer, the [`getcwd()`](library/unistd/working_directory.picoc#L11) wrapper
-converts success to the caller’s buffer pointer.
-
-```mermaid
-sequenceDiagram
-    participant P as Process/library wrapper
-    participant K as Kernel path code
-    participant PCB as Current PCB
-    participant E as RETI-Emulator host service
-
-    P->>K: chdir(path)
-    K->>PCB: Read current working_directory for relative normalization
-    K->>E: ESC is-directory absolute-path ESC /
-    E-->>K: 0 or failure
-    alt directory exists
-        K->>PCB: kmalloc new path, kfree old path, replace pointer
-        K-->>P: 0
-    else invalid directory
-        K-->>P: -1 without changing PCB
-    end
-    P->>K: getcwd(buffer, size)
-    K->>PCB: Copy stored working_directory without a host request
-    K-->>P: 0, getcwd wrapper returns buffer
-```
+[`getcwd()`](library/unistd/working_directory.picoc#L11) copies the PCB's stored
+directory through [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156)
+without a host request. The kernel returns a status integer, which the wrapper
+converts to the caller's buffer pointer on success.
 
 # 8. Kernel data structures: relationships, storage, and lifetimes
 [\[↑ TOC\]](#contents)
@@ -7085,7 +7118,7 @@ whitespace. It reads through [`fgetc()`](library/stdio/stdio.picoc#L178) and use
 The [`start`](library/start/) library supplies the entry point selected with `-C` and a helper
 that prepares the process before calling its application entry function. It has no public header
 and contains two function definitions. The table shows their roles. The complete source and stack
-setup are in [`1.1.5.3 PicoOS libstart startup sequence`](#1153-picoos-libstart-startup-sequence).
+setup are in [`1.1.5.2 PicoOS libstart startup sequence`](#1152-picoos-libstart-startup-sequence).
 Calls made by the application's own entry function depend on that application.
 
 | Library function | Return value / status and purpose | Syscalls / Host Requests |
@@ -7145,17 +7178,17 @@ performed by
 the dispatcher and `RTI`, as explained below.
 
 ```mermaid
-%%{init: {"sequence": {"height": 90}}}%%
+%%{init: {"sequence": {"height": 45, "width": 110, "actorMargin": 15, "boxMargin": 5, "diagramMarginX": 10, "wrap": true}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
 sequenceDiagram
     box rgb(232, 248, 248) EPROM
         participant B as Bootloader<br/>.text and .data
     end
-    box rgb(255, 248, 237) Kernel-reserved SRAM: offsets 0–48308
+    box rgb(255, 248, 237) Kernel-reserved SRAM
         participant K as Kernel image<br/>0–41496<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40766
         participant KH as Kernel heap<br/>41497–45592
         participant KS as Kernel stack<br/>45593–48308
     end
-    box rgb(239, 252, 242) Process and Shared Data Heap: SRAM offsets 48309–262143, managed by pmalloc
+    box rgb(239, 252, 242) Process and Shared Data Heap
         participant I as Init image<br/>libstart startup
         participant SH as Shell image<br/>libstart startup
         participant A as Application A<br/>libstart startup
@@ -7349,7 +7382,7 @@ and constants belong to `.data`. Neither the entry nor
 [`kernel/kernel.reti`](kernel/kernel.reti#L7) shows the generated call to
 [`main()`](kernel/kernel.picoc#L31) at the beginning of `.text`, after `.ivt`.
 
-<!-- Presentation generation: Reproduce the default compiler-generated _start source from 1.1.5.1 here, directly before kernel main. Show the main call and exit operation again on these slides. Do not require navigation back to earlier slides. -->
+<!-- Presentation generation: Reproduce the default compiler-generated _start source from 1.1.5.1 here, directly before kernel main. Show the main call and exit operation again at this presentation stage. Do not require navigation back to earlier presentation stages. -->
 
 The complete [`main()`](kernel/kernel.picoc#L31) below sets up memory allocation,
 terminal and process state, DMA when enabled, and interrupt handling. It then
@@ -7478,9 +7511,9 @@ init's local heap and environment, then calls init's
 [`main()`](system/init.picoc#L100). If that returns, the same wrapper passes
 its return value to [`exit()`](library/stdlib/exit.picoc#L3). The complete
 startup source is already shown in
-[Section 1.1.5.3, PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence).
+[Section 1.1.5.2, PicoOS `libstart` startup sequence](#1152-picoos-libstart-startup-sequence).
 
-<!-- Presentation generation: Reproduce the libstart source from 1.1.5.3 here, directly before init's main/session loop. Show _start and start_process, including heap/environment initialization and exit(main(...)). Do not require navigation back to earlier slides. -->
+<!-- Presentation generation: Reproduce the libstart source from 1.1.5.2 here, directly before init's main/session loop. Show _start and start_process, including heap/environment initialization and exit(main(...)). Do not require navigation back to earlier presentation stages. -->
 
 ### 10.3.1 Init responsibilities
 [\[↑ TOC\]](#contents)
@@ -7601,9 +7634,9 @@ enters the shell's
 [`start_process()`](library/start/start.picoc#L7) prepares the shell's own heap
 and inherited environment and calls shell [`main()`](user/shell.picoc#L1448).
 The shared startup code is shown in
-[Section 1.1.5.3, PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence).
+[Section 1.1.5.2, PicoOS `libstart` startup sequence](#1152-picoos-libstart-startup-sequence).
 
-<!-- Presentation generation: Show the libstart source from 1.1.5.3 again at shell startup when this stage has its own slides. Place it here rather than sending the audience back to the earlier startup slides. -->
+<!-- Presentation generation: Show the libstart source from 1.1.5.2 again at shell startup when this stage has its own presentation stage. Place it here rather than sending the audience back to the earlier startup presentation stage. -->
 
 The shell configures descriptors, terminal input ownership, and its parent-death
 signal, then enters its command-reading loop. Init remains blocked waiting for
@@ -7630,7 +7663,7 @@ When scheduled, each application enters its own
 [`libstart _start()`](library/start/start.picoc#L14), then
 [`start_process()`](library/start/start.picoc#L7), then its `main` function.
 The common startup source is shown in
-[Section 1.1.5.3, PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence).
+[Section 1.1.5.2, PicoOS `libstart` startup sequence](#1152-picoos-libstart-startup-sequence).
 Returning from `main` becomes an [`exit()`](library/stdlib/exit.picoc#L3) syscall,
 so the kernel records the result and handles process termination. The shell
 waits for foreground applications and can keep accepting commands while
@@ -7639,7 +7672,7 @@ as in the diagram. Command details follow in
 [Section 11.4, Command parsing, expansion, and execution](#114-command-parsing-expansion-and-execution)
 and [Section 12, User applications and commands](#12-user-applications-and-commands).
 
-<!-- Presentation generation: Reproduce the libstart source from 1.1.5.3 directly at this application-startup stage when generating its slides. Show the application's main call and the exit path here. Do not rely on navigation back to earlier slides. -->
+<!-- Presentation generation: Reproduce the libstart source from 1.1.5.2 directly at this application-startup stage in its presentation stage. Show the application's main call and the exit path here. Do not rely on navigation back to earlier presentation stages. -->
 
 ### 10.3.6 Shell exit and restart policy
 [\[↑ TOC\]](#contents)
@@ -7720,7 +7753,6 @@ the descriptor, signal, process, and library interfaces described above, then
 hands command execution to the applications in the next chapter. The sections
 below follow a command from persistent shell state through input, parsing,
 process control, redirection, and optional pipeline execution.
-
 
 ## 11.1 Shell-owned state
 [\[↑ TOC\]](#contents)
@@ -7956,53 +7988,20 @@ and from nested shells. A relative entry supplied by the user is resolved from t
 [`Process.working_directory`](kernel/process/process.header#L39), just like other relative paths.
 
 Built-ins execute directly in the shell and are listed in
-[Section 11.5, Shell built-in commands](#115-shell-built-in-commands). The
-following sequence instead shows one successful foreground external command
-through [`eval()`](user/shell.picoc#L1224),
-[`load_from_path()`](user/shell.picoc#L1186), and
-[`run_process()`](user/shell.picoc#L1034). Image transfer is one overview step
-here because
-[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma)
-documents its two flows.
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant S as Shell
-    participant K as Kernel
-    participant C as Child process
-
-    U->>S: Submit command
-    S->>S: Validate and parse command
-    S->>K: Load executable
-    K-->>S: NEW child PID
-    S->>K: Apply redirection and run child
-    K->>C: Copy startup state and mark READY
-    S->>K: Restore descriptors, give child input, and wait
-    C->>K: Exit or stop
-    K-->>S: Resume with child status
-    S->>K: Restore shell input ownership
-    S->>S: Store status in $?
-```
+[Section 11.5, Shell built-in commands](#115-shell-built-in-commands).
+For an external command, [`eval()`](user/shell.picoc#L1224) loads the image
+through [`load_from_path()`](user/shell.picoc#L1186), then calls
+[`run_process()`](user/shell.picoc#L1034) to expand arguments, apply redirections,
+and start the new process. Image transfer is described in
+[Section 4.5.1, Executable transfer with polling or DMA](#451-executable-transfer-with-polling-or-dma).
+A foreground command receives terminal ownership while the shell waits for
+its exit or stop status, as explained in
+[Section 11.5.1, Foreground processes, background processes, and job-control signals](#1151-foreground-processes-background-processes-and-job-control-signals).
 
 A background external command shares the load and run preparation but does not
 transfer terminal ownership or call [`waitpid()`](library/sys/wait/wait.picoc#L14).
-The next sequence begins after loading has returned the new PID and shows the
-shorter handoff that lets the shell accept another command.
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant S as Shell
-    participant K as Kernel
-    participant C as Background child
-
-    S->>K: run(pid, arguments, environment)
-    K->>C: Copy startup state and mark READY
-    K-->>S: Child started
-    S->>S: Restore descriptors and store PID in $!
-    S-->>U: Display the next prompt
-```
+After restoring its own descriptors, the shell records the background PID in
+`$!` and returns to the prompt.
 
 Argument handling is intentionally small. The kernel splits the final string on unquoted spaces and
 tabs and removes matching single or double quotes. There is no general escape grammar.
@@ -9177,7 +9176,7 @@ The [PicoC-Compiler](../PicoC-Compiler/README.md) and
 command-line options.
 
 This lets students follow the PicoC-to-RETI translation patterns from the
-operating-systems lecture slides while the real kernel executes.
+operating-systems concepts while the real kernel executes.
 
 <!-- TODO: Add the details for trying out memory-mapped devices with `(A)ssign value`. -->
 
@@ -9240,7 +9239,7 @@ layout, allocation sources, and lifetimes](#81-memory-layout-allocation-sources-
 distinguishes the process stack from the process heap. The startup sequence
 that makes [`malloc()`](library/stdlib/malloc.picoc#L35) available before
 [`main()`](test/exercise_sheet_4_heap/launcher.picoc#L10) is visualized in
-[Section 1.1.5.3, PicoOS `libstart` startup sequence](#1153-picoos-libstart-startup-sequence).
+[Section 1.1.5.2, PicoOS `libstart` startup sequence](#1152-picoos-libstart-startup-sequence).
 
 After the one-allocation exercise, students can use
 [`basic_free.picoc`](test/basic_free.picoc) and

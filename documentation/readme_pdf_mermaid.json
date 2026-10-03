@@ -1,0 +1,15 @@
+{
+  "theme": "default",
+  "look": "classic",
+  "flowchart": {
+    "useMaxWidth": false
+  },
+  "sequence": {
+    "useMaxWidth": false,
+    "wrap": true
+  },
+  "state": {
+    "useMaxWidth": false
+  },
+  "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"
+}
