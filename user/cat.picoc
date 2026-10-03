@@ -32,12 +32,44 @@ void echo_input_character(char character, bool echo_input) {
     }
 }
 
+int write_file_contents(char *buffer, int count, bool terminal_output) {
+    char output[CAT_BUFFER_SIZE * 4];
+    char *hex_digits = "0123456789abcdef";
+    int index = 0;
+    int output_length = 0;
+    int value;
+
+    if (!terminal_output) {
+        return write(STDOUT_FILENO, buffer, count) != count;
+    }
+
+    // Binary terminal controls can hide subsequent output or change the TUI's
+    // character set. Display them as text, keeping file copies byte-for-byte.
+    while (index < count) {
+        value = buffer[index] & 255;
+        if ((value >= ' ' && value <= '~') ||
+            value == '\n' || value == '\r' || value == '\t') {
+            output[output_length] = value;
+            output_length = output_length + 1;
+        } else {
+            output[output_length] = '\\';
+            output[output_length + 1] = 'x';
+            output[output_length + 2] = hex_digits[value / 16];
+            output[output_length + 3] = hex_digits[value % 16];
+            output_length = output_length + 4;
+        }
+        index = index + 1;
+    }
+    return write(STDOUT_FILENO, output, output_length) != output_length;
+}
+
 int copy_file_descriptor(int file_descriptor) {
     char buffer[CAT_BUFFER_SIZE];
+    bool terminal_output = lseek(STDOUT_FILENO, 0, SEEK_CUR) < 0;
     int count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);
 
     while (count > 0) {
-        if (write(STDOUT_FILENO, buffer, count) != count) {
+        if (write_file_contents(buffer, count, terminal_output) != 0) {
             return 1;
         }
         count = read(file_descriptor, buffer, CAT_BUFFER_SIZE);

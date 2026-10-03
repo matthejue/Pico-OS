@@ -1,0 +1,90 @@
+// dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks
+
+#include "../../library/fcntl/fcntl.header"
+#include "../../library/unistd/unistd.header"
+
+#define CONTENT_CAPACITY 160
+#define SOURCE_PATH "/test/cat_binary/data.txt"
+#define COPY_PATH "/test/cat_binary/copy.txt"
+
+char contents[CONTENT_CAPACITY];
+char copied_contents[CONTENT_CAPACITY];
+
+int append_text(int length, char *text) {
+    int index = 0;
+
+    while (text[index] != '\0') {
+        contents[length] = text[index];
+        length = length + 1;
+        index = index + 1;
+    }
+    return length;
+}
+
+int prepare_contents(void) {
+    int length = 0;
+
+    // Put ESC at the last byte of cat's first 64-byte read. An unterminated
+    // terminal string must remain visible across that read boundary.
+    while (length < 63) {
+        contents[length] = 'A';
+        length = length + 1;
+    }
+    contents[length] = 27;
+    length = append_text(length + 1, "]unterminated-title\n");
+    contents[length] = 14;
+    contents[length + 1] = 15;
+    contents[length + 2] = 19;
+    contents[length + 3] = 0;
+    contents[length + 4] = 127;
+    contents[length + 5] = 128;
+    contents[length + 6] = 255;
+    length = append_text(length + 7, "\n");
+
+    // This looks like a host UART request and must be copied as file data.
+    contents[length] = 27;
+    length = append_text(length + 1, "write stdout");
+    contents[length] = 27;
+    length = append_text(length + 1, "/\n");
+    contents[length] = 27;
+    return append_text(length + 1, "Punterminated-string\ndone\n");
+}
+
+int main(int argc, char **argv) {
+    int length = prepare_contents();
+    int file_descriptor;
+    int count;
+    int index = 0;
+
+    if (argc < 2) {
+        file_descriptor = open(SOURCE_PATH, O_WRONLY | O_CREAT | O_TRUNC);
+        if (file_descriptor < 0) {
+            return 1;
+        }
+        count = write(file_descriptor, contents, length);
+        close(file_descriptor);
+        if (count != length) {
+            return 2;
+        }
+        write(STDOUT_FILENO, "binary cat fixture ready\n", 25);
+        return 0;
+    }
+
+    file_descriptor = open(COPY_PATH, O_RDONLY);
+    if (file_descriptor < 0) {
+        return 3;
+    }
+    count = read(file_descriptor, copied_contents, CONTENT_CAPACITY);
+    close(file_descriptor);
+    if (count != length) {
+        return 4;
+    }
+    while (index < length) {
+        if ((copied_contents[index] & 255) != (contents[index] & 255)) {
+            return 5;
+        }
+        index = index + 1;
+    }
+    write(STDOUT_FILENO, "binary cat copy passed\n", 23);
+    return 0;
+}

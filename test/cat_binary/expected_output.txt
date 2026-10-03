@@ -1,0 +1,26 @@
+process with pid 3 created
+binary cat fixture ready
+process with pid 4 created
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x1b]unterminated-title
+\x0e\x0f\x13\x00\x7f\x80\xff
+\x1bwrite stdout\x1b/
+\x1bPunterminated-string
+done
+process with pid 5 created
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x1b]unterminated-title
+\x0e\x0f\x13\x00\x7f\x80\xff
+\x1bwrite stdout\x1b/
+\x1bPunterminated-string
+done
+process with pid 6 created
+process with pid 7 created
+binary cat copy passed
+process with pid 8 created
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\x1b]unterminated-title
+\x0e\x0f\x13\x00\x7f\x80\xff
+\x1bwrite stdout\x1b/
+\x1bPunterminated-string
+done
+process with pid 9 created
+after-binary-cat
+process with pid 10 created

@@ -1,0 +1,8 @@
+./test/cat_binary/launcher.bin
+cat.bin test/cat_binary/data.txt
+cat.bin < test/cat_binary/data.txt
+cat.bin test/cat_binary/data.txt > test/cat_binary/copy.txt
+./test/cat_binary/launcher.bin check
+cat.bin test/cat_binary/data.txt > /device/terminal.dev
+echo.bin after-binary-cat
+poweroff.bin
