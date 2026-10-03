@@ -18,7 +18,7 @@ void dispatcher_reschedule_if_requested(int *caller_context) {
 }
 
 __attribute__((naked))
-void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
+void dispatcher_jump_to_process(struct ProcessControlBlock *process, int stack_boundary) {
     // Reads the process pointer and its precomputed stack boundary from the call frame
     asm("LOADIN SP BAF 2");
     asm("LOADIN SP IN1 3");
@@ -40,7 +40,7 @@ void dispatcher_jump_to_process(struct Process *process, int stack_boundary) {
     asm("RTI");
 }
 
-void dispatcher_switch_to_process(struct Process *process) {
+void dispatcher_switch_to_process(struct ProcessControlBlock *process) {
     if (current_process() != NULL && current_process()->state == PROCESS_STATE_RUNNING) {
         current_process()->state = PROCESS_STATE_READY;
     }
@@ -53,7 +53,7 @@ void dispatcher_switch_to_process(struct Process *process) {
 }
 
 void dispatcher_start_next_process(void) {
-    struct Process *next_process = scheduler_next_process();
+    struct ProcessControlBlock *next_process = scheduler_next_process();
 
     // Waits in kernel context when every process is blocked. A hardware
     // interrupt can make one of them runnable without a separate idle process
@@ -69,7 +69,7 @@ void dispatcher_start_next_process(void) {
 }
 
 void dispatcher_switch_from_context(int *caller_context) {
-    struct Process *process = current_process();
+    struct ProcessControlBlock *process = current_process();
 
     if (process != NULL) {
         process->activation.sp = (int)(caller_context + 6);

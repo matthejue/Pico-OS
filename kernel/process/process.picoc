@@ -3,7 +3,7 @@
 #include "process_loader.header"
 #include "../kernel.header"
 #include "../kmalloc.header"
-#include "../pmalloc.header"
+#include "../psdmalloc.header"
 #include "../shared_memory.header"
 #include "../signal.header"
 #include "../dispatcher.header"
@@ -13,9 +13,9 @@
 #include "../../common/file.header"
 #include "../../common/uart_protocol.header"
 
-struct Process *process_list_head = NULL;
-struct Process *process_list_tail = NULL;
-struct Process *active_process = NULL;
+struct ProcessControlBlock *process_list_head = NULL;
+struct ProcessControlBlock *process_list_tail = NULL;
+struct ProcessControlBlock *active_process = NULL;
 int next_process_id = 1;
 
 void initialize_process_table(void) {
@@ -25,12 +25,12 @@ void initialize_process_table(void) {
     next_process_id = 1;
 }
 
-struct Process *first_process(void) {
+struct ProcessControlBlock *first_process(void) {
     return process_list_head;
 }
 
 void list_processes(void) {
-    struct Process *process = first_process();
+    struct ProcessControlBlock *process = first_process();
     struct IoRequest request;
     char line[PATH_MAX + 16];
     char *path;
@@ -59,11 +59,11 @@ void list_processes(void) {
     }
 }
 
-struct Process *current_process(void) {
+struct ProcessControlBlock *current_process(void) {
     return active_process;
 }
 
-void set_current_process(struct Process *process) {
+void set_current_process(struct ProcessControlBlock *process) {
     active_process = process;
 }
 
@@ -86,7 +86,7 @@ char *copy_process_path(char *path) {
     return copy;
 }
 
-struct Process *create_process(
+struct ProcessControlBlock *create_process(
     int base_address,
     int size,
     int code_start,
@@ -95,8 +95,8 @@ struct Process *create_process(
     int heap_size,
     char *binary_path
 ) {
-    struct Process *process = (struct Process *)kmalloc(sizeof(struct Process));
-    struct Process *parent = current_process();
+    struct ProcessControlBlock *process = (struct ProcessControlBlock *)kmalloc(sizeof(struct ProcessControlBlock));
+    struct ProcessControlBlock *parent = current_process();
     int stack_pointer = base_address + size - 1;
 
     process->pid = next_process_id;
@@ -159,8 +159,8 @@ struct Process *create_process(
     return process;
 }
 
-struct Process *find_process_by_pid(int pid) {
-    struct Process *process = process_list_head;
+struct ProcessControlBlock *find_process_by_pid(int pid) {
+    struct ProcessControlBlock *process = process_list_head;
 
     while (process != NULL) {
         if (process->pid == pid) {
@@ -173,14 +173,14 @@ struct Process *find_process_by_pid(int pid) {
     return NULL;
 }
 
-void remove_from_wait_queue(struct Process *process) {
+void remove_from_wait_queue(struct ProcessControlBlock *process) {
     if (process->waiting_queue_ptr == NULL) {
         return;
     }
 
     struct wait_queue *queue = process->waiting_queue_ptr;
-    struct Process *previous = NULL;
-    struct Process *candidate = queue->head;
+    struct ProcessControlBlock *previous = NULL;
+    struct ProcessControlBlock *candidate = queue->head;
 
     // A wait queue is intrusive: a process can be on only one queue at a time
     while (candidate != NULL && candidate != process) {
@@ -206,9 +206,9 @@ void remove_from_wait_queue(struct Process *process) {
     candidate->wait_next = NULL;
 }
 
-void remove_process(struct Process *process) {
-    struct Process *previous = NULL;
-    struct Process *candidate = process_list_head;
+void remove_process(struct ProcessControlBlock *process) {
+    struct ProcessControlBlock *previous = NULL;
+    struct ProcessControlBlock *candidate = process_list_head;
 
     while (candidate != NULL && candidate != process) {
         previous = candidate;
@@ -239,15 +239,15 @@ void remove_process(struct Process *process) {
 
     release_process_shared_memory(candidate);
     cancel_process_load(candidate);
-    pfree(candidate->base_address);
+    PSDFree(candidate->base_address);
     destroy_file_descriptor_table(candidate->file_descriptors);
     kfree(candidate->binary_path);
     kfree(candidate->working_directory);
     kfree(candidate);
 }
 
-bool process_has_waiting_parent(struct Process *process) {
-    struct Process *waiting_process = process->waiters.head;
+bool process_has_waiting_parent(struct ProcessControlBlock *process) {
+    struct ProcessControlBlock *waiting_process = process->waiters.head;
 
     while (waiting_process != NULL) {
         if (waiting_process->pid == process->parent_pid) {
@@ -259,10 +259,10 @@ bool process_has_waiting_parent(struct Process *process) {
 }
 
 void wake_parent_waiting_for_process(
-    struct Process *process,
+    struct ProcessControlBlock *process,
     int status
 ) {
-    struct Process *waiting_process;
+    struct ProcessControlBlock *waiting_process;
 
     while (process->waiters.head != NULL) {
         waiting_process = process->waiters.head;
@@ -276,8 +276,8 @@ void wake_parent_waiting_for_process(
     }
 }
 
-void orphan_and_signal_children(struct Process *parent) {
-    struct Process *child;
+void orphan_and_signal_children(struct ProcessControlBlock *parent) {
+    struct ProcessControlBlock *child;
 
     while (true) {
         child = process_list_head;
@@ -301,8 +301,8 @@ void orphan_and_signal_children(struct Process *parent) {
     }
 }
 
-void terminate_process(struct Process *process, int status) {
-    struct Process *parent;
+void terminate_process(struct ProcessControlBlock *process, int status) {
+    struct ProcessControlBlock *parent;
     bool parent_is_waiting;
 
     if (process == NULL ||
@@ -326,7 +326,7 @@ void terminate_process(struct Process *process, int status) {
 }
 
 bool unload_process_by_pid(int pid) {
-    struct Process *process = process_list_head;
+    struct ProcessControlBlock *process = process_list_head;
 
     while (process != NULL && process->pid != pid) {
         process = process->next;
@@ -346,8 +346,8 @@ bool unload_process_by_pid(int pid) {
 }
 
 bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context) {
-    struct Process *process = current_process();
-    struct Process *waited_process;
+    struct ProcessControlBlock *process = current_process();
+    struct ProcessControlBlock *waited_process;
 
     waited_process = find_process_by_pid(request->pid);
     if (waited_process == NULL ||
@@ -373,7 +373,7 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
 }
 
 void enqueue_current_process_on_wait_queue(struct wait_queue *queue) {
-    struct Process *process = current_process();
+    struct ProcessControlBlock *process = current_process();
 
     // Reuses the single wait_next field for this process's one active wait queue
     process->wait_next = NULL;
@@ -393,7 +393,7 @@ void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context) {
 }
 
 bool wakeup_wait_queue(struct wait_queue *queue) {
-    struct Process *process;
+    struct ProcessControlBlock *process;
 
     if (queue->head == NULL) {
         return false;
@@ -416,13 +416,13 @@ bool wakeup_wait_queue(struct wait_queue *queue) {
 }
 
 int process_heap_start(void) {
-    struct Process *process = current_process();
+    struct ProcessControlBlock *process = current_process();
 
     return process->base_address + process->heap_start;
 }
 
 int process_heap_size(void) {
-    struct Process *process = current_process();
+    struct ProcessControlBlock *process = current_process();
 
     return process->heap_size;
 }

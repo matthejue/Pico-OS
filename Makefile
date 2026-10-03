@@ -652,7 +652,7 @@ KERNEL_PICOC_SOURCES := \
 	kernel/periphery.picoc \
 	common/heap.picoc \
 	kernel/kmalloc.picoc \
-	kernel/pmalloc.picoc \
+	kernel/psdmalloc.picoc \
 	kernel/shared_memory.picoc \
 	kernel/process/process.picoc \
 	kernel/signal.picoc \

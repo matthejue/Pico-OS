@@ -5,7 +5,7 @@
 #include "../../common/syscall.header"
 
 void store_process_arguments(
-    struct Process *process,
+    struct ProcessControlBlock *process,
     char *arguments,
     char **environment
 );

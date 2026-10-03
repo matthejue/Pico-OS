@@ -1,6 +1,6 @@
 #pragma once
 
-struct Process;
+struct ProcessControlBlock;
 
 #define STACK_HEAP_BOUNDARY_REGISTER 10
 #define CPU_EXCEPTION_CAUSE_REGISTER 11
@@ -10,7 +10,7 @@ struct Process;
 #define CPU_EXCEPTION_ILLEGAL_INSTRUCTION 3
 
 void activate_kernel_stack_boundary(void);
-int process_stack_boundary(struct Process *process);
+int process_stack_boundary(struct ProcessControlBlock *process);
 void activate_current_process_stack_boundary(void);
 void handle_cpu_exception(int interrupted_kernel_cs_difference);
 void handle_process_heap_full_exception(void);

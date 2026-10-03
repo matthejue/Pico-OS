@@ -8,4 +8,4 @@
 
 int load_process(char *path, bool show_loading_bar);
 int load_process_chunk(char *path, bool show_loading_bar, int *caller_context);
-void cancel_process_load(struct Process *process);
+void cancel_process_load(struct ProcessControlBlock *process);

@@ -7,7 +7,7 @@
 #include "process/process_arguments.header"
 #include "process/process_loader.header"
 #include "kmalloc.header"
-#include "pmalloc.header"
+#include "psdmalloc.header"
 #include "shared_memory.header"
 #include "filesystem/terminal.header"
 #include "../config/config.header"
@@ -36,7 +36,7 @@ int main(void) {
     init_kernel_heap();
     initialize_terminal();
     initialize_process_table();
-    init_process_memory_heap();
+    init_process_shared_data_heap();
     initialize_shared_memory();
     if (dma_is_active()) {
         initialize_dma();

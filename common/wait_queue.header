@@ -1,8 +1,8 @@
 #pragma once
 
-struct Process;
+struct ProcessControlBlock;
 
 struct wait_queue {
-    struct Process *head;
-    struct Process *tail;
+    struct ProcessControlBlock *head;
+    struct ProcessControlBlock *tail;
 };

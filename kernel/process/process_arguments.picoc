@@ -123,7 +123,7 @@ char *copy_process_string(char *target, char *source) {
 }
 
 void store_process_arguments(
-    struct Process *process,
+    struct ProcessControlBlock *process,
     char *arguments,
     char **environment
 ) {
@@ -239,7 +239,7 @@ void store_process_arguments(
 }
 
 bool mark_process_ready_with_arguments(struct RunProcessRequest *request) {
-    struct Process *process;
+    struct ProcessControlBlock *process;
     struct FileDescriptorTable *file_descriptors;
 
     // Only a newly created process can be started

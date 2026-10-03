@@ -1,0 +1,53 @@
+// dependencies: ../common/heap.reti_blocks
+
+#include "psdmalloc.header"
+#include "memory_constants.header"
+#include "../common/heap.header"
+
+struct Heap process_shared_data_heap;
+
+void init_process_shared_data_heap(void) {
+    int first_process_address = PROCESS_MEMORY_START;
+    int last_sram_address = SRAM_MAX_ADDRESS_IN_MEMORY_MAP;
+
+    heap_init_region(
+        &process_shared_data_heap,
+        (void *)first_process_address,
+        last_sram_address - first_process_address + 1
+    );
+}
+
+int PSDMalloc(int size) {
+    void *memory = heap_alloc_from(&process_shared_data_heap, size);
+
+    if (memory == NULL) {
+        return PSDMALLOC_INVALID_START;
+    }
+
+    return (int)memory;
+}
+
+// Resizes process and shared-data allocations; currently unused
+int PSDRealloc(int start, int size) {
+    void *memory;
+
+    if (start == PSDMALLOC_INVALID_START) {
+        memory = heap_realloc_from(&process_shared_data_heap, NULL, size);
+    } else {
+        memory = heap_realloc_from(&process_shared_data_heap, (void *)start, size);
+    }
+
+    if (memory == NULL) {
+        return PSDMALLOC_INVALID_START;
+    }
+
+    return (int)memory;
+}
+
+void PSDFree(int start) {
+    if (start == PSDMALLOC_INVALID_START) {
+        return;
+    }
+
+    heap_free_from(&process_shared_data_heap, (void *)start);
+}

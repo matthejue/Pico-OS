@@ -60,7 +60,7 @@ void enqueue_terminal_byte(struct Terminal *terminal, int value) {
 
 void enqueue_terminal_reader(
     struct Terminal *terminal,
-    struct Process *process
+    struct ProcessControlBlock *process
 ) {
     process->wait_next = NULL;
     process->waiting_queue_ptr = &(terminal->input_waiters);
@@ -72,7 +72,7 @@ void enqueue_terminal_reader(
     terminal->input_waiters.tail = process;
 }
 
-void suspend_pending_terminal_read(struct Process *process) {
+void suspend_pending_terminal_read(struct ProcessControlBlock *process) {
     struct Terminal *terminal = kernel_terminal();
 
     if (process->pending_terminal_read_buffer != NULL &&
@@ -81,7 +81,7 @@ void suspend_pending_terminal_read(struct Process *process) {
     }
 }
 
-void resume_pending_terminal_read(struct Process *process) {
+void resume_pending_terminal_read(struct ProcessControlBlock *process) {
     struct Terminal *terminal = kernel_terminal();
     int uart_interrupt_index;
     int uart_interrupt_priority;
@@ -137,7 +137,7 @@ int begin_terminal_read(
     int count,
     int *caller_context
 ) {
-    struct Process *process = current_process();
+    struct ProcessControlBlock *process = current_process();
     int uart_interrupt_index;
     int uart_interrupt_priority;
 
@@ -180,7 +180,7 @@ int begin_terminal_read(
 }
 
 void complete_pending_terminal_read(
-    struct Process *process,
+    struct ProcessControlBlock *process,
     struct Terminal *terminal
 ) {
     int result;
@@ -211,7 +211,7 @@ void complete_pending_terminal_read(
 }
 
 void handle_uart_interrupt(void) {
-    struct Process *process = terminal_input_process();
+    struct ProcessControlBlock *process = terminal_input_process();
     struct Terminal *terminal = kernel_terminal();
     int value;
     int status;

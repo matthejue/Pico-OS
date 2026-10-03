@@ -2,7 +2,7 @@
 #include "../dma.header"
 #include "process.header"
 #include "../kmalloc.header"
-#include "../pmalloc.header"
+#include "../psdmalloc.header"
 #include "../../common/loading_bar.header"
 #include "../../common/file.header"
 #include "../../common/uart_protocol.header"
@@ -31,7 +31,7 @@ int loaded_process_stack_start(int heap_start, int heap_size, int stack_start) {
     }
 
     if (stack_start < heap_start + heap_size) {
-        return PMALLOC_INVALID_START;
+        return PSDMALLOC_INVALID_START;
     }
 
     return stack_start;
@@ -73,7 +73,7 @@ void free_process_load(struct ProcessLoad *load) {
     kfree(load);
 }
 
-void cancel_process_load(struct Process *process) {
+void cancel_process_load(struct ProcessControlBlock *process) {
     struct ProcessLoad *load = process->pending_load;
 
     if (load == NULL) {
@@ -83,13 +83,13 @@ void cancel_process_load(struct Process *process) {
         cancel_dma_transfer();
     }
     process->pending_load = NULL;
-    pfree(load->base_address);
+    PSDFree(load->base_address);
     free_process_load(load);
 }
 
-int finish_process_load(struct Process *owner) {
+int finish_process_load(struct ProcessControlBlock *owner) {
     struct ProcessLoad *load = owner->pending_load;
-    struct Process *process = create_process(
+    struct ProcessControlBlock *process = create_process(
         load->base_address,
         load->process_size,
         load->code_start,
@@ -124,7 +124,7 @@ int begin_process_load(
     int base_address;
     int byte_count;
     struct ProcessLoad *load;
-    struct Process *owner = current_process();
+    struct ProcessControlBlock *owner = current_process();
 
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return 0;
@@ -159,13 +159,13 @@ int begin_process_load(
         heap_size,
         stack_start
     );
-    if (effective_stack_start == PMALLOC_INVALID_START) {
+    if (effective_stack_start == PSDMALLOC_INVALID_START) {
         uart_print_string("error: invalid process stack start\n");
         return 0;
     }
     process_size = effective_stack_start + 1;
-    base_address = pmalloc(process_size);
-    if (base_address == PMALLOC_INVALID_START) {
+    base_address = PSDMalloc(process_size);
+    if (base_address == PSDMALLOC_INVALID_START) {
         uart_print_string("error: not enough process memory\n");
         return 0;
     }
@@ -224,7 +224,7 @@ int begin_process_load(
     return SYSCALL_LOAD_PROCESS_CONTINUE;
 }
 
-int continue_process_load(struct Process *owner) {
+int continue_process_load(struct ProcessControlBlock *owner) {
     struct ProcessLoad *load = owner->pending_load;
     int status;
     int remaining = load->payload_word_count - load->loaded_word_count;
@@ -294,7 +294,7 @@ int load_process_chunk(
     bool show_loading_bar,
     int *caller_context
 ) {
-    struct Process *owner = current_process();
+    struct ProcessControlBlock *owner = current_process();
 
     if (owner->pending_load == NULL) {
         return begin_process_load(path, show_loading_bar, caller_context);
@@ -314,7 +314,7 @@ int load_process(char *path, bool show_loading_bar) {
     int payload_word_count;
     int process_size;
     int base_address;
-    struct Process *process;
+    struct ProcessControlBlock *process;
 
     if (!build_process_path(path, absolute_path, PATH_MAX)) {
         return 0;
@@ -350,15 +350,15 @@ int load_process(char *path, bool show_loading_bar) {
         heap_size,
         stack_start
     );
-    if (effective_stack_start == PMALLOC_INVALID_START) {
+    if (effective_stack_start == PSDMALLOC_INVALID_START) {
         drain_process_words(payload_word_count, show_loading_bar);
         uart_print_string("error: invalid process stack start\n");
         return 0;
     }
     process_size = effective_stack_start + 1;
-    base_address = pmalloc(process_size);
+    base_address = PSDMalloc(process_size);
 
-    if (base_address == PMALLOC_INVALID_START) {
+    if (base_address == PSDMALLOC_INVALID_START) {
         drain_process_words(payload_word_count, show_loading_bar);
         uart_print_string("error: not enough process memory\n");
         return 0;

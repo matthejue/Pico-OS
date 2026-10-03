@@ -15,7 +15,7 @@ void activate_kernel_stack_boundary(void) {
     );
 }
 
-int process_stack_boundary(struct Process *process) {
+int process_stack_boundary(struct ProcessControlBlock *process) {
     return process->base_address + process->heap_start + process->heap_size - 1;
 }
 

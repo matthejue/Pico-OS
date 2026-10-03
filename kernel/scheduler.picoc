@@ -1,7 +1,7 @@
 #include "scheduler.header"
 #include "../common/stddef.header"
 
-bool scheduler_can_run(struct Process *process) {
+bool scheduler_can_run(struct ProcessControlBlock *process) {
     return process != NULL &&
            (process->state == PROCESS_STATE_READY ||
             // A still-current RUNNING process may be the only runnable process
@@ -9,9 +9,9 @@ bool scheduler_can_run(struct Process *process) {
             process->state == PROCESS_STATE_RUNNING);
 }
 
-struct Process *scheduler_next_process(void) {
-    struct Process *start;
-    struct Process *candidate;
+struct ProcessControlBlock *scheduler_next_process(void) {
+    struct ProcessControlBlock *start;
+    struct ProcessControlBlock *candidate;
 
     // Without any known process, the scheduler has no valid process to return
     if (first_process() == NULL) {

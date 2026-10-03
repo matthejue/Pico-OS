@@ -75,14 +75,14 @@ def render(slug, title, blocks, highlighted):
         payload_width += internal_headers * (HEADER_WIDTH - 3 * CELL_WIDTH)
         fill = "#e5f3de" if free else "#deecff"
         parts.append(f'<rect x="{x}" y="{TOP}" width="{HEADER_WIDTH}" height="{HEIGHT}" '
-                     'fill="#fff0cc" stroke="#43576a"/>')
+                     'fill="#fff0cc"/>')
         for dy, value in [(24, "Block Header"), (44, label), (66, f"size = {size}"),
                           (87, f"free = {str(free).lower()}"), (106, "3 cells")]:
             parts.append(text(x + HEADER_WIDTH / 2, TOP + dy, value, size=13,
                               weight="bold" if dy <= 44 else "normal"))
         x += HEADER_WIDTH
         parts.append(f'<rect x="{x}" y="{TOP}" width="{payload_width}" height="{HEIGHT}" '
-                     f'fill="{fill}" stroke="#43576a"/>')
+                     f'fill="{fill}"/>')
         for dy, value in [(39, f"Payload {label}"), (62, "FREE" if free else "ALLOCATED"),
                           (85, f"{size} cells")]:
             parts.append(text(x + payload_width / 2, TOP + dy, value, size=13,
@@ -99,11 +99,18 @@ def render(slug, title, blocks, highlighted):
         x += payload_width
     assert end == REGION_CELLS
     width = x + ORIGIN
+    # Each physical boundary is one line shared by its neighboring regions.
+    parts.append(f'<rect x="{ORIGIN}" y="{TOP}" width="{x - ORIGIN}" '
+                 f'height="{HEIGHT}" fill="none" stroke="#43576a"/>')
+    for position in positions:
+        for boundary in (position - HEADER_WIDTH / 2, position + HEADER_WIDTH / 2):
+            if boundary != ORIGIN:
+                parts.append(f'<path d="M {boundary} {TOP} v {HEIGHT}" stroke="#43576a"/>')
     for left, right in zip(positions, positions[1:]):
         parts.append(f'<path d="M {left} {TOP} C {left} 46, {right} 46, {right} {TOP - 4}" '
                      'fill="none" stroke="#405ea8" stroke-width="2" marker-end="url(#arrow)"/>')
         parts.append(text((left + right) / 2, 55, "next", size=14, color="#405ea8"))
-    parts.append(text(x - payload_width / 2, 76, "next = NULL", size=13, color="#405ea8"))
+    parts.append(text(positions[-1], 76, "next = NULL", size=13, color="#405ea8"))
     parts.append(text(ORIGIN, 76, "first_block", size=12, anchor="start"))
     parts.append(f'<path d="M {ORIGIN + 6} 82 L {positions[0]} {TOP - 3}" '
                  'stroke="#405ea8" stroke-width="1.5" marker-end="url(#arrow)"/>')
@@ -114,7 +121,7 @@ def render(slug, title, blocks, highlighted):
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="292" '
            f'viewBox="0 0 {width} 292" role="img" aria-labelledby="title desc">\n'
            f'<title id="title">{escape(title)}</title>\n'
-           '<desc id="desc">One horizontal heap region with separate headers and payloads. '
+           '<desc id="desc">One continuous horizontal heap region with adjacent headers and payloads sharing divider lines. '
            'Curved next arrows link headers in address order. Green payloads are free, '
            'blue payloads are allocated, and the orange outline marks the changed or selected block. '
            'Widths preserve memory positions across steps but are not to scale in cells.</desc>\n'

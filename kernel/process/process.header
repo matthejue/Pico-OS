@@ -28,7 +28,7 @@ struct ActivationRecord {
     int ds;
 };
 
-struct Process {
+struct ProcessControlBlock {
     int pid;
     int state;
     int base_address;
@@ -48,9 +48,9 @@ struct Process {
     struct wait_queue *waiting_queue_ptr;
     // A process can be blocked on only one wait queue at a time, so this
     // intrusive link is sufficient to connect it to its queue successor
-    struct Process *wait_next;
+    struct ProcessControlBlock *wait_next;
     // Link to this process's successor in the global process list
-    struct Process *next;
+    struct ProcessControlBlock *next;
     // Shared-memory mappings released when this process is removed
     struct SharedMemoryAttachment *shared_memory_attachments;
     // PID of the process that loaded this process
@@ -69,7 +69,7 @@ struct Process {
 };
 
 void initialize_process_table(void);
-struct Process *create_process(
+struct ProcessControlBlock *create_process(
     int base_address,
     int size,
     int code_start,
@@ -83,14 +83,14 @@ bool wait_for_process_by_pid(struct WaitPidRequest *request, int *caller_context
 void sleep_on_wait_queue(struct wait_queue *queue, int *caller_context);
 void enqueue_current_process_on_wait_queue(struct wait_queue *queue);
 bool wakeup_wait_queue(struct wait_queue *queue);
-void remove_from_wait_queue(struct Process *process);
+void remove_from_wait_queue(struct ProcessControlBlock *process);
 int process_heap_start(void);
 int process_heap_size(void);
 void exit_process(int status);
-void terminate_process(struct Process *process, int status);
+void terminate_process(struct ProcessControlBlock *process, int status);
 void list_processes(void);
-struct Process *first_process(void);
-struct Process *current_process(void);
-struct Process *find_process_by_pid(int pid);
-void set_current_process(struct Process *process);
+struct ProcessControlBlock *first_process(void);
+struct ProcessControlBlock *current_process(void);
+struct ProcessControlBlock *find_process_by_pid(int pid);
+void set_current_process(struct ProcessControlBlock *process);
 char *copy_process_path(char *path);

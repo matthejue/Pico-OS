@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1634" height="611" viewBox="0 0 1634 611" role="img" aria-labelledby="title desc">
+<title id="title">Inside Process Payload A</title>
+<desc id="desc">An outer header is followed by one Process Payload. Only optional .ivt, .text and .data belong to the User Process Image. The User Process Heap and User Process Stack follow it. process_heap is a global in process .data and its first_block points to an inner heap header.</desc>
+<defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
+<rect width="1634" height="611" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif">
+<text x="32" y="28" text-anchor="start" font-size="21" font-weight="bold" fill="#172b3a">Inside Process Payload A</text><text x="32" y="55" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="90" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="77.0" y="384.0" text-anchor="middle" font-size="10.695187165775401" font-weight="bold" fill="#172b3a">Outer Block</text><text x="77.0" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Header A</text></a>
+<rect x="122" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="172.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">optional</text><text x="172.0" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">.ivt</text>
+<rect x="222" y="310" width="165" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="304.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="304.5" y="405.0" text-anchor="middle" font-size="13.157894736842106" font-weight="normal" fill="#172b3a">program + libraries</text>
+<rect x="387" y="310" width="220" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<a href="../../library/stdlib/malloc.picoc#L6"><text x="497.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.data</text><text x="497.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">global data</text><text x="497.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">process_heap</text></a>
+<rect x="607" y="310" width="85" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="649.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="649.5" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Header A</text><text x="649.5" y="405.0" text-anchor="middle" font-size="10.997067448680351" font-weight="normal" fill="#172b3a">size · free</text><text x="649.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="692" y="310" width="160" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="772.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload A</text><text x="772.0" y="405.0" text-anchor="middle" font-size="13.440860215053764" font-weight="normal" fill="#172b3a">application object</text>
+<rect x="852" y="310" width="85" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="894.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="894.5" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Header B</text><text x="894.5" y="405.0" text-anchor="middle" font-size="10.997067448680351" font-weight="normal" fill="#172b3a">size · free</text><text x="894.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="937" y="310" width="160" height="156" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="1017.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Payload B</text><text x="1017.0" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">library object</text>
+<rect x="1097" y="310" width="85" height="156" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<a href="../../common/heap.header#L5"><text x="1139.5" y="363.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Block</text><text x="1139.5" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">Header C</text><text x="1139.5" y="405.0" text-anchor="middle" font-size="10.997067448680351" font-weight="normal" fill="#172b3a">size · free</text><text x="1139.5" y="426.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="1182" y="310" width="160" height="156" fill="#e5f3de" stroke="none" stroke-width="1"/>
+<text x="1262.0" y="394.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">Free Payload C</text>
+<rect x="1342" y="310" width="260" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1472.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">User Process Stack</text><text x="1472.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">arguments + saved state</text><text x="1472.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">grows ←</text>
+<rect x="32" y="466" width="90" height="30" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<text x="77.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Metadata</text>
+<rect x="122" y="466" width="485" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="364.5" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">User Process Image</text>
+<path d="M 122 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="607" y="466" width="735" height="30" fill="#deecff" stroke="none" stroke-width="1"/>
+<text x="974.5" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">User Process Heap</text>
+<path d="M 607 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="1342" y="466" width="260" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="1472.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">User Process Stack</text>
+<path d="M 1342 466 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 466 H 1602" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="32" y="496" width="90" height="30" fill="#fff0cc" stroke="none" stroke-width="1"/>
+<text x="77.0" y="516" text-anchor="middle" font-size="10.049019607843137" font-weight="bold" fill="#172b3a">Outer header</text>
+<rect x="122" y="496" width="1480" height="30" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="862.0" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#172b3a">Process Payload A · one allocation in the Process and Shared Data Heap</text>
+<path d="M 122 496 v 30" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 32 496 H 1602" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 122 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 222 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 387 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 607 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 692 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 852 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 937 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1097 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1182 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 1342 310 v 156" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<rect x="32" y="310" width="1570" height="216" fill="none" stroke="#43576a" stroke-width="1.5"/>
+<path d="M 497.0 310 V 187 Q 497.0 175 509.0 175 H 637.5 Q 649.5 175 649.5 187 V 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="470.25" y="162" width="206" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="573.25" y="176" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">process_heap.first_block</text>
+<path d="M 649.5 310 C 649.5 260, 894.5 260, 894.5 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="749.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="772.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
+<path d="M 894.5 310 C 894.5 260, 1139.5 260, 1139.5 307" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="994.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
+<text x="1017.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
+<text x="1139.5" y="298" text-anchor="middle" font-size="13" font-weight="normal" fill="#405ea8">next = NULL</text><text x="32" y="591" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
+</g>
+</svg>

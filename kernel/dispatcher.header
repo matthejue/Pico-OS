@@ -1,6 +1,6 @@
 #pragma once
 
-struct Process;
+struct ProcessControlBlock;
 
 void dispatcher_switch_from_context(int *caller_context);
 void dispatcher_start_next_process(void);

@@ -3,7 +3,7 @@
 #include "../common/stddef.header"
 #include "../common/syscall.header"
 
-struct Process;
+struct ProcessControlBlock;
 
 struct SharedMemoryEntry {
     char *name;
@@ -23,4 +23,4 @@ void initialize_shared_memory(void);
 int open_shared_memory(struct ShmOpenRequest *request);
 void *map_shared_memory(int shared_memory_id);
 int unlink_shared_memory(char *name);
-void release_process_shared_memory(struct Process *process);
+void release_process_shared_memory(struct ProcessControlBlock *process);

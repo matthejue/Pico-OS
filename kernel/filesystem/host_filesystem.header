@@ -3,7 +3,7 @@
 #include "../../common/stddef.header"
 #include "../../common/syscall.header"
 
-struct Process;
+struct ProcessControlBlock;
 
 bool build_process_path(char *path, char *result, int capacity);
 char *system_relative_path(char *path);

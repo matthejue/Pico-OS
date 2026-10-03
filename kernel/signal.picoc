@@ -20,8 +20,8 @@ bool signal_number_is_valid(int signal_number) {
            signal_number == SIGTTIN;
 }
 
-void notify_process_stopped(struct Process *process) {
-    struct Process *waiting_process;
+void notify_process_stopped(struct ProcessControlBlock *process) {
+    struct ProcessControlBlock *waiting_process;
 
     while (process->waiters.head != NULL) {
         waiting_process = process->waiters.head;
@@ -34,7 +34,7 @@ void notify_process_stopped(struct Process *process) {
     }
 }
 
-void stop_process(struct Process *process, int signal_number) {
+void stop_process(struct ProcessControlBlock *process, int signal_number) {
     if (process->state == PROCESS_STATE_STOPPED ||
         process->state == PROCESS_STATE_ZOMBIE) {
         return;
@@ -47,7 +47,7 @@ void stop_process(struct Process *process, int signal_number) {
     notify_process_stopped(process);
 }
 
-void continue_process(struct Process *process) {
+void continue_process(struct ProcessControlBlock *process) {
     if (process->state != PROCESS_STATE_STOPPED) {
         return;
     }
@@ -68,12 +68,12 @@ void continue_process(struct Process *process) {
     }
 }
 
-void kill_process(struct Process *process, int signal_number) {
+void kill_process(struct ProcessControlBlock *process, int signal_number) {
     terminate_process(process, 128 + signal_number);
 }
 
 void send_signal_to_process(
-    struct Process *process,
+    struct ProcessControlBlock *process,
     int signal_number
 ) {
     if (process == NULL ||
@@ -106,7 +106,7 @@ void send_signal_to_process(
 }
 
 int send_signal_by_pid(struct KillRequest *request) {
-    struct Process *process;
+    struct ProcessControlBlock *process;
 
     if (request->signal_number != 0 &&
         !signal_number_is_valid(request->signal_number)) {
@@ -123,7 +123,7 @@ int send_signal_by_pid(struct KillRequest *request) {
     return 0;
 }
 
-bool prepare_process_termination(struct Process *process) {
+bool prepare_process_termination(struct ProcessControlBlock *process) {
     int signal_number = process->pending_termination_signal;
 
     if (signal_number == 0) {
@@ -146,7 +146,7 @@ int set_parent_death_signal(struct PrctlRequest *request) {
 }
 
 int set_foreground_process(int pid) {
-    struct Process *process;
+    struct ProcessControlBlock *process;
 
     if (pid == 0) {
         foreground_process_target = -current_process()->pid;
@@ -170,13 +170,13 @@ int terminal_input_owner_id(void) {
     return foreground_process_target;
 }
 
-bool process_has_terminal_input(struct Process *process) {
+bool process_has_terminal_input(struct ProcessControlBlock *process) {
     return process != NULL &&
            process->pid == terminal_input_owner_id();
 }
 
-struct Process *terminal_input_process(void) {
-    struct Process *process;
+struct ProcessControlBlock *terminal_input_process(void) {
+    struct ProcessControlBlock *process;
     int owner_id = terminal_input_owner_id();
 
     if (owner_id != 0) {
@@ -190,7 +190,7 @@ struct Process *terminal_input_process(void) {
 }
 
 bool handle_terminal_signal_character(int value) {
-    struct Process *foreground_process;
+    struct ProcessControlBlock *foreground_process;
     int signal_number;
 
     if (value == TERMINAL_INTERRUPT_CHARACTER) {

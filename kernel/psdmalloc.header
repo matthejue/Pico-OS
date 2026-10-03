@@ -1,0 +1,8 @@
+#pragma once
+
+#define PSDMALLOC_INVALID_START -1
+
+void init_process_shared_data_heap(void);
+int PSDMalloc(int size);
+int PSDRealloc(int start, int size);
+void PSDFree(int start);

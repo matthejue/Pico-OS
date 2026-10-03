@@ -125,7 +125,7 @@ char *system_relative_path(char *path) {
     return path;
 }
 
-void set_process_working_directory(struct Process *process, char *path) {
+void set_process_working_directory(struct ProcessControlBlock *process, char *path) {
     char *copy = copy_process_path(path);
 
     kfree(process->working_directory);
