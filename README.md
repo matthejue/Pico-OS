@@ -527,9 +527,9 @@ entry points and memory layout. The table summarizes them:
 ### 1.1.1 Compilation pipeline and compiler passes
 [\[↑ TOC\]](#contents)
 
-The original compiler parsed one PicoC file with Lark, built an AST, and
-lowered it into RETI. Its [passes](https://github.com/matthejue/PicoC-Compiler/blob/master/src/passes.py) and
-[AST transformer](https://github.com/matthejue/PicoC-Compiler/blob/master/src/ast_transformers.py) followed this sequence:
+The original compiler used Lark to turn one PicoC source file into a parse tree.
+Its [`TransformerPicoC`](https://github.com/matthejue/PicoC-Compiler/blob/fb553487c96c6105689cbdf4d9caf61cc9d6434d/src/ast_transformers.py#L10) converted that tree into a PicoC AST,
+which the [compiler passes](https://github.com/matthejue/PicoC-Compiler/blob/fb553487c96c6105689cbdf4d9caf61cc9d6434d/src/passes.py) lowered into RETI:
 
 ```mermaid
 flowchart LR
@@ -538,7 +538,7 @@ flowchart LR
     subgraph frontend["Lexing and parsing"]
         lexer["Lark lexer and parser"]
         tree["Parse tree"]
-        ast["TransformerPicoC AST"]
+        ast["PicoC AST"]
     end
 
     subgraph compilation["Single-file compilation passes"]
@@ -552,13 +552,13 @@ flowchart LR
 
     output["One RETI program"]
 
-    source --> lexer --> tree --> ast
+    source --> lexer --> tree -->|TransformerPicoC| ast
     ast --> shrink --> blocks --> anf --> reti_blocks --> patch --> reti --> output
 ```
 
-The extended pipeline preprocesses includes and macros, checks symbols and
-types, and then lowers each file. The linker merges those results, inserts
-startup code, and resolves addresses. The yellow stages show the additions:
+The extended pipeline replaces Lark with Tree-sitter to parse preprocessed source.
+[`TransformerPicoC.build_ast()`](../PicoC-Compiler/source/ast_transformers.py#L111) converts the parse tree into a PicoC AST before per-file symbol, type, and lowering passes.
+Linking merges results, inserts startup code, and resolves addresses. Yellow stages mark additions or replacements:
 
 ```mermaid
 flowchart LR
@@ -570,7 +570,7 @@ flowchart LR
     end
 
     subgraph frontend["Lexing and parsing"]
-        tokens["Token stream"]
+        parser["Tree-sitter lexer and parser"]:::added
         parse_tree["Tree-sitter parse tree"]
         ast["PicoC AST"]
     end
@@ -592,7 +592,7 @@ flowchart LR
 
     output["Linked RETI program"]
 
-    source --> preprocessor --> preprocessed --> tokens --> parse_tree --> ast
+    source --> preprocessor --> preprocessed --> parser --> parse_tree -->|TransformerPicoC.build_ast| ast
     ast --> shrink --> blocks --> symbol --> typing --> anf --> reti_blocks
     reti_blocks --> merge --> patch --> reti --> output
     classDef added fill:#fff2b2,stroke:#8a5a00,stroke-width:3px,color:#111
