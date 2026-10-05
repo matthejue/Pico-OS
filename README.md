@@ -318,16 +318,31 @@ teaching uses, AI use, and limitations.
       - [2.4.3 System-call selection function reference](#243-system-call-selection-function-reference)
    - [2.5 Timer interrupts and userspace preemption](#25-timer-interrupts-and-userspace-preemption)
       - [2.5.1 Timer interrupt path](#251-timer-interrupt-path)
+         - [2.5.1.1 Saving context and selecting the timer branch](#2511-saving-context-and-selecting-the-timer-branch)
+         - [2.5.1.2 Requesting deferred scheduling for kernel work](#2512-requesting-deferred-scheduling-for-kernel-work)
+         - [2.5.1.3 Restoring interrupted kernel context with RTI](#2513-restoring-interrupted-kernel-context-with-rti)
+         - [2.5.1.4 Entering kernel context for userspace preemption](#2514-entering-kernel-context-for-userspace-preemption)
+         - [2.5.1.5 Saving process context and restoring the selected process](#2515-saving-process-context-and-restoring-the-selected-process)
       - [2.5.2 Kernel non-preemption and deferred rescheduling](#252-kernel-non-preemption-and-deferred-rescheduling)
       - [2.5.3 Shell character delay for different timer intervals](#253-shell-character-delay-for-different-timer-intervals)
    - [2.6 UART receive interrupt path](#26-uart-receive-interrupt-path)
-      - [2.6.1 Borrowed-stack entry and return](#261-borrowed-stack-entry-and-return)
-      - [2.6.2 UART nesting and interrupt priorities](#262-uart-nesting-and-interrupt-priorities)
-      - [2.6.3 Polled UART function reference](#263-polled-uart-function-reference)
+      - [2.6.1 Entering kernel segments on the interrupted stack](#261-entering-kernel-segments-on-the-interrupted-stack)
+      - [2.6.2 Handling the received byte](#262-handling-the-received-byte)
+      - [2.6.3 Restoring interrupted context with RTI](#263-restoring-interrupted-context-with-rti)
+      - [2.6.4 UART nesting and interrupt priorities](#264-uart-nesting-and-interrupt-priorities)
+      - [2.6.5 Polled UART function reference](#265-polled-uart-function-reference)
    - [2.7 DMA completion interrupt path](#27-dma-completion-interrupt-path)
-      - [2.7.1 DMA waiting and completion function reference](#271-dma-waiting-and-completion-function-reference)
+      - [2.7.1 Entering kernel segments on the interrupted stack](#271-entering-kernel-segments-on-the-interrupted-stack)
+      - [2.7.2 Completing the DMA wait](#272-completing-the-dma-wait)
+      - [2.7.3 Restoring interrupted context with RTI](#273-restoring-interrupted-context-with-rti)
+      - [2.7.4 DMA waiting and completion function reference](#274-dma-waiting-and-completion-function-reference)
    - [2.8 CPU exceptions and runtime errors](#28-cpu-exceptions-and-runtime-errors)
       - [2.8.1 CPU exception entry and registers](#281-cpu-exception-entry-and-registers)
+         - [2.8.1.1 Entering kernel context after a fault](#2811-entering-kernel-context-after-a-fault)
+            - [2.8.1.1.1 Comparing exception and timer context tests](#28111-comparing-exception-and-timer-context-tests)
+         - [2.8.1.2 Reading and classifying the exception](#2812-reading-and-classifying-the-exception)
+            - [2.8.1.2.1 Reporting the exception](#28121-reporting-the-exception)
+         - [2.8.1.3 Halting the kernel or terminating the process](#2813-halting-the-kernel-or-terminating-the-process)
       - [2.8.2 Supported exceptions and allocation errors](#282-supported-exceptions-and-allocation-errors)
       - [2.8.3 Exception and stack-boundary function reference](#283-exception-and-stack-boundary-function-reference)
 1. [Memory management and shared memory](#3-memory-management-and-shared-memory)
@@ -2562,7 +2577,12 @@ flowchart LR
     click RESTORE "#64-restoring-the-selected-process-and-returning-with-rti"
 ```
 
-The entry and its two continuations implement those paths:
+#### 2.5.1.1 Saving context and selecting the timer branch
+[\[↑ TOC\]](#contents)
+
+[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32) saves the
+interrupted registers and uses the saved PC to choose between kernel and
+userspace execution. The complete entry below prepares both continuations:
 
 ```c
 __attribute__((naked))
@@ -2594,38 +2614,6 @@ void timer_interrupt(void) {
     asm("ADD ACC CS");
     asm("MOVE ACC PC");
 }
-
-__attribute__((naked))
-void timer_interrupt_kernel_return(void) {
-    // The request stays pending while the interrupted kernel instructions resume
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-}
-
-__attribute__((naked))
-void timer_interrupt_process(void) {
-    // BAF preserves caller_context while SP switches to the kernel stack
-    asm("MOVE SP BAF");
-    asm("LOADI IN1 0");
-    write_stack_heap_boundary_from_in1();
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435351
-    activate_kernel_stack_boundary();
-
-    // Passes the interrupted stack frame to the dispatcher
-    asm("PUSH BAF"); // Caller context
-
-    // The dispatcher switches to a process through RTI and does not return
-    asm("LOADI ACC 0");
-    asm("PUSH ACC"); // Unreachable return address required by the call frame
-    asm("LOADI32 ACC dispatcher_switch_from_context");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
 ```
 
 [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32) chooses
@@ -2647,10 +2635,51 @@ Process and Shared Data Heap. The subtraction therefore distinguishes valid
 code addresses without overflow in the configured `2^18`-word SRAM.
 
 Testing saved PC handles entry and restore windows where `CS` is changing.
+[`2.8.1.1.1 Comparing exception and timer context tests`](#28111-comparing-exception-and-timer-context-tests)
+explains why exception entry uses a different test and where the tests can disagree.
 
-4. For a saved PC at or below kernel `DS`, keep the stack, request rescheduling,
-   and use [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62). Otherwise continue through
-   [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74).
+For a saved PC at or below kernel `DS`, keep the stack, request rescheduling,
+and use [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62).
+Otherwise continue through
+[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74).
+
+#### 2.5.1.2 Requesting deferred scheduling for kernel work
+[\[↑ TOC\]](#contents)
+
+For the kernel branch, [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32)
+calls [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) on
+the interrupted stack, with [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62)
+as its return address. The helper only sets
+[`reschedule_requested`](kernel/dispatcher.picoc#L8), preserving the
+current process's [`activation`](kernel/process/process.header#L40) and
+[`state`](kernel/process/process.header#L33). Its implementation is in
+[`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path).
+
+The kernel has no PCB of its own. Kernel execution includes syscalls, device
+handlers, and the dispatcher's wait loop. Resetting its stack during a timer
+interrupt would overwrite suspended call frames.
+
+#### 2.5.1.3 Restoring interrupted kernel context with `RTI`
+[\[↑ TOC\]](#contents)
+
+After the request helper returns,
+[`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62)
+restores the saved registers. This continuation keeps the interrupted stack
+and its active boundary:
+
+```c
+__attribute__((naked))
+void timer_interrupt_kernel_return(void) {
+    // The request stays pending while the interrupted kernel instructions resume
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+```
 
 [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62)
 resumes the interrupted kernel work in these steps:
@@ -2663,6 +2692,37 @@ resumes the interrupted kernel work in these steps:
    [`reschedule_requested`](kernel/dispatcher.picoc#L8) flag is checked at a
    later scheduling point, as explained in
    [`2.5.2 Kernel non-preemption and deferred rescheduling`](#252-kernel-non-preemption-and-deferred-rescheduling).
+
+#### 2.5.1.4 Entering kernel context for userspace preemption
+[\[↑ TOC\]](#contents)
+
+The userspace branch jumps directly from
+[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32) to
+[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74),
+bypassing the deferred-request and kernel-return functions. This entry
+installs kernel `SP` before passing the saved frame to the dispatcher:
+
+```c
+__attribute__((naked))
+void timer_interrupt_process(void) {
+    // BAF preserves caller_context while SP switches to the kernel stack
+    asm("MOVE SP BAF");
+    asm("LOADI IN1 0");
+    write_stack_heap_boundary_from_in1();
+    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435351
+    activate_kernel_stack_boundary();
+
+    // Passes the interrupted stack frame to the dispatcher
+    asm("PUSH BAF"); // Caller context
+
+    // The dispatcher switches to a process through RTI and does not return
+    asm("LOADI ACC 0");
+    asm("PUSH ACC"); // Unreachable return address required by the call frame
+    asm("LOADI32 ACC dispatcher_switch_from_context");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+```
 
 [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)
 prepares an immediate process switch in these steps:
@@ -2680,21 +2740,42 @@ prepares an immediate process switch in these steps:
    to prepare the C call.
 4. Transfer control to
    [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71).
-   It copies the saved registers into the current PCB's
-   [`activation`](kernel/process/process.header#L40), then starts process
-   selection. The selected process's restoration is described in
-   [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti).
+   [`2.5.1.5 Saving process context and restoring the selected process`](#2515-saving-process-context-and-restoring-the-selected-process)
+   follows the dispatcher from saving this context to resuming the selected
+   process.
 
-This path calls [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71)
-unconditionally, so it does not set or check
-[`reschedule_requested`](kernel/dispatcher.picoc#L8).
-[`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43) clears
-any pending request when selecting a process. A nested UART interrupt returns
-to the timer handler, which continues the same immediate switch.
+A nested UART interrupt returns to the timer handler, which continues the
+same immediate switch.
 
-The kernel has no PCB of its own. Kernel execution includes syscalls, device
-handlers, and the dispatcher's wait loop. Resetting its stack during a timer
-interrupt would overwrite suspended call frames.
+#### 2.5.1.5 Saving process context and restoring the selected process
+[\[↑ TOC\]](#contents)
+
+The userspace timer branch calls
+[`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71)
+unconditionally, without setting or checking
+[`reschedule_requested`](kernel/dispatcher.picoc#L8). The dispatcher
+copies the interrupted registers into the current PCB's
+[`activation`](kernel/process/process.header#L40). If the process's
+[`state`](kernel/process/process.header#L33) is
+[`PROCESS_STATE_RUNNING`](kernel/process/process.header#L14), it changes
+that attribute to [`PROCESS_STATE_READY`](kernel/process/process.header#L13).
+It then calls
+[`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55).
+[`6.3 Saving the current process and selecting the next process`](#63-saving-the-current-process-and-selecting-the-next-process)
+shows the complete context copy and selection loop.
+
+For the selected process,
+[`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43)
+clears [`reschedule_requested`](kernel/dispatcher.picoc#L8), updates the
+current-process pointer through
+[`set_current_process(process)`](kernel/process/process.picoc#L66), and sets its
+[`state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_RUNNING`](kernel/process/process.header#L14). It then calls
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), which restores
+the selected PCB's registers and stack boundary and executes `RTI`.
+[`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti)
+shows that restoration. The timer continuation does not return through its
+dummy C return address.
 
 ### 2.5.2 Kernel non-preemption and deferred rescheduling
 [\[↑ TOC\]](#contents)
@@ -2753,7 +2834,12 @@ flowchart LR
     click RETURN "interrupt_service_routines/os_isrs.picoc#L210"
 ```
 
-The naked entry and return keep the interrupted stack:
+### 2.6.1 Entering kernel segments on the interrupted stack
+[\[↑ TOC\]](#contents)
+
+[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L185) preserves
+the interrupted context and calls the C handler with kernel `CS` and `DS`.
+The entry keeps the existing stack so suspended kernel calls remain intact:
 
 ```c
 __attribute__((naked))
@@ -2780,19 +2866,6 @@ void uart_interrupt(void) {
     asm("ADD ACC CS");
     asm("MOVE ACC PC");
 }
-
-__attribute__((naked))
-void uart_interrupt_return(void) {
-    // Restores the context that was active before the UART interrupt
-    asm("MOVE BAF SP");
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-}
 ```
 
 [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L185) enters the
@@ -2806,13 +2879,19 @@ handler in these steps:
    as the return address and transfer control to
    [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L213).
 
-[`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L210)
-resumes the interrupted work in these steps:
+UART and DMA save registers and call their handlers on the interrupted
+stack. Calls use free space below the saved frame. Resetting kernel `SP`
+could overwrite suspended kernel calls.
 
-1. Copy `BAF` back to `SP` to select the saved frame after the C handler returns.
-2. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC`.
-3. Execute `RTI` to resume the interrupted instruction stream. This return
-   does not query the scheduling flag or switch processes.
+The existing stack limit remains active. A fault inside either handler is
+classified as a kernel exception once kernel `CS` has been installed, even
+when the handler is borrowing a user stack.
+
+Direct syscall return additionally changes the stack boundary, as shown in
+[`2.4.2.4 Restoring process context with RTI`](#2424-restoring-process-context-with-rti).
+
+### 2.6.2 Handling the received byte
+[\[↑ TOC\]](#contents)
 
 The complete C handler below acknowledges the byte before deciding whether it
 is a signal character or ordinary terminal input:
@@ -2862,22 +2941,38 @@ that byte in these steps:
    The ring and overflow policy are explained in
    [`8.2 Global terminal input buffer`](#82-global-terminal-input-buffer).
 
-### 2.6.1 Borrowed-stack entry and return
+### 2.6.3 Restoring interrupted context with `RTI`
 [\[↑ TOC\]](#contents)
 
-UART and DMA save registers and call their handlers on the interrupted
-stack. Calls use free space below the saved frame. Resetting kernel `SP`
-could overwrite suspended kernel calls.
+When [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L213)
+returns, [`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L210)
+resumes the interrupted process or kernel operation. The saved frame supplies
+the registers restored below:
 
-The existing stack limit remains active. A fault inside either handler is
-classified as a kernel exception once kernel `CS` has been installed, even
-when the handler is borrowing a user stack.
+```c
+__attribute__((naked))
+void uart_interrupt_return(void) {
+    // Restores the context that was active before the UART interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+```
 
-The timer's kernel return uses the same register restoration but needs no
-`MOVE BAF SP`. Direct syscall return additionally changes the stack boundary,
-as shown in [`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace).
+[`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L210)
+resumes the interrupted work in these steps:
 
-### 2.6.2 UART nesting and interrupt priorities
+1. Copy `BAF` back to `SP` to select the saved frame after the C handler returns.
+2. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC`.
+3. Execute `RTI` to resume the interrupted instruction stream. This return
+   does not query the scheduling flag or switch processes.
+
+### 2.6.4 UART nesting and interrupt priorities
 [\[↑ TOC\]](#contents)
 
 The emulator allows only a strictly higher-priority hardware interrupt to
@@ -2909,7 +3004,7 @@ queue on the host. Mapping UART to `255` leaves them queued. This differs
 from the kernel ring's full-buffer policy, which drops new bytes. The
 emulator reports pending-handler queue overflow explicitly.
 
-### 2.6.3 Polled UART function reference
+### 2.6.5 Polled UART function reference
 [\[↑ TOC\]](#contents)
 
 The interrupt path above handles terminal input. The target-specific functions
@@ -2928,7 +3023,7 @@ DMA completion enters service routine 4 and wakes the waiting loader. The
 loader checks success or failure when it next runs. This diagram follows
 the handler's call to [`wakeup_wait_queue(&dma_waiters)`](kernel/process/process.picoc#L395).
 Interrupt delivery follows the priority rules in
-[`2.6.2 UART nesting and interrupt priorities`](#262-uart-nesting-and-interrupt-priorities):
+[`2.6.4 UART nesting and interrupt priorities`](#264-uart-nesting-and-interrupt-priorities):
 
 ```mermaid
 flowchart LR
@@ -2944,8 +3039,12 @@ flowchart LR
     click RETURN "interrupt_service_routines/os_isrs.picoc#L246"
 ```
 
-The entry and return borrow the interrupted stack. The C handler wakes a
-waiter and leaves process selection to the dispatcher:
+### 2.7.1 Entering kernel segments on the interrupted stack
+[\[↑ TOC\]](#contents)
+
+[`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L223) saves the
+interrupted registers and installs kernel `CS` and `DS`. Like UART entry,
+it borrows the interrupted stack for the C handler:
 
 ```c
 __attribute__((naked))
@@ -2970,23 +3069,6 @@ void dma_interrupt(void) {
     asm("ADD ACC CS");
     asm("MOVE ACC PC");
 }
-
-__attribute__((naked))
-void dma_interrupt_return(void) {
-    // Restores the context that was active before the DMA interrupt
-    asm("MOVE BAF SP");
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-}
-
-void handle_dma_interrupt(void) {
-    wakeup_wait_queue(&dma_waiters);
-}
 ```
 
 [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L223) enters
@@ -3000,10 +3082,59 @@ the C handler in these steps:
    as the return address and transfer control to
    [`handle_dma_interrupt()`](kernel/dma.picoc#L40).
 
+### 2.7.2 Completing the DMA wait
+[\[↑ TOC\]](#contents)
+
+[`initialize_dma()`](kernel/dma.picoc#L9) initializes [`dma_waiters`](kernel/dma.picoc#L6). [`start_dma_uart_receive()`](kernel/dma.picoc#L18)
+accepts one transfer when DMA is active and idle with no waiter. It saves
+the continuation result, queues the caller, programs DMA, and dispatches.
+Completion makes the caller runnable.
+
+At completion, [`handle_dma_interrupt()`](kernel/dma.picoc#L40) wakes a
+waiter through the following call. It leaves process selection and checking
+the transfer result to later execution:
+
+```c
+void handle_dma_interrupt(void) {
+    wakeup_wait_queue(&dma_waiters);
+}
+```
+
 [`handle_dma_interrupt()`](kernel/dma.picoc#L40) calls [`wakeup_wait_queue(&dma_waiters)`](kernel/process/process.picoc#L395). It removes
-the FIFO head, clears its wait links, and makes it ready. For a stopped
-process, it records that state in [`stopped_from_state`](kernel/process/process.header#L62). An empty queue is
+the FIFO head from [`dma_waiters`](kernel/dma.picoc#L6), updates the queue's
+[`head`](common/wait_queue.header#L6) and [`tail`](common/wait_queue.header#L7),
+and clears the PCB's [`wait_next`](kernel/process/process.header#L51) and
+[`waiting_queue_ptr`](kernel/process/process.header#L48). If the process's
+[`state`](kernel/process/process.header#L33) is
+[`PROCESS_STATE_STOPPED`](kernel/process/process.header#L16), it sets
+[`stopped_from_state`](kernel/process/process.header#L62) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13), preserving the
+stop until the process is continued. Otherwise it sets
+[`state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13). An empty queue is
 unchanged.
+
+### 2.7.3 Restoring interrupted context with `RTI`
+[\[↑ TOC\]](#contents)
+
+After [`handle_dma_interrupt()`](kernel/dma.picoc#L40) returns,
+[`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L246)
+restores the interrupted context from its saved frame:
+
+```c
+__attribute__((naked))
+void dma_interrupt_return(void) {
+    // Restores the context that was active before the DMA interrupt
+    asm("MOVE BAF SP");
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
+}
+```
 
 [`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L246)
 resumes the interrupted work in these steps:
@@ -3012,18 +3143,13 @@ resumes the interrupted work in these steps:
 2. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC`.
 3. Execute `RTI`, without querying the reschedule flag or dispatching a process.
    The stack and boundary behavior matches
-   [`2.6.1 Borrowed-stack entry and return`](#261-borrowed-stack-entry-and-return).
-
-[`initialize_dma()`](kernel/dma.picoc#L9) initializes [`dma_waiters`](kernel/dma.picoc#L6). [`start_dma_uart_receive()`](kernel/dma.picoc#L18)
-accepts one transfer when DMA is active and idle with no waiter. It saves
-the continuation result, queues the caller, programs DMA, and dispatches.
-Completion makes the caller runnable.
+   [`2.6.1 Entering kernel segments on the interrupted stack`](#261-entering-kernel-segments-on-the-interrupted-stack).
 
 DMA and the timer have equal priority, so they wait for each other's handler.
 UART can interrupt either. DMA can interrupt a syscall and then return to it.
-[`2.6.2 UART nesting and interrupt priorities`](#262-uart-nesting-and-interrupt-priorities) explains nesting and pending events.
+[`2.6.4 UART nesting and interrupt priorities`](#264-uart-nesting-and-interrupt-priorities) explains nesting and pending events.
 
-### 2.7.1 DMA waiting and completion function reference
+### 2.7.4 DMA waiting and completion function reference
 [\[↑ TOC\]](#contents)
 
 The functions in [`kernel/dma.picoc`](kernel/dma.picoc) connect process
@@ -3064,6 +3190,9 @@ flowchart LR
     click EXIT "kernel/process/process.picoc#L430"
     click RESTORE "kernel/dispatcher.picoc#L21"
 ```
+
+#### 2.8.1.1 Entering kernel context after a fault
+[\[↑ TOC\]](#contents)
 
 The two periphery registers below control protection and report the cause.
 They connect the emulator's fault detection to the kernel handler:
@@ -3121,6 +3250,37 @@ prepares the exception handler in these steps:
    [`handle_cpu_exception()`](kernel/exception.picoc#L70). This handler halts
    or terminates the process, so it never returns through that address.
 
+The diagram follows the three instructions in step 3, from interrupted `CS`
+to the argument passed on the kernel stack:
+
+![Interrupted CS preserved in BAF, compared with kernel CS, and pushed as the exception handler argument](documentation/images/exception-cs-comparison.svg)
+
+User `CS` comes from the PCB's [`activation.cs`](kernel/process/process.header#L27),
+restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21).
+
+##### 2.8.1.1.1 Comparing exception and timer context tests
+[\[↑ TOC\]](#contents)
+
+The timer must recognize unfinished kernel work before switching processes.
+During [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21), user `CS`
+is already loaded while kernel restore instructions are still executing.
+**Saved PC identifies those instructions correctly.** The timer therefore
+tests `saved PC > kernel DS`, as shown in
+[`2.5.1.1 Saving context and selecting the timer branch`](#2511-saving-context-and-selecting-the-timer-branch).
+
+Exception entry instead preserves `CS` in `BAF` and resets the potentially
+exhausted stack. It uses **`interrupted CS == kernel CS`** to select kernel
+panic. This simpler test agrees with the timer during ordinary execution,
+including syscalls using kernel `CS`.
+
+**The exception test has a limitation:** a fault in kernel restore code
+after loading user `CS` would be classified as a process error. Using saved
+PC is possible here too, but it would have to be preserved before resetting
+`SP`. The different condition is an implementation choice.
+
+#### 2.8.1.2 Reading and classifying the exception
+[\[↑ TOC\]](#contents)
+
 The C handler below implements the two outcomes using the supplied CS
 comparison and the cause register:
 
@@ -3143,17 +3303,56 @@ these steps:
 
 1. Read [`CPU_EXCEPTION_CAUSE_REGISTER`](kernel/exception.header#L6), then
    determine whether the interrupted CS difference is zero.
-2. Call [`print_cpu_exception_message()`](kernel/exception.picoc#L44). A kernel
-   message goes directly over UART, while a process message uses descriptor 1.
-3. For interrupted kernel `CS`, call [`shutdown()`](kernel/kernel.picoc#L15)
+2. Call [`print_cpu_exception_message()`](kernel/exception.picoc#L44) with
+   the cause and classification before choosing the termination path.
+
+##### 2.8.1.2.1 Reporting the exception
+[\[↑ TOC\]](#contents)
+
+[`print_cpu_exception_message(cause, kernel_exception)`](kernel/exception.picoc#L44)
+chooses a diagnostic for division by zero, stack overflow, or an illegal
+instruction. The classification determines the output path:
+
+| Fault context | Diagnostic output | Kernel functions |
+| --- | --- | --- |
+| Kernel | Sends the panic message directly over UART, avoiding the current process's descriptor table | [`uart_print_string()`](common/uart_protocol.picoc#L73) |
+| Process | Sends the termination message through descriptor 1 in the current PCB's [`file_descriptors`](kernel/process/process.header#L42), so output follows that process's redirection | [`write_process_exception_message(message)`](kernel/exception.picoc#L29) builds an [`IoRequest`](common/file.header#L31) and calls [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217) |
+
+#### 2.8.1.3 Halting the kernel or terminating the process
+[\[↑ TOC\]](#contents)
+
+After reporting the fault, [`handle_cpu_exception()`](kernel/exception.picoc#L70)
+calls [`shutdown()`](kernel/kernel.picoc#L15) for a kernel exception or
+[`exit_process(PROCESS_EXIT_STATUS_EXCEPTION)`](kernel/process/process.picoc#L430)
+for a process exception. These complete functions show why neither path
+returns to the faulting instruction:
+
+```c
+void shutdown(void) {
+    asm("JUMP 0");
+}
+```
+
+```c
+void exit_process(int status) {
+    terminate_process(current_process(), status);
+    dispatcher_start_next_process();
+    // Switching to a next process returns via RTI; shutdown is only reached when none remain
+    shutdown();
+}
+```
+
+The two outcomes proceed as follows:
+
+1. For interrupted kernel `CS`, call [`shutdown()`](kernel/kernel.picoc#L15)
    and halt with `JUMP 0`.
-4. Otherwise call [`exit_process(PROCESS_EXIT_STATUS_EXCEPTION)`](kernel/process/process.picoc#L430).
+2. Otherwise call [`exit_process(PROCESS_EXIT_STATUS_EXCEPTION)`](kernel/process/process.picoc#L430).
    It reaches [`terminate_process()`](kernel/process/process.picoc#L304),
    records [`exit_status`](kernel/process/process.header#L60), changes
    [`state`](kernel/process/process.header#L33) to
    [`PROCESS_STATE_ZOMBIE`](kernel/process/process.header#L17), and removes
    the PCB immediately when no parent needs to collect it.
-5. Enter [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55).
+3. Enter [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55).
    The selected process resumes through the steps in
    [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti).
    If the process list becomes empty, selection returns and

@@ -1,4 +1,4 @@
-"""Generate the README's interrupt-controller and timer memory-layout diagrams."""
+"""Generate the README's interrupt-controller and context-classification diagrams."""
 
 from html import escape
 import json
@@ -136,6 +136,49 @@ def timer_memory():
     f.save("timer-pc-memory-layout.svg")
 
 
+def exception_cs():
+    f = Figure(1640, 485, "How exception entry compares interrupted CS with kernel CS",
+               "Kernel CS points to the start of kernel .text. A process's activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. Zero selects kernel panic and a nonzero value selects process termination.")
+    f.text(24, 32, "SRAM offsets increase left to right · widths are schematic", 18)
+    f.box(24, 86, 1125, 170, "kernel")
+    f.text(36, 113, "Kernel region", 20, True)
+    f.box(40, 127, 660, 113, "free")
+    f.text(52, 153, "Kernel image", 18, True)
+    for x, w, label, color in [(52, 85, ".ivt", "pc"),
+                               (137, 279, ".text · kernel code", "active"),
+                               (416, 269, ".data · kernel globals", "saved")]:
+        f.box(x, 164, w, 62, color, label, 17)
+    f.box(716, 127, 208, 113, "kernel", "Kernel heap", 17)
+    f.box(924, 127, 208, 113, "kernel", "Kernel stack", 17)
+    f.box(1149, 86, 466, 170, "unused")
+    f.text(1161, 113, "Process and Shared Data Heap", 18)
+    f.box(1161, 127, 442, 113, "active")
+    f.text(1173, 153, "One process's .text", 18, True)
+    f.text(1173, 184, "Start = process->activation.cs", 18)
+    f.arrow([(137, 296), (137, 228)], True)
+    f.text(149, 283, f"kernel CS = {CS:#010x}", 18, True)
+    f.arrow([(1161, 296), (1161, 242)], True)
+    f.text(1173, 283, "process CS differs from kernel CS", 18, True)
+    f.text(24, 335, "Before comparison: BAF = interrupted CS · CS = kernel CS", 19)
+    f.box(24, 367, 350, 94, "saved")
+    f.text(36, 397, "A · MOVE BAF ACC", 20, True)
+    f.text(36, 430, "ACC = interrupted CS", 18)
+    f.arrow([(376, 414), (424, 414)])
+    f.box(426, 367, 350, 94, "active")
+    f.text(438, 397, "B · SUB ACC CS", 20, True)
+    f.text(438, 430, "ACC = interrupted CS − kernel CS", 18)
+    f.arrow([(778, 414), (826, 414)])
+    f.box(828, 367, 350, 94, "kernel")
+    f.text(840, 397, "C · PUSH ACC", 20, True)
+    f.text(840, 430, "Kernel-stack argument = difference", 17)
+    f.arrow([(1180, 414), (1228, 414)])
+    f.box(1230, 367, 385, 94, "free")
+    f.text(1242, 397, "D · handle_cpu_exception()", 20, True)
+    f.text(1242, 426, "0 → kernel panic\n≠ 0 → process termination", 17)
+    f.save("exception-cs-comparison.svg")
+
+
 if __name__ == "__main__":
     memory_map()
     timer_memory()
+    exception_cs()
