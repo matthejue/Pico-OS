@@ -4,7 +4,6 @@
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker></defs>
 <rect width="1294" height="292" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="27" font-size="18" font-weight="bold" text-anchor="start" fill="#172b3a">Initial state: request 11 cells</text>
 <rect x="32" y="100" width="102" height="116" fill="#fff0cc"/>
 <text x="83.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
 <text x="83.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">A</text>

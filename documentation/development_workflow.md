@@ -92,7 +92,7 @@ hello PicoOS
 `load` creates a PCB whose state attribute is `NEW`. `run` prepares its initial
 arguments, changes the state attribute to `READY`, and waits for the foreground
 process. [`4.1.1 Process States and Transitions`](../README.md#411-process-states-and-transitions)
-and [`4.3 Loading and Starting a Process`](../README.md#43-loading-and-starting-a-process)
+and [`4.2 Loading and Starting a Process`](../README.md#42-loading-and-starting-a-process)
 connect these shell operations to the kernel structures.
 
 ## Build and run targets

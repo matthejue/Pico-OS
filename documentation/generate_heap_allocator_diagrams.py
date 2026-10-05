@@ -130,7 +130,6 @@ def render(slug, title, blocks, highlighted):
            '<path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker></defs>\n'
            f'<rect width="{width}" height="292" fill="white"/>\n'
            '<g font-family="DejaVu Sans, sans-serif">\n'
-           + text(ORIGIN, 27, title, size=18, weight="bold", anchor="start") + "\n"
            + "\n".join(parts) + "\n</g>\n</svg>\n")
     (OUTPUT / f"heap-{slug}.svg").write_text(svg)
 

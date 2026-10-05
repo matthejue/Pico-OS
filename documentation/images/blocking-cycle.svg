@@ -6,8 +6,6 @@
 </defs>
 <rect width="1600" height="900" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="800" y="88" text-anchor="middle" font-size="48" font-weight="bold" fill="#172b3a">sleep() → wakeup() → resume</text>
-<a href="../../kernel/process/process.header#L33"><text x="800" y="148" text-anchor="middle" font-size="26" font-weight="normal" fill="#43576a">One process · its PCB state</text></a>
 <rect x="160" y="260" width="360" height="160" fill="#fff5e3" stroke="#995b0b" stroke-width="2.5"/>
 <a href="../../kernel/process/process.header#L15"><text x="340" y="326" text-anchor="middle" font-size="38" font-weight="bold" fill="#995b0b">BLOCKED</text></a>
 <text x="340" y="374" text-anchor="middle" font-size="26" font-weight="normal" fill="#172b3a">Waiting for an event</text>

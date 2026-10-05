@@ -4,7 +4,7 @@
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
 <rect width="2109" height="1017" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="21" font-weight="bold" fill="#172b3a">Global shared-memory list and entry names in SRAM</text><text x="32" y="55" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<text x="32" y="28" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
@@ -76,7 +76,6 @@
 <rect x="32" y="310" width="470" height="186" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="572" y="310" width="230" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
 <rect x="1172" y="310" width="230" height="156" fill="none" stroke="#9c3d15" stroke-width="3"/>
-<text x="32" y="581" text-anchor="start" font-size="17" font-weight="bold" fill="#172b3a">Same two SharedMemoryEntry objects shown as the registry list</text>
 <rect x="32" y="776" width="350" height="156" fill="#f0f3f6" stroke="#9c3d15" stroke-width="3"/>
 <text x="207.0" y="831" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">Kernel registry global</text>
 <text x="207.0" y="861" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">shared_memory_list_head</text>

@@ -75,9 +75,6 @@ class Figure:
 
 def generate():
     f = Figure()
-    f.text(800, 88, "sleep() → wakeup() → resume", 48, bold=True)
-    f.text(800, 148, "One process · its PCB state", 26, color=LINE, link=STATE)
-
     f.state(160, 260, "BLOCKED", "Waiting for an event", "#fff5e3", BLOCKED,
             "kernel/process/process.header#L15")
     f.state(1080, 260, "READY", "Waiting for CPU time", "#eef5ff", READY,

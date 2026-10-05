@@ -58,7 +58,6 @@ class Figure:
 def memory_map():
     f = Figure(1720, 800, 'Interrupt-controller initialization in the RETI memory map',
                'EPROM, periphery and SRAM in address order. Individual entries of two int[3] arrays in kernel .data write the six controller registers. The kernel image contains .ivt, .text and .data, followed by kernel heap and stack. Process and shared data occupy the remaining heap.')
-    f.text(24, 38, 'Interrupt-controller initialization', 28, True)
     f.text(1455, 38, 'Addresses →', 21)
     # Context stays unfilled. Only the cells taking part in the writes use color.
     f.box(24, 90, 205, 690, 'free')
@@ -116,8 +115,7 @@ def memory_map():
 def timer_memory():
     f = Figure(1640, 340, "Why the timer compares the saved PC with kernel DS",
                "The kernel .text lies before .data and its DS boundary. User process .text lies in the Process and Shared Data Heap above the kernel region.")
-    f.text(24, 32, "Timer classification: kernel execution below kernel DS, user processes above it", 23, True)
-    f.text(24, 66, "SRAM offsets increase left to right · widths are schematic", 18)
+    f.text(24, 32, "SRAM offsets increase left to right · widths are schematic", 18)
     f.box(24, 86, 1125, 170, "kernel")
     f.text(36, 113, "Kernel region", 20, True)
     f.box(40, 127, 660, 113, "free")
@@ -130,7 +128,7 @@ def timer_memory():
     he = hs + SECTIONS["heap_size"] - 1
     f.box(716, 127, 208, 113, "kernel", f"Kernel heap\n{hs}–{he}", 17)
     f.box(924, 127, 208, 113, "kernel", f"Kernel stack\n{he+1}–{K-BASE}", 17)
-    f.box(1165, 86, 450, 170, "unused", f"Process and Shared Data Heap\n{PM-BASE}–262143\n\nProcess .text (normal user PCs)\nShared-data payloads", 18)
+    f.box(1149, 86, 466, 170, "unused", f"Process and Shared Data Heap\n{PM-BASE}–262143\n\nProcess .text (normal user PCs)\nShared-data payloads", 18)
     f.arrow([(416, 296), (416, 228)], True)
     f.text(428, 283, f"kernel DS = {DS:#010x}", 18, True)
     f.text(24, 323, "saved PC < kernel DS → kernel execution", 19, True)

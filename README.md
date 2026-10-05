@@ -10,7 +10,7 @@ follow the numbered chapters in the [contents](#contents). For source builds
 and development, see the [development workflow](documentation/development_workflow.md).
 
 PicoOS has **15 libraries**, **18 user applications** including the [`shell`](user/shell.picoc),
-and **37 syscalls**. See [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies), [`13.1 Applications, library calls, and host requests`](#131-applications-library-calls-and-host-requests), and [`2.4.2.1.1 System-call groups`](#24211-system-call-groups) for their interfaces.
+and **37 syscalls**. See [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies), [`13.1 Applications, library calls, and host requests`](#131-applications-library-calls-and-host-requests), and [`2.4.2.2.1 System-call groups`](#24221-system-call-groups) for their interfaces.
 
 [POSIX](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap01.html)
 standardizes Unix interfaces and command behavior, including processes,
@@ -93,7 +93,7 @@ The launchers accept these options to select the emulator and terminal mode:
 
 The launcher asks whether to enable DMA unless you already selected it on
 the command line. DMA copies incoming executable data into SRAM while the
-CPU can run other processes. [`4.3.1 Loading a process (load library call)`](#431-loading-a-process-load-library-call) compares DMA with polling, and [`2.7 DMA completion interrupt path`](#27-dma-completion-interrupt-path) follows
+CPU can run other processes. [`4.2.1 Loading a process (load library call)`](#421-loading-a-process-load-library-call) compares DMA with polling, and [`2.7 DMA completion interrupt path`](#27-dma-completion-interrupt-path) follows
 the completion interrupt.
 
 On the first run, the launcher offers to download the
@@ -293,23 +293,28 @@ teaching uses, AI use, and limitations.
    - [1.2 RETI-Emulator extensions](#12-reti-emulator-extensions)
       - [1.2.1 RETI machine model and memory-mapped peripherals](#121-reti-machine-model-and-memory-mapped-peripherals)
       - [1.2.2 Atomic test-and-set with TSL](#122-atomic-test-and-set-with-tsl)
+         - [1.2.2.1 Test-and-set in SRAM](#1221-test-and-set-in-sram)
+         - [1.2.2.2 TSL instruction encoding](#1222-tsl-instruction-encoding)
       - [1.2.3 UART host-service protocol](#123-uart-host-service-protocol)
       - [1.2.4 Debugger, source view, and terminal modes](#124-debugger-source-view-and-terminal-modes)
 1. [Interrupts, system calls, preemption, and exceptions](#2-interrupts-system-calls-preemption-and-exceptions)
    - [2.1 RETI interrupt entry and the interrupt service routine table](#21-reti-interrupt-entry-and-the-interrupt-service-routine-table)
    - [2.2 Interrupt-controller mappings and priorities](#22-interrupt-controller-mappings-and-priorities)
-      - [2.2.1 Interrupt-controller function reference](#221-interrupt-controller-function-reference)
-      - [2.2.2 Memory-mapped periphery function reference](#222-memory-mapped-periphery-function-reference)
+      - [2.2.1 Interrupt-controller initialization](#221-interrupt-controller-initialization)
+      - [2.2.2 Interrupt-controller function reference](#222-interrupt-controller-function-reference)
+      - [2.2.3 Memory-mapped periphery function reference](#223-memory-mapped-periphery-function-reference)
    - [2.3 Saved interrupt stack frame](#23-saved-interrupt-stack-frame)
    - [2.4 System-call interface and execution](#24-system-call-interface-and-execution)
       - [2.4.1 Syscall selectors and register convention](#241-syscall-selectors-and-register-convention)
          - [2.4.1.1 Process, wait, signal, and memory request structures](#2411-process-wait-signal-and-memory-request-structures)
          - [2.4.1.2 File and directory request structures](#2412-file-and-directory-request-structures)
       - [2.4.2 System-call entry, execution, and return to userspace](#242-system-call-entry-execution-and-return-to-userspace)
-         - [2.4.2.1 Handle Syscall](#2421-handle-syscall)
-            - [2.4.2.1.1 System-call groups](#24211-system-call-groups)
-         - [2.4.2.2 Selecting the return path](#2422-selecting-the-return-path)
-         - [2.4.2.3 Stack-boundary helpers](#2423-stack-boundary-helpers)
+         - [2.4.2.1 Entering kernel context](#2421-entering-kernel-context)
+            - [2.4.2.1.1 Stack-boundary helpers](#24211-stack-boundary-helpers)
+         - [2.4.2.2 Handle Syscall](#2422-handle-syscall)
+            - [2.4.2.2.1 System-call groups](#24221-system-call-groups)
+         - [2.4.2.3 Selecting the return path](#2423-selecting-the-return-path)
+         - [2.4.2.4 Restoring process context with RTI](#2424-restoring-process-context-with-rti)
       - [2.4.3 System-call selection function reference](#243-system-call-selection-function-reference)
    - [2.5 Timer interrupts and userspace preemption](#25-timer-interrupts-and-userspace-preemption)
       - [2.5.1 Timer interrupt path](#251-timer-interrupt-path)
@@ -345,27 +350,36 @@ teaching uses, AI use, and limitations.
          - [3.6.3.1 Initial state and first-fit search](#3631-initial-state-and-first-fit-search)
          - [3.6.3.2 Allocation splits D](#3632-allocation-splits-d)
          - [3.6.3.3 Free D and merge its remainder](#3633-free-d-and-merge-its-remainder)
+            - [3.6.3.3.1 Mark D free](#36331-mark-d-free)
+            - [3.6.3.3.2 Merge D and its remainder](#36332-merge-d-and-its-remainder)
          - [3.6.3.4 Free C and merge repeatedly at B](#3634-free-c-and-merge-repeatedly-at-b)
+            - [3.6.3.4.1 Mark C free](#36341-mark-c-free)
+            - [3.6.3.4.2 First merge at B](#36342-first-merge-at-b)
+            - [3.6.3.4.3 Second merge at B](#36343-second-merge-at-b)
 1. [Processes and process lifecycle](#4-processes-and-process-lifecycle)
    - [4.1 Process control block fields](#41-process-control-block-fields)
       - [4.1.1 Process states and transitions](#411-process-states-and-transitions)
       - [4.1.2 Global process list and current process](#412-global-process-list-and-current-process)
          - [4.1.2.1 From PCBs to Process Payloads in SRAM](#4121-from-pcbs-to-process-payloads-in-sram)
-   - [4.2 Initial user process stack](#42-initial-user-process-stack)
-      - [4.2.1 User process stack placement](#421-user-process-stack-placement)
-      - [4.2.2 Initial argc, argv, and envp](#422-initial-argc-argv-and-envp)
-         - [4.2.2.1 Concrete initial-stack example](#4221-concrete-initial-stack-example)
-   - [4.3 Loading and starting a process](#43-loading-and-starting-a-process)
-      - [4.3.1 Loading a process (load library call)](#431-loading-a-process-load-library-call)
-         - [4.3.1.1 Load function reference](#4311-load-function-reference)
-      - [4.3.2 Starting a process (run library call)](#432-starting-a-process-run-library-call)
-         - [4.3.2.1 Parent-to-child inheritance](#4321-parent-to-child-inheritance)
-            - [4.3.2.1.1 Environment origin and propagation](#43211-environment-origin-and-propagation)
-            - [4.3.2.1.2 Loading-bar environment variable](#43212-loading-bar-environment-variable)
-         - [4.3.2.2 Recording termination status](#4322-recording-termination-status)
-         - [4.3.2.3 Parent collection and final removal](#4323-parent-collection-and-final-removal)
-         - [4.3.2.4 Run function reference](#4324-run-function-reference)
-   - [4.4 Process list, PCB metadata, and lifecycle function reference](#44-process-list-pcb-metadata-and-lifecycle-function-reference)
+   - [4.2 Loading and starting a process](#42-loading-and-starting-a-process)
+      - [4.2.1 Loading a process (load library call)](#421-loading-a-process-load-library-call)
+         - [4.2.1.1 Step 1: Receiving the process image](#4211-step-1-receiving-the-process-image)
+            - [4.2.1.1.1 ProcessLoad transfer record](#42111-processload-transfer-record)
+         - [4.2.1.2 Step 2: Creating the child PCB](#4212-step-2-creating-the-child-pcb)
+         - [4.2.1.3 Process stack after load](#4213-process-stack-after-load)
+         - [4.2.1.4 Load function reference](#4214-load-function-reference)
+      - [4.2.2 Starting a process (run library call)](#422-starting-a-process-run-library-call)
+         - [4.2.2.1 Initial user process stack](#4221-initial-user-process-stack)
+            - [4.2.2.1.1 User process stack placement](#42211-user-process-stack-placement)
+            - [4.2.2.1.2 Initial argc, argv, and envp](#42212-initial-argc-argv-and-envp)
+               - [4.2.2.1.2.1 Concrete initial-stack example](#422121-concrete-initial-stack-example)
+         - [4.2.2.2 Parent-to-child inheritance](#4222-parent-to-child-inheritance)
+            - [4.2.2.2.1 Environment origin and propagation](#42221-environment-origin-and-propagation)
+            - [4.2.2.2.2 Loading-bar environment variable](#42222-loading-bar-environment-variable)
+         - [4.2.2.3 Recording termination status](#4223-recording-termination-status)
+         - [4.2.2.4 Parent collection and final removal](#4224-parent-collection-and-final-removal)
+         - [4.2.2.5 Run function reference](#4225-run-function-reference)
+   - [4.3 Process list, PCB metadata, and lifecycle function reference](#43-process-list-pcb-metadata-and-lifecycle-function-reference)
 1. [Shared Memory Entries and Mappings](#5-shared-memory-entries-and-mappings)
    - [5.1 Named entries and per-process attachments](#51-named-entries-and-per-process-attachments)
       - [5.1.1 Global shared-memory list and entry names](#511-global-shared-memory-list-and-entry-names)
@@ -1101,7 +1115,7 @@ The naked [`_start()`](library/start/start.picoc#L14) reads the stack built by t
 to [`start_process()`](library/start/start.picoc#L7). That helper initializes the heap and environment, calls
 [`main()`](library/start/start.picoc#L4), and sends its return value to [`exit()`](library/stdlib/exit.picoc#L3). Like the startup support
 supplied with `libc`, [`libstart`](library/start/libstart.picoc) prepares the runtime before the application
-runs. [`4.2 Initial user process stack`](#42-initial-user-process-stack) shows the initial stack.
+runs. [`4.2.2.1 Initial user process stack`](#4221-initial-user-process-stack) shows the initial stack.
 
 #### 1.1.5.3 Startup functions used by PicoOS images
 [\[↑ TOC\]](#contents)
@@ -1131,7 +1145,7 @@ These are regions within one program. The table shows what goes into them:
 
 With `-O1`, known global initializers become words in `.data` or the selected
 `.ivt`. Runtime-dependent initializers still execute at startup. The kernel
-uses this for its five [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) pointers, which must be
+uses this for its five [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L23) pointers, which must be
 available immediately after loading. [`1.1.4 Placing globals in .ivt with section("ivt")`](#114-placing-globals-in-ivt-with-sectionivt) demonstrates placement, and [`2.1 RETI interrupt entry and the interrupt service routine table`](#21-reti-interrupt-entry-and-the-interrupt-service-routine-table)
 shows the complete table and interrupt entry.
 
@@ -1359,8 +1373,34 @@ The compiler creates this file only at the final link. A compile-only `-c`
 invocation instead creates reusable `.reti_blocks` and `.st` files because no
 complete program layout exists yet.
 
+The final [`reti()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L311)
+pass calculates the offsets from the linked `.ivt`, `.text`, and `.data`
+sections. [`_entries_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L271)
+counts the emitted RETI words, ignoring comments. The global-data extent is
+the greatest offset-plus-size value among global data symbols, calculated by
+[`_data_segment_symbol_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L274).
+Taking the larger data size ensures that the heap begins after all static
+storage, including storage represented by symbol metadata rather than emitted
+data words. The default metadata is calculated as follows:
+
+```text
+codesegment_start = words in .ivt
+datasegment_start = words in .ivt + words in .text
+heap_start = datasegment_start + max(words in .data, global-data extent)
+heap_size = -1
+stack_start = -1
+```
+
+Normal userspace images have no `.ivt` words, so their code starts at offset
+0. When both `--heap-size CELLS` and `--stack-size CELLS` are supplied,
+[`_apply_memory_sizes()`](../PicoC-Compiler/source/option_handler.py#L1195)
+replaces the two `-1` defaults with the requested heap size and
+`stack_start = heap_start + heap_size + stack_size`. These values describe
+RETI cell offsets and counts within the Process Payload, not file byte offsets.
+
 Run `reti_emulator -a program.reti` to assemble a loadable binary. It reads
-the matching `.sections` file and prepends five big-endian layout words.
+the matching `.sections` file and prepends five big-endian layout words through
+[`assemble_sram_program_to_binary()`](../RETI-Emulator/source/reti_emulator_main.c#L107).
 `-S PATH` selects another metadata file. The diagram shows both inputs:
 
 ```mermaid
@@ -1385,20 +1425,34 @@ $ hexyl -n 20 program.bin
 These first 20 bytes encode the five displayed layout values. The appendix
 shows how to inspect other ranges.
 
-The loaders interpret those five header words in this order:
+The header contains no field names. The assembler writes values in a fixed
+order, and the loaders identify them by their position. Each word occupies
+four bytes, so the five reads consume file bytes 0 through 19:
 
-| Word | Value | Use in PicoOS |
-| ---: | --- | --- |
-| 0 | `codesegment_start` | Initial code segment and entry point |
-| 1 | `datasegment_start` | Initial data segment |
-| 2 | [`heap_start`](kernel/process/process.header#L36) | Start of the User Process Heap within a Process Payload |
-| 3 | [`heap_size`](kernel/process/process.header#L37) | Configured heap size, or `-1` for the PicoOS default |
-| 4 | [`stack_start`](kernel/process/process_loader.picoc#L121) | Highest stack cell, or `-1` for the PicoOS default |
+| Word | File byte offset | Value | Use in PicoOS |
+| ---: | ---: | --- | --- |
+| 0 | 0 | [`codesegment_start`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L345) | Stored in [`ProcessLoad.code_start`](kernel/process/process_loader.picoc#L17), then added to [`base_address`](kernel/process/process.header#L34) for [`activation.cs`](kernel/process/process.header#L27) by [`create_process()`](kernel/process/process.picoc#L89) |
+| 1 | 4 | [`datasegment_start`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L346) | Stored in [`ProcessLoad.data_start`](kernel/process/process_loader.picoc#L18), then added to [`base_address`](kernel/process/process.header#L34) for [`activation.ds`](kernel/process/process.header#L28) by [`create_process()`](kernel/process/process.picoc#L89) |
+| 2 | 8 | [`heap_start`](kernel/process/process.header#L36) | Process-relative start of the User Process Heap, passed through [`ProcessLoad.heap_start`](kernel/process/process_loader.picoc#L19) to [`create_process()`](kernel/process/process.picoc#L89) |
+| 3 | 12 | [`heap_size`](kernel/process/process.header#L37) | Resolved by [`begin_process_load()`](kernel/process/process_loader.picoc#L109), which substitutes [`DEFAULT_PROCESS_HEAP_CELLS`](kernel/process/process_loader.header#L6) for `-1`, then stores [`ProcessLoad.heap_size`](kernel/process/process_loader.picoc#L20) |
+| 4 | 16 | [`stack_start`](kernel/process/process_loader.picoc#L121) | Resolved by [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28) to the highest stack offset. Adding one gives [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16), later stored as PCB [`size`](kernel/process/process.header#L35) |
+
+[`begin_process_load()`](kernel/process/process_loader.picoc#L109) requests
+`read-range 0 20`, consumes the response's byte count, and then calls
+[`receive_word()`](common/uart_protocol.picoc#L7) five times in the table's order.
+Each call combines four UART bytes as a signed big-endian 32-bit value.
+Thus `ff ff ff ff` becomes `-1`, the heap and stack default marker.
+[`4.2.2.1.1 User process stack placement`](#42211-user-process-stack-placement)
+explains how the defaults determine the reservation.
 
 The bootloader receives a word count followed by the header and payload
 through the [`load`](#123-uart-host-service-protocol) host request. The process loader uses `file-size` and
 `read-range`. Both consume the header and copy only the payload to SRAM.
-A Process Payload also reserves space for its heap and stack. [`4.3.1 Loading a process (load library call)`](#431-loading-a-process-load-library-call) follows
+[`load_process()`](kernel/process/process_loader.picoc#L305) consumes its response's
+word count before reading the same five fields. The [`bootloader`](boot/bootloader.picoc#L41)
+also reads them in order, but discards the two heap fields because the kernel
+uses [`kernel/memory_constants.header`](kernel/memory_constants.header).
+A Process Payload also reserves space for its heap and stack. [`4.2.1 Loading a process (load library call)`](#421-loading-a-process-load-library-call) follows
 the loading paths.
 
 ### 1.1.9 Generated memory constants for the bootloader and kernel
@@ -1416,12 +1470,12 @@ kernel layout with a 4,096-cell heap and a 2,715-cell stack:
 ```c
 #define SRAM_BASE (-2147483647 - 1) // -2^31
 #define SRAM_MAX_ADDRESS_IN_MEMORY_MAP -2147221505 // -2^31 + 2^18 - 1
-#define KERNEL_HEAP_START -2147442151 // -2^31 + heap_start
+#define KERNEL_HEAP_START -2147442162 // -2^31 + heap_start
 #define KERNEL_HEAP_SIZE 4096 // heap_size
-#define PROCESS_MEMORY_START -2147435339 // -2^31 + stack_start + 1
+#define PROCESS_MEMORY_START -2147435350 // -2^31 + stack_start + 1
 #define KERNEL_CS_START_ASM "LOADI32 CS -2147483643" // -2^31 + codesegment_start
-#define KERNEL_DS_START_ASM "LOADI32 DS -2147442882" // -2^31 + datasegment_start
-#define KERNEL_SP_START_ASM "LOADI32 SP -2147435340" // -2^31 + stack_start
+#define KERNEL_DS_START_ASM "LOADI32 DS -2147442893" // -2^31 + datasegment_start
+#define KERNEL_SP_START_ASM "LOADI32 SP -2147435351" // -2^31 + stack_start
 #define KERNEL_CS_ACC_ASM "LOADI32 ACC -2147483643" // -2^31 + codesegment_start
 ```
 
@@ -1547,7 +1601,11 @@ timer, DMA, and UART mappings. The dispatcher writes each process's
 reads the old value into `D`, and writes `1` to that address. No interrupt or
 process switch can occur between the read and write.
 
-The example uses a non-zero offset to distinguish the base from the target:
+#### 1.2.2.1 Test-and-set in SRAM
+[\[↑ TOC\]](#contents)
+
+The example uses a non-zero offset to distinguish the base from the target.
+`DS = 0x80000040`, so `DS + 2 = 0x80000042` selects the third SRAM cell:
 
 ```reti
 # Before: M[DS + 2] = 0
@@ -1565,6 +1623,9 @@ two cells, not two bytes:
 Saving the address first lets `S` and `D` be the same register. Writing to
 `SP` can fail stack protection before the store, and writing to `PC` changes
 control flow. The example uses `ACC`, avoiding those special cases.
+
+#### 1.2.2.2 `TSL` instruction encoding
+[\[↑ TOC\]](#contents)
 
 `TSL` occupies mode `10` of RETI's Store, Move category. These fields encode
 `TSL DS ACC 2`:
@@ -1770,17 +1831,17 @@ void (*interrupt_vector_table[OS_INTERRUPT_VECTOR_COUNT])(void) = {
 
 | Index | Entry | Source |
 | ---: | --- | --- |
-| 0 | [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105) | Software `INT 0` from userspace |
-| 1 | [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) | Timer device |
-| 2 | [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L196) | UART receive device |
-| 3 | [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L172) | Fixed synchronous CPU exception entry |
-| 4 | [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L234) | DMA completion on the hardware custom-device line |
+| 0 | [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94) | Software `INT 0` from userspace |
+| 1 | [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32) | Timer device |
+| 2 | [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L185) | UART receive device |
+| 3 | [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L161) | Fixed synchronous CPU exception entry |
+| 4 | [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L223) | DMA completion on the hardware custom-device line |
 
-[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) contains function pointers of type `void (*)(void)`.
+[`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L23) contains function pointers of type `void (*)(void)`.
 The linker encodes each handler's SRAM address. Interrupt entry loads that
 address into `PC`, without a C call or generated stack frame.
 
-This excerpt connects the first entry to [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105). Its `naked`
+This excerpt connects the first entry to [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94). Its `naked`
 attribute lets it save registers before any generated code could change them.
 [`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace) gives the complete body:
 
@@ -1795,9 +1856,7 @@ Interrupt entry automatically saves only a return PC on the active stack.
 For software `INT 0`, this is the address of that instruction. For hardware
 interrupts and CPU exceptions, the emulator saves the address one instruction
 before the instruction to resume or retry. Each ISR explicitly saves any
-general registers it needs. `RTI` reloads the PC from `SP + 1`, increments
-`SP`, and advances `PC` by one. It does not restore `CS`, `DS`, or the general
-registers, so the return stub or dispatcher must restore them first.
+general registers it needs.
 
 ## 2.2 Interrupt-controller mappings and priorities
 [\[↑ TOC\]](#contents)
@@ -1805,6 +1864,9 @@ registers, so the return stub or dispatcher must restore them first.
 `interrupt_device_isrs[]` maps timer, DMA, and UART to entries `1`, `4`,
 and `2`. `interrupt_device_priorities[]` gives them priorities `1`, `1`, and
 `2`. UART can interrupt timer or DMA handling. Equal-priority events wait.
+
+### 2.2.1 Interrupt-controller initialization
+[\[↑ TOC\]](#contents)
 
 Startup first disables each device, then writes its configured mapping and
 priority. The timer starts after init is ready, with a 5,000-instruction
@@ -1843,7 +1905,7 @@ void interrupt_controller_initialize(void) {
 ```
 
 The two three-cell arrays reside in kernel `.data`. They hold table indices
-and priorities. The separate [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) in `.ivt` holds the
+and priorities. The separate [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L23) in `.ivt` holds the
 actual handler pointers.
 
 The memory map locates these arrays within the kernel image. Arrows show
@@ -1865,7 +1927,7 @@ and priority. The table traces each array entry to its register:
 [`9.3 Kernel global variables and process-list roots`](#93-kernel-global-variables-and-process-list-roots) lists the globals and their storage. Terminal reads temporarily disable
 UART delivery when inspecting the input buffer to prevent a race with its ISR.
 
-### 2.2.1 Interrupt-controller function reference
+### 2.2.2 Interrupt-controller function reference
 [\[↑ TOC\]](#contents)
 
 The controller functions in
@@ -1880,7 +1942,7 @@ controller's global mapping arrays to the register writes they produce.
 | [`interrupt_controller_disable_device(device)`](kernel/interrupt_controller.picoc#L23) | Returns no value | Writes mapping 255 and priority 0 for one device | [`interrupt_controller_device_to_isr_register()`](kernel/interrupt_controller.picoc#L15), [`interrupt_controller_device_to_priority_register()`](kernel/interrupt_controller.picoc#L19), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41), [`reboot()`](kernel/kernel.picoc#L19), [`resume_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L84) |
 | [`interrupt_controller_activate_timer(void)`](kernel/interrupt_controller.picoc#L34) | Returns no value | Writes the 5,000-instruction interval to periphery register 9 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 
-### 2.2.2 Memory-mapped periphery function reference
+### 2.2.3 Memory-mapped periphery function reference
 [\[↑ TOC\]](#contents)
 
 Functions in [`kernel/periphery.picoc`](kernel/periphery.picoc) perform the
@@ -1896,18 +1958,27 @@ serves stack protection, CPU exceptions, and UART handling.
 [\[↑ TOC\]](#contents)
 
 System calls and process timer preemption create the same process-stack frame.
-[`caller_context`](kernel/dispatcher.picoc#L71) points to its free cell:
+[`caller_context`](kernel/dispatcher.picoc#L71) points to its free cell. **`SP`
+initially holds this address; `MOVE SP BAF` copies it into `BAF` before `SP`
+switches to the kernel stack.** The entry routines then pass the address as the
+C argument `caller_context` using `PUSH BAF`
+([syscall entry](interrupt_service_routines/os_isrs.picoc#L94),
+[process timer entry](interrupt_service_routines/os_isrs.picoc#L74)):
 
-| Offset | Stored value |
-| ---: | --- |
-| `+0` | Free cell addressed by [`caller_context`](kernel/dispatcher.picoc#L71) |
-| `+1` | Saved `DS` |
-| `+2` | Saved `CS` |
-| `+3` | Saved `BAF` |
-| `+4` | Saved `IN2` |
-| `+5` | Saved `IN1` |
-| `+6` | Saved `ACC` |
-| `+7` | Return PC saved by interrupt entry |
+| Offset | Stored value | Address marker at entry |
+| ---: | --- | --- |
+| **`+0`** | Free cell addressed by [`caller_context`](kernel/dispatcher.picoc#L71) | **← `BAF` = `caller_context`** (copied from `SP`) |
+| `+1` | Saved `DS` | |
+| `+2` | Saved `CS` | |
+| `+3` | Saved `BAF` | Interrupted process's original `BAF` value |
+| `+4` | Saved `IN2` | |
+| `+5` | Saved `IN1` | |
+| `+6` | Saved `ACC` | |
+| `+7` | Return PC saved by interrupt entry | |
+
+The live **`BAF` pointer → `+0`** and the **saved `BAF` value at `+3`** have
+different roles. Inside a C function, `BAF` is used for that function's call
+frame; `caller_context` is accessed as a pointer argument.
 
 [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) copies offsets 1–6 into the current PCB’s
 embedded activation and records [`activation.sp`](kernel/process/process.header#L25) = [`caller_context`](kernel/dispatcher.picoc#L71) + 6. The
@@ -1949,9 +2020,9 @@ A syscall wrapper places its selector in `ACC` and a value or pointer in
 PicoC return convention in [`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup).
 
 For multiple arguments, the wrapper fills a request structure on its stack
-and passes its absolute address in `IN1`. [`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) shows this for [`waitpid()`](library/sys/wait/wait.picoc#L14).
+and passes its absolute address in `IN1`. [`10.1.2 Packing arguments and executing the syscall`](#1012-packing-arguments-and-executing-the-syscall) shows this for [`waitpid()`](library/sys/wait/wait.picoc#L14).
 
-<!-- Presentation: Copy the waitpid code example from Section 7.2.2 directly
+<!-- Presentation: Copy the waitpid code example from Section 10.1.2 directly
 into the slides here. Do not merely link to it or jump between sections. -->
 
 The declarations in [`common/syscall.header`](common/syscall.header) and [`common/file.header`](common/file.header) define
@@ -2056,23 +2127,33 @@ descriptor, shared-memory ID, path, or wait-queue pointer.
 ### 2.4.2 System-call entry, execution, and return to userspace
 [\[↑ TOC\]](#contents)
 
-`INT 0` saves its PC on the process stack and enters [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105).
+`INT 0` saves its PC on the process stack and enters [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94).
 The ISR installs the kernel context and calls [`handle_syscall()`](kernel/syscall.picoc#L16). The diagram
 follows the request through execution and either direct restoration or
-scheduling. [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path) explains that choice:
+scheduling. [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) explains that choice:
 
 ```mermaid
 flowchart LR
-    ENTRY["Save context and enter kernel<br/>syscall_interrupt<br/>write_stack_heap_boundary_from_in1<br/>activate_kernel_stack_boundary"] --> HANDLE["Execute operation<br/>handle_syscall"]
-    HANDLE -->|returns normally| RETURN["Save result and check rescheduling<br/>syscall_interrupt_return<br/>caller_context[4] = IN2<br/>dispatcher_reschedule_if_requested"]
+    ENTRY["<b>syscall_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_syscall()</b>"]
+    HANDLE -->|returns| RETURN["<b>syscall_interrupt_return()</b><br/>caller_context[4] = IN2<br/>dispatcher_reschedule_if_requested()"]
     RETURN --> CHECK{"reschedule_requested?"}
-    CHECK -->|false| RESTORE["Restore caller and return with RTI<br/>syscall_interrupt_restore<br/>activate_current_process_stack_boundary"]
-    CHECK -->|true| DISPATCH["Dispatcher<br/>Select a process and return with RTI"]
-    HANDLE -->|blocks, yields, or exits| DISPATCH
+    CHECK -->|false| RESTORE["<b>syscall_interrupt_restore()</b><br/>activate_current_process_stack_boundary()<br/>RTI"]
+    CHECK -->|true| DISPATCH["Dispatcher<br/>RTI"]
+    HANDLE -->|blocks / yields / exits| DISPATCH
     HANDLE -->|shutdown or reboot| SYSTEM["Halt or restart"]
+    click ENTRY "interrupt_service_routines/os_isrs.picoc#L94"
+    click HANDLE "kernel/syscall.picoc#L16"
+    click RETURN "interrupt_service_routines/os_isrs.picoc#L133"
+    click CHECK "kernel/dispatcher.picoc#L8"
+    click RESTORE "interrupt_service_routines/os_isrs.picoc#L148"
+    click DISPATCH "kernel/dispatcher.picoc#L57"
 ```
 
-These naked routines manage registers and stacks explicitly. `BAF` holds
+#### 2.4.2.1 Entering kernel context
+[\[↑ TOC\]](#contents)
+
+[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94) saves the
+caller's registers and installs the kernel context. `BAF` holds
 the saved-frame pointer while kernel `CS`, `DS`, and `SP` are active. The
 macros come from [`kernel/memory_constants.header`](kernel/memory_constants.header), described in [`1.1.9 Generated memory constants for the bootloader and kernel`](#119-generated-memory-constants-for-the-bootloader-and-kernel):
 
@@ -2092,8 +2173,8 @@ void syscall_interrupt(void) {
     asm("LOADI IN1 0");
     write_stack_heap_boundary_from_in1();
     asm(KERNEL_CS_START_ASM); // LOADI32 CS -2147483643
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442882
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435340
+    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442893
+    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435351
     activate_kernel_stack_boundary();
 
     // Builds the handle_syscall arguments from the saved context
@@ -2115,37 +2196,9 @@ void syscall_interrupt(void) {
     asm("ADD ACC CS");
     asm("MOVE ACC PC");
 }
-
-__attribute__((naked))
-void syscall_interrupt_return(void) {
-    // Handle_syscall restores BAF to the saved caller context before returning
-    // Saves the IN2 result before a pending timer request can dispatch the caller
-    asm("STOREIN BAF IN2 4");
-
-    asm("PUSH BAF"); // Caller context
-    asm("LOADI32 ACC syscall_interrupt_restore");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC dispatcher_reschedule_if_requested");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-void syscall_interrupt_restore(void) {
-    asm("MOVE BAF SP");
-    activate_current_process_stack_boundary();
-    asm("POP DS");
-    asm("POP CS");
-    asm("POP BAF");
-    asm("POP IN2");
-    asm("POP IN1");
-    asm("POP ACC");
-    asm("RTI");
-}
 ```
 
-[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105) prepares
+[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94) prepares
 the kernel call in these steps:
 
 1. Save `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and `DS` on the user-process stack.
@@ -2158,14 +2211,14 @@ the kernel call in these steps:
    disable the old limit. Load kernel `CS`, `DS`, and `SP`, then call
    [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). The old
    process limit would reject the lower kernel `SP`. Both helpers are explained
-   in [`2.4.2.3 Stack-boundary helpers`](#2423-stack-boundary-helpers).
+   in [`2.4.2.1.1 Stack-boundary helpers`](#24211-stack-boundary-helpers).
 4. Push the context pointer, argument, and selector onto the kernel stack.
    Read the argument from the saved `IN1` and the selector from the saved
    `ACC`, pushing each before reusing `IN2`.
 5. Set saved `IN2` to the default result `1`, so an operation that switches
    processes can later resume successfully. An operation such as DMA loading
    can replace this saved result before switching.
-6. Push [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L144)
+6. Push [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L133)
    as the C return address and transfer control to
    [`handle_syscall()`](kernel/syscall.picoc#L16). Its C epilogue restores `BAF`
    to the context pointer before returning.
@@ -2173,36 +2226,74 @@ the kernel call in these steps:
 Only the call arguments are copied to the kernel stack. The interrupted
 register values remain on the user-process stack.
 
-[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L144)
-handles a normally returning kernel operation:
+##### 2.4.2.1.1 Stack-boundary helpers
+[\[↑ TOC\]](#contents)
 
-1. Store the result from `IN2` in `caller_context[4]` before a reschedule can
-   move that context into the PCB's
-   [`activation.in2`](kernel/process/process.header#L23).
-2. Pass the context pointer to
-   [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), using
-   [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L159)
-   as its return address.
-3. Continue to restoration if the helper returns. If
-   [`reschedule_requested`](kernel/dispatcher.picoc#L8) is true, the helper
-   enters the dispatcher instead, as shown in the decision diagram above. The
-   complete helper is in
-   [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path).
+Switching stacks also changes the protection boundary in periphery cell
+`0x4000000a`. It is the lowest allowed free `SP`. Zero disables checking.
+Instructions that decrease `SP` below the limit fail, while automatic
+interrupt entry bypasses the check so an exhausted stack can report its fault.
 
-[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L159)
-resumes the caller when no switch was requested:
+Kernel `SP` lies below the process boundary. Entry disables that limit,
+loads kernel `SP`, then installs the kernel limit. UART, DMA, and the timer
+branch for kernel work retain the interrupted stack and boundary.
 
-1. Copy `BAF` to `SP` to select the saved user-process frame and discard the
-   kernel scratch call frames.
-2. Call [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22)
-   to replace the kernel limit with the caller's limit. Kernel `CS` and `DS`
-   remain active while this helper reads the current PCB. Its temporary call
-   uses free space below the saved registers.
-3. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC`, including the saved syscall
-   result. `RTI` then consumes the saved PC, restores the pre-interrupt `SP`,
-   and resumes at the instruction after `INT 0`.
+The inline writer in [`common/periphery_asm.header`](common/periphery_asm.header#L2) uses `IN1` without a C
+call frame. It can disable protection even on an almost exhausted stack.
+It clobbers `ACC`, which resumable entries have already saved:
 
-#### 2.4.2.1 Handle Syscall
+```c
+static inline void write_stack_heap_boundary_from_in1(void) {
+    asm("LOADI ACC 1048576");
+    asm("MULTI ACC 1024");
+    asm("STOREIN ACC IN1 10");
+}
+```
+
+The writer builds the periphery base in `ACC` and stores `IN1` in cell 10.
+Entry uses it with zero. The dispatcher uses it with the selected process's
+boundary after restoring `SP`.
+
+The C helpers in [`kernel/exception.picoc`](kernel/exception.picoc#L11) need ordinary call space, so
+entry installs kernel `SP` before calling them:
+
+```c
+void activate_kernel_stack_boundary(void) {
+    periphery_write_register(
+        STACK_HEAP_BOUNDARY_REGISTER,
+        KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1
+    );
+}
+
+int process_stack_boundary(struct ProcessControlBlock *process) {
+    return process->base_address + process->heap_start + process->heap_size - 1;
+}
+
+void activate_current_process_stack_boundary(void) {
+    periphery_write_register(
+        STACK_HEAP_BOUNDARY_REGISTER,
+        process_stack_boundary(current_process())
+    );
+}
+```
+
+[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11) writes
+`KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1`, the final kernel-heap cell,
+through [`periphery_write_register()`](kernel/periphery.picoc#L11).
+
+[`process_stack_boundary(process)`](kernel/exception.picoc#L18) returns
+`base_address + heap_start + heap_size - 1` from the supplied PCB.
+
+[`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22) obtains the current PCB,
+computes its limit, and writes it. It changes protection without moving
+`SP` or scheduling.
+
+Direct syscall return reinstalls the caller's boundary. Scheduled return
+restores `SP` and writes the selected process's boundary in
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21). Borrowed-stack handlers retain the existing
+limit.
+
+#### 2.4.2.2 Handle Syscall
 [\[↑ TOC\]](#contents)
 
 [`handle_syscall()`](kernel/syscall.picoc#L16) selects the operation with an `if`/`else if` chain. It
@@ -2246,7 +2337,7 @@ The dispatch rules are:
    Blocking, yielding, or terminating calls may switch processes before
    reaching this return.
 
-##### 2.4.2.1.1 System-call groups
+##### 2.4.2.2.1 System-call groups
 [\[↑ TOC\]](#contents)
 
 PicoOS implements **37 syscalls**, declared in [`common/syscall.header`](common/syscall.header) and
@@ -2264,12 +2355,46 @@ group. [`2.4.1 Syscall selectors and register convention`](#241-syscall-selector
 | Descriptors and I/O | Descriptor availability, open, read, write, close, seek, duplicate, direct UART byte send | Descriptor availability returns 1 directly, [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39), [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150), [`write_file_descriptor()`](kernel/filesystem/filesystem.picoc#L217), [`close_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L146), [`seek_file_descriptor()`](kernel/filesystem/filesystem.picoc#L268), [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L163), [`send_byte_over_uart()`](kernel/uart_hardware.picoc#L9) |
 | Paths and directories | Change/get working directory, make/read directory, unlink file, remove directory, move path, touch file | [`change_working_directory()`](kernel/filesystem/host_filesystem.picoc#L163), [`get_working_directory()`](kernel/filesystem/host_filesystem.picoc#L156), [`make_host_directory()`](kernel/filesystem/host_filesystem.picoc#L177), [`read_host_directory()`](kernel/filesystem/host_filesystem.picoc#L187), [`unlink_host_file()`](kernel/filesystem/host_filesystem.picoc#L208), [`remove_host_directory()`](kernel/filesystem/host_filesystem.picoc#L212), [`move_host_path()`](kernel/filesystem/host_filesystem.picoc#L216), [`touch_host_file()`](kernel/filesystem/host_filesystem.picoc#L234) |
 
-#### 2.4.2.2 Selecting the return path
+#### 2.4.2.3 Selecting the return path
 [\[↑ TOC\]](#contents)
 
 A returning syscall saves its result, then checks [`reschedule_requested`](kernel/dispatcher.picoc#L8).
 This flag records whether the dispatcher should select a process before
 returning to userspace.
+
+The return routine stores the result before checking whether to dispatch:
+
+```c
+__attribute__((naked))
+void syscall_interrupt_return(void) {
+    // Handle_syscall restores BAF to the saved caller context before returning
+    // Saves the IN2 result before a pending timer request can dispatch the caller
+    asm("STOREIN BAF IN2 4");
+
+    asm("PUSH BAF"); // Caller context
+    asm("LOADI32 ACC syscall_interrupt_restore");
+    asm("ADD ACC CS");
+    asm("PUSH ACC");
+    asm("LOADI32 ACC dispatcher_reschedule_if_requested");
+    asm("ADD ACC CS");
+    asm("MOVE ACC PC");
+}
+```
+
+[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L133)
+handles a normally returning kernel operation:
+
+1. Store the result from `IN2` in `caller_context[4]` before a reschedule can
+   move that context into the PCB's
+   [`activation.in2`](kernel/process/process.header#L23).
+2. Pass the context pointer to
+   [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), using
+   [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L148)
+   as its return address.
+3. Continue to restoration if the helper returns. If
+   [`reschedule_requested`](kernel/dispatcher.picoc#L8) is true, the helper
+   enters the dispatcher instead, as shown in the decision diagram above. The
+   helpers below implement this choice.
 
 These helpers set the flag and act on it. The second helper enters the
 dispatcher directly when the flag is set:
@@ -2339,75 +2464,59 @@ The flag check and `RTI` are not atomic. A timer after the check leaves its
 request pending until a later scheduling point. A timer in userspace enters
 the dispatcher directly.
 
-#### 2.4.2.3 Stack-boundary helpers
+[`6.3 Saving the current process and selecting the next process`](#63-saving-the-current-process-and-selecting-the-next-process)
+shows saving the outgoing activation, and
+[`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti)
+shows restoring the selected process.
+
+#### 2.4.2.4 Restoring process context with `RTI`
 [\[↑ TOC\]](#contents)
 
-Switching stacks also changes the protection boundary in periphery cell
-`0x4000000a`. It is the lowest allowed free `SP`. Zero disables checking.
-Instructions that decrease `SP` below the limit fail, while automatic
-interrupt entry bypasses the check so an exhausted stack can report its fault.
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L148)
+restores the caller's `SP` and explicitly pops the general-purpose registers,
+`BAF`, `CS`, and `DS` from the saved interrupt frame. After a process switch,
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) restores these
+registers from the selected PCB's [`activation`](kernel/process/process.header#L40)
+instead. In both paths, restored `SP` points one cell below the PC saved on
+that process's stack at its last hardware or software interrupt. `RTI` reads
+that PC at `SP + 1`, increments `SP`, and advances `PC` by one to resume
+execution. It does not restore the other registers.
 
-Kernel `SP` lies below the process boundary. Entry disables that limit,
-loads kernel `SP`, then installs the kernel limit. UART, DMA, and the timer
-branch for kernel work retain the interrupted stack and boundary.
-
-The inline writer in [`common/periphery_asm.header`](common/periphery_asm.header#L2) uses `IN1` without a C
-call frame. It can disable protection even on an almost exhausted stack.
-It clobbers `ACC`, which resumable entries have already saved:
+The direct syscall return performs this restoration explicitly:
 
 ```c
-static inline void write_stack_heap_boundary_from_in1(void) {
-    asm("LOADI ACC 1048576");
-    asm("MULTI ACC 1024");
-    asm("STOREIN ACC IN1 10");
+__attribute__((naked))
+void syscall_interrupt_restore(void) {
+    asm("MOVE BAF SP");
+    activate_current_process_stack_boundary();
+    asm("POP DS");
+    asm("POP CS");
+    asm("POP BAF");
+    asm("POP IN2");
+    asm("POP IN1");
+    asm("POP ACC");
+    asm("RTI");
 }
 ```
 
-The writer builds the periphery base in `ACC` and stores `IN1` in cell 10.
-Entry uses it with zero. The dispatcher uses it with the selected process's
-boundary after restoring `SP`.
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L148)
+resumes the caller when no switch was requested:
 
-The C helpers in [`kernel/exception.picoc`](kernel/exception.picoc#L11) need ordinary call space, so
-entry installs kernel `SP` before calling them:
+1. Copy `BAF` to `SP` to select the saved user-process frame and discard the
+   kernel scratch call frames.
+2. Call [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22)
+   to replace the kernel limit with the caller's limit. Kernel `CS` and `DS`
+   remain active while this helper reads the current PCB. Its temporary call
+   uses free space below the saved registers.
+3. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC`, including the saved syscall
+   result, then execute `RTI` to resume after `INT 0`.
 
-```c
-void activate_kernel_stack_boundary(void) {
-    periphery_write_register(
-        STACK_HEAP_BOUNDARY_REGISTER,
-        KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1
-    );
-}
+The diagram shows Process 1 being restored alongside two other processes,
+using the layout from [`3.2 SRAM image and heap hierarchy`](#32-sram-image-and-heap-hierarchy).
+Restored [`activation.sp`](kernel/process/process.header#L25) selects Process 1's
+stack, and `RTI` returns execution to its `.text`:
 
-int process_stack_boundary(struct ProcessControlBlock *process) {
-    return process->base_address + process->heap_start + process->heap_size - 1;
-}
-
-void activate_current_process_stack_boundary(void) {
-    periphery_write_register(
-        STACK_HEAP_BOUNDARY_REGISTER,
-        process_stack_boundary(current_process())
-    );
-}
-```
-
-[`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11) writes
-`KERNEL_HEAP_START + KERNEL_HEAP_SIZE - 1`, the final kernel-heap cell,
-through [`periphery_write_register()`](kernel/periphery.picoc#L11).
-
-[`process_stack_boundary(process)`](kernel/exception.picoc#L18) returns
-`base_address + heap_start + heap_size - 1` from the supplied PCB.
-
-[`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22) obtains the current PCB,
-computes its limit, and writes it. It changes protection without moving
-`SP` or scheduling.
-
-Direct syscall return reinstalls the caller's boundary. Scheduled return
-restores `SP` and writes the selected process's boundary in
-[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21). Borrowed-stack handlers retain the existing
-limit.
-
-[`6.3 Saving the current process and selecting the next process`](#63-saving-the-current-process-and-selecting-the-next-process) shows saving the outgoing activation, and [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti) shows restoring the
-selected process. [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path) covers the selection helper.
+![Three process memory layouts with optional .ivt, .text and .data grouped as each process image, followed by its heap and stack. PCB 1 restores each CPU register, SP selects Process 1's stack, and RTI returns the PC to the resume instruction in Process 1's .text.](documentation/images/process-context-restore.svg)
 
 ### 2.4.3 System-call selection function reference
 [\[↑ TOC\]](#contents)
@@ -2417,7 +2526,7 @@ and saved caller context to the subsystem functions grouped above.
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Returns the selected operation's result for immediate calls. Calls that switch processes leave through the saved interrupt frame. Exit, shutdown, and reboot do not return normally. | Selects one of 37 kernel operations and may change process, scheduler, memory, descriptor, or host-filesystem state | The kernel functions in [`2.4.2.1.1 System-call groups`](#24211-system-call-groups) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105) after userspace executes `INT 0` |
+| [`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16) | Returns the selected operation's result for immediate calls. Calls that switch processes leave through the saved interrupt frame. Exit, shutdown, and reboot do not return normally. | Selects one of 37 kernel operations and may change process, scheduler, memory, descriptor, or host-filesystem state | The kernel functions in [`2.4.2.2.1 System-call groups`](#24221-system-call-groups) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94) after userspace executes `INT 0` |
 
 ## 2.5 Timer interrupts and userspace preemption
 [\[↑ TOC\]](#contents)
@@ -2430,39 +2539,30 @@ is ready. This counts emulated instructions rather than wall-clock time.
 [\[↑ TOC\]](#contents)
 
 The timer schedules immediately after interrupting userspace and defers
-scheduling after interrupting kernel work. This diagram follows both paths.
-`c` is the saved-frame pointer from [`2.3 Saved interrupt stack frame`](#23-saved-interrupt-stack-frame):
+scheduling after interrupting kernel work. The diagram follows the functions
+below, comparing the saved PC with kernel `DS`, the start of kernel `.data`.
+A deferred request is handled at a later scheduling point, including the
+syscall return path in
+[`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace):
 
 ```mermaid
 flowchart LR
-    ENTRY["timer_interrupt<br/>Save six registers; load kernel CS/DS"] --> CHECK{"saved PC − kernel DS ≥ 0?"}
-    CHECK -->|no: kernel execution| REQUEST_K["dispatcher_request_reschedule<br/>reschedule_requested = true"]
-    REQUEST_K --> RETURN["timer_interrupt_kernel_return<br/>Six POPs + RTI"]
-    RETURN -->|syscall returns later| LATER["Same kernel work continues<br/>syscall_interrupt_return saves IN2"]
-    RETURN -->|kernel work dispatches directly| SELECT
-    LATER --> PENDING{"dispatcher_reschedule_if_requested(c)<br/>reschedule_requested?"}
-    PENDING -->|false| DIRECT["syscall_interrupt_restore<br/>Resume calling process with RTI"]
-    PENDING -->|true| DISPATCH["dispatcher_switch_from_context(c)<br/>Save process activation"]
-    CHECK -->|yes: user process| PROCESS["timer_interrupt_process<br/>BAF = c; kernel SP + boundary"]
-    PROCESS --> REQUEST_P["dispatcher_request_reschedule<br/>reschedule_requested = true"]
-    REQUEST_P --> AFTER["timer_interrupt_after_reschedule_request<br/>dispatcher_switch_from_context(c)"]
-    AFTER --> DISPATCH
-    DISPATCH --> SELECT["dispatcher_start_next_process<br/>→ dispatcher_switch_to_process<br/>reschedule_requested = false"]
-    SELECT --> RESTORE["dispatcher_jump_to_process<br/>Restore activation + boundary; RTI"]
+    ENTRY["<b>timer_interrupt()</b><br/>Save context"] --> CHECK{"saved PC ><br/>kernel DS?"}
+    CHECK -->|no: kernel| REQUEST_K["<b>dispatcher_request_reschedule()</b><br/>reschedule_requested = true"]
+    REQUEST_K --> RETURN["<b>timer_interrupt_kernel_return()</b><br/>RTI: kernel work"]
+    CHECK -->|yes: userspace| PROCESS["<b>timer_interrupt_process()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"]
+    PROCESS --> SWITCH["<b>dispatcher_switch_from_context(caller_context)</b><br/>Save process->activation<br/>RUNNING state becomes READY"]
+    SWITCH --> RESTORE["Dispatcher<br/>Clear reschedule_requested<br/>RTI: selected process"]
+    click ENTRY "interrupt_service_routines/os_isrs.picoc#L32"
+    click CHECK "interrupt_service_routines/os_isrs.picoc#L51"
+    click REQUEST_K "kernel/dispatcher.picoc#L10"
+    click RETURN "interrupt_service_routines/os_isrs.picoc#L62"
+    click PROCESS "interrupt_service_routines/os_isrs.picoc#L74"
+    click SWITCH "kernel/dispatcher.picoc#L71"
+    click RESTORE "#64-restoring-the-selected-process-and-returning-with-rti"
 ```
 
-The entry distinguishes them using the saved PC. This diagram isolates the
-implemented `>=` test:
-
-```mermaid
-flowchart LR
-    LOAD["LOADIN SP ACC 7<br/>ACC = saved PC"] --> SUBTRACT["SUB ACC DS<br/>DS = kernel .data start"]
-    SUBTRACT --> CHECK{"JUMP32>= timer_interrupt_process<br/>saved PC − kernel DS ≥ 0?"}
-    CHECK -->|yes: user process| PROCESS["timer_interrupt_process<br/>Select fresh kernel stack"]
-    CHECK -->|no: kernel execution| KERNEL["Request reschedule<br/>Keep interrupted stack"]
-```
-
-The entry and its three continuations implement those paths:
+The entry and its two continuations implement those paths:
 
 ```c
 __attribute__((naked))
@@ -2478,14 +2578,14 @@ void timer_interrupt(void) {
 
     // Uses kernel segments because an interrupt can arrive during entry or return
     asm(KERNEL_CS_START_ASM); // LOADI32 CS -2147483643
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442882
+    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442893
 
     // Six saved registers put the automatic return PC at SP + 7.
     // DS is now kernel .data's start: kernel code is below it, process code above.
     // Test saved PC because CS may still be changing on kernel entry/return.
     asm("LOADIN SP ACC 7"); // Saved return PC at SP + 7
     asm("SUB ACC DS"); // Saved PC minus the kernel .data start
-    asm("JUMP32>= timer_interrupt_process"); // Nonnegative: process context
+    asm("JUMP32> timer_interrupt_process"); // Positive: process context
 
     asm("LOADI32 ACC timer_interrupt_kernel_return");
     asm("ADD ACC CS");
@@ -2513,19 +2613,9 @@ void timer_interrupt_process(void) {
     asm("MOVE SP BAF");
     asm("LOADI IN1 0");
     write_stack_heap_boundary_from_in1();
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435340
+    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435351
     activate_kernel_stack_boundary();
 
-    asm("LOADI32 ACC timer_interrupt_after_reschedule_request");
-    asm("ADD ACC CS");
-    asm("PUSH ACC");
-    asm("LOADI32 ACC dispatcher_request_reschedule");
-    asm("ADD ACC CS");
-    asm("MOVE ACC PC");
-}
-
-__attribute__((naked))
-void timer_interrupt_after_reschedule_request(void) {
     // Passes the interrupted stack frame to the dispatcher
     asm("PUSH BAF"); // Caller context
 
@@ -2538,7 +2628,7 @@ void timer_interrupt_after_reschedule_request(void) {
 }
 ```
 
-[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) chooses
+[`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32) chooses
 between immediate and deferred scheduling in these steps:
 
 1. Save `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and `DS` on the interrupted stack.
@@ -2546,8 +2636,8 @@ between immediate and deferred scheduling in these steps:
 2. Load kernel `CS` and `DS` for the ISR's code and global data. Keep the
    interrupted `SP` until the saved PC identifies the execution context.
 3. Execute `LOADIN SP ACC 7`, `SUB ACC DS`, and
-   `JUMP32>= timer_interrupt_process`. This loads the saved PC, subtracts the
-   start of kernel `.data`, and branches on a nonnegative result. The layout
+   `JUMP32> timer_interrupt_process`. This loads the saved PC, subtracts the
+   start of kernel `.data`, and branches on a positive result. The layout
    below explains the comparison:
 
    ![Kernel execution below kernel DS and user-process execution strictly above it](documentation/images/timer-pc-memory-layout.svg)
@@ -2556,15 +2646,13 @@ Kernel `.text` is below kernel `DS`. User images are above it, in the
 Process and Shared Data Heap. The subtraction therefore distinguishes valid
 code addresses without overflow in the configured `2^18`-word SRAM.
 
-Equality also takes the userspace branch, but kernel `DS` is a data address,
-not a normal code location. Testing saved PC handles entry and restore
-windows where `CS` is changing.
+Testing saved PC handles entry and restore windows where `CS` is changing.
 
-4. For a saved PC below kernel `DS`, keep the stack, request rescheduling,
-   and use [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L63). Otherwise continue through
-   [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L75).
+4. For a saved PC at or below kernel `DS`, keep the stack, request rescheduling,
+   and use [`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62). Otherwise continue through
+   [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74).
 
-[`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L63)
+[`timer_interrupt_kernel_return()`](interrupt_service_routines/os_isrs.picoc#L62)
 resumes the interrupted kernel work in these steps:
 
 1. Pop `DS`, `CS`, `BAF`, `IN2`, `IN1`, and `ACC` from the interrupted stack.
@@ -2576,7 +2664,7 @@ resumes the interrupted kernel work in these steps:
    later scheduling point, as explained in
    [`2.5.2 Kernel non-preemption and deferred rescheduling`](#252-kernel-non-preemption-and-deferred-rescheduling).
 
-[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L75)
+[`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)
 prepares an immediate process switch in these steps:
 
 1. Copy the saved-frame pointer from `SP` to `BAF`, preserving the outgoing
@@ -2587,25 +2675,22 @@ prepares an immediate process switch in these steps:
    [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). This makes
    space for kernel calls without comparing kernel `SP` against the process's
    old limit. The helpers are explained in
-   [`2.4.2.3 Stack-boundary helpers`](#2423-stack-boundary-helpers).
-3. Call [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10),
-   setting [`reschedule_requested`](kernel/dispatcher.picoc#L8) to `true`.
-   Use [`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L92)
-   as the return address.
-
-[`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L92)
-passes the saved process to the dispatcher in these steps:
-
-1. Push the context pointer held in `BAF` and a dummy return address of `0`
+   [`2.4.2.1.1 Stack-boundary helpers`](#24211-stack-boundary-helpers).
+3. Push the context pointer held in `BAF` and a dummy return address of `0`
    to prepare the C call.
-2. Transfer control to
+4. Transfer control to
    [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71).
    It copies the saved registers into the current PCB's
    [`activation`](kernel/process/process.header#L40), then starts process
    selection. The selected process's restoration is described in
    [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti).
-   This path switches directly, so it needs neither a pending-request check
-   nor a direct restoration of the old process's boundary.
+
+This path calls [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71)
+unconditionally, so it does not set or check
+[`reschedule_requested`](kernel/dispatcher.picoc#L8).
+[`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43) clears
+any pending request when selecting a process. A nested UART interrupt returns
+to the timer handler, which continues the same immediate switch.
 
 The kernel has no PCB of its own. Kernel execution includes syscalls, device
 handlers, and the dispatcher's wait loop. Resetting its stack during a timer
@@ -2619,7 +2704,7 @@ process enters the kernel. Device interrupts can still run during that work.
 
 A timer during kernel execution requests a later switch and returns to the
 interrupted work. Syscall return checks the flag before resuming userspace,
-subject to the timing window in [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path). UART handlers also return to the
+subject to the timing window in [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path). UART handlers also return to the
 interrupted operation. This serializes processes' kernel calls, while shared
 terminal state still needs protection against UART interrupts.
 
@@ -2656,11 +2741,16 @@ a terminal signal and ordinary input:
 
 ```mermaid
 flowchart LR
-    ENTRY["uart_interrupt<br/>Save registers and load kernel CS/DS"] --> HANDLE["handle_uart_interrupt<br/>Read and acknowledge byte"]
-    HANDLE --> SIGNAL{"handle_terminal_signal_character<br/>Recognized control character?"}
-    SIGNAL -->|yes| RETURN["uart_interrupt_return<br/>Restore context and execute RTI"]
-    SIGNAL -->|no| INPUT["enqueue_terminal_byte<br/>complete_pending_terminal_read"]
+    ENTRY["<b>uart_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_uart_interrupt()</b><br/>Read + acknowledge byte<br/>handle_terminal_signal_character()"]
+    HANDLE --> SIGNAL{"Ctrl+C / Ctrl+Z?"}
+    SIGNAL -->|yes: signal handled| RETURN["<b>uart_interrupt_return()</b><br/>RTI"]
+    SIGNAL -->|no: input byte| INPUT["<b>enqueue_terminal_byte()</b><br/>complete_pending_terminal_read()"]
     INPUT --> RETURN
+    click ENTRY "interrupt_service_routines/os_isrs.picoc#L185"
+    click HANDLE "kernel/filesystem/terminal.picoc#L213"
+    click SIGNAL "kernel/signal.picoc#L192"
+    click INPUT "kernel/filesystem/terminal.picoc#L49"
+    click RETURN "interrupt_service_routines/os_isrs.picoc#L210"
 ```
 
 The naked entry and return keep the interrupted stack:
@@ -2681,7 +2771,7 @@ void uart_interrupt(void) {
     // processes are blocked and the dispatcher is waiting for an interrupt
     asm("MOVE SP BAF");
     asm(KERNEL_CS_START_ASM); // LOADI32 CS -2147483643
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442882
+    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442893
 
     asm("LOADI32 ACC uart_interrupt_return");
     asm("ADD ACC CS");
@@ -2705,18 +2795,18 @@ void uart_interrupt_return(void) {
 }
 ```
 
-[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L196) enters the
+[`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L185) enters the
 handler in these steps:
 
 1. Save `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and `DS`, preserving the interrupted
    context alongside its automatically saved PC.
 2. Keep the saved-frame pointer in `BAF` and load kernel `CS` and `DS`.
    Retain the interrupted `SP` and boundary so nested kernel calls remain intact.
-3. Push [`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L221)
+3. Push [`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L210)
    as the return address and transfer control to
    [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L213).
 
-[`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L221)
+[`uart_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L210)
 resumes the interrupted work in these steps:
 
 1. Copy `BAF` back to `SP` to select the saved frame after the C handler returns.
@@ -2811,7 +2901,7 @@ interrupted context. It may wake a reader or send a terminal signal.
 `Ctrl+C` targeting the current process records [`pending_termination_signal`](kernel/process/process.header#L63)
 and requests scheduling. `Ctrl+Z` changes the process state without setting
 that flag. CPU selection enforces either change at the next scheduling point.
-[`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path) describes the request helpers.
+[`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) describes the request helpers.
 
 Lower or equal priorities wait. The timer keeps one expiration outstanding,
 DMA latches completion, and UART retains one byte while later terminal bytes
@@ -2836,19 +2926,22 @@ separate polled UART path used by kernel and directly linked common code.
 
 DMA completion enters service routine 4 and wakes the waiting loader. The
 loader checks success or failure when it next runs. This diagram follows
-delivery and wakeup:
+the handler's call to [`wakeup_wait_queue(&dma_waiters)`](kernel/process/process.picoc#L395).
+Interrupt delivery follows the priority rules in
+[`2.6.2 UART nesting and interrupt priorities`](#262-uart-nesting-and-interrupt-priorities):
 
 ```mermaid
 flowchart LR
-    PENDING["DMA completion/error latched<br/>Mapping enabled"] --> PRIORITY{"No active hardware ISR<br/>or strictly higher priority?"}
-    PRIORITY -->|no| WAIT["Pending-handler queue<br/>Retry after active ISR returns"]
-    PRIORITY -->|yes| ENTRY["dma_interrupt<br/>Save registers; keep SP; kernel CS/DS"]
-    WAIT --> PRIORITY
-    ENTRY --> HANDLE["handle_dma_interrupt<br/>wakeup_wait_queue(&dma_waiters)"]
+    ENTRY["<b>dma_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_dma_interrupt()</b><br/>wakeup_wait_queue(&dma_waiters)"]
     HANDLE --> QUEUE{"dma_waiters.head != NULL?"}
-    QUEUE -->|yes| WAKE["Remove FIFO head<br/>End its DMA wait"]
-    QUEUE -->|no| RETURN["dma_interrupt_return<br/>Restore interrupted context; RTI"]
+    QUEUE -->|yes| WAKE["Wake FIFO head"]
+    QUEUE -->|no| RETURN["<b>dma_interrupt_return()</b><br/>RTI"]
     WAKE --> RETURN
+    click ENTRY "interrupt_service_routines/os_isrs.picoc#L223"
+    click HANDLE "kernel/dma.picoc#L40"
+    click QUEUE "kernel/dma.picoc#L6"
+    click WAKE "kernel/process/process.picoc#L395"
+    click RETURN "interrupt_service_routines/os_isrs.picoc#L246"
 ```
 
 The entry and return borrow the interrupted stack. The C handler wakes a
@@ -2868,7 +2961,7 @@ void dma_interrupt(void) {
     // BAF keeps the interrupted stack while the handler uses kernel segments
     asm("MOVE SP BAF");
     asm(KERNEL_CS_START_ASM); // LOADI32 CS -2147483643
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442882
+    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442893
 
     asm("LOADI32 ACC dma_interrupt_return");
     asm("ADD ACC CS");
@@ -2896,14 +2989,14 @@ void handle_dma_interrupt(void) {
 }
 ```
 
-[`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L234) enters
+[`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L223) enters
 the C handler in these steps:
 
 1. Save `ACC`, `IN1`, `IN2`, `BAF`, `CS`, and `DS` on the interrupted stack.
 2. Keep the saved-frame pointer in `BAF` and load kernel `CS` and `DS` so the
    handler can access [`dma_waiters`](kernel/dma.picoc#L6). Preserve `SP` and
    the active boundary to protect suspended kernel calls.
-3. Push [`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L257)
+3. Push [`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L246)
    as the return address and transfer control to
    [`handle_dma_interrupt()`](kernel/dma.picoc#L40).
 
@@ -2912,7 +3005,7 @@ the FIFO head, clears its wait links, and makes it ready. For a stopped
 process, it records that state in [`stopped_from_state`](kernel/process/process.header#L62). An empty queue is
 unchanged.
 
-[`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L257)
+[`dma_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L246)
 resumes the interrupted work in these steps:
 
 1. Copy `BAF` back to `SP` to select the saved frame after the C handler returns.
@@ -2940,7 +3033,7 @@ loading to the DMA registers and the completion path described above.
 | --- | --- | --- | --- | --- |
 | [`initialize_dma(void)`](kernel/dma.picoc#L9) | Returns no value | Initializes [`dma_waiters`](kernel/dma.picoc#L6) and sets [`dma_initialized`](kernel/dma.picoc#L7) once when DMA is active, otherwise changes nothing | [`dma_is_active()`](common/dma.picoc#L17) | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31), [`start_dma_uart_receive()`](kernel/dma.picoc#L18) |
 | [`start_dma_uart_receive(destination, word_count, caller_context)`](kernel/dma.picoc#L18) | Returns `false` when DMA is unavailable, busy, or already has a waiter. Successful setup does not return through the current kernel call. The process later resumes from its saved interrupt frame with [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L48). | Stores the continuation result in the saved syscall frame, blocks the caller on [`dma_waiters`](kernel/dma.picoc#L6), starts a UART-to-SRAM transfer, and switches processes | [`dma_is_active()`](common/dma.picoc#L17), [`initialize_dma()`](kernel/dma.picoc#L9), [`dma_transfer_status()`](common/dma.picoc#L21), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109) |
-| [`handle_dma_interrupt(void)`](kernel/dma.picoc#L40) | Returns no value | Wakes the first process whose PCB is queued on [`dma_waiters`](kernel/dma.picoc#L6) | [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Hardware interrupts:** DMA completion via [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L234) |
+| [`handle_dma_interrupt(void)`](kernel/dma.picoc#L40) | Returns no value | Wakes the first process whose PCB is queued on [`dma_waiters`](kernel/dma.picoc#L6) | [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) | **Hardware interrupts:** DMA completion via [`dma_interrupt()`](interrupt_service_routines/os_isrs.picoc#L223) |
 
 ## 2.8 CPU exceptions and runtime errors
 [\[↑ TOC\]](#contents)
@@ -2958,14 +3051,18 @@ diagram shows why the faulting context does not resume:
 
 ```mermaid
 flowchart LR
-    ENTRY["cpu_exception_interrupt<br/>Preserve old CS and select kernel context"] --> HANDLE["handle_cpu_exception<br/>Read cause and compare old CS with kernel CS"]
-    HANDLE --> KERNEL{"Old CS equals kernel CS?"}
-    KERNEL -->|yes| PANIC["Print kernel panic"] --> HALT["shutdown<br/>JUMP 0"]
-    KERNEL -->|no| EXIT["Print process error<br/>exit_process with exception status"]
-    EXIT --> NEXT["dispatcher_start_next_process<br/>Wait for a runnable process"]
-    NEXT --> SELECT{"Process selected?"}
-    SELECT -->|no processes remain| HALT
-    SELECT -->|yes| RESTORE["dispatcher_jump_to_process<br/>Restore selected process and execute RTI"]
+    ENTRY["<b>cpu_exception_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_cpu_exception()</b><br/>Read cause<br/>print_cpu_exception_message()"]
+    HANDLE --> KERNEL{"interrupted CS = kernel CS?"}
+    KERNEL -->|yes: kernel panic| HALT["<b>shutdown()</b><br/>JUMP 0"]
+    KERNEL -->|no: process error| EXIT["<b>exit_process()</b><br/>PROCESS_EXIT_STATUS_EXCEPTION<br/>dispatcher_start_next_process()"]
+    EXIT -->|no processes remain| HALT
+    EXIT -->|process selected| RESTORE["<b>dispatcher_jump_to_process()</b><br/>RTI: selected process"]
+    click ENTRY "interrupt_service_routines/os_isrs.picoc#L161"
+    click HANDLE "kernel/exception.picoc#L70"
+    click KERNEL "kernel/exception.picoc#L72"
+    click HALT "kernel/kernel.picoc#L15"
+    click EXIT "kernel/process/process.picoc#L430"
+    click RESTORE "kernel/dispatcher.picoc#L21"
 ```
 
 The two periphery registers below control protection and report the cause.
@@ -2987,8 +3084,8 @@ void cpu_exception_interrupt(void) {
     asm("LOADI IN1 0");
     write_stack_heap_boundary_from_in1();
     asm(KERNEL_CS_START_ASM); // LOADI32 CS -2147483643
-    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442882
-    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435340
+    asm(KERNEL_DS_START_ASM); // LOADI32 DS -2147442893
+    asm(KERNEL_SP_START_ASM); // LOADI32 SP -2147435351
     activate_kernel_stack_boundary();
 
     // A zero difference identifies an exception raised in kernel code
@@ -3005,7 +3102,7 @@ void cpu_exception_interrupt(void) {
 }
 ```
 
-[`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L172)
+[`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L161)
 prepares the exception handler in these steps:
 
 1. Preserve the interrupted `CS` value in `BAF`. Here `BAF` temporarily holds
@@ -3016,7 +3113,7 @@ prepares the exception handler in these steps:
    [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11). Even a
    kernel fault resets `SP`, because the interrupted stack may be exhausted
    and its call frames will not be resumed. The helpers are explained in
-   [`2.4.2.3 Stack-boundary helpers`](#2423-stack-boundary-helpers).
+   [`2.4.2.1.1 Stack-boundary helpers`](#24211-stack-boundary-helpers).
 3. Subtract kernel `CS` from the preserved old `CS` and push the difference
    as the C handler's argument. The boundary helper preserves the old value
    across its ordinary C call.
@@ -3097,10 +3194,10 @@ that file.
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
 | [`handle_process_heap_full_exception(void)`](kernel/exception.picoc#L82) | Does not return normally | Writes a diagnostic through descriptor 1 and terminates the current process with exception status | [`write_process_exception_message()`](kernel/exception.picoc#L29), [`exit_process()`](kernel/process/process.picoc#L430) | **Library functions:** [`require_process_heap_allocation()`](library/stdlib/malloc.picoc#L8) through the process-heap-full syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`activate_kernel_stack_boundary(void)`](kernel/exception.picoc#L11) | Returns no value | Writes the kernel heap end to periphery register 10 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105)<br>**Hardware interrupts:** timer via [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L75)<br>**CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L172)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
+| [`activate_kernel_stack_boundary(void)`](kernel/exception.picoc#L11) | Returns no value | Writes the kernel heap end to periphery register 10 | [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call entry:** [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94)<br>**Hardware interrupts:** timer via [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L161)<br>**Kernel functions:** [`main()`](kernel/kernel.picoc#L31) |
 | [`process_stack_boundary(process)`](kernel/exception.picoc#L18) | Returns the process's absolute heap end | Reads [`base_address`](kernel/process/process.header#L34), [`heap_start`](kernel/process/process.header#L36), and [`heap_size`](kernel/process/process.header#L37), changes no state | None | **Kernel functions:** [`activate_current_process_stack_boundary()`](kernel/exception.picoc#L22), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
-| [`activate_current_process_stack_boundary(void)`](kernel/exception.picoc#L22) | Returns no value | Writes the current process boundary to periphery register 10 | [`current_process()`](kernel/process/process.picoc#L62), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call return:** [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L159) |
-| [`handle_cpu_exception(interrupted_kernel_cs_difference)`](kernel/exception.picoc#L70) | Does not return normally | Reads register 11, terminates the current process for a process fault or shuts down for a kernel fault | [`periphery_read_register()`](kernel/periphery.picoc#L5), [`print_cpu_exception_message()`](kernel/exception.picoc#L44), [`shutdown()`](kernel/kernel.picoc#L15), [`exit_process()`](kernel/process/process.picoc#L430) | **CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L172) |
+| [`activate_current_process_stack_boundary(void)`](kernel/exception.picoc#L22) | Returns no value | Writes the current process boundary to periphery register 10 | [`current_process()`](kernel/process/process.picoc#L62), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`periphery_write_register()`](kernel/periphery.picoc#L11) | **System-call return:** [`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L148) |
+| [`handle_cpu_exception(interrupted_kernel_cs_difference)`](kernel/exception.picoc#L70) | Does not return normally | Reads register 11, terminates the current process for a process fault or shuts down for a kernel fault | [`periphery_read_register()`](kernel/periphery.picoc#L5), [`print_cpu_exception_message()`](kernel/exception.picoc#L44), [`shutdown()`](kernel/kernel.picoc#L15), [`exit_process()`](kernel/process/process.picoc#L430) | **CPU exceptions:** [`cpu_exception_interrupt()`](interrupt_service_routines/os_isrs.picoc#L161) |
 | [`panic_kernel_heap_full(void)`](kernel/exception.picoc#L89) | Does not return | Writes a UART kernel-panic message and shuts down | [`uart_print_string()`](common/uart_protocol.picoc#L73), [`shutdown()`](kernel/kernel.picoc#L15) | **Kernel functions:** [`require_kernel_heap_allocation()`](kernel/kmalloc.picoc#L9) |
 
 # 3. Memory management and shared memory
@@ -3189,11 +3286,11 @@ when the kernel is rebuilt:
 | Larger part | SRAM offset | Section or region | Contents |
 | --- | ---: | --- | --- |
 | Kernel Image | `0..4` | `.ivt` | Five interrupt service routine addresses |
-| Kernel Image | `5..40765` | `.text` | Kernel code, including interrupt service routines |
-| Kernel Image | `40766..41496` | `.data` | Kernel globals, including both kernel-managed heap descriptors and list roots |
-| Kernel runtime reservation | `41497..45592` | Kernel Heap | 4096 cells, including in-region block headers |
-| Kernel runtime reservation | `45593..48308` | Kernel Stack | Stack grows toward lower addresses from the initial free `SP` cell |
-| After the Kernel region | `48309..262143` | Process and Shared Data Heap | Outer blocks for Process Payloads and Shared Data Payloads |
+| Kernel Image | `5..40754` | `.text` | Kernel code, including interrupt service routines |
+| Kernel Image | `40755..41485` | `.data` | Kernel globals, including both kernel-managed heap descriptors and list roots |
+| Kernel runtime reservation | `41486..45581` | Kernel Heap | 4096 cells, including in-region block headers |
+| Kernel runtime reservation | `45582..48297` | Kernel Stack | Stack grows toward lower addresses from the initial free `SP` cell |
+| After the Kernel region | `48298..262143` | Process and Shared Data Heap | Outer blocks for Process Payloads and Shared Data Payloads |
 
 The bootloader consumes the binary header separately from the Kernel Image.
 [`init_kernel_heap()`](kernel/kmalloc.picoc#L17) initializes the reserved kernel heap, and
@@ -3214,8 +3311,8 @@ table connects them to PCB addresses:
 
 [`base_address`](kernel/process/process.header#L34) is absolute, while [`heap_start`](kernel/process/process.header#L36) is relative to it.
 [`process_heap_start()`](kernel/process/process.picoc#L418) adds them, and [`process_heap_size()`](kernel/process/process.picoc#L424) returns the size.
-[`libstart`](library/start/libstart.picoc) uses both to initialize the user heap. [`4.2.1 User process stack placement`](#421-user-process-stack-placement) explains stack
-reservation, and [`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp) shows startup contents.
+[`libstart`](library/start/libstart.picoc) uses both to initialize the user heap. [`4.2.2.1.1 User process stack placement`](#42211-user-process-stack-placement) explains stack
+reservation, and [`4.2.2.1.2 Initial argc, argv, and envp`](#42212-initial-argc-argv-and-envp) shows startup contents.
 
 ## 3.3 Kernel Heap
 [\[↑ TOC\]](#contents)
@@ -3438,10 +3535,19 @@ Its [`next`](common/heap.header#L8) is `NULL`, and D's [`next`](common/heap.head
 #### 3.6.3.3 Free D and merge its remainder
 [\[↑ TOC\]](#contents)
 
+Freeing D leaves two adjacent free blocks, D and its remainder D′.
+The merge scan restores D's original 16-cell payload.
+
+##### 3.6.3.3.1 Mark D free
+[\[↑ TOC\]](#contents)
+
 Freeing the payload recovers D's header and sets [`free`](common/heap.header#L7) to true. This is
 the intermediate state before merging:
 
 ![D marked free with its eleven payload cells still separate from free D′ and its two payload cells](documentation/images/heap-03-d-marked-free.svg)
+
+##### 3.6.3.3.2 Merge D and its remainder
+[\[↑ TOC\]](#contents)
 
 The merge scan starts at A and reaches D/D′. Both are free, so D absorbs
 D′'s header and payload. Its size becomes `11 + 3 + 2 = 16`, and [`next`](common/heap.header#L8)
@@ -3454,15 +3560,27 @@ D has no successor, so the scan ends with the initial four-block layout.
 #### 3.6.3.4 Free C and merge repeatedly at B
 [\[↑ TOC\]](#contents)
 
+Freeing C creates a run of three free blocks. The allocator combines them
+through two merges at B without advancing to another header.
+
+##### 3.6.3.4.1 Mark C free
+[\[↑ TOC\]](#contents)
+
 Freeing C's payload at offset 21 marks C free. B, C, and D are now adjacent
 free blocks:
 
 ![C marked free, making B, C, and D consecutive free blocks after allocated A](documentation/images/heap-05-c-marked-free.svg)
 
+##### 3.6.3.4.2 First merge at B
+[\[↑ TOC\]](#contents)
+
 The scan reaches B/C and merges them. B's size becomes `4 + 3 + 12 = 19`,
 and its [`next`](common/heap.header#L8) becomes D:
 
 ![First merge at B bypasses Header C and produces nineteen free payload cells followed by free D](documentation/images/heap-06-b-c-merged.svg)
+
+##### 3.6.3.4.3 Second merge at B
+[\[↑ TOC\]](#contents)
 
 The scan stays at B and checks its new neighbor D. It merges again, giving
 B `19 + 3 + 16 = 38` payload cells and `next = NULL`. This is repeated
@@ -3549,7 +3667,7 @@ physical addresses, with no MMU translation or process isolation.
 
 [`8.9 PicoOS paths, working directories, and host operations`](#89-picoos-paths-working-directories-and-host-operations) explains [`working_directory`](kernel/process/process.header#L39), and [`8.1 Per-process file-descriptor table`](#81-per-process-file-descriptor-table) explains [`file_descriptors`](kernel/process/process.header#L42).
 [`binary_path`](kernel/process/process.header#L38) exists before `argv[0]` is copied to the stack and remains
-available to [`list_processes()`](kernel/process/process.picoc#L32) even if userspace changes `argv[0]`. [`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp)
+available to [`list_processes()`](kernel/process/process.picoc#L32) even if userspace changes `argv[0]`. [`4.2.2.1.2 Initial argc, argv, and envp`](#42212-initial-argc-argv-and-envp)
 shows that stack copy.
 
 ### 4.1.1 Process states and transitions
@@ -3581,7 +3699,7 @@ process run again if no other process is eligible. Being ready does not
 start execution immediately.
 
 [`ZOMBIE`](kernel/process/process.header#L17) retains the termination status while excluding the process from
-scheduling. [`4.3.2.2 Recording termination status`](#4322-recording-termination-status) and [`4.3.2.3 Parent collection and final removal`](#4323-parent-collection-and-final-removal) explain status delivery and final removal.
+scheduling. [`4.2.2.3 Recording termination status`](#4223-recording-termination-status) and [`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal) explain status delivery and final removal.
 
 The diagram follows normal startup, scheduling, waits, signals, and
 termination. Removal ends the PCB's lifetime. [`6. Scheduling and context switching`](#6-scheduling-and-context-switching) explains scheduling, and
@@ -3654,7 +3772,7 @@ A shared-memory tail would add maintenance without improving insertion.
 Name lookup and finding a predecessor for removal still require a scan.
 
 [`remove_process()`](kernel/process/process.picoc#L209) finds the PCB and predecessor, bypasses the node, and
-updates the head, tail, and current pointer as needed. [`4.3.2.3 Parent collection and final removal`](#4323-parent-collection-and-final-removal) explains
+updates the head, tail, and current pointer as needed. [`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal) explains
 resource cleanup. [`7.2 Wait queues and PCB links`](#72-wait-queues-and-pcb-links) covers its separate wait-queue link.
 
 The scheduler scans the process list directly. Wait queues use [`wait_next`](kernel/process/process.header#L51),
@@ -3677,18 +3795,224 @@ Payloads. The middle allocation holds shared data:
 Adding code and data offsets gives [`activation.cs`](kernel/process/process.header#L27) and [`activation.ds`](kernel/process/process.header#L28).
 Adding [`heap_start`](kernel/process/process.header#L36) gives the user-heap address.
 
-## 4.2 Initial user process stack
+## 4.2 Loading and starting a process
 [\[↑ TOC\]](#contents)
 
-[`run()`](library/unistd/process.picoc#L31) completes the initial stack before setting [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13).
-After [`load()`](library/unistd/process.picoc#L17), the stack contains only a preliminary entry PC. [`4.3 Loading and starting a process`](#43-loading-and-starting-a-process) explains
-these two phases.
+[`load()`](library/unistd/process.picoc#L17) receives a program, and [`run()`](library/unistd/process.picoc#L31) prepares it to execute. Their
+wrappers reach [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) and [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241).
+The dispatcher later restores the prepared activation, as shown in [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti).
 
-### 4.2.1 User process stack placement
+The memory diagrams below arrange addresses from lower to higher, left to
+right. Region widths are illustrative.
+
+### 4.2.1 Loading a process (`load` library call)
+[\[↑ TOC\]](#contents)
+
+Loading first receives the program into a reserved Process Payload, then
+creates its [`ProcessControlBlock`](kernel/process/process.header#L31).
+The two steps below distinguish the caller's temporary transfer record from
+the child's PCB. Only after reception succeeds does the child receive a PID,
+with [`state`](kernel/process/process.header#L33) set to [`NEW`](kernel/process/process.header#L12).
+
+#### 4.2.1.1 Step 1: Receiving the process image
+[\[↑ TOC\]](#contents)
+
+[`begin_process_load()`](kernel/process/process_loader.picoc#L109) resolves the path,
+validates the five-word binary header, applies heap and stack defaults, and
+reserves the Process Payload with [`PSDMalloc()`](kernel/psdmalloc.picoc#L20).
+The caller's [`pending_load`](kernel/process/process.header#L68) points to a
+[`ProcessLoad`](kernel/process/process_loader.picoc#L14) that retains the destination
+and transfer progress between syscalls. No child PCB exists yet.
+
+The diagram follows the image from host storage through UART into SRAM.
+Dashed arrows show data movement, and solid arrows show stored pointers.
+Only the image words after the header are copied into the User Process Image.
+The user heap and stack are reserved but remain uninitialized:
+
+![EPROM, the complete peripheral mapping, and SRAM with CPU-polling and DMA transfer paths into the newly allocated User Process Image, while the caller owns ProcessLoad](documentation/images/process-load-transfer.svg)
+
+Without DMA, [`begin_process_load()`](kernel/process/process_loader.picoc#L109) reads the file size and 20-byte header.
+[`continue_process_load()`](kernel/process/process_loader.picoc#L227) receives at most 256 words per request.
+[`receive_word()`](common/uart_protocol.picoc#L7) assembles four bytes into each SRAM word. The wrapper
+returns through userspace between chunks, allowing scheduling.
+
+With `--dma`, the header still uses polling. The payload arrives in one
+transfer, and the caller blocks on [`dma_waiters`](kernel/dma.picoc#L6). Completion wakes it. Its
+next load syscall checks the result and creates the child PCB. Rejected
+transfers free the partial allocation and return `0`. [`2.7 DMA completion interrupt path`](#27-dma-completion-interrupt-path) explains DMA.
+
+Boot-time init loading uses [`load_process()`](kernel/process/process_loader.picoc#L305) and a continuous [`load`](#123-uart-host-service-protocol)
+response. [`receive_words_to_sram()`](common/sram_loader.picoc#L6) polls UART or DMA completion because
+there is no running user caller to block. Both paths use [`create_process()`](kernel/process/process.picoc#L89).
+
+##### 4.2.1.1.1 `ProcessLoad` transfer record
+[\[↑ TOC\]](#contents)
+
+[`ProcessLoad`](kernel/process/process_loader.picoc#L14) is the temporary kernel-heap
+record for an in-progress userspace load. The loading caller owns it through
+[`pending_load`](kernel/process/process.header#L68). It preserves the reserved
+payload's address, header values, copied binary path, and transfer progress
+between syscalls, including while the caller waits for DMA completion.
+The child PCB is created only after reception succeeds.
+
+The table explains the struct's fields and the functions that use them.
+[`9.1 Memory layout, allocation sources, and lifetimes`](#91-memory-layout-allocation-sources-and-lifetimes)
+describes its allocation and ownership:
+
+| Field | Meaning | Used by |
+| --- | --- | --- |
+| [`ProcessLoad.base_address`](kernel/process/process_loader.picoc#L15) | Absolute start of the reserved Process and Shared Data Heap region | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), used by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227), [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
+| [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16) | Total reserved cells for the User Process Image, User Process Heap, and User Process Stack | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
+| [`ProcessLoad.code_start`](kernel/process/process_loader.picoc#L17), [`ProcessLoad.data_start`](kernel/process/process_loader.picoc#L18) | Linked code- and data-segment offsets from the binary header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
+| [`ProcessLoad.heap_start`](kernel/process/process_loader.picoc#L19), [`ProcessLoad.heap_size`](kernel/process/process_loader.picoc#L20) | Resolved userspace heap offset and cell count | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
+| [`ProcessLoad.payload_word_count`](kernel/process/process_loader.picoc#L21) | Encoded program words after the five-word header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), bounds both DMA and polling transfers in [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) and [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
+| [`ProcessLoad.loaded_word_count`](kernel/process/process_loader.picoc#L22) | Words copied by the polling transfer so far | First initialized to 0 by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), advanced and checked by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
+| [`ProcessLoad.loading_bar_update`](kernel/process/process_loader.picoc#L23) | Next word count at which progress output is redrawn | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), updated by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
+| [`ProcessLoad.uses_dma`](kernel/process/process_loader.picoc#L24) | Whether the reserved image is being filled by one DMA transfer rather than polling chunks | First initialized to `false` and set to `true` by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), checked by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
+| [`ProcessLoad.path`](kernel/process/process_loader.picoc#L25) | Kernel-owned absolute binary path used by later range requests and copied into the completed PCB | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), read by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), freed by [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) |
+
+On success, [`finish_process_load()`](kernel/process/process_loader.picoc#L90)
+passes the reserved payload to the new child PCB, clears the caller's
+[`pending_load`](kernel/process/process.header#L68), and frees the transfer record
+and its copied path. [`cancel_process_load()`](kernel/process/process_loader.picoc#L76) cancels active DMA
+and releases the partial Process Payload and temporary transfer record if
+reception fails.
+
+#### 4.2.1.2 Step 2: Creating the child PCB
+[\[↑ TOC\]](#contents)
+
+After reception succeeds, [`finish_process_load()`](kernel/process/process_loader.picoc#L90)
+passes the received image's bounds to [`create_process()`](kernel/process/process.picoc#L89).
+That function allocates the child's [`ProcessControlBlock`](kernel/process/process.header#L31),
+assigns its PID from [`next_process_id`](kernel/process/process.picoc#L19),
+advances that counter, and sets [`state`](kernel/process/process.header#L33) to
+[`NEW`](kernel/process/process.header#L12). It records the payload bounds, prepares
+[`activation`](kernel/process/process.header#L40) and a preliminary entry PC,
+and creates the initial descriptors and paths.
+[`4.1 Process control block fields`](#41-process-control-block-fields) lists every initialized field.
+
+The diagram shows the completed image and its new PCB. In this example, the
+previous tail's [`next`](kernel/process/process.header#L53) points to the child,
+and [`process_list_tail`](kernel/process/process.picoc#L17) changes to the new PCB.
+The saved stack registers point into the reserved stack, which contains only
+the preliminary entry PC:
+
+![Completed load with the child PCB appended in the kernel heap, state NEW, fresh descriptors, initialized activation fields, and only one preliminary entry-PC cell on its stack](documentation/images/process-load-complete.svg)
+
+[`finish_process_load()`](kernel/process/process_loader.picoc#L90) then clears the
+caller's [`pending_load`](kernel/process/process.header#L68), frees the temporary
+[`ProcessLoad`](kernel/process/process_loader.picoc#L14) and its path, and returns
+the child PID. The child cannot be scheduled until [`run()`](library/unistd/process.picoc#L31)
+prepares its startup stack and sets [`state`](kernel/process/process.header#L33)
+to [`READY`](kernel/process/process.header#L13).
+
+#### 4.2.1.3 Process stack after `load`
+[\[↑ TOC\]](#contents)
+
+After a successful [`load()`](library/unistd/process.picoc#L17) returns the child PID,
+[`create_process()`](kernel/process/process.picoc#L89) has initialized only one cell
+of the child's reserved stack. The highest stack address, `highest_stack_address`,
+is [`base_address`](kernel/process/process.header#L34) + [`size`](kernel/process/process.header#L35) - 1.
+As in the initial stack table in [`4.2.2.1.2 Initial argc, argv, and envp`](#42212-initial-argc-argv-and-envp),
+the stack is drawn vertically with lower addresses at the top and higher
+addresses at the bottom. Stack growth is upward toward lower addresses.
+The arrows connect the saved registers in the child's PCB to the stack cells
+they point to:
+
+![Child stack after load, lower addresses at the top and higher addresses at the bottom: saved activation.baf points to the only initialized stack cell at the bottom, while saved activation.sp points to the uninitialized cell immediately above it; stack growth is upward](documentation/images/process-loaded-stack.svg)
+
+The bottom two stack boxes each represent one 32-bit cell. The larger top box
+represents all remaining reserved stack cells. Saved
+[`activation.baf`](kernel/process/process.header#L26) points to `highest_stack_address`.
+Saved [`activation.sp`](kernel/process/process.header#L25) points one cell lower,
+to `highest_stack_address - 1`. The cell at `highest_stack_address`
+contains [`activation.cs`](kernel/process/process.header#L27) minus 1, the value
+that `RTI` would consume from `SP + 1` before advancing PC.
+
+The child's [`state`](kernel/process/process.header#L33) remains
+[`NEW`](kernel/process/process.header#L12), so it cannot yet be selected to run.
+There is no `argc`, `argv[]`, `envp[]`, or copied-string area. The other reserved
+stack cells have unspecified contents because loading does not zero them.
+[`run()`](library/unistd/process.picoc#L31) builds the complete
+startup layout shown in [`4.2.2.1 Initial user process stack`](#4221-initial-user-process-stack).
+
+#### 4.2.1.4 Load function reference
+[\[↑ TOC\]](#contents)
+
+The table starts with the syscall-backed loader, then lists transfer
+helpers and the boot-time loader. [`4.2.2.5 Run function reference`](#4225-run-function-reference) covers run setup:
+
+| Kernel function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Positive PID when complete, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L48) (-1) while work remains | Starts or resumes the caller-owned load. Successful completion creates a PCB with [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12) | [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`current_process()`](kernel/process/process.picoc#L62)<br>**Host requests:** `file-size <path>` and `read-range <offset> <count> <path>` through helpers | **Library functions:** [`load()`](library/unistd/process.picoc#L17) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> |
+| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | PID on success, 0 on rejected path, missing/short header, invalid stack placement, or exhausted process memory | Kernel boot-time continuous transfer. Reserves the Process Payload, receives the image, and creates the PCB | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`create_process()`](kernel/process/process.picoc#L89), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_host_request()`](common/uart_protocol.picoc#L82)<br>**Host requests:** `load <path>` | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) in [`kernel/kernel.picoc`](kernel/kernel.picoc) |
+| [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) | PID for an empty payload, continuation status after transfer setup, or 0 on path/header/allocation/transfer failure | Reads the header, reserves memory, allocates [`ProcessLoad`](kernel/process/process_loader.picoc#L14) and its path, sets [`caller.pending_load`](kernel/process/process.header#L68), initializes progress, and optionally starts blocking DMA | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`copy_process_path()`](kernel/process/process.picoc#L70), [`current_process()`](kernel/process/process.picoc#L62), [`dma_is_active()`](common/dma.picoc#L17), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`kmalloc()`](kernel/kmalloc.picoc#L23), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43)<br>**Host requests:** `file-size <path>`, `read-range 0 20 <path>`, optional whole-payload `read-range 20 <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
+| [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) | PID on completion, continuation status while DMA is busy or polling work remains, or 0 on transfer failure | Checks DMA status or polls up to 256 payload words, advances [`loaded_word_count`](kernel/process/process_loader.picoc#L22) and progress, completes or cancels the load | [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`dma_transfer_status()`](common/dma.picoc#L21), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58)<br>**Host requests:** Polling `read-range <offset> <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
+| [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) | New PID | Creates the child PCB after transfer, clears [`owner.pending_load`](kernel/process/process.header#L68), and frees temporary load metadata and its copied path | [`create_process()`](kernel/process/process.picoc#L89), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
+| [`create_process(base_address, size, code_start, data_start, heap_start, heap_size, binary_path)`](kernel/process/process.picoc#L89) | PCB pointer. Kernel-heap exhaustion halts the OS through allocation checks | Assigns PID and [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12), records memory fields, initializes [`activation`](kernel/process/process.header#L40), queues and signals, creates standard descriptors, copies paths and parent-derived metadata, writes the preliminary entry PC, and appends the PCB | [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), [`current_process()`](kernel/process/process.picoc#L62), [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`copy_process_path(path)`](kernel/process/process.picoc#L70) | New kernel-owned string pointer | Allocates and copies a path including its terminator | [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`create_process()`](kernel/process/process.picoc#L89), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128) |
+| [`loaded_process_stack_start(heap_start, heap_size, stack_start)`](kernel/process/process_loader.picoc#L28) | Highest process-relative stack offset, or [`PSDMALLOC_INVALID_START`](kernel/psdmalloc.header#L3) for overlap | Resolves the default highest stack offset or checks an explicit offset, no memory writes | None | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) | No return value | Cancels busy DMA if needed, clears [`process.pending_load`](kernel/process/process.header#L68), frees the partial Process Payload and temporary metadata | [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`dma_transfer_status()`](common/dma.picoc#L21), [`free_process_load()`](kernel/process/process_loader.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`remove_process()`](kernel/process/process.picoc#L209) |
+| [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) | No return value | Frees the temporary kernel-owned host path and [`ProcessLoad`](kernel/process/process_loader.picoc#L14) | [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`finish_process_load()`](kernel/process/process_loader.picoc#L90) |
+| [`drain_process_words(payload_word_count, show_loading_bar)`](kernel/process/process_loader.picoc#L40) | No return value | Consumes a rejected continuous payload so UART remains synchronized, optionally reports progress | [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305) |
+| [`drain_process_bytes(byte_count)`](kernel/process/process_loader.picoc#L62) | No return value | Consumes unexpected positive range-response data so UART remains synchronized | [`receive_byte_over_uart()`](kernel/uart_hardware.picoc#L24) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
+
+The directly linked transfer helper is shared by bootloader and kernel:
+
+| Kernel / Library Function | Return value / status | Effects | Calls | Called by |
+| --- | --- | --- | --- | --- |
+| [`receive_words_to_sram(base_address, word_count, show_loading_bar)`](common/sram_loader.picoc#L6) (Shared/Common) | No return value | Receives word_count cells at base_address. Polls UART without DMA, otherwise starts DMA and busy-waits for its status, updates requested loading progress | [`dma_is_active()`](common/dma.picoc#L17), [`dma_transfer_status()`](common/dma.picoc#L21), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305)<br>**Bootloader functions:** [`boot_main()`](boot/bootloader.picoc#L41) |
+
+### 4.2.2 Starting a process (`run` library call)
+[\[↑ TOC\]](#contents)
+
+Starting finishes the process setup in this order:
+
+1. Pack the PID, raw arguments, and selected environment into a
+   [`RunProcessRequest`](common/syscall.header#L55). A `NULL` environment selects the caller's environment.
+   A custom null-terminated array replaces it. [`4.2.2.2.1 Environment origin and propagation`](#42221-environment-origin-and-propagation)
+   explains how the library selects the environment.
+2. Find the PCB and require [`state`](kernel/process/process.header#L33) to be [`NEW`](kernel/process/process.header#L12).
+3. Copy inheritable descriptors from the run caller.
+4. Copy arguments and environment strings to the child stack, build their
+   pointer arrays, and update [`activation.sp`](kernel/process/process.header#L25) and [`activation.baf`](kernel/process/process.header#L26).
+5. Set [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13) and return success.
+
+The figure highlights the new stack, descriptor table, and changed PCB
+fields. The heap remains reserved until userspace startup:
+
+![Run changes inside the same SRAM layout: inherited descriptor table, copied caller arguments and environment, new stack and activation pointers, and state NEW to READY](documentation/images/process-run-setup.svg)
+
+The shell separates the command name, expands variables, and passes the
+remaining argument string to [`run()`](library/unistd/process.picoc#L31). The kernel splits it on spaces and
+tabs, preserving quoted whitespace and removing matching quotes. It builds
+the pointer array itself. [`12.4 Command parsing, expansion, and execution`](#124-command-parsing-expansion-and-execution) explains shell parsing.
+
+The kernel copies the request's strings into the child stack.
+[`4.2.2.1 Initial user process stack`](#4221-initial-user-process-stack) below shows
+the prepared layout, including a concrete diagram for `add.bin`.
+
+Setting [`READY`](kernel/process/process.header#L13) permits later scheduling. The call does not load the CPU
+registers immediately. On first dispatch, [`_start()`](library/start/start.picoc#L14) initializes the heap
+and environment before entering the application.
+
+#### 4.2.2.1 Initial user process stack
+[\[↑ TOC\]](#contents)
+
+This is the child stack prepared by a successful [`run()`](library/unistd/process.picoc#L31)
+call, before the child executes its first instruction. Setup completes the
+stack before setting [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13).
+The preliminary entry PC left by [`load()`](library/unistd/process.picoc#L17) is replaced
+by the layout below. The scheduler may dispatch the child before the caller
+resumes; these figures show the prepared startup stack.
+
+##### 4.2.2.1.1 User process stack placement
 [\[↑ TOC\]](#contents)
 
 The blue highlight locates one process's stack after its image and heap.
-Other processes have their own stacks in separate Process Payloads:
+The lower view expands Process Payload A, excluding its outer allocator
+header. Other processes have their own stacks in separate Process Payloads:
 
 ![Complete SRAM expanded into Process Payload A, with both the payload and its User Process Stack highlighted by matching blue fills and thick blue borders](documentation/images/process-stack-placement.svg)
 
@@ -3703,7 +4027,7 @@ Because this is the inclusive highest offset, it reserves 1001 cells beyond
 the heap. The loader rejects a stack start inside the heap and adds one to
 the effective offset for the allocation size.
 
-### 4.2.2 Initial `argc`, `argv`, and `envp`
+##### 4.2.2.1.2 Initial `argc`, `argv`, and `envp`
 [\[↑ TOC\]](#contents)
 
 [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) fills the high end of that reservation during
@@ -3782,7 +4106,7 @@ layout. PicoOS shares these representations but uses separate [`load()`](library
 <!-- Presentation: mention the System V Intel386 initial-process-stack comparison,
      distinguish POSIX source-level conventions, and explain the RETI adaptations. -->
 
-#### 4.2.2.1 Concrete initial-stack example
+###### 4.2.2.1.2.1 Concrete initial-stack example
 [\[↑ TOC\]](#contents)
 
 Save this program as `add.picoc` and link it with [`libstart`](library/start/libstart.picoc) and [`libstdlib`](library/stdlib/libstdlib.picoc).
@@ -3831,139 +4155,7 @@ are absolute addresses:
 The last string terminator overwrites the preliminary entry PC at the top
 of the stack. The final entry PC now lies below [`argc`](kernel/process/process_arguments.picoc#L131).
 
-## 4.3 Loading and starting a process
-[\[↑ TOC\]](#contents)
-
-[`load()`](library/unistd/process.picoc#L17) receives a program, and [`run()`](library/unistd/process.picoc#L31) prepares it to execute. Their
-wrappers reach [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) and [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241).
-The dispatcher later restores the prepared activation, as shown in [`6.4 Restoring the selected process and returning with RTI`](#64-restoring-the-selected-process-and-returning-with-rti).
-
-### 4.3.1 Loading a process (`load` library call)
-[\[↑ TOC\]](#contents)
-
-Loading reserves memory, receives the image, and creates a process record.
-The main steps are:
-
-1. Resolve the path, read and validate the binary header, apply heap and
-   stack defaults, and reserve a Process Payload with [`PSDMalloc()`](kernel/psdmalloc.picoc#L20).
-2. Keep transfer progress in the caller's [`pending_load`](kernel/process/process.header#L68) while receiving
-   the image through polling or DMA.
-3. Call [`create_process()`](kernel/process/process.picoc#L89) to allocate and append a PCB with [`state`](kernel/process/process.header#L33) set
-   to [`NEW`](kernel/process/process.header#L12). It records the payload bounds, prepares segment registers and
-   a preliminary entry PC, and creates the initial descriptors and paths.
-   [`4.1 Process control block fields`](#41-process-control-block-fields) lists every initialized field.
-4. Clear [`pending_load`](kernel/process/process.header#L68), release temporary metadata, and return the child PID.
-
-Only the image words after the header are copied into the Process Payload.
-The user heap remains uninitialized until userspace startup.
-
-This first step follows the image from host storage through UART into SRAM.
-Dashed arrows show data movement, and solid arrows show stored pointers:
-
-![EPROM, the complete peripheral mapping, and SRAM with CPU-polling and DMA transfer paths into the newly allocated User Process Image, while the caller owns ProcessLoad](documentation/images/process-load-transfer.svg)
-
-Without DMA, [`begin_process_load()`](kernel/process/process_loader.picoc#L109) reads the file size and 20-byte header.
-[`continue_process_load()`](kernel/process/process_loader.picoc#L227) receives at most 256 words per request.
-[`receive_word()`](common/uart_protocol.picoc#L7) assembles four bytes into each SRAM word. The wrapper
-returns through userspace between chunks, allowing scheduling.
-
-With `--dma`, the header still uses polling. The payload arrives in one
-transfer, and the caller blocks on [`dma_waiters`](kernel/dma.picoc#L6). Completion wakes it. Its
-next load syscall checks the result and creates the child PCB. Rejected
-transfers free the partial allocation and return `0`. [`2.7 DMA completion interrupt path`](#27-dma-completion-interrupt-path) explains DMA.
-
-After reception, creation appends the PCB, advances [`next_process_id`](kernel/process/process.picoc#L19), and
-leaves [`state`](kernel/process/process.header#L33) set to [`NEW`](kernel/process/process.header#L12):
-
-![Completed load with the child PCB appended in the kernel heap, state NEW, fresh descriptors, initialized activation fields, and only one preliminary entry-PC cell on its stack](documentation/images/process-load-complete.svg)
-
-The stack now contains an entry PC at `base_address + size - 1`. Saved
-[`activation.sp`](kernel/process/process.header#L25) lies one cell below it, and [`activation.baf`](kernel/process/process.header#L26) points to it.
-No argument or environment layout exists yet. The remaining stack cells
-are uninitialized.
-
-[`ProcessLoad`](kernel/process/process_loader.picoc#L14) retains header values and transfer progress between syscalls.
-The table shows its fields. [`9.1 Memory layout, allocation sources, and lifetimes`](#91-memory-layout-allocation-sources-and-lifetimes) describes its storage and lifetime:
-
-| Field | Meaning | Used by |
-| --- | --- | --- |
-| [`ProcessLoad.base_address`](kernel/process/process_loader.picoc#L15) | Absolute start of the reserved Process and Shared Data Heap region | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), used by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227), [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
-| [`ProcessLoad.process_size`](kernel/process/process_loader.picoc#L16) | Total reserved cells for the User Process Image, User Process Heap, and User Process Stack | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
-| [`ProcessLoad.code_start`](kernel/process/process_loader.picoc#L17), [`ProcessLoad.data_start`](kernel/process/process_loader.picoc#L18) | Linked code- and data-segment offsets from the binary header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
-| [`ProcessLoad.heap_start`](kernel/process/process_loader.picoc#L19), [`ProcessLoad.heap_size`](kernel/process/process_loader.picoc#L20) | Resolved userspace heap offset and cell count | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), passed to [`create_process()`](kernel/process/process.picoc#L89) by [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) |
-| [`ProcessLoad.payload_word_count`](kernel/process/process_loader.picoc#L21) | Encoded program words after the five-word header | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), bounds both DMA and polling transfers in [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) and [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
-| [`ProcessLoad.loaded_word_count`](kernel/process/process_loader.picoc#L22) | Words copied by the polling transfer so far | First initialized to 0 by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), advanced and checked by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
-| [`ProcessLoad.loading_bar_update`](kernel/process/process_loader.picoc#L23) | Next word count at which progress output is redrawn | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), updated by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) |
-| [`ProcessLoad.uses_dma`](kernel/process/process_loader.picoc#L24) | Whether the reserved image is being filled by one DMA transfer rather than polling chunks | First initialized to `false` and set to `true` by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), checked by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) |
-| [`ProcessLoad.path`](kernel/process/process_loader.picoc#L25) | Kernel-owned absolute binary path used by later range requests and copied into the completed PCB | First initialized by [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109), read by [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) and [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90), freed by [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) |
-
-[`finish_process_load()`](kernel/process/process_loader.picoc#L90) creates the child and releases temporary load data.
-[`cancel_process_load()`](kernel/process/process_loader.picoc#L76) also cancels active DMA and releases the partial
-Process Payload. No child PCB exists until the transfer finishes.
-
-Boot-time init loading uses [`load_process()`](kernel/process/process_loader.picoc#L305) and a continuous [`load`](#123-uart-host-service-protocol)
-response. [`receive_words_to_sram()`](common/sram_loader.picoc#L6) polls UART or DMA completion because
-there is no running user caller to block. Both paths use [`create_process()`](kernel/process/process.picoc#L89).
-
-#### 4.3.1.1 Load function reference
-[\[↑ TOC\]](#contents)
-
-The table starts with the syscall-backed loader, then lists transfer
-helpers and the boot-time loader. [`4.3.2.4 Run function reference`](#4324-run-function-reference) covers run setup:
-
-| Kernel function | Return value / status | Effects | Calls | Called by |
-| --- | --- | --- | --- | --- |
-| [`load_process_chunk(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L292) | Positive PID when complete, 0 on failure, or [`SYSCALL_LOAD_PROCESS_CONTINUE`](common/syscall.header#L48) (-1) while work remains | Starts or resumes the caller-owned load. Successful completion creates a PCB with [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12) | [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`current_process()`](kernel/process/process.picoc#L62)<br>**Host requests:** `file-size <path>` and `read-range <offset> <count> <path>` through helpers | **Library functions:** [`load()`](library/unistd/process.picoc#L17) via the syscall<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> | <hr><hr> |
-| [`load_process(path, show_loading_bar)`](kernel/process/process_loader.picoc#L305) | PID on success, 0 on rejected path, missing/short header, invalid stack placement, or exhausted process memory | Kernel boot-time continuous transfer. Reserves the Process Payload, receives the image, and creates the PCB | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`create_process()`](kernel/process/process.picoc#L89), [`drain_process_words()`](kernel/process/process_loader.picoc#L40), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_host_request()`](common/uart_protocol.picoc#L82)<br>**Host requests:** `load <path>` | **Kernel functions:** [`main()`](kernel/kernel.picoc#L31) in [`kernel/kernel.picoc`](kernel/kernel.picoc) |
-| [`begin_process_load(path, show_loading_bar, caller_context)`](kernel/process/process_loader.picoc#L109) | PID for an empty payload, continuation status after transfer setup, or 0 on path/header/allocation/transfer failure | Reads the header, reserves memory, allocates [`ProcessLoad`](kernel/process/process_loader.picoc#L14) and its path, sets [`caller.pending_load`](kernel/process/process.header#L68), initializes progress, and optionally starts blocking DMA | [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), [`build_process_path()`](kernel/filesystem/host_filesystem.picoc#L92), [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`copy_process_path()`](kernel/process/process.picoc#L70), [`current_process()`](kernel/process/process.picoc#L62), [`dma_is_active()`](common/dma.picoc#L17), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`kmalloc()`](kernel/kmalloc.picoc#L23), [`loaded_process_stack_start()`](kernel/process/process_loader.picoc#L28), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L6), [`uart_print_string()`](common/uart_protocol.picoc#L73), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_send_host_request()`](common/uart_protocol.picoc#L82), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43)<br>**Host requests:** `file-size <path>`, `read-range 0 20 <path>`, optional whole-payload `read-range 20 <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
-| [`continue_process_load(owner)`](kernel/process/process_loader.picoc#L227) | PID on completion, continuation status while DMA is busy or polling work remains, or 0 on transfer failure | Checks DMA status or polls up to 256 payload words, advances [`loaded_word_count`](kernel/process/process_loader.picoc#L22) and progress, completes or cancels the load | [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`dma_transfer_status()`](common/dma.picoc#L21), [`drain_process_bytes()`](kernel/process/process_loader.picoc#L62), [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_send_file_range_command()`](common/uart_protocol.picoc#L90), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58)<br>**Host requests:** Polling `read-range <offset> <count> <path>` | **Kernel functions:** [`load_process_chunk()`](kernel/process/process_loader.picoc#L292) |
-| [`finish_process_load(owner)`](kernel/process/process_loader.picoc#L90) | New PID | Creates the child PCB after transfer, clears [`owner.pending_load`](kernel/process/process.header#L68), and frees temporary load metadata and its copied path | [`create_process()`](kernel/process/process.picoc#L89), [`free_process_load()`](kernel/process/process_loader.picoc#L71), [`system_relative_path()`](kernel/filesystem/host_filesystem.picoc#L121) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
-| [`create_process(base_address, size, code_start, data_start, heap_start, heap_size, binary_path)`](kernel/process/process.picoc#L89) | PCB pointer. Kernel-heap exhaustion halts the OS through allocation checks | Assigns PID and [`state`](kernel/process/process.header#L33) [`NEW`](kernel/process/process.header#L12), records memory fields, initializes [`activation`](kernel/process/process.header#L40), queues and signals, creates standard descriptors, copies paths and parent-derived metadata, writes the preliminary entry PC, and appends the PCB | [`copy_process_path()`](kernel/process/process.picoc#L70), [`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35), [`current_process()`](kernel/process/process.picoc#L62), [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`finish_process_load()`](kernel/process/process_loader.picoc#L90), [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`copy_process_path(path)`](kernel/process/process.picoc#L70) | New kernel-owned string pointer | Allocates and copies a path including its terminator | [`kmalloc()`](kernel/kmalloc.picoc#L23) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`create_process()`](kernel/process/process.picoc#L89), [`set_process_working_directory()`](kernel/filesystem/host_filesystem.picoc#L128) |
-| [`loaded_process_stack_start(heap_start, heap_size, stack_start)`](kernel/process/process_loader.picoc#L28) | Highest process-relative stack offset, or [`PSDMALLOC_INVALID_START`](kernel/psdmalloc.header#L3) for overlap | Resolves the default highest stack offset or checks an explicit offset, no memory writes | None | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`cancel_process_load(process)`](kernel/process/process_loader.picoc#L76) | No return value | Cancels busy DMA if needed, clears [`process.pending_load`](kernel/process/process.header#L68), frees the partial Process Payload and temporary metadata | [`PSDFree()`](kernel/psdmalloc.picoc#L47), [`cancel_dma_transfer()`](common/dma.picoc#L32), [`dma_transfer_status()`](common/dma.picoc#L21), [`free_process_load()`](kernel/process/process_loader.picoc#L71) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227), [`remove_process()`](kernel/process/process.picoc#L209) |
-| [`free_process_load(load)`](kernel/process/process_loader.picoc#L71) | No return value | Frees the temporary kernel-owned host path and [`ProcessLoad`](kernel/process/process_loader.picoc#L14) | [`kfree()`](kernel/kmalloc.picoc#L38) | **Kernel functions:** [`cancel_process_load()`](kernel/process/process_loader.picoc#L76), [`finish_process_load()`](kernel/process/process_loader.picoc#L90) |
-| [`drain_process_words(payload_word_count, show_loading_bar)`](kernel/process/process_loader.picoc#L40) | No return value | Consumes a rejected continuous payload so UART remains synchronized, optionally reports progress | [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305) |
-| [`drain_process_bytes(byte_count)`](kernel/process/process_loader.picoc#L62) | No return value | Consumes unexpected positive range-response data so UART remains synchronized | [`receive_byte_over_uart()`](kernel/uart_hardware.picoc#L24) | **Kernel functions:** [`begin_process_load()`](kernel/process/process_loader.picoc#L109), [`continue_process_load()`](kernel/process/process_loader.picoc#L227) |
-
-The directly linked transfer helper is shared by bootloader and kernel:
-
-| Kernel / Library Function | Return value / status | Effects | Calls | Called by |
-| --- | --- | --- | --- | --- |
-| [`receive_words_to_sram(base_address, word_count, show_loading_bar)`](common/sram_loader.picoc#L6) (Shared/Common) | No return value | Receives word_count cells at base_address. Polls UART without DMA, otherwise starts DMA and busy-waits for its status, updates requested loading progress | [`dma_is_active()`](common/dma.picoc#L17), [`dma_transfer_status()`](common/dma.picoc#L21), [`receive_word()`](common/uart_protocol.picoc#L7), [`start_dma_uart_transfer()`](common/dma.picoc#L25), [`uart_start_loading_bar()`](common/loading_bar.picoc#L43), [`uart_update_loading_bar()`](common/loading_bar.picoc#L58) | **Kernel functions:** [`load_process()`](kernel/process/process_loader.picoc#L305)<br>**Bootloader functions:** [`boot_main()`](boot/bootloader.picoc#L41) |
-
-### 4.3.2 Starting a process (`run` library call)
-[\[↑ TOC\]](#contents)
-
-Starting finishes the process setup in this order:
-
-1. Pack the PID, raw arguments, and selected environment into a
-   [`RunProcessRequest`](common/syscall.header#L55). A `NULL` environment selects the caller's environment.
-2. Find the PCB and require [`state`](kernel/process/process.header#L33) to be [`NEW`](kernel/process/process.header#L12).
-3. Copy inheritable descriptors from the run caller.
-4. Copy arguments and environment strings to the child stack, build their
-   pointer arrays, and update [`activation.sp`](kernel/process/process.header#L25) and [`activation.baf`](kernel/process/process.header#L26).
-5. Set [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13) and return success.
-
-The figure highlights the new stack, descriptor table, and changed PCB
-fields. The heap remains reserved until userspace startup:
-
-![Run changes inside the same SRAM layout: inherited descriptor table, copied caller arguments and environment, new stack and activation pointers, and state NEW to READY](documentation/images/process-run-setup.svg)
-
-The shell separates the command name, expands variables, and passes the
-remaining argument string to [`run()`](library/unistd/process.picoc#L31). The kernel splits it on spaces and
-tabs, preserving quoted whitespace and removing matching quotes. It builds
-the pointer array itself. [`12.4 Command parsing, expansion, and execution`](#124-command-parsing-expansion-and-execution) explains shell parsing.
-
-The kernel copies the request's strings rather than retaining caller
-pointers. [`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp) shows the final layout and relocated entry PC.
-
-Setting [`READY`](kernel/process/process.header#L13) permits later scheduling. The call does not load the CPU
-registers immediately. On first dispatch, [`_start()`](library/start/start.picoc#L14) initializes the heap
-and environment before entering the application.
-
-#### 4.3.2.1 Parent-to-child inheritance
+#### 4.2.2.2 Parent-to-child inheritance
 [\[↑ TOC\]](#contents)
 
 Inheritance occurs during both loading and starting. PicoOS creates a new
@@ -3995,7 +4187,7 @@ The child gets a new PID, activation, wait queues, and signal bookkeeping.
 Shared-memory attachments are not inherited. Init has parent PID `0`, no
 parent-death signal, directory `/`, and fresh standard descriptors.
 
-##### 4.3.2.1.1 Environment origin and propagation
+##### 4.2.2.2.1 Environment origin and propagation
 [\[↑ TOC\]](#contents)
 
 The kernel stores no environment pointer in the PCB. It starts init with
@@ -4012,21 +4204,38 @@ file and allocation failures stop init startup.
 The current file supplies `PATH=/user`. Init optionally adds
 [`PICOOS_LOADING_BAR`](common/loading_bar.header#L5) before starting the shell.
 
-[`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31) selects init's environment through
-[`current_environment()`](library/stdlib/env.picoc#L6). An explicit array replaces that default. The
-kernel's direct boot call bypasses this library selection, so init itself
-starts empty.
+Passing `NULL` as the environment argument to [`run()`](library/unistd/process.picoc#L31)
+selects the caller's current environment at run time, rather than at
+[`load()`](library/unistd/process.picoc#L17) time. The library calls
+[`current_environment()`](library/stdlib/env.picoc#L6), which simply returns
+the calling image's [`environ`](library/stdlib/env.picoc#L4) global, and stores
+that pointer in [`RunProcessRequest.environment`](common/syscall.header#L58)
+before invoking the syscall. It does not look up the recorded parent through
+[`parent_pid`](kernel/process/process.header#L57). The environment comes from
+the process calling [`run()`](library/unistd/process.picoc#L31).
+
+A custom null-terminated array of `NAME=value` strings is stored in
+[`RunProcessRequest.environment`](common/syscall.header#L58) instead. It replaces
+the default completely without merging entries. To supply an empty environment,
+pass an array whose first entry is `NULL`, rather than a `NULL` array pointer.
+Thus [`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31) selects
+init's environment. The kernel's direct boot call bypasses this library
+selection, so init itself starts empty.
 
 Environment propagation makes two copies. First, [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125)
-copies pointers and strings onto the child stack and updates its saved
-stack registers. [`4.2.2 Initial argc, argv, and envp`](#422-initial-argc-argv-and-envp) shows the layout.
+copies strings onto the child stack, builds pointers to those copies, and
+updates its saved stack registers. [`4.2.2.1.2 Initial argc, argv, and envp`](#42212-initial-argc-argv-and-envp) shows the layout.
 
 At first dispatch, [`initialize_environment()`](library/stdlib/env.picoc#L97) copies that stack array and
 its strings into the child heap, then assigns [`environ`](library/stdlib/env.picoc#L4). Later environment
 changes affect neither the initial stack nor the parent's copies.
 
-The shell passes its environment to applications in the same way. The
-diagram follows unchanged values and branches that remove or replace them:
+The [`shell`](user/shell.picoc) passes its environment to applications by calling
+[`run()`](library/unistd/process.picoc#L31) with a `NULL` environment argument
+inside [`run_process()`](user/shell.picoc#L1034). Its `export NAME=value` built-in
+calls [`setenv()`](library/stdlib/env.picoc#L126) to update the shell's own
+[`environ`](library/stdlib/env.picoc#L4). The diagram follows unchanged values
+and branches that remove or replace them:
 
 ```mermaid
 flowchart LR
@@ -4047,7 +4256,7 @@ flowchart LR
 caller and children started afterward. Existing processes keep their copies.
 [`getenv()`](library/stdlib/env.picoc#L115) returns a pointer to the value or `NULL`. [`10.2.7.3 Environment operations in env.picoc`](#10273-environment-operations-in-envpicoc) covers the API.
 
-##### 4.3.2.1.2 Loading-bar environment variable
+##### 4.2.2.2.2 Loading-bar environment variable
 [\[↑ TOC\]](#contents)
 
 The early boot flag [`loading_bar_enabled`](config/config.header#L5) makes init add
@@ -4070,7 +4279,7 @@ int main(int argc, char **argv) {
 This affects only cat's environment. The shell can still show a bar while
 loading cat.
 
-#### 4.3.2.2 Recording termination status
+#### 4.2.2.3 Recording termination status
 [\[↑ TOC\]](#contents)
 
 A child's [`exit_status`](kernel/process/process.header#L60) reaches the parent through [`waitpid()`](library/sys/wait/wait.picoc#L14). If the
@@ -4146,7 +4355,7 @@ relationship before reading the status or queuing the caller:
 This is an API check. Without memory isolation, it cannot stop a program
 from overwriting kernel memory.
 
-[`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) shows the wrapper and stopped-parent case. [`7.3.1 Supported signals and fixed actions`](#731-supported-signals-and-fixed-actions) and [`2.8 CPU exceptions and runtime errors`](#28-cpu-exceptions-and-runtime-errors) cover
+[`10.1.2 Packing arguments and executing the syscall`](#1012-packing-arguments-and-executing-the-syscall) shows the wrapper, and [`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) explains the stopped-parent case. [`7.3.1 Supported signals and fixed actions`](#731-supported-signals-and-fixed-actions) and [`2.8 CPU exceptions and runtime errors`](#28-cpu-exceptions-and-runtime-errors) cover
 signal and exception statuses. Explicit unloading forces removal.
 
 When a parent terminates, [`orphan_and_signal_children()`](kernel/process/process.picoc#L279) sets each direct
@@ -4154,7 +4363,7 @@ child's [`parent_pid`](kernel/process/process.header#L57) to `0`. It removes zom
 children their configured [`parent_death_signal`](kernel/process/process.header#L59). PicoOS does not reparent
 them to init. Unix literature calls final collection and removal *reaping*.
 
-#### 4.3.2.3 Parent collection and final removal
+#### 4.2.2.4 Parent collection and final removal
 [\[↑ TOC\]](#contents)
 
 The order of [`waitpid()`](library/sys/wait/wait.picoc#L14) and child
@@ -4175,7 +4384,7 @@ cancels unfinished loading, and frees the payload, descriptors, paths, and
 PCB. Until then, a zombie may retain a partial image it was loading. [`5.2 Mapping, unlinking, and deferred destruction`](#52-mapping-unlinking-and-deferred-destruction)
 explains the effect of releasing shared-memory attachments.
 
-#### 4.3.2.4 Run function reference
+#### 4.2.2.5 Run function reference
 [\[↑ TOC\]](#contents)
 
 The syscall-backed start helper appears first, followed by its parsing and
@@ -4194,11 +4403,11 @@ stack-copying helpers. [`8.6 File-descriptor creation, inheritance, duplication,
 | [`process_string_cell_count(value)`](kernel/process/process_arguments.picoc#L103) | Number of character cells including the zero terminator | Reads one null-terminated string | None | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
 | [`copy_process_string(target, source)`](kernel/process/process_arguments.picoc#L113) | Address of the first cell after the copied zero terminator | Copies a string and its terminator to the destination stack area | None | **Kernel functions:** [`store_process_arguments()`](kernel/process/process_arguments.picoc#L125) |
 
-## 4.4 Process list, PCB metadata, and lifecycle function reference
+## 4.3 Process list, PCB metadata, and lifecycle function reference
 [\[↑ TOC\]](#contents)
 
 These functions manage process metadata, list membership, termination, and
-removal. [`4.3.1.1 Load function reference`](#4311-load-function-reference) covers loading, [`4.3.2.4 Run function reference`](#4324-run-function-reference) covers starting, and [`7.2.3 Wait queue function reference`](#723-wait-queue-function-reference) covers
+removal. [`4.2.1.4 Load function reference`](#4214-load-function-reference) covers loading, [`4.2.2.5 Run function reference`](#4225-run-function-reference) covers starting, and [`7.2.3 Wait queue function reference`](#723-wait-queue-function-reference) covers
 wait queues:
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
@@ -4347,9 +4556,10 @@ unlink destroys the entry immediately.
 its entry's count. Destruction requires both an unlink request and a zero
 reference count.
 
-This timeline follows Entry 1: opening creates it, mapping adds references,
-unlinking removes its name, and process removal releases the references.
-The data stays allocated until both destruction conditions hold:
+This timeline follows Entry 1 and Shared Data Payload A, mapped by two
+processes. Opening creates the entry, mapping adds references, unlinking
+removes its name, and process removal releases the references. The data
+stays allocated until both destruction conditions hold:
 
 ![Shared-memory lifetime from left to right: shm_open creates Entry 1 with count 0, mmap in two processes raises the count to 2, shm_unlink removes the name while the count stays 2, removal of PCB 1 lowers it to 1, and removal of PCB 2 lowers it to 0 and frees the unlinked entry and its data.](documentation/images/memory-shared-destruction.svg)
 
@@ -4358,7 +4568,7 @@ stays allocated. Unlinking it later destroys it. The timeline omits PCB 1's
 other mapping, which is also released on removal.
 
 A retained zombie keeps its attachments. They are released at final PCB
-removal, as explained in [`4.3.2.3 Parent collection and final removal`](#4323-parent-collection-and-final-removal).
+removal, as explained in [`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal).
 
 The entry is also the registry node. [`destroy_shared_memory_entry()`](kernel/shared_memory.picoc#L69) unlinks
 it, frees its data with [`PSDFree()`](kernel/psdmalloc.picoc#L47), and frees its metadata with [`kfree()`](kernel/kmalloc.picoc#L38).
@@ -4591,15 +4801,14 @@ struct ActivationRecord {
 | [`cs`](kernel/process/process.header#L27) | Absolute code-segment base used for instruction addresses | First initialized by [`create_process()`](kernel/process/process.picoc#L89), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 | [`ds`](kernel/process/process.header#L28) | Absolute data-segment base used for globals/static data | First initialized by [`create_process()`](kernel/process/process.picoc#L89), saved by [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) and restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) |
 
-The saved PC stays on the process stack at `activation.sp + 1`. During
-restoration, `BAF` holds the PCB pointer until the other registers are loaded.
-The dispatcher restores `SP` before installing the process boundary.
+[`2.4.2.4 Restoring process context with RTI`](#2424-restoring-process-context-with-rti)
+shows how this record and the saved PC on the process stack work together.
 
 ## 6.3 Saving the current process and selecting the next process
 [\[↑ TOC\]](#contents)
 
 The save path preserves the outgoing process before selecting another one.
-The syscall and timer paths in [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path) and [`2.5.1 Timer interrupt path`](#251-timer-interrupt-path) lead here.
+The syscall and timer paths in [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) and [`2.5.1 Timer interrupt path`](#251-timer-interrupt-path) lead here.
 
 These entry paths provide the saved frame from [`2.3 Saved interrupt stack frame`](#23-saved-interrupt-stack-frame):
 
@@ -4692,7 +4901,7 @@ next context in these steps:
    [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43). If there
    is no candidate and the process list is empty, return to the caller.
 
-[`6.1.1 Algorithm and Round Robin comparison`](#611-algorithm-and-round-robin-comparison) covers empty-list and no-runnable cases. [`2.4.2.2 Selecting the return path`](#2422-selecting-the-return-path) covers deferred
+[`6.1.1 Algorithm and Round Robin comparison`](#611-algorithm-and-round-robin-comparison) covers empty-list and no-runnable cases. [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) covers deferred
 requests.
 
 ## 6.4 Restoring the selected process and returning with `RTI`
@@ -4738,18 +4947,15 @@ selected process in these steps:
 3. Call [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2)
    to install the selected process's limit. This inline helper has no C frame,
    so it is usable after selecting the process stack. Its complete explanation
-   is in [`2.4.2.3 Stack-boundary helpers`](#2423-stack-boundary-helpers).
+   is in [`2.4.2.1.1 Stack-boundary helpers`](#24211-stack-boundary-helpers).
 4. Load `CS`, `DS`, `IN1`, `IN2`, and `ACC` from the selected PCB's
    [`activation`](kernel/process/process.header#L40). Restore `BAF` last,
    because it holds the PCB pointer while the other values are read.
-5. Execute `RTI` to read the saved PC from `SP + 1` on the selected process's
-   stack, increment `SP`, and advance `PC`. This resumes an interrupted user
-   instruction, continues after a software syscall, or starts a new process
-   whose prepared PC was `CS - 1`.
+5. Execute `RTI` as explained in
+   [`2.4.2.4 Restoring process context with RTI`](#2424-restoring-process-context-with-rti).
+   For a new process, its prepared PC is `CS - 1`, so execution starts at `CS`.
 
-The assembly relies on fixed PCB offsets. Registers come from [`activation`](kernel/process/process.header#L40),
-and PC comes from the process stack. Direct syscall return instead pops
-registers from the saved interrupt frame.
+The assembly relies on fixed PCB offsets.
 
 Resumable switches save the outgoing activation first. Startup and
 termination begin directly with [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) because
@@ -4764,9 +4970,9 @@ switch, selecting a process, saving context, and restoring execution:
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71) | Returns only if the process list becomes empty. Otherwise the dispatch path leaves through `RTI` | Copies [`caller_context`](kernel/dispatcher.picoc#L71) into the current PCB's activation and changes only [`RUNNING`](kernel/process/process.header#L14) to [`READY`](kernel/process/process.header#L13) | [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Library functions:** [`yield()`](library/schedule/schedule.picoc#L4), blocking [`sleep()`](library/unistd/blocking.picoc#L9), waiting [`waitpid()`](library/sys/wait/wait.picoc#L14), blocking terminal [`read()`](library/unistd/io.picoc#L6), and DMA-backed [`load()`](library/unistd/process.picoc#L17), all through syscalls<br>**Hardware interrupts:** userspace timer via [`timer_interrupt_after_reschedule_request()`](interrupt_service_routines/os_isrs.picoc#L92)<br>**Kernel functions:** [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), and the yield branch in [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| [`dispatcher_request_reschedule(void)`](kernel/dispatcher.picoc#L10) | Returns no value | Sets [`reschedule_requested`](kernel/dispatcher.picoc#L8) after timer expiry or a terminating signal for the running process | None | **Hardware interrupts:** timer through [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L33) and [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L75)<br>**Kernel functions:** [`send_signal_to_process()`](kernel/signal.picoc#L75) |
-| [`dispatcher_reschedule_if_requested(caller_context)`](kernel/dispatcher.picoc#L14) | Returns when no request is pending, otherwise returns only if dispatch finds an empty process list | Sends the saved syscall frame into the dispatcher when a deferred request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **System-call return:** every normally returning syscall through [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L144) |
+| [`dispatcher_switch_from_context(caller_context)`](kernel/dispatcher.picoc#L71) | Returns only if the process list becomes empty. Otherwise the dispatch path leaves through `RTI` | Copies [`caller_context`](kernel/dispatcher.picoc#L71) into the current PCB's activation and changes only [`RUNNING`](kernel/process/process.header#L14) to [`READY`](kernel/process/process.header#L13) | [`current_process()`](kernel/process/process.picoc#L62), [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) | **Library functions:** [`yield()`](library/schedule/schedule.picoc#L4), blocking [`sleep()`](library/unistd/blocking.picoc#L9), waiting [`waitpid()`](library/sys/wait/wait.picoc#L14), blocking terminal [`read()`](library/unistd/io.picoc#L6), and DMA-backed [`load()`](library/unistd/process.picoc#L17), all through syscalls<br>**Hardware interrupts:** userspace timer via [`timer_interrupt_process()`](interrupt_service_routines/os_isrs.picoc#L74)<br>**Kernel functions:** [`dispatcher_reschedule_if_requested()`](kernel/dispatcher.picoc#L14), [`begin_terminal_read()`](kernel/filesystem/terminal.picoc#L134), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390), [`start_dma_uart_receive()`](kernel/dma.picoc#L18), and the yield branch in [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`dispatcher_request_reschedule(void)`](kernel/dispatcher.picoc#L10) | Returns no value | Sets [`reschedule_requested`](kernel/dispatcher.picoc#L8) after a timer interrupts kernel work or a terminating signal targets the running process | None | **Hardware interrupts:** timer interrupting kernel work through [`timer_interrupt()`](interrupt_service_routines/os_isrs.picoc#L32)<br>**Kernel functions:** [`send_signal_to_process()`](kernel/signal.picoc#L75) |
+| [`dispatcher_reschedule_if_requested(caller_context)`](kernel/dispatcher.picoc#L14) | Returns when no request is pending, otherwise returns only if dispatch finds an empty process list | Sends the saved syscall frame into the dispatcher when a deferred request is pending | [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **System-call return:** every normally returning syscall through [`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L133) |
 | [`dispatcher_start_next_process(void)`](kernel/dispatcher.picoc#L55) | Leaves through `RTI` for a runnable process, waits while existing processes cannot run, or returns for an empty process list | Repeatedly requests a scheduler choice, consumes deferred termination for a selected process, and starts dispatch | [`scheduler_next_process()`](kernel/scheduler.picoc#L12), [`first_process()`](kernel/process/process.picoc#L28), [`prepare_process_termination()`](kernel/signal.picoc#L126), [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) | **Kernel functions:** [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`exit_process()`](kernel/process/process.picoc#L430), [`main()`](kernel/kernel.picoc#L31) |
 | [`dispatcher_switch_to_process(process)`](kernel/dispatcher.picoc#L43) | Does not return normally | Changes an old [`RUNNING`](kernel/process/process.header#L14) process to [`READY`](kernel/process/process.header#L13), clears the reschedule request, updates [`active_process`](kernel/process/process.picoc#L18), marks the selected process [`RUNNING`](kernel/process/process.header#L14), and begins restoration | [`current_process()`](kernel/process/process.picoc#L62), [`set_current_process()`](kernel/process/process.picoc#L66), [`process_stack_boundary()`](kernel/exception.picoc#L18), [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) | **Kernel functions:** [`dispatcher_start_next_process()`](kernel/dispatcher.picoc#L55) |
 | [`dispatcher_jump_to_process(process, stack_boundary)`](kernel/dispatcher.picoc#L21) | Leaves through `RTI`, it has no normal C return | Installs the selected process's `SP` and stack boundary, restores the other activation registers, then restores `PC` from the process stack | [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2) | **Kernel functions:** [`dispatcher_switch_to_process()`](kernel/dispatcher.picoc#L43) |
@@ -4784,17 +4990,21 @@ contention. This chapter connects those operations to PCB state.
 Blocking waits for an event, waking makes the process eligible for CPU time,
 and dispatching resumes its saved execution.
 
-> **Block → wake → run.** Waiting sets the PCB's [`state`](kernel/process/process.header#L33) to [`BLOCKED`](kernel/process/process.header#L15) and
-> dispatches another process. The event makes it [`READY`](kernel/process/process.header#L13). The scheduler
-> then decides when its saved execution resumes.
+> **Basic principle: block → wake → run.** A waiting process joins a
+> [`wait_queue`](common/wait_queue.header#L5), sets its PCB's
+> [`state`](kernel/process/process.header#L33) to
+> [`BLOCKED`](kernel/process/process.header#L15), and the
+> [`dispatcher`](kernel/dispatcher.picoc#L71) switches away. The awaited event,
+> such as child termination or mutex release, removes the waiter and sets its
+> state to [`READY`](kernel/process/process.header#L13). The
+> [`scheduler`](kernel/scheduler.picoc#L12) can then select it, and the
+> [`dispatcher`](kernel/dispatcher.picoc#L43) resumes it. **Ready means eligible
+> to run, not running yet.**
 
-The cycle distinguishes waiting for an event from waiting for CPU time:
+The cycle follows one process's PCB [`state`](kernel/process/process.header#L33)
+and distinguishes waiting for an event from waiting for CPU time:
 
 ![Waiting cycle: sleep() joins a wait queue with PCB state BLOCKED, wakeup() removes the waiter and sets state READY, then the scheduler selects the process and the dispatcher resumes it with state RUNNING.](documentation/images/blocking-cycle.svg)
-
-[`sleep()`](library/unistd/blocking.picoc#L9) and [`wakeup()`](library/unistd/blocking.picoc#L19) use syscalls. Kernel events operate on queues
-directly. [`waiting_queue_ptr`](kernel/process/process.header#L48) identifies a process's queue, and [`wait_next`](kernel/process/process.header#L51)
-links the next waiter. A child embeds its parent's queue in [`waiters`](kernel/process/process.header#L46).
 
 The table pairs common blocking events with the event that completes each
 wait and the queue that connects them:
@@ -4815,8 +5025,11 @@ is described in [`7.3 Process signals`](#73-process-signals).
 [\[↑ TOC\]](#contents)
 
 [`wait_queue`](common/wait_queue.header#L5) stores the head and tail of a PCB FIFO. Its shared header
-defines the layout. Library wrappers invoke syscalls, while kernel
-functions in [`kernel/process/process.picoc`](kernel/process/process.picoc) maintain the links.
+defines the layout. The library functions [`sleep()`](library/unistd/blocking.picoc#L9)
+and [`wakeup()`](library/unistd/blocking.picoc#L19) invoke syscalls to reach the
+kernel's queue operations. Kernel events call those operations directly.
+The functions in [`kernel/process/process.picoc`](kernel/process/process.picoc)
+maintain the links.
 
 The definition shows the endpoints. The links between them live in PCBs:
 
@@ -4891,8 +5104,12 @@ flowchart LR
     D -. waiting_queue_ptr .-> AW
 ```
 
-[`waiting_queue_ptr`](kernel/process/process.header#L48) points back to `&child->waiters`. No separate queue
-allocation is needed. [`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) adds the request and result handoff.
+In the diagram, A's [`waiters`](kernel/process/process.header#L46) is the queue
+object embedded in the child PCB. Each waiting PCB's
+[`wait_next`](kernel/process/process.header#L51) links to the next waiter, and its
+[`waiting_queue_ptr`](kernel/process/process.header#L48) points back to
+`&child->waiters`. No separate queue allocation is needed.
+[`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) adds the request and result handoff.
 
 ### 7.2.1 Blocking with `sleep` and waking with `wakeup`
 [\[↑ TOC\]](#contents)
@@ -4906,48 +5123,47 @@ does not switch processes.
 ### 7.2.2 Child waiting with `waitpid`
 [\[↑ TOC\]](#contents)
 
-[`waitpid()`](library/sys/wait/wait.picoc#L14) waits for one exact child, without an options argument. Its
-stack-local [`WaitPidRequest.status`](common/syscall.header#L63) points to a separate local result integer.
-If the child is stopped or a zombie, the kernel writes that result
-immediately. Otherwise the parent blocks on the child's queue.
+[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) uses the same blocking and wakeup
+primitives as [`sleep()`](library/unistd/blocking.picoc#L9) and
+[`wakeup()`](library/unistd/blocking.picoc#L19), but selects the child's embedded
+[`waiters`](kernel/process/process.header#L46) queue. Only the process whose
+[`pid`](kernel/process/process.header#L32) matches the child's
+[`parent_pid`](kernel/process/process.header#L57) may wait for it.
+[`10.1 From a library call to the kernel: waitpid`](#101-from-a-library-call-to-the-kernel-waitpid)
+shows the complete library implementation, its files, and the syscall path.
 
-The complete wrapper shows both stack objects. Neither needs heap
-allocation:
+When the child has neither stopped nor terminated, [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348)
+saves the result address in the parent's
+[`waiting_status_ptr`](kernel/process/process.header#L44) and calls
+[`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) with the child's queue.
+The parent's [`waiting_queue_ptr`](kernel/process/process.header#L48) points back
+to that queue, and its [`state`](kernel/process/process.header#L33) becomes
+[`BLOCKED`](kernel/process/process.header#L15). The result integer remains in
+the parent's suspended userspace stack frame until the wait completes.
 
-```c
-int waitpid(int pid) {
-    int status = 0;
-    struct WaitPidRequest request;
+Child termination calls [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261),
+which writes the result through the saved pointer, clears
+[`waiting_status_ptr`](kernel/process/process.header#L44), and calls
+[`wakeup_wait_queue()`](kernel/process/process.picoc#L395). A child stop delivers
+its status through [`notify_process_stopped()`](kernel/signal.picoc#L23) and uses
+the same wakeup primitive. Wakeup clears the parent's
+[`waiting_queue_ptr`](kernel/process/process.header#L48) and
+[`wait_next`](kernel/process/process.header#L51). An ordinary parent's
+[`state`](kernel/process/process.header#L33) becomes
+[`READY`](kernel/process/process.header#L13). If the parent itself is stopped,
+its state stays [`STOPPED`](kernel/process/process.header#L16), while
+[`stopped_from_state`](kernel/process/process.header#L62) becomes
+[`READY`](kernel/process/process.header#L13). It resumes only after
+[`SIGCONT`](common/signal.header#L6).
 
-    request.pid = pid;
-    request.status = &status;
-    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
-    }
-    return status;
-}
-```
-
-[`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) passes `&request` in `IN1`. The kernel reads the
-PID and copies `request.status` into [`waiting_status_ptr`](kernel/process/process.header#L44) if blocking is
-needed. It retains the result pointer rather than the request address.
-The suspended frame keeps both locals alive. [`10.1.2 Packing arguments and executing the syscall`](#1012-packing-arguments-and-executing-the-syscall) shows the registers.
-
-Child termination writes through the parent's saved pointer and wakes it.
-An ordinary parent becomes [`READY`](kernel/process/process.header#L13). A stopped parent records the completed
-wait but stays stopped until continued. On resumption, [`waitpid()`](library/sys/wait/wait.picoc#L14) returns
-its updated local status.
-
-The immediate cases do not put the parent on a wait queue. The kernel either
-collects an existing zombie or reports an already stopped child before
-returning directly.
-
-Wakeup clears the parent's queue links. If the parent is removed first,
-[`remove_process()`](kernel/process/process.picoc#L209) uses [`waiting_queue_ptr`](kernel/process/process.header#L48) to unlink it before freeing the
-PCB, preventing a later wakeup from following freed memory.
-
-A child that exits first retains [`exit_status`](kernel/process/process.header#L60) until collection. Invalid
-PIDs and non-children return `-1`. Waiting for an exact child prevents init
-or the shell from completing the wrong wait.
+An already stopped child or zombie supplies its status immediately without
+queuing the parent. Invalid PIDs and non-children return `-1`.
+[`4.2.2.3 Recording termination status`](#4223-recording-termination-status) and
+[`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal)
+explain status values and child removal. If the parent is removed during a
+wait, [`remove_process()`](kernel/process/process.picoc#L209) follows
+[`waiting_queue_ptr`](kernel/process/process.header#L48) to unlink it before
+freeing its PCB, preventing a later wakeup from following freed memory.
 
 ### 7.2.3 Wait queue function reference
 [\[↑ TOC\]](#contents)
@@ -4965,7 +5181,7 @@ queue and child-lifecycle helpers:
 
 | Kernel function | Return value / status | Effects | Calls | Called by |
 | --- | --- | --- | --- | --- |
-| [`wait_for_process_by_pid(request, caller_context)`](kernel/process/process.picoc#L348) | Returns `true` after an immediate invalid, zombie, or stopped result. The normal blocking path switches away and resumes userspace with the successful `IN2 = 1` preset by [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105). The source-level `false` fallback is reached only if dispatch returns instead of restoring a process. | Validates the parent-child relationship. Immediately collects a zombie or stopped status. Otherwise copies `request->status` into the parent PCB and blocks it on `&child->waiters`. | [`current_process()`](kernel/process/process.picoc#L62), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`remove_process()`](kernel/process/process.picoc#L209), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) | **Library functions:** [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`SYSCALL_WAITPID`](common/syscall.header#L13)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| [`wait_for_process_by_pid(request, caller_context)`](kernel/process/process.picoc#L348) | Returns `true` after an immediate invalid, zombie, or stopped result. The normal blocking path switches away and resumes userspace with the successful `IN2 = 1` preset by [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94). The source-level `false` fallback is reached only if dispatch returns instead of restoring a process. | Validates the parent-child relationship. Immediately collects a zombie or stopped status. Otherwise copies `request->status` into the parent PCB and blocks it on `&child->waiters`. | [`current_process()`](kernel/process/process.picoc#L62), [`find_process_by_pid()`](kernel/process/process.picoc#L162), [`remove_process()`](kernel/process/process.picoc#L209), [`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) | **Library functions:** [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`SYSCALL_WAITPID`](common/syscall.header#L13)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16) |
 | [`sleep_on_wait_queue(queue, caller_context)`](kernel/process/process.picoc#L390) | Returns no value. Normally dispatch leaves through `RTI` and the saved userspace context resumes after a later wakeup. A C return is possible only if dispatch finds an empty process list. | Links the current PCB to `queue`, changes it to [`BLOCKED`](kernel/process/process.header#L15), saves its activation, and dispatches another process. | [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) | **Library functions:** [`sleep()`](library/unistd/blocking.picoc#L9) through [`SYSCALL_SLEEP`](common/syscall.header#L19). [`waitpid()`](library/sys/wait/wait.picoc#L14) through [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16), [`wait_for_process_by_pid()`](kernel/process/process.picoc#L348) |
 | [`wakeup_wait_queue(queue)`](kernel/process/process.picoc#L395) | `false` when empty. `true` after waking one FIFO head. | Advances [`head`](common/wait_queue.header#L6), fixes [`tail`](common/wait_queue.header#L7), clears the removed PCB's [`wait_next`](kernel/process/process.header#L51) and [`waiting_queue_ptr`](kernel/process/process.header#L48), and makes it ready or records a completed wait under [`STOPPED`](kernel/process/process.header#L16). | None | **Library functions:** [`wakeup()`](library/unistd/blocking.picoc#L19) through [`SYSCALL_WAKEUP`](common/syscall.header#L20)<br>**Kernel functions:** [`handle_syscall()`](kernel/syscall.picoc#L16), [`handle_dma_interrupt()`](kernel/dma.picoc#L40), [`notify_process_stopped()`](kernel/signal.picoc#L23), [`wake_parent_waiting_for_process()`](kernel/process/process.picoc#L261) |
 |  |  |  |  |  |
@@ -5040,7 +5256,7 @@ and [`SIGCONT`](common/signal.header#L6) are needed to resume that read. [`8.4 F
 Normal exit and signal termination reach [`terminate_process()`](kernel/process/process.picoc#L304). Normal exit
 uses the application's status, while signals use `128 + signal_number`.
 [`kill.bin`](user/kill.picoc#L69) defaults to [`SIGKILL`](common/signal.header#L5) and yields after an accepted request.
-[`4.3.2.2 Recording termination status`](#4322-recording-termination-status) covers exception and unload statuses.
+[`4.2.2.3 Recording termination status`](#4223-recording-termination-status) covers exception and unload statuses.
 
 `Ctrl+C` sends [`SIGINT`](common/signal.header#L4) through the UART handler to the foreground target.
 A noncurrent target can terminate immediately. For the current running
@@ -5053,7 +5269,7 @@ the parent, and removes the child. This is the usual foreground `Ctrl+C`
 case: the shell resumes with status `130` and reclaims terminal ownership.
 
 Otherwise the child retains [`exit_status`](kernel/process/process.header#L60) as a zombie until a later
-[`waitpid()`](library/sys/wait/wait.picoc#L14) collects it. [`4.3.2.3 Parent collection and final removal`](#4323-parent-collection-and-final-removal) explains final cleanup.
+[`waitpid()`](library/sys/wait/wait.picoc#L14) collects it. [`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal) explains final cleanup.
 
 ### 7.3.4 Fixed PicoOS signal actions compared with Unix
 [\[↑ TOC\]](#contents)
@@ -5532,7 +5748,7 @@ while a terminal reader is blocked or stopped.
 | [`begin_terminal_read(terminal, buffer, count, caller_context)`](kernel/filesystem/terminal.picoc#L134) | Immediate available count, or a saved result on later resumption after blocking/stopping, it does not wait to fill `count` | Reads ring or fills pending fields, queues PCB, saves activation, and dispatches | [`current_process()`](kernel/process/process.picoc#L62), [`process_has_terminal_input()`](kernel/signal.picoc#L173), [`send_signal_to_process()`](kernel/signal.picoc#L75), [`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`enqueue_current_process_on_wait_queue()`](kernel/process/process.picoc#L375) | **Kernel functions:** [`read_file_descriptor()`](kernel/filesystem/filesystem.picoc#L150) |
 | [`resume_pending_terminal_read(process)`](kernel/filesystem/terminal.picoc#L84) | Returns no value | With UART delivery temporarily disabled, fills a stopped foreground reader’s buffer immediately or requeues it, sets [`ProcessControlBlock.stopped_from_state`](kernel/process/process.header#L62) for continuation | [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`interrupt_controller_disable_device()`](kernel/interrupt_controller.picoc#L23), [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`remove_from_wait_queue()`](kernel/process/process.picoc#L176), [`interrupt_controller_assign_device()`](kernel/interrupt_controller.picoc#L59), [`enqueue_terminal_reader()`](kernel/filesystem/terminal.picoc#L61) | **Kernel functions:** [`continue_process()`](kernel/signal.picoc#L50) |
 | [`complete_pending_terminal_read(process, terminal)`](kernel/filesystem/terminal.picoc#L182) | Returns no value | Copies available input, writes saved [`activation.in2`](kernel/process/process.header#L23), clears pending fields, and marks the selected reader ready | [`copy_terminal_bytes()`](kernel/filesystem/terminal.picoc#L35), [`remove_from_wait_queue()`](kernel/process/process.picoc#L176) | **Kernel functions:** [`handle_uart_interrupt()`](kernel/filesystem/terminal.picoc#L213) |
-| [`handle_uart_interrupt(void)`](kernel/filesystem/terminal.picoc#L213) | Returns no value | Acknowledges one byte, consumes a terminal signal character or offers ordinary input to the ring, then tries to complete the selected reader | [`terminal_input_process()`](kernel/signal.picoc#L178), [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`periphery_write_register()`](kernel/periphery.picoc#L11), [`handle_terminal_signal_character()`](kernel/signal.picoc#L192), [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) | **Hardware interrupts:** UART receive via [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L196) |
+| [`handle_uart_interrupt(void)`](kernel/filesystem/terminal.picoc#L213) | Returns no value | Acknowledges one byte, consumes a terminal signal character or offers ordinary input to the ring, then tries to complete the selected reader | [`terminal_input_process()`](kernel/signal.picoc#L178), [`kernel_terminal()`](kernel/filesystem/terminal.picoc#L22), [`periphery_read_register()`](kernel/periphery.picoc#L5), [`periphery_write_register()`](kernel/periphery.picoc#L11), [`handle_terminal_signal_character()`](kernel/signal.picoc#L192), [`enqueue_terminal_byte()`](kernel/filesystem/terminal.picoc#L49), [`complete_pending_terminal_read()`](kernel/filesystem/terminal.picoc#L182) | **Hardware interrupts:** UART receive via [`uart_interrupt()`](interrupt_service_routines/os_isrs.picoc#L185) |
 
 ## 8.8 Opening, reading, writing, and seeking
 [\[↑ TOC\]](#contents)
@@ -5826,12 +6042,12 @@ global allocations:
 | [`next_shared_memory_id`](kernel/shared_memory.picoc#L7) | `int` | Next registry ID, initially 1. It is independent of process IDs |
 | [`dma_waiters`](kernel/dma.picoc#L6) | [`struct wait_queue`](common/wait_queue.header#L5) | Standalone queue whose endpoints reference PCBs waiting for UART DMA completion |
 | [`dma_initialized`](kernel/dma.picoc#L7) | `bool` | Initially false. It prevents reinitializing the DMA queue after setup |
-| [`reschedule_requested`](kernel/dispatcher.picoc#L8) | `bool` | Deferred timer-rescheduling flag. It is set by [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) and cleared on process selection |
+| [`reschedule_requested`](kernel/dispatcher.picoc#L8) | `bool` | Deferred rescheduling flag for a timer interrupting kernel work or a terminating signal targeting the running process. It is set by [`dispatcher_request_reschedule()`](kernel/dispatcher.picoc#L10) and cleared on process selection |
 | [`foreground_process_target`](kernel/signal.picoc#L12) | `int` | Signed process ID for terminal control: 0 means no registered owner, positive ID permits terminal signal delivery, negative ID retains input ownership while suppressing that delivery. It is not a PCB pointer |
 | [`interrupt_device_isrs`](kernel/interrupt_controller.picoc#L3) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART service-routine indices `{1, 4, 2}` copied into periphery configuration. They are not function pointers |
 | [`interrupt_device_priorities`](kernel/interrupt_controller.picoc#L9) | `int[INTERRUPT_DEVICE_COUNT]` (3 entries) | Timer/DMA/UART priorities `{1, 1, 2}` used during controller initialization |
-| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. This kernel-image copy controls the init transfer. The separately linked bootloader and init images each have their own copy, as explained in [`4.3.2.1.2 Loading-bar environment variable`](#43212-loading-bar-environment-variable) |
-| [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L24) | `void (*[OS_INTERRUPT_VECTOR_COUNT])(void)` (5 entries) | `.ivt` array of syscall, timer, UART, exception and DMA handler addresses. The CPU reads these to enter kernel `.text` |
+| [`loading_bar_enabled`](config/config.header#L5) | `bool` | Initially true. This kernel-image copy controls the init transfer. The separately linked bootloader and init images each have their own copy, as explained in [`4.2.2.2.2 Loading-bar environment variable`](#42222-loading-bar-environment-variable) |
+| [`interrupt_vector_table`](interrupt_service_routines/os_isrs.picoc#L23) | `void (*[OS_INTERRUPT_VECTOR_COUNT])(void)` (5 entries) | `.ivt` array of syscall, timer, UART, exception and DMA handler addresses. The CPU reads these to enter kernel `.text` |
 
 This example shows three roots into one PCB list. The current pointer can
 select any member. Empty lists have null endpoints, and a one-element list
@@ -5888,25 +6104,51 @@ parameters and behavior documented here.
 ## 10.1 From a library call to the kernel: waitpid
 [\[↑ TOC\]](#contents)
 
-[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) waits for one child and returns its exit or stopped status.
-This walkthrough connects its declaration, linked implementation, request,
-and kernel handler.
+[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) waits for one exact child and
+returns its exit or stopped status, or `-1` for an invalid PID or non-child.
+This example connects the application's header include, linked library,
+syscall entry, kernel wait, and return to the caller. It also shows which files make up the library and why the
+kernel can deliver a result into a suspended library call.
 
 ### 10.1.1 Header, implementation, and linking
 [\[↑ TOC\]](#contents)
 
-A header declares how to call a function. A linked implementation supplies
-the code. PicoOS uses `.header` and `.picoc` in place of `.h` and `.c`.
-The wait library has these files:
+A header declares how to call a function. Its implementation supplies the
+executable code. PicoOS uses `.header` and `.picoc` in place of `.h` and `.c`.
+The [`sys/wait`](library/sys/wait/) library separates its public declarations,
+implementation, and compilation unit. Shared headers supply the types and
+constants that the library and kernel must agree on.
 
-| File | Role |
+The table connects each source file and generated artifact to its role in
+calling [`waitpid()`](library/sys/wait/wait.picoc#L14):
+
+| File | Role in the wait library |
 | --- | --- |
-| [`wait.header`](library/sys/wait/wait.header) | Declares `int waitpid(int pid);` and `bool WIFSTOPPED(int status);` for callers |
-| [`wait.picoc`](library/sys/wait/wait.picoc) | Defines both functions and the assembly helper [`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) |
-| [`libwait.picoc`](library/sys/wait/libwait.picoc) | The compilation unit, containing `#include "wait.picoc"` |
-| [`common/syscall.header`](common/syscall.header) | Defines [`SYSCALL_WAITPID`](common/syscall.header#L13) and the shared [`WaitPidRequest`](common/syscall.header#L61) structure used by the library and kernel |
+| [`wait.header`](library/sys/wait/wait.header) | Public declarations of [`waitpid(pid)`](library/sys/wait/wait.picoc#L14) and [`WIFSTOPPED(status)`](library/sys/wait/wait.picoc#L25). Includes the shared type and signal headers. `#pragma once` prevents repeated declarations through multiple includes |
+| [`wait.picoc`](library/sys/wait/wait.picoc) | Includes the public header and syscall definitions. Implements both public functions and [`invoke_waitpid_syscall(number, argument)`](library/sys/wait/wait.picoc#L4), the assembly helper that enters the kernel |
+| [`libwait.picoc`](library/sys/wait/libwait.picoc) | Compilation unit containing only `#include "wait.picoc"`. Compiling this file collects the implementation and its included headers into one reusable library artifact |
+| [`common/stddef.header`](common/stddef.header) | Defines [`bool`](common/stddef.header#L3), [`true`](common/stddef.header#L9), and [`false`](common/stddef.header#L8), used by the stopped-status test and kernel completion result |
+| [`common/signal.header`](common/signal.header) | Defines the stopped-status constants inspected by [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25). They match statuses delivered from the child's [`stop_signal`](kernel/process/process.header#L61) |
+| [`common/syscall.header`](common/syscall.header) | Defines [`SYSCALL_WAITPID`](common/syscall.header#L13) and [`WaitPidRequest`](common/syscall.header#L61). The shared layout lets the kernel read the child PID and result address prepared by the library |
+| [`libwait.reti_blocks`](library/sys/wait/libwait.reti_blocks) | Generated RETI code blocks for the library functions, supplied to the linker |
+| [`libwait.st`](library/sys/wait/libwait.st) | Generated symbol table containing function signatures and type information. The compiler reads it alongside the code blocks when linking calls from an application |
 
-The shell includes the header and waits for its foreground child:
+The complete public header establishes the caller's view of the library:
+
+```c
+#pragma once
+
+#include "../../../common/stddef.header"
+#include "../../../common/signal.header"
+
+int waitpid(int pid);
+bool WIFSTOPPED(int status);
+```
+
+For example, [`shell.picoc`](user/shell.picoc) includes this header and calls
+[`waitpid()`](library/sys/wait/wait.picoc#L14) for its foreground child. These
+lines from the shell show the include and the call that stores the returned
+status in [`last_command_exit_status`](user/shell.picoc#L29):
 
 ```c
 #include "../library/sys/wait/wait.header"
@@ -5914,20 +6156,42 @@ The shell includes the header and waits for its foreground child:
 last_command_exit_status = waitpid(pid);
 ```
 
-Including the header does not supply the implementation. Compile
-[`libwait.picoc`](library/sys/wait/libwait.picoc) with `-c` to obtain `.reti_blocks` and `.st`, then link them
-into the application. The ordinary function call stays in that user image.
-Its syscall later crosses into the separately built kernel.
+Including the header gives the compiler the signature. The implementation
+is supplied during linking.
 
-Other libraries use umbrella sources and `// dependencies:` comments
-in the same way. [`1.1.2 Separate compilation, reusable artifacts, and linking`](#112-separate-compilation-reusable-artifacts-and-linking) shows linking commands, and [`1.1.5 Selecting a startup function with -C / --startup-source`](#115-selecting-a-startup-function-with--c----startup-source) explains `-C`
-startup selection.
+The library compilation unit is deliberately small. Its complete contents
+are:
+
+```c
+#include "wait.picoc"
+```
+
+Compile it from the repository root to produce the two reusable artifacts:
+
+```console
+$ picoc_compiler -c -O1 library/sys/wait/libwait.picoc
+```
+
+Supply [`libwait.reti_blocks`](library/sys/wait/libwait.reti_blocks) as a linker
+input alongside the application's compiled code and other required libraries.
+Keep [`libwait.st`](library/sys/wait/libwait.st) beside it. The linker resolves
+calls to [`waitpid()`](library/sys/wait/wait.picoc#L14) to code inside the user
+image. The kernel is built separately and is reached at runtime through
+`INT 0`. This library has its own syscall helper, so it does not need to link
+[`unistd`](library/unistd/) to enter the kernel.
+
+[`1.1.2 Separate compilation, reusable artifacts, and linking`](#112-separate-compilation-reusable-artifacts-and-linking)
+shows complete linking commands. An executable also needs the startup code
+explained in
+[`1.1.5 Selecting a startup function with -C / --startup-source`](#115-selecting-a-startup-function-with--c----startup-source).
 
 ### 10.1.2 Packing arguments and executing the syscall
 [\[↑ TOC\]](#contents)
 
-The wrapper passes a child PID and a result destination using the shared
-request type:
+The syscall interface passes one value or address in `IN1`. To supply both a
+child PID and a result destination, [`waitpid()`](library/sys/wait/wait.picoc#L14)
+uses [`WaitPidRequest`](common/syscall.header#L61), defined in the shared syscall
+header:
 
 ```c
 struct WaitPidRequest {
@@ -5936,11 +6200,16 @@ struct WaitPidRequest {
 };
 ```
 
-[`request.pid`](common/syscall.header#L62) receives the argument, and [`request.status`](common/syscall.header#L63) points to a local
-integer. [`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) gives the public wrapper. This helper passes its address
-into the kernel:
+The complete [`wait.picoc`](library/sys/wait/wait.picoc) implementation below
+shows the ordinary library call, both stack-local objects, and the assembly
+that enters the kernel. It also includes
+[`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25), which inspects the returned
+integer entirely in userspace:
 
 ```c
+#include "wait.header"
+#include "../../../common/syscall.header"
+
 int invoke_waitpid_syscall(int number, int argument) {
     int result;
 
@@ -5950,42 +6219,132 @@ int invoke_waitpid_syscall(int number, int argument) {
     asm("STOREIN BAF IN2 0");
     return result;
 }
+
+int waitpid(int pid) {
+    int status = 0;
+    struct WaitPidRequest request;
+
+    request.pid = pid;
+    request.status = &status;
+    while (!invoke_waitpid_syscall(SYSCALL_WAITPID, (int)&request)) {
+    }
+    return status;
+}
+
+bool WIFSTOPPED(int status) {
+    return status == SIGNAL_STOP_STATUS ||
+           status == SIGNAL_STOPPED_STATUS ||
+           status == SIGNAL_TERMINAL_INPUT_STATUS;
+}
 ```
 
-The first two loads put the selector in `ACC` and request address in `IN1`.
-`INT 0` enters the kernel. After return, `STOREIN` saves `IN2` in the helper's
-local result. The offsets follow [`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup).
+[`request.pid`](common/syscall.header#L62) selects the exact child, and
+[`request.status`](common/syscall.header#L63) points to the separate local
+[`status`](library/sys/wait/wait.picoc#L15) integer. Both the
+[`request`](library/sys/wait/wait.picoc#L16) and the result remain on the
+parent's userspace stack for the duration of the call. Neither requires heap
+allocation. The helper receives the request's absolute address as its
+second argument.
 
-The helper result says whether the wait completed. The child status is
-returned through [`WaitPidRequest.status`](common/syscall.header#L63). The wrapper retries on zero and
-then returns that status. Unlike POSIX [`waitpid`](https://pubs.opengroup.org/onlinepubs/9799919799/functions/wait.html), its public API has one
-argument and no options or output parameter.
+The register table connects the helper's instructions to the request and
+kernel result. The `BAF` offsets follow
+[`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup):
+
+| Register | Prepared or read by the helper | Meaning for this call |
+| --- | --- | --- |
+| `ACC` | `LOADIN BAF ACC 3` reads the first argument | [`SYSCALL_WAITPID`](common/syscall.header#L13) selects the wait branch in [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| `IN1` | `LOADIN BAF IN1 4` reads the second argument | Address of the stack-local [`WaitPidRequest`](common/syscall.header#L61), containing the child PID and status destination |
+| `IN2` | After `INT 0`, `STOREIN BAF IN2 0` saves it in the helper's local [`result`](library/sys/wait/wait.picoc#L5) | Completion indication returned by the syscall. The child status is written separately through [`WaitPidRequest.status`](common/syscall.header#L63) |
+
+The wrapper retries if the helper returns zero, then returns its updated
+local [`status`](library/sys/wait/wait.picoc#L15). A normal blocking wait
+resumes with `IN2 = 1`, so it does not poll while the child runs. PicoOS's
+public API takes only the child PID and returns the status directly. It has
+no options argument or caller-supplied status pointer.
 
 ### 10.1.3 Interrupt entry, waiting, and return
 [\[↑ TOC\]](#contents)
 
-[`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L105) saves registers and installs the kernel context.
-[`handle_syscall()`](kernel/syscall.picoc#L16) then selects the wait branch:
+`INT 0` enters [`syscall_interrupt()`](interrupt_service_routines/os_isrs.picoc#L94),
+which saves the userspace registers and switches to the kernel's code, data,
+and stack context. It calls
+[`handle_syscall(syscall_number, argument, caller_context)`](kernel/syscall.picoc#L16)
+with the saved selector, request address, and register-frame address. The
+[`SYSCALL_WAITPID`](common/syscall.header#L13) branch casts the argument back to
+[`WaitPidRequest *`](common/syscall.header#L61) and calls
+[`wait_for_process_by_pid()`](kernel/process/process.picoc#L348).
 
-```c
-} else if (syscall_number == SYSCALL_WAITPID) {
-        return wait_for_process_by_pid(
-            (struct WaitPidRequest *)argument,
-            caller_context
-        );
-    }
+The kernel reads [`WaitPidRequest.pid`](common/syscall.header#L62), finds the
+child PCB, and checks its [`parent_pid`](kernel/process/process.header#L57)
+against the caller's [`pid`](kernel/process/process.header#L32). The diagram
+shows the two return paths and where a blocking wait retains its result
+address:
+
+```mermaid
+flowchart LR
+    WAIT["wait_for_process_by_pid<br/>validate child and inspect state"]
+    WAIT -->|invalid, zombie, or stopped| DIRECT["Write through request.status<br/>return true"]
+    DIRECT --> RESTORE["syscall_interrupt_return<br/>save IN2 and check rescheduling<br/>restore caller or dispatch, then RTI"]
+    WAIT -->|child has neither stopped nor terminated| BLOCK["Parent PCB<br/>waiting_status_ptr = request.status<br/>state = BLOCKED<br/>queued on child.waiters"]
+    BLOCK --> SAVE["dispatcher_switch_from_context<br/>save parent activation<br/>run another process"]
+    SAVE -->|child terminates or stops| WAKE["Write status through waiting_status_ptr<br/>clear pointer and wake parent"]
+    WAKE --> LATER["Dispatcher selects parent<br/>restore activation and RTI"]
+    RESTORE --> RESULT["Userspace helper resumes after INT 0<br/>waitpid returns local status"]
+    LATER --> RESULT
+    click WAIT "kernel/process/process.picoc#L348"
+    click DIRECT "common/syscall.header#L63"
+    click RESTORE "interrupt_service_routines/os_isrs.picoc#L133"
+    click BLOCK "kernel/process/process.header#L31"
+    click SAVE "kernel/dispatcher.picoc#L71"
+    click WAKE "kernel/process/process.picoc#L261"
+    click LATER "kernel/dispatcher.picoc#L21"
+    click RESULT "library/sys/wait/wait.picoc#L14"
 ```
 
-The kernel validates the parent relationship. It returns an error, collects
-a zombie, reports a stopped child, or saves the result pointer and sleeps
-on the child's queue.
+For an invalid PID or non-child, the kernel writes `-1` through
+[`WaitPidRequest.status`](common/syscall.header#L63). If the child's
+[`state`](kernel/process/process.header#L33) is
+[`ZOMBIE`](kernel/process/process.header#L17), it copies
+[`exit_status`](kernel/process/process.header#L60) and calls
+[`remove_process()`](kernel/process/process.picoc#L209). If the child is
+[`STOPPED`](kernel/process/process.header#L16), it writes `128 +`
+[`stop_signal`](kernel/process/process.header#L61) and leaves the child
+allocated. Each immediate path returns [`true`](common/stddef.header#L9) to
+the syscall handler, which returns the completion indication in `IN2`.
+[`syscall_interrupt_return()`](interrupt_service_routines/os_isrs.picoc#L133)
+saves that result before checking for pending rescheduling. The caller
+returns through `RTI`, either after
+[`syscall_interrupt_restore()`](interrupt_service_routines/os_isrs.picoc#L148)
+restores its registers or after the dispatcher selects it again.
 
-Immediate completion follows direct syscall return. A blocked parent
-resumes through the dispatcher after wakeup. Both finish with `RTI` after
-`INT 0`. [`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace) explains entry and return, and [`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) explains the wait.
+Otherwise the kernel copies [`WaitPidRequest.status`](common/syscall.header#L63)
+into the parent's [`waiting_status_ptr`](kernel/process/process.header#L44).
+It retains this result pointer rather than the request address.
+[`sleep_on_wait_queue()`](kernel/process/process.picoc#L390) links the parent to
+the child's [`waiters`](kernel/process/process.header#L46) and changes the
+parent's [`state`](kernel/process/process.header#L33) to
+[`BLOCKED`](kernel/process/process.header#L15).
+[`dispatcher_switch_from_context()`](kernel/dispatcher.picoc#L71) saves the
+caller's registers in its [`activation`](kernel/process/process.header#L40)
+and dispatches another process. Before calling the handler, the interrupt
+service routine presets the saved `IN2` result to `1`. This becomes the
+parent's [`activation.in2`](kernel/process/process.header#L23) when it blocks.
 
-The suspended stack keeps request and result alive. Only the result pointer
-is retained in the PCB. [`2.4.1 Syscall selectors and register convention`](#241-syscall-selectors-and-register-convention) describes request lifetimes.
+Child termination or stopping later writes the status into the parent's
+suspended stack frame and wakes it. When the dispatcher selects the parent
+again, [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) restores
+its activation and executes `RTI`. Execution resumes immediately after
+`INT 0` in [`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4), with
+`IN2 = 1`. The helper returns that completion indication, and
+[`waitpid()`](library/sys/wait/wait.picoc#L14) returns the integer written by
+the kernel. The blocked call resumes through its saved userspace context.
+It does not resume the kernel wait function to reach its final
+`return false`.
+
+[`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid) explains
+queue cleanup and the case where the waiting parent itself is stopped.
+[`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace)
+details register saving and both syscall return paths.
 
 ## 10.2 Library overview and dependencies
 [\[↑ TOC\]](#contents)
@@ -6225,7 +6584,47 @@ does not allocate memory or enter the kernel.
 [\[↑ TOC\]](#contents)
 
 [`env.picoc`](library/stdlib/env.picoc) manages [`environ`](library/stdlib/env.picoc#L4). Creating or enlarging entries uses the process
-heap, including the failure path in [`10.2.7.1 Heap operations in malloc.picoc`](#10271-heap-operations-in-mallocpicoc):
+heap, including the failure path in [`10.2.7.1 Heap operations in malloc.picoc`](#10271-heap-operations-in-mallocpicoc).
+
+At startup, [`start_process()`](library/start/start.picoc#L7) locates the initial
+[`envp`](kernel/process/process_arguments.picoc#L141) array at `argv + argc + 1`.
+The [`argc`](kernel/process/process_arguments.picoc#L131) argument pointers are
+followed by the [`argv[argc] = NULL`](kernel/process/process_arguments.picoc#L180) sentinel,
+then the environment pointers. [`initialize_environment()`](library/stdlib/env.picoc#L97)
+copies that array and its strings into the process heap and assigns
+[`environ`](library/stdlib/env.picoc#L4). The stack address therefore comes from
+the known argument layout, not a search for `=`. [`4.2.2.1.2 Initial argc, argv, and envp`](#42212-initial-argc-argv-and-envp)
+shows the stack layout, and [`4.2.2.2.1 Environment origin and propagation`](#42221-environment-origin-and-propagation)
+explains how the selected environment reaches it.
+
+[`getenv()`](library/stdlib/env.picoc#L115) subsequently searches the heap-owned
+[`environ`](library/stdlib/env.picoc#L4) array without a syscall or another stack
+lookup. [`environment_variable_length()`](library/stdlib/env.picoc#L10) determines
+the requested name's length. [`environment_variable_index()`](library/stdlib/env.picoc#L51)
+visits entries until it finds a match or reaches the array's `NULL` sentinel.
+For each entry, [`environment_variable_matches()`](library/stdlib/env.picoc#L37)
+compares exactly the requested name characters and requires the next character
+to be `=`. For example, `PATH=/user` matches `PATH`, while `PATH_EXTRA=/test`
+does not. It does not scan for an arbitrary `=`. After a match, the returned
+pointer skips the name and that one separator, as the complete lookup function
+shows:
+
+```c
+char *getenv(char *name) {
+    int name_length = environment_variable_length(name);
+    int index = environment_variable_index(name, name_length);
+
+    if (index == -1) {
+        return NULL;
+    }
+
+    return environ[index] + name_length + 1;
+}
+```
+
+The result points into the existing environment string, rather than a new
+allocation. An empty value returns a pointer to its `\0` terminator, while a
+missing name returns `NULL`. The table summarizes lookup and modification:
 
 | Library function | Return value / status and purpose | Syscalls / Host Requests |
 | --- | --- | --- |
@@ -6390,9 +6789,9 @@ sequenceDiagram
         participant B as Bootloader<br/>.text and .data
     end
     box rgb(255, 248, 237) Kernel-reserved SRAM
-        participant K as Kernel image<br/>0–41496<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40766
-        participant KH as Kernel heap<br/>41497–45592
-        participant KS as Kernel stack<br/>45593–48308
+        participant K as Kernel image<br/>0–41485<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40755
+        participant KH as Kernel heap<br/>41486–45581
+        participant KS as Kernel stack<br/>45582–48297
     end
     box rgb(239, 252, 242) Process and Shared Data Heap
         participant I as Init image<br/>libstart startup
@@ -6413,10 +6812,10 @@ sequenceDiagram
 
 The offsets come from the current kernel layout. The bootloader starts
 with a temporary stack at SRAM offset `262143`. [`start_loaded_kernel()`](boot/bootloader.picoc#L21)
-replaces it with the kernel stack at `48308`. Kernel startup initializes
-heap cells `41497..45592` and installs `45592` as the stack boundary.
+replaces it with the kernel stack at `48297`. Kernel startup initializes
+heap cells `41486..45581` and installs `45581` as the stack boundary.
 
-The Process and Shared Data Heap starts at `48309`. It is managed by
+The Process and Shared Data Heap starts at `48298`. It is managed by
 [`PSDMalloc()`](kernel/psdmalloc.picoc#L20), separately from the preceding Kernel Heap managed by [`kmalloc()`](kernel/kmalloc.picoc#L23).
 
 Init, the shell, and applications occupy separate Process Payloads, with
@@ -6714,7 +7113,7 @@ int main(void) {
 ```
 
 [`waitpid()`](library/sys/wait/wait.picoc#L14) selects that exact shell. Loading uses the polling or DMA path
-from [`4.3.1 Loading a process (load library call)`](#431-loading-a-process-load-library-call), while [`11.3.2 Initial environment configuration`](#1132-initial-environment-configuration) explains configuration parsing.
+from [`4.2.1 Loading a process (load library call)`](#421-loading-a-process-load-library-call), while [`11.3.2 Initial environment configuration`](#1132-initial-environment-configuration) explains configuration parsing.
 
 ### 11.3.4 Shell startup
 [\[↑ TOC\]](#contents)
@@ -6975,7 +7374,7 @@ and from nested shells. A relative entry supplied by the user is resolved from t
 [`ProcessControlBlock.working_directory`](kernel/process/process.header#L39), just like other relative paths.
 
 Built-ins execute in the shell. External commands use [`load_from_path()`](user/shell.picoc#L1186)
-and [`run_process()`](user/shell.picoc#L1034) to load, expand, redirect, and start. [`4.3.1 Loading a process (load library call)`](#431-loading-a-process-load-library-call) explains
+and [`run_process()`](user/shell.picoc#L1034) to load, expand, redirect, and start. [`4.2.1 Loading a process (load library call)`](#421-loading-a-process-load-library-call) explains
 transfer, and [`12.5.1 Foreground processes, background processes, and job-control signals`](#1251-foreground-processes-background-processes-and-job-control-signals) explains foreground waiting.
 
 Background execution skips terminal transfer and waiting. The shell
@@ -7385,7 +7784,7 @@ commands, options, and error behavior.
 [\[↑ TOC\]](#contents)
 
 The table links each entry point and identifies its library calls and host
-requests. [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies) lists the 15 libraries, and [`2.4.2.1.1 System-call groups`](#24211-system-call-groups) groups the 37 syscalls.
+requests. [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies) lists the 15 libraries, and [`2.4.2.2.1 System-call groups`](#24221-system-call-groups) groups the 37 syscalls.
 Loading the command itself is the parent shell's operation:
 
 **Shared output requests** mean the descriptor routing from [`8.8 Opening, reading, writing, and seeking`](#88-opening-reading-writing-and-seeking). Regular
@@ -8038,7 +8437,7 @@ guarantees:
 
 | Real-time operating-systems lecture topic | What students can inspect in PicoOS |
 | --- | --- |
-| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`ProcessControlBlock`](kernel/process/process.header#L31) list, [`4.3.2.3 Parent collection and final removal`](#4323-parent-collection-and-final-removal) explains why termination and removal are separate steps |
+| Process states | New, ready, running, blocked, stopped, and zombie entries in the [`ProcessControlBlock`](kernel/process/process.header#L31) list, [`4.2.2.4 Parent collection and final removal`](#4224-parent-collection-and-final-removal) explains why termination and removal are separate steps |
 | Scheduling and dispatching | The scheduler chooses a ready process, the dispatcher saves and restores its activation record |
 | [`waitpid()`](library/sys/wait/wait.picoc#L14), [`sleep()`](library/unistd/blocking.picoc#L9), and [`wakeup()`](library/unistd/blocking.picoc#L19) | A process blocks in a wait queue until a child, mutex, or other event wakes it |
 | Mutexes | [`mutex_lock()`](library/mutex/mutex.picoc#L18) blocks a contending process and [`mutex_unlock()`](library/mutex/mutex.picoc#L25) wakes a waiting process |
@@ -8167,7 +8566,7 @@ Each reference gives the relevant implementation details:
 - non-preemptive kernel execution and deferred rescheduling, as explained in
   [`2.5.2 Kernel non-preemption and deferred rescheduling`](#252-kernel-non-preemption-and-deferred-rescheduling)
 - fixed/default process heap and stack sizing with no dynamic stack growth, as
-  described in [`4.2 Initial user process stack`](#42-initial-user-process-stack)
+  described in [`4.2.2.1 Initial user process stack`](#4221-initial-user-process-stack)
 - limited formatting and scanning, shell parsing, and standard-library subsets,
   as described in [`10.2.9 stdio: streams, formatting, and scanning`](#1029-stdio-streams-formatting-and-scanning),
   [`12.4 Command parsing, expansion, and execution`](#124-command-parsing-expansion-and-execution), and

@@ -4,8 +4,6 @@
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
 <rect width="1756" height="738" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="32" text-anchor="start" font-size="25" font-weight="bold" fill="#172b3a">Remove the name now. Free the data after the last mapping.</text>
-<text x="32" y="61" text-anchor="start" font-size="18" font-weight="normal" fill="#172b3a">Example: Shared Memory Entry 1 and Shared Data Payload A, mapped by two processes</text>
 <rect x="32" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
 <text x="190.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">1  Open</text>
 <a href="../../library/sys/mman/mman.picoc#L15"><text x="190.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">shm_open(name, size)</text></a>

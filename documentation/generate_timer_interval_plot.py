@@ -33,7 +33,6 @@ delay_axis.plot(
     color="#2066a8",
     label="Character appears",
 )
-delay_axis.set_title("Typed character appears in the shell")
 delay_axis.set_ylabel("Delay (ms)")
 delay_axis.set_ylim(100, 132)
 delay_axis.legend(loc="upper right")

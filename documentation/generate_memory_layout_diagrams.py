@@ -179,7 +179,7 @@ class Diagram:
         self.parts.append(self.rect(x, TOP, width, CELL_HEIGHT + BAND_HEIGHT,
                                     "none", stroke=FOCUS, stroke_width=3))
 
-    def expand(self, source, detail, first, last, caption):
+    def expand(self, source, detail, first, last):
         """Expand one payload below the SRAM row, without implying a pointer."""
         scale = (self.right - LEFT) / (detail.right - LEFT)
         detail_top = self.bottom + 330
@@ -194,8 +194,6 @@ class Diagram:
             f'<path d="M {source_x} {source_bottom} L {target_left} {detail_top} '
             f'M {source_x + source_width} {source_bottom} L {target_right} {detail_top}" '
             'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
-        self.parts.append(self.text(LEFT, self.bottom + 50, caption,
-                                    size=16, bold=True, anchor="start"))
         self.parts.append(
             f'<g transform="translate({dx} {dy}) scale({scale})">'
             + "\n".join(detail.parts) + '</g>')
@@ -216,8 +214,7 @@ class Diagram:
                f'<defs>{defs}</defs>\n'
                f'<rect width="{width}" height="{self.height}" fill="white"/>\n'
                '<g font-family="DejaVu Sans, sans-serif">\n'
-               + self.text(LEFT, 28, self.title, size=21, bold=True, anchor="start")
-               + self.text(LEFT, 55, "Low to high addresses →   ·   Widths are illustrative",
+               + self.text(LEFT, 28, "Low to high addresses →   ·   Widths are illustrative",
                            size=15, anchor="start")
                + "\n".join(self.parts)
                + self.text(LEFT, self.height - 20,
@@ -365,9 +362,6 @@ def shared_memory_list():
     lower_y = fig.bottom + 250
     lower_height = 156
     root_x, root_width = LEFT, 350
-    fig.parts.append(fig.text(LEFT, fig.bottom + 55,
-                              "Same two SharedMemoryEntry objects shown as the registry list",
-                              size=17, bold=True, anchor="start"))
     fig.parts.append(fig.rect(root_x, lower_y, root_width, lower_height, MUTED,
                               stroke=FOCUS, stroke_width=3))
     fig.parts.append(fig.text(root_x + root_width / 2, lower_y + 55,
@@ -518,9 +512,6 @@ def shared_memory_attachments():
             'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
     # Keep the identity guides from running through the explanatory caption.
     fig.parts.append(fig.rect(LEFT, 690, 1180, 60, "white"))
-    fig.parts.append(fig.text(LEFT, 710,
-                              "Same seven objects shown as two per-process attachment lists",
-                              size=19, bold=True, anchor="start"))
     fig.parts.append(fig.text(LEFT, 739,
                               "Dashed lines: same objects in both views, not stored pointers or extra allocations",
                               size=15, anchor="start"))
@@ -568,11 +559,6 @@ def shared_memory_destruction():
 
     def box(x, y, w, h, fill=ALLOCATED):
         parts.append(Diagram.rect(x, y, w, h, fill, stroke=LINE, stroke_width=1.5))
-
-    label(LEFT, 32, "Remove the name now. Free the data after the last mapping.",
-          size=25, bold=True, anchor="start")
-    label(LEFT, 61, "Example: Shared Memory Entry 1 and Shared Data Payload A, mapped by two processes",
-          size=18, anchor="start")
 
     stages = (
         ("1  Open", "shm_open(name, size)", "Create Entry 1 and its data",
@@ -733,8 +719,7 @@ def main():
     detail = process_layout("overview-process-payload", expanded=True,
                             include_outer_header=False, highlight_heap=False,
                             emphasize_heap=True)
-    overview.expand("opA", detail, "ivt", "stack",
-                    "Expand Process Payload A · outer Block Header A stays in the SRAM row")
+    overview.expand("opA", detail, "ivt", "stack")
     overview.parts.append(overview.text(LEFT, overview.height - 42,
                                        "Orange outlines and bands: the three heap regions",
                                        size=14, color=FOCUS, anchor="start"))

@@ -1,14 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="404" viewBox="0 0 1440 404" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="354" viewBox="0 50 1440 354" role="img" aria-labelledby="title desc">
   <title id="title">TSL DS ACC 2: atomic access to one SRAM word</title>
   <desc id="desc">Four adjacent, equally sized 32-bit SRAM word cells are separated by lines, with omitted memory at both ends. DS is 0x80000040, and offset 2 selects the cell at 0x80000042. TSL DS ACC 2 copies that cell's old value 0 into ACC and changes the same cell to 1 atomically. Neighboring cells remain unchanged.</desc>
   <rect width="1440" height="404" fill="white"/>
   <g font-family="DejaVu Sans, sans-serif" fill="#172536">
-    <text x="60" y="42" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="bold">TSL DS ACC 2</text>
-    <text x="420" y="42" font-size="26">Test and set one SRAM word</text>
     <text x="60" y="78" font-family="DejaVu Sans Mono, monospace" font-size="21">DS = 0x80000040; DS + 2 = 0x80000042</text>
 
-    <text x="60" y="122" font-size="24" font-weight="bold">SRAM cells</text>
-    <text x="270" y="122" font-size="21">Each cell is one 32-bit word; addresses increase by 1 per cell.</text>
+    <text x="60" y="122" font-size="21">Each cell is one 32-bit word; addresses increase by 1 per cell.</text>
     <!-- One SRAM outline with equal-width word cells, plus omitted memory at both ends. -->
     <rect x="60" y="146" width="1320" height="132" fill="#f1f5f9"/>
     <path d="M720 146 H1005 V278 H720 Z" fill="#fff2b2"/>
