@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 // dependencies: ../../library/stdio/libstdio.reti_blocks ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/signal/libsignal.reti_blocks
 
 #include "../../library/stdio/stdio.header"

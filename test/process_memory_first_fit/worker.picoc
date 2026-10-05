@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 int worker_global;
 
 int main(void) {

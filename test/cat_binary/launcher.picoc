@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 // dependencies: ../../library/fcntl/libfcntl.reti_blocks ../../library/unistd/libunistd.reti_blocks
 
 #include "../../library/fcntl/fcntl.header"

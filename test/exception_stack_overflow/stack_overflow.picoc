@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 void recurse(void) {
     recurse();
 }

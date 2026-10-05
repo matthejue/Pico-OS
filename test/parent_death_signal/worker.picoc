@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 // dependencies: ../../library/schedule/libschedule.reti_blocks
 
 #include "../../library/schedule/schedule.header"

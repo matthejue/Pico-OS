@@ -8135,8 +8135,7 @@ Makefiles, Python and shell scripts, and similar supporting code are generally
 simple and do not contribute to understanding how an operating system works.
 I would simply not have created some of these applications and tests without
 AI. They are the cherry on top of the project, not a central part of it. The
-[AI usage record](documentation/ai_usage.md) lists where AI was used in the
-source code.
+[AI usage record](documentation/ai_usage.md) lists where AI was used in this repository.
 
 Towards the end of the project, the models in GitHub Copilot through GitHub
 Education became better, so I started using AI more. At other university chairs

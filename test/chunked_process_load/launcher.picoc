@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 // dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks
 
 #include "../../library/unistd/unistd.header"

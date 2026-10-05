@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 // dependencies: ../../library/mutex/libmutex.reti_blocks ../../library/stdio/libstdio.reti_blocks
 
 #include "../../library/stdio/stdio.header"

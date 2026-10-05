@@ -1,3 +1,5 @@
+// AI used: GitHub Copilot through GitHub Education
+
 int main(void) {
     int zero = 0;
     int result = 1 / zero;
