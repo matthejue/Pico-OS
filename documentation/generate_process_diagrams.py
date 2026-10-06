@@ -9,7 +9,7 @@ from html import escape
 from pathlib import Path
 
 from generate_memory_layout_diagrams import (
-    ADDRESS, ALLOCATED, FOCUS, HEADER, LINE, METADATA, MUTED, POINTER, sram,
+    ADDRESS, ALLOCATED, FOCUS, FREE, HEADER, HEAP_EMPHASIS, LINE, METADATA, MUTED, POINTER, sram,
 )
 
 OUTPUT = Path(__file__).parent / "images"
@@ -564,40 +564,214 @@ def initial_example():
 
 
 def inheritance():
+    heap_fill = "#f6e8d5"
     f = Figure("inheritance", "Parent-derived state · copies at load completion and at run setup",
-               "A schematic contiguous Kernel Heap contains separate allocator blocks for parent "
+               "The complete SRAM map shows a compact Kernel Image, a detailed Kernel Heap, "
+               "a compact Kernel Stack, and the Process and Shared Data Heap as one compact region. "
+               "The schematic contiguous Kernel Heap contains separate allocator blocks for parent "
                "and child PCBs, parent and child working-directory strings, and independent parent "
                "and child descriptor tables. Solid curved arrows are stored pointer fields. Dashed "
                "arrows mark copying operations, rather than shared pointers. parent_pid and "
-               "parent_death_signal are copied integer values during creation.", height=720, show_address_direction=False)
+               "parent_death_signal are copied integer values during creation.",
+               width=2274, height=720)
     f.label(32, 100, "Load completion: child.parent_pid = parent.pid · child.parent_death_signal = parent.parent_death_signal",
             anchor="start", size=16)
     f.row(280, 150, [
-        ("ha", 60, ("Block", "Header A"), HEADER),
+        ("image", 150, ("Kernel Image",), MUTED),
+        ("ha", 60, ("Block", "Header A"), HEADER, "common/heap.header#L5"),
         ("parent", 290, ("Payload A · PCB 1", "parent / usual caller", "pid · parent_death_signal",
-                         "working_directory", "file_descriptors"), MUTED),
-        ("hb", 60, ("Block", "Header B"), HEADER),
+                         "working_directory", "file_descriptors"), MUTED,
+         "kernel/process/process.header#L31"),
+        ("hb", 60, ("Block", "Header B"), HEADER, "common/heap.header#L5"),
         ("child", 290, ("Payload B · PCB 2", "new child", "parent_pid · parent_death_signal",
-                        "working_directory", "file_descriptors"), ALLOCATED),
-        ("hc", 60, ("Block", "Header C"), HEADER),
-        ("pcwd", 185, ("Payload C", "parent directory", '"/user"'), MUTED),
-        ("hd", 60, ("Block", "Header D"), HEADER),
-        ("ccwd", 185, ("Payload D", "child directory", '"/user" copy'), ALLOCATED),
-        ("he", 60, ("Block", "Header E"), HEADER),
-        ("pfd", 200, ("Payload E", "parent table", "entries → own array"), MUTED),
-        ("hf", 60, ("Block", "Header F"), HEADER),
-        ("cfd", 200, ("Payload F", "child table", "entries → own array"), ALLOCATED),
+                        "working_directory", "file_descriptors"), ALLOCATED,
+         "kernel/process/process.header#L31"),
+        ("hc", 60, ("Block", "Header C"), HEADER, "common/heap.header#L5"),
+        ("pcwd", 185, ("Payload C", "parent directory", '"/user"'), MUTED,
+         "kernel/process/process.header#L39"),
+        ("hd", 60, ("Block", "Header D"), HEADER, "common/heap.header#L5"),
+        ("ccwd", 185, ("Payload D", "child directory", '"/user" copy'), ALLOCATED,
+         "kernel/process/process.header#L39"),
+        ("he", 60, ("Block", "Header E"), HEADER, "common/heap.header#L5"),
+        ("pfd", 200, ("Payload E", "parent table", "entries → own array"), MUTED,
+         "kernel/filesystem/file_descriptor.header#L22"),
+        ("hf", 60, ("Block", "Header F"), HEADER, "common/heap.header#L5"),
+        ("cfd", 200, ("Payload F", "child table", "entries → own array"), ALLOCATED,
+         "kernel/filesystem/file_descriptor.header#L22"),
+        ("kstack", 130, ("Kernel Stack",), MUTED),
+        ("outerheap", 220, ("Process and", "Shared Data Heap"), heap_fill,
+         "kernel/psdmalloc.picoc#L7"),
     ])
-    f.band("ha", "cfd", 430, "Kernel Heap · each header is immediately adjacent to its own payload")
-    f.arrow("parent", "pcwd", "working_directory", 130, source_shift=-70, color=ADDRESS, label_x=550)
-    f.arrow("child", "ccwd", "working_directory", 195, source_shift=-70, color=ADDRESS, label_x=945)
+    f.band("image", "image", 430, "Kernel Image")
+    f.band("ha", "cfd", 430, "Kernel Heap", heap_fill)
+    f.band("kstack", "kstack", 430, "Kernel Stack")
+    f.band("outerheap", "outerheap", 430, "Process and Shared Data Heap", heap_fill)
+    f.arrow("parent", "pcwd", "working_directory", 130, source_shift=-70, color=ADDRESS, label_x=700)
+    f.arrow("child", "ccwd", "working_directory", 195, source_shift=-70, color=ADDRESS, label_x=1095)
+    # Route the lower arrows from beneath the hierarchy band to keep it clear.
+    pointer_cells = ("parent", "child", "pcwd", "ccwd", "pfd", "cfd")
+    for key in pointer_cells:
+        x, y, w, h = f.cells[key]
+        f.cells[key] = (x, y, w, h + 30)
     f.arrow("pcwd", "ccwd", "copy string during load", 500, below=True, color=ADDRESS, dashed=True)
-    f.arrow("parent", "pfd", "file_descriptors", 610, below=True, source_shift=70, label_x=610)
-    f.arrow("child", "cfd", "file_descriptors", 690, below=True, source_shift=70, label_x=1180)
+    f.arrow("parent", "pfd", "file_descriptors", 610, below=True, source_shift=70, label_x=760)
+    f.arrow("child", "cfd", "file_descriptors", 690, below=True, source_shift=70, label_x=1330)
     f.arrow("pfd", "cfd", "deep copy during run", 490, below=True, color=METADATA, dashed=True)
+    for key in pointer_cells:
+        x, y, w, h = f.cells[key]
+        f.cells[key] = (x, y, w, h - 30)
     f.focus("child")
     f.label(32, 698, "Descriptor entry arrays and their path allocations are omitted. These copy operations never share those objects.",
             anchor="start", size=16)
+    f.save()
+
+
+def termination_status():
+    """Locate the retained result pointer and the distinct waitpid stack objects.
+
+    BAF_wait offsets follow libwait.reti_blocks: the three local cells are
+    request.pid at -2, request.status at -1, and status at 0. The helper and
+    interrupt context are grouped because their individual cells are not the
+    result storage. PCB fields are selected, not a physical field-order view.
+    """
+    heap_fill = "#f6e8d5"
+    status_fill = "#f6eee5"
+    f = Figure("termination-status", "Where a child's termination status is stored",
+               "Continuous SRAM has a Kernel Image, Kernel Heap with separate parent and child "
+               "PCB allocations, Kernel Stack, and Process and Shared Data Heap with separate "
+               "parent and child payloads. Expanded PCB fields show the parent's saved status "
+               "pointer and the child's exit_status. The parent payload expands into image, "
+               "heap, and stack, then into the suspended syscall and waitpid frames. "
+               "WaitPidRequest occupies two cells containing pid and a pointer. A distinct "
+               "int status cell receives 7. Solid arrows represent pointers and a dashed "
+               "arrow represents the write of 7. After delivery the kernel clears the saved "
+               "pointer and wait queue, wakes the parent, and removes the child.",
+               width=1904, height=900, show_address_direction=False)
+    f.row(130, 110, [
+        ("ivt", 70, (".ivt",), MUTED),
+        ("text", 100, (".text", "kernel code"), MUTED),
+        ("data", 130, (".data", "kernel globals"), MUTED),
+        ("kha", 60, ("Block", "Header A"), HEADER),
+        ("parent", 190, ("Payload A", "PCB 1 · parent", "ProcessControlBlock"), ALLOCATED,
+         "kernel/process/process.header#L31"),
+        ("khb", 60, ("Block", "Header B"), HEADER),
+        ("child", 190, ("Payload B", "PCB 2 · child", "ProcessControlBlock"), ALLOCATED,
+         "kernel/process/process.header#L31"),
+        ("kother", 60, ("Other", "blocks"), MUTED),
+        ("kstack", 130, ("Kernel Stack", "kernel calls", "grows ←"), MUTED),
+        ("oha", 60, ("Block", "Header A"), HEADER),
+        ("pa", 300, ("Process Payload A · parent", "image · heap · stack"), ALLOCATED),
+        ("ohb", 60, ("Block", "Header B"), HEADER),
+        ("pb", 270, ("Process Payload B · child", "image · heap · stack"), ALLOCATED),
+        ("other", 160, ("Other outer blocks", "shared data · free space"), MUTED),
+    ])
+    f.band("ivt", "data", 240, "Kernel Image")
+    f.band("kha", "kother", 240, "", heap_fill)
+    f.label(737, 261, "Kernel Heap", bold=True)
+    f.band("kstack", "kstack", 240, "Kernel Stack")
+    f.band("oha", "other", 240, "", heap_fill)
+    f.label(1627, 261, "Process and Shared Data Heap", bold=True)
+    f.arrow("parent", "pa", "base_address", 75, color=ADDRESS, label_x=840)
+    f.arrow("child", "pb", "base_address", 95, color=ADDRESS, label_x=1190)
+
+    # Show selected attributes inside their allocated PCBs, linked to definitions.
+    for name, x, title, fields in (
+        ("p", 32, "PCB 1 · parent", [
+            ("pid", "pid = 1", 32),
+            ("state", "state = BLOCKED → READY", 33),
+            ("ptr", "waiting_status_ptr = &status", 44),
+            ("base", "base_address → Process Payload A", 34),
+        ]),
+        ("c", 422, "PCB 2 · child", [
+            ("pid", "pid = 2 · parent_pid = 1", 57),
+            ("exit", "exit_status = 7", 60),
+            ("state", "state = ZOMBIE", 33),
+            ("waiters", "waiters.head / tail = &PCB 1", 46),
+        ]),
+    ):
+        f.row(390, 42, [(name + "title", 350, (title,), ALLOCATED,
+                         "kernel/process/process.header#L31")], x=x)
+        for i, (key, value, line) in enumerate(fields):
+            f.row(432 + i * 36, 36, [(name + key, 350, (value,), ALLOCATED,
+                                     f"kernel/process/process.header#L{line}")], x=x)
+    # Connect actual box corners, including the short section through each band.
+    # The band labels sit clear of these lines.
+    def expand_box(source, first, last):
+        x, y, w, h = f.cells[source]
+        tx, ty, _, _ = f.cells[first]
+        ex, _, ew, _ = f.cells[last]
+        bottom = y + h
+        f.parts.append(
+            f'<path d="M {x} {bottom} V {bottom + 30} L {tx} {ty} '
+            f'M {x + w} {bottom} V {bottom + 30} L {ex + ew} {ty}" '
+            'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
+
+    expand_box("parent", "ptitle", "ptitle")
+    expand_box("child", "ctitle", "ctitle")
+
+    f.row(390, 130, [
+        ("ptext", 160, (".text", "program + libraries"), MUTED),
+        ("pdata", 160, (".data", "process globals"), MUTED),
+        ("pheap", 220, ("User Process Heap", "own allocator"), heap_fill),
+        ("pstack", 512, ("User Process Stack", "suspended waitpid() call", "grows toward lower addresses ←"),
+         ALLOCATED, "library/sys/wait/wait.picoc#L14"),
+    ], x=820)
+    f.band("ptext", "pdata", 520, "User Process Image")
+    f.band("pheap", "pheap", 520, "User Process Heap", heap_fill)
+    f.band("pstack", "pstack", 520, "User Process Stack", ALLOCATED)
+    expand_box("pa", "ptext", "pstack")
+
+    f.row(780, 120, [
+        ("unused", 100, ("Unused", "stack cells"), FREE),
+        ("context", 210, ("Saved syscall context", "registers + return PC"), MUTED,
+         "interrupt_service_routines/os_isrs.picoc#L94"),
+        ("helper", 210, ("invoke_waitpid_syscall", "frame + arguments", "argument = &request"), MUTED,
+         "library/sys/wait/wait.picoc#L4"),
+        ("rpid", 150, ("BAF_wait - 2", "request.pid = 2"), ALLOCATED,
+         "common/syscall.header#L62"),
+        ("rstatus", 200, ("BAF_wait - 1", "request.status", "= &status (address)"), ALLOCATED,
+         "common/syscall.header#L63"),
+        ("status", 200, ("BAF_wait + 0", "int status", "0 → 7 (integer value)"), status_fill,
+         "library/sys/wait/wait.picoc#L15"),
+        ("savedbaf", 130, ("BAF_wait + 1", "Saved caller BAF"), MUTED),
+        ("returnpc", 140, ("BAF_wait + 2", "Return PC"), MUTED),
+        ("pidarg", 130, ("BAF_wait + 3", "pid argument = 2"), MUTED),
+        ("caller", 170, ("Caller frames", "e.g. main()"), MUTED),
+        ("startup", 200, ("Startup values", "argc · argv · envp", "strings"), MUTED),
+    ])
+    f.band("unused", "unused", 900, "Free cells", FREE)
+    f.band("context", "context", 900, "Interrupt frame")
+    f.band("helper", "helper", 900, "Helper call")
+    f.band("rpid", "rstatus", 900, "struct WaitPidRequest request · 2 cells", ALLOCATED)
+    f.band("status", "status", 900, "Separate int · 1 cell", status_fill)
+    f.band("savedbaf", "pidarg", 900, "Saved frame + argument")
+    f.band("caller", "startup", 900, "Older stack contents")
+    f.band("rpid", "pidarg", 930, "waitpid() stack frame")
+    expand_box("pstack", "unused", "startup")
+    f.arrow("helper", "rpid", "IN1 = &request at INT 0", 712,
+            color=ADDRESS, label_x=610)
+    f.arrow("rstatus", "status", "request.status = &status", 706,
+            color=POINTER, label_x=800)
+    # Leave PCB fields through their right edges rather than crossing lower fields.
+    def result_arrow(source, corridor, lane, target_shift, color, dashed=False):
+        x, y, w, h = f.cells[source]
+        tx, ty, tw, _ = f.cells["status"]
+        sx, sy, tx = x + w, y + h / 2, tx + tw / 2 + target_shift
+        d = (f"M {sx} {sy} H {corridor - 8} Q {corridor} {sy} {corridor} {sy + 8} "
+             f"V {lane - 12} Q {corridor} {lane} {corridor + 12} {lane} "
+             f"H {tx - 12} Q {tx} {lane} {tx} {lane + 12} V {ty}")
+        style = ' stroke-dasharray="7 4"' if dashed else ""
+        f.parts.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="2"{style} '
+                       f'marker-end="url(#{color[1:]})"/>')
+
+    result_arrow("pptr", 402, 658, -55, POINTER)
+    f.label(402, 643, "1. Save request.status in parent PCB", size=14,
+            color=POINTER, anchor="start", link="kernel/process/process.picoc#L370")
+    result_arrow("cexit", 792, 618, 45, METADATA, dashed=True)
+    f.label(812, 585, "2. Kernel writes 7 through waiting_status_ptr", size=14,
+            color=METADATA, anchor="start", link="kernel/process/process.picoc#L271")
+    # Crop the space formerly occupied by the heading and surrounding notes.
+    f.parts = ['<g transform="translate(0,-75)">', *f.parts, '</g>']
     f.save()
 
 
@@ -612,6 +786,7 @@ def main():
     run_setup()
     initial_example()
     inheritance()
+    termination_status()
 
 
 if __name__ == "__main__":

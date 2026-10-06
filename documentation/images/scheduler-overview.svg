@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="245" viewBox="0 0 1600 245" role="img" aria-labelledby="title desc">
+<title id="title">PCB list with process_list_head and active_process</title>
+<desc id="desc">Five PCBs are connected from left to right by ProcessControlBlock.next. PCB 5.next is NULL. The two global variables appear on the left. process_list_head points to PCB 1 and active_process points to PCB 3, whose state is RUNNING. Other state values are READY, BLOCKED, STOPPED and READY.</desc>
+<defs>
+<marker id="43576a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#43576a"/></marker>
+<marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#26715b"/></marker>
+<marker id="9c3d15" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#9c3d15"/></marker>
+<marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#405ea8"/></marker>
+</defs>
+<rect width="1600" height="245" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif">
+<rect x="460" y="70" width="165" height="78" fill="#deecff" stroke="#43576a" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="542.5" y="99" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 1</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="542.5" y="129" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
+<path d="M 628 110 H 653" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="642.5" y="96" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="660" y="70" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="742.5" y="99" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 2</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="742.5" y="129" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: BLOCKED</text></a>
+<path d="M 828 110 H 853" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="842.5" y="96" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="860" y="70" width="165" height="78" fill="#edf7f1" stroke="#43576a" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="942.5" y="99" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 3</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="942.5" y="129" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: RUNNING</text></a>
+<path d="M 1028 110 H 1053" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1042.5" y="96" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="1060" y="70" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1142.5" y="99" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 4</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1142.5" y="129" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: STOPPED</text></a>
+<path d="M 1228 110 H 1253" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1242.5" y="96" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<rect x="1260" y="70" width="165" height="78" fill="#deecff" stroke="#43576a" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1342.5" y="99" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 5</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1342.5" y="129" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
+<path d="M 1428 110 H 1474" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1453.0" y="96" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
+<a href="../../kernel/process/process.header#L53"><text x="1515" y="117" text-anchor="middle" font-size="22" font-weight="normal" fill="#172b3a">NULL</text></a>
+<a href="../../kernel/process/process.picoc#L16"><text x="32" y="117" text-anchor="start" font-size="21" font-weight="normal" fill="#405ea8">process_list_head</text></a>
+<path d="M 250 110 H 457" fill="none" stroke="#405ea8" stroke-width="2.5" marker-end="url(#405ea8)"/>
+<a href="../../kernel/process/process.picoc#L18"><text x="32" y="200" text-anchor="start" font-size="21" font-weight="normal" fill="#26715b">active_process</text></a>
+<path d="M 250 193 H 942.5 V 151" fill="none" stroke="#26715b" stroke-width="2.5" marker-end="url(#26715b)"/>
+</g></svg>
