@@ -5,7 +5,7 @@ pointers to waitpid's stack-local result, with containment shown by boxes.
 """
 
 from generate_process_diagrams import Figure
-from generate_memory_layout_diagrams import ALLOCATED, MUTED, POINTER
+from generate_memory_layout_diagrams import MUTED, POINTER
 
 
 def main():
@@ -28,10 +28,8 @@ def main():
                  link="common/syscall.header#L61")
     figure.label(207, 152, "pid", size=22, link="common/syscall.header#L62")
     figure.label(207, 178, "status", size=22, link="common/syscall.header#L63")
-    figure.box(552, 94, 180, 96, ALLOCATED)
-    figure.label(642, 137, "int status", size=24, bold=True,
+    figure.label(642, 174, "int status", size=24, bold=True,
                  link="library/sys/wait/wait.picoc#L15")
-    figure.label(642, 171, "result value", size=21)
 
     figure.box(1012, 24, 256, 188, "white", thickness=2)
     figure.label(1140, 62, "PCB 1 · parent", size=24, bold=True,

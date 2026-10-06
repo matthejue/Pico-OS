@@ -42,6 +42,7 @@ test/*.reti
 *.reti_ast
 *.ps
 *.st
+!documentation/countdown.reti_blocks
 *.sections
 *.bin
 *.input

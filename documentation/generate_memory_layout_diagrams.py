@@ -199,27 +199,28 @@ class Diagram:
             + "\n".join(detail.parts) + '</g>')
         self.height = int(detail_top + (detail.bottom - TOP) * scale) + 85
 
-    def save(self):
+    def save(self, *, notes=True, top=0, bottom=None):
         width = self.right + LEFT
+        height = (self.height if bottom is None else bottom) - top
         defs = "".join(
             f'<marker id="{color[1:]}" viewBox="0 0 10 10" refX="9" refY="5" '
             'markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
             f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{color}"/></marker>'
             for color in (POINTER, METADATA, ADDRESS))
         svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
-               f'height="{self.height}" viewBox="0 0 {width} {self.height}" '
+               f'height="{height}" viewBox="0 {top} {width} {height}" '
                'role="img" aria-labelledby="title desc">\n'
                f'<title id="title">{escape(self.title)}</title>\n'
                f'<desc id="desc">{escape(self.description)}</desc>\n'
                f'<defs>{defs}</defs>\n'
                f'<rect width="{width}" height="{self.height}" fill="white"/>\n'
                '<g font-family="DejaVu Sans, sans-serif">\n'
-               + self.text(LEFT, 28, "Low to high addresses →   ·   Widths are illustrative",
-                           size=15, anchor="start")
+               + (self.text(LEFT, 28, "Low to high addresses →   ·   Widths are illustrative",
+                            size=15, anchor="start") if notes else "")
                + "\n".join(self.parts)
-               + self.text(LEFT, self.height - 20,
-                           "Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads",
-                           size=14, anchor="start")
+               + (self.text(LEFT, self.height - 20,
+                            "Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads",
+                            size=14, anchor="start") if notes else "")
                + "\n</g>\n</svg>\n")
         (OUTPUT / f"memory-{self.slug}.svg").write_text(svg)
 
@@ -400,7 +401,7 @@ def shared_memory_list():
     fig.parts.append(fig.text((first_right + node_xs[1]) / 2, edge_y - 12,
                               "next", size=14, color=METADATA))
     fig.height = lower_y + lower_height + 85
-    fig.save()
+    fig.save(notes=False, top=120, bottom=lower_y + lower_height + 20)
 
 
 def shared_memory_payload_links():
@@ -510,11 +511,6 @@ def shared_memory_attachments():
         fig.parts.append(
             f'<path d="M {fig.center(source)} {fig.bottom} L {x + width / 2} {y}" '
             'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>')
-    # Keep the identity guides from running through the explanatory caption.
-    fig.parts.append(fig.rect(LEFT, 690, 1180, 60, "white"))
-    fig.parts.append(fig.text(LEFT, 739,
-                              "Dashed lines: same objects in both views, not stored pointers or extra allocations",
-                              size=15, anchor="start"))
     for _, x, y, width, lines, link in nodes:
         fig.parts.append(fig.rect(x, y, width, node_height, ALLOCATED,
                                   stroke=FOCUS, stroke_width=3))
@@ -538,11 +534,8 @@ def shared_memory_attachments():
          "entry", 2280, 1054)
     edge(f"M 950 {second_y + 65} H 1830 V {first_y + 65} H 2027",
          "entry", 1920, first_y + 52)
-    fig.parts.append(fig.text(650, 1300,
-                              "Entry 1: Attachment 1 + Attachment 3 = 2 mappings   ·   Entry 2: Attachment 2 = 1 mapping",
-                              size=16, anchor="start"))
-    fig.height = 1360
-    fig.save()
+    fig.height = second_y + node_height + 32
+    fig.save(notes=False, top=60)
 
 
 def shared_memory_destruction():
@@ -720,10 +713,7 @@ def main():
                             include_outer_header=False, highlight_heap=False,
                             emphasize_heap=True)
     overview.expand("opA", detail, "ivt", "stack")
-    overview.parts.append(overview.text(LEFT, overview.height - 42,
-                                       "Orange outlines and bands: the three heap regions",
-                                       size=14, color=FOCUS, anchor="start"))
-    overview.save()
+    overview.save(notes=False, top=90, bottom=overview.height - 53)
     process("process-payload")
 
     kernel = sram("kernel-heap", "Kernel Heap blocks and concrete kernel objects",

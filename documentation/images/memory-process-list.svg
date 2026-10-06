@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2039" height="971" viewBox="0 0 2039 971" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2039" height="773" viewBox="0 145 2039 773" role="img" aria-labelledby="title desc">
 <title id="title">Global process list within SRAM</title>
 <desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Global process_list_head, process_list_tail and active_process point to PCB 1, PCB 3 and PCB 2. Four schematic neighboring Kernel Heap blocks contain PCB 1, its working_directory string, PCB 2 and PCB 3. Above SRAM, ProcessControlBlock.next links PCB 1, PCB 2, PCB 3, NULL, skipping the directory allocation. The working_directory arrow also stays above SRAM. Below SRAM, the same three PCB objects appear as a logical process list. process_list_head reaches PCB 1, process_list_tail reaches PCB 3, and active_process reaches PCB 2 in both views. PCB next links connect 1 to 2 to 3 to NULL. Dashed lines identify the same PCB objects across the two views. Allocator pointer arrows are omitted.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
-<rect width="2039" height="971" fill="white"/>
+<rect width="2039" height="918" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
@@ -123,6 +123,6 @@
 <a href="../../kernel/process/process.header#L53"><text x="960.0" y="842" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">next</text></a>
 <path d="M 1370 854 C 1415 854, 1545 854, 1590 854" fill="none" stroke="#785099" stroke-width="2" marker-end="url(#785099)"/>
 <a href="../../kernel/process/process.header#L53"><text x="1480.0" y="842" text-anchor="middle" font-size="14" font-weight="normal" fill="#785099">next</text></a>
-<rect x="32" y="560" width="720" height="30" fill="white" stroke="none" stroke-width="1"/><text x="32" y="951" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
+<rect x="32" y="560" width="720" height="30" fill="white" stroke="none" stroke-width="1"/>
 </g>
 </svg>

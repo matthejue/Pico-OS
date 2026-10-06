@@ -210,7 +210,7 @@ def process_list_diagram(slug, *, with_payloads=False):
 def process_list():
     fig = process_list_diagram("process-list")
     add_logical_process_list(fig)
-    fig.save()
+    fig.save(notes=False, top=145)
 
 
 def add_logical_process_list(fig):
@@ -256,11 +256,12 @@ def add_logical_process_list(fig):
                       link="kernel/process/process.header#L53")
     logical.box(32, fig.bottom + 34, 720, 30, "white", "none")
     fig.parts.extend(logical.parts)
-    fig.height = lower_y + 110 + 85
+    fig.height = lower_y + 110 + 32
 
 
 def process_payload_links():
-    process_list_diagram("process-payload-links", with_payloads=True).save()
+    fig = process_list_diagram("process-payload-links", with_payloads=True)
+    fig.save(notes=False, top=55, bottom=fig.bottom + 20)
 
 
 def placement():
@@ -415,15 +416,13 @@ def load_complete():
                "to NEW. The previous tail PCB 1 receives next = PCB 2 and process_list_tail changes "
                "to PCB 2. The new PCB points to a fresh standard descriptor table and its Process "
                "Payload. create_process writes cs minus one into the cell at highest_stack_address. "
-               "The argument and environment layout does not exist yet.", width=1824, height=890, show_address_direction=False)
-    f.label(32, 99, "create_process(): old tail.next = new PCB · process_list_tail = new PCB · next_process_id increments",
-            anchor="start", size=16, color=FOCUS)
+               "The argument and environment layout does not exist yet.", width=1824, height=735, show_address_direction=False)
     memory_snapshot(f)
     f.focus_lines("data", 2, 2, 4)
     f.focus_lines("caller", 2, 2, 4)
     f.focus("ustack")
-    f.label(32, 869, "finish_process_load(): caller.pending_load = NULL, temporary ProcessLoad and its path are freed.",
-            anchor="start", size=16)
+    # Crop the space formerly occupied by the surrounding explanatory lines.
+    f.parts = ['<g transform="translate(0,-125)">', *f.parts, '</g>']
     f.save()
 
 
@@ -573,10 +572,8 @@ def inheritance():
                "and child descriptor tables. Solid curved arrows are stored pointer fields. Dashed "
                "arrows mark copying operations, rather than shared pointers. parent_pid and "
                "parent_death_signal are copied integer values during creation.",
-               width=2274, height=720)
-    f.label(32, 100, "Load completion: child.parent_pid = parent.pid · child.parent_death_signal = parent.parent_death_signal",
-            anchor="start", size=16)
-    f.row(280, 150, [
+               width=2274, height=530, show_address_direction=False)
+    f.row(150, 150, [
         ("image", 150, ("Kernel Image",), MUTED),
         ("ha", 60, ("Block", "Header A"), HEADER, "common/heap.header#L5"),
         ("parent", 290, ("Payload A · PCB 1", "parent / usual caller", "pid · parent_death_signal",
@@ -602,27 +599,25 @@ def inheritance():
         ("outerheap", 220, ("Process and", "Shared Data Heap"), heap_fill,
          "kernel/psdmalloc.picoc#L7"),
     ])
-    f.band("image", "image", 430, "Kernel Image")
-    f.band("ha", "cfd", 430, "Kernel Heap", heap_fill)
-    f.band("kstack", "kstack", 430, "Kernel Stack")
-    f.band("outerheap", "outerheap", 430, "Process and Shared Data Heap", heap_fill)
-    f.arrow("parent", "pcwd", "working_directory", 130, source_shift=-70, color=ADDRESS, label_x=700)
-    f.arrow("child", "ccwd", "working_directory", 195, source_shift=-70, color=ADDRESS, label_x=1095)
+    f.band("image", "image", 300, "Kernel Image")
+    f.band("ha", "cfd", 300, "Kernel Heap", heap_fill)
+    f.band("kstack", "kstack", 300, "Kernel Stack")
+    f.band("outerheap", "outerheap", 300, "Process and Shared Data Heap", heap_fill)
+    f.arrow("parent", "pcwd", "working_directory", 0, source_shift=-70, color=ADDRESS, label_x=700)
+    f.arrow("child", "ccwd", "working_directory", 65, source_shift=-70, color=ADDRESS, label_x=1095)
     # Route the lower arrows from beneath the hierarchy band to keep it clear.
     pointer_cells = ("parent", "child", "pcwd", "ccwd", "pfd", "cfd")
     for key in pointer_cells:
         x, y, w, h = f.cells[key]
         f.cells[key] = (x, y, w, h + 30)
-    f.arrow("pcwd", "ccwd", "copy string during load", 500, below=True, color=ADDRESS, dashed=True)
-    f.arrow("parent", "pfd", "file_descriptors", 610, below=True, source_shift=70, label_x=760)
-    f.arrow("child", "cfd", "file_descriptors", 690, below=True, source_shift=70, label_x=1330)
-    f.arrow("pfd", "cfd", "deep copy during run", 490, below=True, color=METADATA, dashed=True)
+    f.arrow("pcwd", "ccwd", "copy string during load", 370, below=True, color=ADDRESS, dashed=True)
+    f.arrow("parent", "pfd", "file_descriptors", 480, below=True, source_shift=70, label_x=760)
+    f.arrow("child", "cfd", "file_descriptors", 560, below=True, source_shift=70, label_x=1330)
+    f.arrow("pfd", "cfd", "deep copy during run", 360, below=True, color=METADATA, dashed=True)
     for key in pointer_cells:
         x, y, w, h = f.cells[key]
         f.cells[key] = (x, y, w, h - 30)
     f.focus("child")
-    f.label(32, 698, "Descriptor entry arrays and their path allocations are omitted. These copy operations never share those objects.",
-            anchor="start", size=16)
     f.save()
 
 

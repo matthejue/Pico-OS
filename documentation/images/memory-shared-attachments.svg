@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2849" height="1360" viewBox="0 0 2849 1360" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2849" height="1222" viewBox="0 60 2849 1222" role="img" aria-labelledby="title desc">
 <title id="title">Per-process shared-memory attachment lists within SRAM</title>
 <desc id="desc">Kernel .ivt, .text and .data form the outlined Kernel Image. Two PCBs, three SharedMemoryAttachment objects and two SharedMemoryEntry objects occupy seven separate Kernel Heap payloads. PCB 1 links Attachment 1 then Attachment 2, which reference Entry 1 and Entry 2. PCB 2 links Attachment 3, which also references Entry 1. Entry 1 has reference_count 2 and Entry 2 has reference_count 1. Both entries have unlink_requested false. The global shared_memory_list_head reaches Entry 1 and SharedMemoryEntry.next reaches Entry 2. Below SRAM, the same seven objects are repeated as two per-process attachment lists. Dashed lines identify the same objects across views, not additional allocations or stored pointers. The Process and Shared Data Heap is one box. Name strings, other kernel allocations, process-list pointers and payload address arrows are omitted.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
-<rect width="2849" height="1360" fill="white"/>
+<rect width="2849" height="1282" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
@@ -118,8 +118,6 @@
 <path d="M 1772.0 526 L 800.0 1120" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
 <path d="M 2052.0 526 L 2190.0 870" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
 <path d="M 2332.0 526 L 2600.0 1120" fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>
-<rect x="32" y="690" width="1180" height="60" fill="white" stroke="none" stroke-width="1"/>
-<text x="32" y="739" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Dashed lines: same objects in both views, not stored pointers or extra allocations</text>
 <rect x="32" y="870" width="250" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
 <a href="../../kernel/process/process.header#L31"><text x="157.0" y="919.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#172b3a">PCB 1</text><text x="157.0" y="941.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">ProcessControlBlock</text><text x="157.0" y="963.0" text-anchor="middle" font-size="15.35483870967742" font-weight="normal" fill="#172b3a">shared_memory_attachments</text></a>
 <rect x="32" y="1120" width="250" height="130" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
@@ -152,6 +150,5 @@
 <path d="M 950 1185 H 1830 V 935 H 2027" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
 <rect x="1889.5" y="905" width="61" height="23" fill="white" stroke="none" stroke-width="1"/>
 <text x="1920" y="922" text-anchor="middle" font-size="16" font-weight="normal" fill="#785099">entry</text>
-<text x="650" y="1300" text-anchor="start" font-size="16" font-weight="normal" fill="#172b3a">Entry 1: Attachment 1 + Attachment 3 = 2 mappings   ·   Entry 2: Attachment 2 = 1 mapping</text><text x="32" y="1340" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
 </g>
 </svg>

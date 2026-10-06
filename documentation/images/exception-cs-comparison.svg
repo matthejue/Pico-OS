@@ -1,48 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="485" viewBox="0 0 1640 485" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="381" viewBox="0 0 1640 381" role="img" aria-labelledby="title desc">
 <title id="title">How exception entry compares interrupted CS with kernel CS</title>
-<desc id="desc">Kernel CS points to the start of kernel .text. A process&#x27;s activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. Zero selects kernel panic and a nonzero value selects process termination.</desc>
+<desc id="desc">SRAM regions appear in address order with schematic widths. Kernel CS points to the start of kernel .text. A process&#x27;s activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. Zero selects kernel panic and a nonzero value selects process termination.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif" fill="#192c38">
-<text x="24" y="32" font-size="18" font-weight="normal" text-anchor="start">SRAM offsets increase left to right · widths are schematic</text>
-<rect x="24" y="86" width="1125" height="170" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="36" y="113" font-size="20" font-weight="bold" text-anchor="start">Kernel region</text>
-<rect x="40" y="127" width="660" height="113" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
-<text x="52" y="153" font-size="18" font-weight="bold" text-anchor="start">Kernel image</text>
-<rect x="52" y="164" width="85" height="62" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
-<text x="64" y="190" font-size="17" font-weight="normal" text-anchor="start">.ivt</text>
-<rect x="137" y="164" width="279" height="62" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="149" y="190" font-size="17" font-weight="normal" text-anchor="start">.text · kernel code</text>
-<rect x="416" y="164" width="269" height="62" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
-<text x="428" y="190" font-size="17" font-weight="normal" text-anchor="start">.data · kernel globals</text>
-<rect x="716" y="127" width="208" height="113" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="728" y="153" font-size="17" font-weight="normal" text-anchor="start">Kernel heap</text>
-<rect x="924" y="127" width="208" height="113" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="936" y="153" font-size="17" font-weight="normal" text-anchor="start">Kernel stack</text>
-<rect x="1149" y="86" width="466" height="170" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
-<text x="1161" y="113" font-size="18" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
-<rect x="1161" y="127" width="442" height="113" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="1173" y="153" font-size="18" font-weight="bold" text-anchor="start">One process&#x27;s .text</text>
-<text x="1173" y="184" font-size="18" font-weight="normal" text-anchor="start">Start = process-&gt;activation.cs</text>
-<path d="M 137 296 L 137 228" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-<text x="149" y="283" font-size="18" font-weight="bold" text-anchor="start">kernel CS = 0x80000005</text>
-<path d="M 1161 296 L 1161 242" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-<text x="1173" y="283" font-size="18" font-weight="bold" text-anchor="start">process CS differs from kernel CS</text>
-<text x="24" y="335" font-size="19" font-weight="normal" text-anchor="start">Before comparison: BAF = interrupted CS · CS = kernel CS</text>
-<rect x="24" y="367" width="350" height="94" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
-<text x="36" y="397" font-size="20" font-weight="bold" text-anchor="start">A · MOVE BAF ACC</text>
-<text x="36" y="430" font-size="18" font-weight="normal" text-anchor="start">ACC = interrupted CS</text>
-<path d="M 376 414 L 424 414" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<rect x="426" y="367" width="350" height="94" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
-<text x="438" y="397" font-size="20" font-weight="bold" text-anchor="start">B · SUB ACC CS</text>
-<text x="438" y="430" font-size="18" font-weight="normal" text-anchor="start">ACC = interrupted CS − kernel CS</text>
-<path d="M 778 414 L 826 414" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<rect x="828" y="367" width="350" height="94" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
-<text x="840" y="397" font-size="20" font-weight="bold" text-anchor="start">C · PUSH ACC</text>
-<text x="840" y="430" font-size="17" font-weight="normal" text-anchor="start">Kernel-stack argument = difference</text>
-<path d="M 1180 414 L 1228 414" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
-<rect x="1230" y="367" width="385" height="94" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
-<text x="1242" y="397" font-size="20" font-weight="bold" text-anchor="start">D · handle_cpu_exception()</text>
-<text x="1242" y="426" font-size="17" font-weight="normal" text-anchor="start">0 → kernel panic</text>
-<text x="1242" y="448" font-size="17" font-weight="normal" text-anchor="start">≠ 0 → process termination</text>
+<rect x="24" y="24" width="1125" height="170" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="51" font-size="20" font-weight="bold" text-anchor="start">Kernel region</text>
+<rect x="40" y="65" width="660" height="113" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="52" y="91" font-size="18" font-weight="bold" text-anchor="start">Kernel image</text>
+<rect x="52" y="102" width="85" height="62" fill="#eadffa" stroke="#526472" stroke-width="1.5"/>
+<text x="64" y="128" font-size="17" font-weight="normal" text-anchor="start">.ivt</text>
+<rect x="137" y="102" width="279" height="62" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="149" y="128" font-size="17" font-weight="normal" text-anchor="start">.text · kernel code</text>
+<rect x="416" y="102" width="269" height="62" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="428" y="128" font-size="17" font-weight="normal" text-anchor="start">.data · kernel globals</text>
+<rect x="716" y="65" width="208" height="113" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
+<text x="728" y="91" font-size="17" font-weight="normal" text-anchor="start">Kernel heap</text>
+<rect x="924" y="65" width="208" height="113" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
+<text x="936" y="91" font-size="17" font-weight="normal" text-anchor="start">Kernel stack</text>
+<rect x="1149" y="24" width="466" height="170" fill="#f1f3f5" stroke="#526472" stroke-width="1.5"/>
+<text x="1161" y="51" font-size="18" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
+<rect x="1161" y="65" width="442" height="113" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="1173" y="91" font-size="18" font-weight="bold" text-anchor="start">One process&#x27;s .text</text>
+<text x="1173" y="122" font-size="18" font-weight="normal" text-anchor="start">Start = process-&gt;activation.cs</text>
+<path d="M 137 234 L 137 166" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="149" y="221" font-size="18" font-weight="bold" text-anchor="start">kernel CS = 0x80000005</text>
+<path d="M 1161 234 L 1161 180" fill="none" stroke="#27617b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="1173" y="221" font-size="18" font-weight="bold" text-anchor="start">process CS differs from kernel CS</text>
+<rect x="24" y="263" width="350" height="94" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<text x="36" y="293" font-size="20" font-weight="bold" text-anchor="start">A · MOVE BAF ACC</text>
+<text x="36" y="326" font-size="18" font-weight="normal" text-anchor="start">ACC = interrupted CS</text>
+<path d="M 376 310 L 424 310" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<rect x="426" y="263" width="350" height="94" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<text x="438" y="293" font-size="20" font-weight="bold" text-anchor="start">B · SUB ACC CS</text>
+<text x="438" y="326" font-size="18" font-weight="normal" text-anchor="start">ACC = interrupted CS − kernel CS</text>
+<path d="M 778 310 L 826 310" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<rect x="828" y="263" width="350" height="94" fill="#e6efe5" stroke="#526472" stroke-width="1.5"/>
+<text x="840" y="293" font-size="20" font-weight="bold" text-anchor="start">C · PUSH ACC</text>
+<text x="840" y="326" font-size="17" font-weight="normal" text-anchor="start">Kernel-stack argument = difference</text>
+<path d="M 1180 310 L 1228 310" fill="none" stroke="#27617b" stroke-width="2"  marker-end="url(#arrow)"/>
+<rect x="1230" y="263" width="385" height="94" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<text x="1242" y="293" font-size="20" font-weight="bold" text-anchor="start">D · handle_cpu_exception()</text>
+<text x="1242" y="322" font-size="17" font-weight="normal" text-anchor="start">0 → kernel panic</text>
+<text x="1242" y="344" font-size="17" font-weight="normal" text-anchor="start">≠ 0 → process termination</text>
 </g></svg>

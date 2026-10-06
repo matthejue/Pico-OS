@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2849" height="1289" viewBox="0 0 2849 1289" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2849" height="1146" viewBox="0 90 2849 1146" role="img" aria-labelledby="title desc">
 <title id="title">SRAM layout and heap hierarchy</title>
 <desc id="desc">Kernel .ivt, .text and .data are adjacent linked sections. The Kernel Heap follows the Kernel Image, then the Kernel Stack. The Process and Shared Data Heap follows the entire Kernel region. Dashed lines expand Process Payload A into its User Process Image, User Process Heap and User Process Stack, excluding the outer header. All three heaps contain four illustrative blocks linked by BlockHeader.next. Kernel payloads A, B and C contain PCB 1 (struct ProcessControlBlock), its binary_path string (PCB-owned path copy), and a Shared Memory Entry (struct SharedMemoryEntry); payload D is free. Dashed lines connect the bottom corners of the blue Process Payload A box to its expanded layout. Orange outlines and orange grouping bands mark the Kernel Heap, Process and Shared Data Heap, and nested User Process Heap. Process Payload C belongs to another process and outer Payload D is free. Both kernel-managed heap descriptors and list roots are globals in kernel .data; process_heap is in the process&#x27;s own .data.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
 <rect width="2849" height="1289" fill="white"/>
 <g font-family="DejaVu Sans, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="15" font-weight="normal" fill="#172b3a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
+<rect x="32" y="310" width="70" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#172b3a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f0f3f6" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#172b3a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#172b3a">kernel code</text>
@@ -173,6 +173,5 @@
 <rect x="1149.0" y="258" width="46" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1172.0" y="273" text-anchor="middle" font-size="14" font-weight="normal" fill="#405ea8">next</text>
 <text x="1294.5" y="298" text-anchor="middle" font-size="13" font-weight="normal" fill="#405ea8">next = NULL</text></g>
-<text x="32" y="1247" text-anchor="start" font-size="14" font-weight="normal" fill="#9c3d15">Orange outlines and bands: the three heap regions</text><text x="32" y="1269" text-anchor="start" font-size="14" font-weight="normal" fill="#172b3a">Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads</text>
 </g>
 </svg>

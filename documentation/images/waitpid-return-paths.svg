@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="560" viewBox="0 0 1680 560" role="img" aria-labelledby="title desc">
+<title id="title">Immediate and blocking waitpid return paths</title>
+<desc id="desc">The kernel wait has two paths. When no wait is needed, it writes through request.status and restores the caller. Otherwise it retains request.status in the parent PCB waiting_status_ptr, sets the parent state to BLOCKED, and saves activation while other processes run. Child stopping or termination writes through waiting_status_ptr and makes the parent state READY. When selected, the dispatcher restores activation. Both paths use RTI to resume after INT 0 in the userspace helper, and waitpid returns the stack-local status. The waiting path assumes the parent is not itself stopped.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#526472"/></marker></defs>
+<rect width="100%" height="100%" fill="white"/>
+<g font-family="DejaVu Sans, sans-serif" fill="#192c38">
+<rect x="24" y="210" width="240" height="110" fill="#e6efe5" stroke="#526472" stroke-width="2"/>
+<a href="../../kernel/process/process.picoc#L348"><text x="144" y="273" text-anchor="middle" font-size="30" font-weight="bold">Kernel wait</text></a>
+<rect x="420" y="40" width="790" height="110" fill="#e6efe5" stroke="#526472" stroke-width="2"/>
+<text x="815" y="85" text-anchor="middle" font-size="30" font-weight="bold">Write status</text>
+<a href="../../common/syscall.header#L63"><text x="815" y="124" text-anchor="middle" font-size="24" font-weight="normal">*request.status</text></a>
+<path d="M 264 265 H 300 V 95 H 410" fill="none" stroke="#526472" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="430" y="192" text-anchor="middle" font-size="24" font-weight="normal">No wait needed</text>
+<rect x="330" y="340" width="450" height="150" fill="#fff1c7" stroke="#526472" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L40"><text x="555" y="398" text-anchor="middle" font-size="30" font-weight="bold">Save activation</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="555" y="448" text-anchor="middle" font-size="24" font-weight="normal">state = BLOCKED</text></a>
+<path d="M 264 265 H 300 V 415 H 320" fill="none" stroke="#526472" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="392" y="310" text-anchor="middle" font-size="24" font-weight="normal">Wait required</text>
+<rect x="860" y="340" width="350" height="150" fill="#dceefa" stroke="#526472" stroke-width="2"/>
+<text x="1035" y="380" text-anchor="middle" font-size="30" font-weight="bold">Write status</text>
+<a href="../../kernel/process/process.header#L44"><text x="1035" y="424" text-anchor="middle" font-size="24" font-weight="normal">*waiting_status_ptr</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1035" y="463" text-anchor="middle" font-size="24" font-weight="normal">state = READY</text></a>
+<path d="M 780 415 H 850" fill="none" stroke="#526472" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="820" y="310" text-anchor="middle" font-size="24" font-weight="normal">Child stops / terminates</text>
+<rect x="1350" y="210" width="300" height="110" fill="#eadffa" stroke="#526472" stroke-width="2"/>
+<a href="../../kernel/dispatcher.picoc#L40"><text x="1500" y="255" text-anchor="middle" font-size="32" font-weight="bold">RTI</text></a>
+<a href="../../library/sys/wait/wait.picoc#L14"><text x="1500" y="295" text-anchor="middle" font-size="23" font-weight="normal">waitpid() returns status</text></a>
+<path d="M 1210 95 H 1500 V 200" fill="none" stroke="#526472" stroke-width="3" marker-end="url(#arrow)"/>
+<a href="../../interrupt_service_routines/os_isrs.picoc#L148"><text x="1340" y="178" text-anchor="middle" font-size="24" font-weight="normal">Restore caller</text></a>
+<path d="M 1210 415 H 1500 V 330" fill="none" stroke="#526472" stroke-width="3" marker-end="url(#arrow)"/>
+<a href="../../kernel/dispatcher.picoc#L21"><text x="1430" y="466" text-anchor="middle" font-size="24" font-weight="normal">Restore activation</text></a>
+<a href="../../kernel/dispatcher.picoc#L55"><text x="1430" y="505" text-anchor="middle" font-size="22" font-weight="normal">when parent is selected</text></a>
+</g></svg>
