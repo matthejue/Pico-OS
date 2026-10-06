@@ -2,8 +2,7 @@
 [\[↓ TOC\]](#contents)
 
 PicoOS is a small educational operating system for the RETI teaching CPU. This
-repository contains its bootloader, kernel, userspace, and tests. The README
-explains how they work together, using the source code as a guide.
+repository contains its bootloader, kernel, libraries, init process, user applications (including shell), and tests.
 
 To try PicoOS, start with [`Build and run`](#build-and-run). To study its design,
 follow the numbered chapters in the [contents](#contents). For source builds
@@ -19,7 +18,7 @@ names and conventions from it, but implements only a small subset and does
 not claim conformance. All code and data share one physical address space,
 without an MMU or process isolation. Files live on the emulator host, reached
 through UART. This small scope makes it possible to follow a library call
-through the kernel and into a context switch.
+through the kernel and into e.g. a context switch.
 
 PicoOS works with two sibling projects. Together they turn PicoC source into
 an executing operating system:

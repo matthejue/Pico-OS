@@ -2,6 +2,17 @@
 \usepackage{booktabs,longtable}
 \usepackage{fvextra}
 \usepackage{adjustbox}
+% The README contents includes six nested list levels. LaTeX's
+% default itemize environment only supports four.
+\usepackage{enumitem}
+\setlistdepth{6}
+\renewlist{itemize}{itemize}{6}
+\setlist[itemize,1]{label=\textbullet}
+\setlist[itemize,2]{label=\normalfont\bfseries\textendash}
+\setlist[itemize,3]{label=\textasteriskcentered}
+\setlist[itemize,4]{label=\textperiodcentered}
+\setlist[itemize,5]{label=\textbullet}
+\setlist[itemize,6]{label=\normalfont\bfseries\textendash}
 \newfontfamily\pdfcodefont{DejaVu Sans Mono}
 \newfontfamily\pdfsymbolfont{DejaVu Serif}
 \usepackage{newunicodechar}

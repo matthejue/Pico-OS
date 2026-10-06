@@ -19,8 +19,9 @@ DejaVu Sans Mono fonts. The target installs Mermaid CLI into the ignored
 [`Mermaid filter`](readme_pdf_mermaid.lua) renders diagrams as vector PDFs
 using the [`rendering configuration`](readme_pdf_mermaid.json), then XeLaTeX
 embeds them into `README.pdf`. The
-[`PDF header`](readme_pdf_header.tex) selects fonts and allows long code lines
-to wrap without changing the Markdown source.
+[`PDF header`](readme_pdf_header.tex) selects fonts, supports the six nested
+list levels in the contents, and allows long code lines to wrap without
+changing the Markdown source.
 
 ## Build and boot from source
 
