@@ -7339,36 +7339,13 @@ execution to its entry point.
 
 The diagram connects that chain to memory. EPROM holds the bootloader,
 and SRAM holds its temporary stack and all later runtime state. The kernel
-comes from the host over UART, with DMA when enabled. Solid arrows show
-loading, and dotted arrows show register setup and control transfer:
+comes from the host over UART, with DMA when enabled. The adjacent colored
+areas show EPROM, periphery with UART, and SRAM split into the kernel-reserved
+area and the Process and Shared Data Heap. The periphery has no execution
+lifeline. Solid arrows show loading and kernel initialization, and dashed
+arrows show register setup and control transfer:
 
-```mermaid
-%%{init: {"sequence":{"height":90},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
-sequenceDiagram
-    box #f4f8f8 EPROM
-        participant B as Bootloader<br/>.text and .data
-    end
-    box #f4f8f8 Kernel-reserved SRAM
-        participant K as Kernel image<br/>0–41485<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40755
-        participant KH as Kernel heap<br/>41486–45581
-        participant KS as Kernel stack<br/>45582–48297
-    end
-    box #f4f8f8 Process and Shared Data Heap
-        participant I as Init image<br/>libstart startup
-        participant SH as Shell image<br/>libstart startup
-        participant A as Application A<br/>libstart startup
-        participant C as Application B<br/>libstart startup
-    end
-    B->>K: boot_main loads the kernel payload at SRAM offset 0
-    B-->>KS: start_loaded_kernel sets SP and BAF from stack_start
-    B-->>K: MOVE CS PC transfers control to kernel _start
-    K->>KS: main calls activate_kernel_stack_boundary
-    K->>KH: main calls init_kernel_heap, then heap_init_region
-    K->>I: load_process loads init
-    I->>SH: init loads the shell
-    SH->>A: shell loads application A
-    SH->>C: shell loads application B
-```
+![Startup sequence over adjacent EPROM, periphery with UART, kernel-reserved SRAM, and the Process and Shared Data Heap. The kernel image, heap and stack occupy the reserved area. Init, shell and applications have separate process payloads.](documentation/images/startup-memory-sequence.svg)
 
 The offsets come from the current kernel layout. The bootloader starts
 with a temporary stack at SRAM offset `262143`. [`start_loaded_kernel()`](boot/bootloader.picoc#L21)

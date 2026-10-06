@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2460" height="866" viewBox="0 0 2460 866" role="img" aria-labelledby="title desc">
+<title id="title">Startup sequence across the memory map</title>
+<desc id="desc">Adjacent EPROM, periphery and SRAM bands show address order, with schematic widths. EPROM contains the bootloader. The periphery band contains UART and has no lifeline. SRAM is split into the kernel-reserved area, containing the kernel image, heap and stack, and the Process and Shared Data Heap, containing separate process payloads for init, shell and applications. Nine arrows follow loading and initialization from bootloader to kernel, init, shell and two applications. Dashed arrows show register setup and transfer of control.</desc>
+<defs>
+<marker id="load" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#17313a"/></marker>
+<marker id="control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#17313a"/></marker>
+</defs>
+<rect width="2460" height="866" fill="white"/>
+<g font-family="Cantarell, sans-serif" fill="#17313a">
+<rect x="20" y="14" width="250" height="840" fill="#fff1d6" fill-opacity="0.3"/>
+<rect x="270" y="14" width="220" height="840" fill="#f4f8f8" fill-opacity="0.3"/>
+<rect x="490" y="14" width="790" height="840" fill="#e7f3ea" fill-opacity="0.3"/>
+<rect x="1280" y="14" width="1160" height="840" fill="#d8efef" fill-opacity="0.3"/>
+<path d="M 20 14 H 2440 V 854 H 20 Z M 270 14 V 854 M 490 14 V 854 M 1280 70 V 854 M 490 70 H 2440" fill="none" stroke="#637983" stroke-width="1.5"/>
+<text x="145" y="43" text-anchor="middle" font-size="28" font-weight="bold">EPROM</text>
+<text x="145" y="64" text-anchor="middle" font-size="18" font-weight="normal">0x00000000</text>
+<text x="380" y="43" text-anchor="middle" font-size="24" font-weight="bold">Periphery</text>
+<text x="380" y="64" text-anchor="middle" font-size="18" font-weight="normal">0x40000000</text>
+<text x="1465" y="43" text-anchor="middle" font-size="28" font-weight="bold">SRAM</text>
+<text x="1465" y="64" text-anchor="middle" font-size="18" font-weight="normal">0x80000000</text>
+<text x="885" y="101" text-anchor="middle" font-size="28" font-weight="bold">Kernel-reserved area</text>
+<text x="885" y="125" text-anchor="middle" font-size="18" font-weight="normal">SRAM offsets 0–48297</text>
+<a href="../../kernel/psdmalloc.picoc#L10"><text x="1860" y="101" text-anchor="middle" font-size="28" font-weight="bold">Process / Shared Data Heap</text></a>
+<text x="1860" y="125" text-anchor="middle" font-size="18" font-weight="normal">From SRAM offset 48298 · each process payload: image → user heap → stack</text>
+<a href="../../common/uart_protocol.picoc#L7"><text x="380" y="185" text-anchor="middle" font-size="24" font-weight="bold">UART</text></a>
+<text x="380" y="211" text-anchor="middle" font-size="18" font-weight="normal">Memory-mapped I/O</text>
+<rect x="35" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="35" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../boot/bootloader.picoc#L9"><text x="145" y="203" text-anchor="middle" font-size="22" font-weight="bold">Bootloader</text></a>
+<text x="145" y="227" text-anchor="middle" font-size="18" font-weight="normal">.text and .data</text>
+<path d="M 145 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="510" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="510" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/kernel.picoc#L31"><text x="620" y="167" text-anchor="middle" font-size="22" font-weight="bold">Kernel image</text></a>
+<text x="620" y="191" text-anchor="middle" font-size="18" font-weight="normal">0–41485</text>
+<text x="620" y="215" text-anchor="middle" font-size="18" font-weight="normal">.ivt: 0–4</text>
+<text x="620" y="239" text-anchor="middle" font-size="18" font-weight="normal">.text from 5</text>
+<text x="620" y="263" text-anchor="middle" font-size="18" font-weight="normal">.data from 40755</text>
+<path d="M 620 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="760" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="760" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/kmalloc.picoc#L17"><text x="870" y="203" text-anchor="middle" font-size="22" font-weight="bold">Kernel heap</text></a>
+<text x="870" y="227" text-anchor="middle" font-size="18" font-weight="normal">41486–45581</text>
+<path d="M 870 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="1010" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="1010" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/memory_constants.header"><text x="1120" y="203" text-anchor="middle" font-size="22" font-weight="bold">Kernel stack</text></a>
+<text x="1120" y="227" text-anchor="middle" font-size="18" font-weight="normal">45582–48297</text>
+<path d="M 1120 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="1320" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="1320" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../system/init.picoc#L101"><text x="1430" y="203" text-anchor="middle" font-size="22" font-weight="bold">Init image</text></a>
+<text x="1430" y="227" text-anchor="middle" font-size="18" font-weight="normal">libstart startup</text>
+<path d="M 1430 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="1610" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="1610" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../user/shell.picoc#L1453"><text x="1720" y="203" text-anchor="middle" font-size="22" font-weight="bold">Shell image</text></a>
+<text x="1720" y="227" text-anchor="middle" font-size="18" font-weight="normal">libstart startup</text>
+<path d="M 1720 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="1900" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="1900" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../library/start/start.picoc#L13"><text x="2010" y="203" text-anchor="middle" font-size="22" font-weight="bold">Application A</text></a>
+<text x="2010" y="227" text-anchor="middle" font-size="18" font-weight="normal">libstart startup</text>
+<path d="M 2010 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<rect x="2190" y="143" width="220" height="130" fill="white" fill-opacity="0.65"/>
+<rect x="2190" y="143" width="220" height="130" fill="none" stroke="#637983" stroke-width="1.5"/>
+<a href="../../library/start/start.picoc#L13"><text x="2300" y="203" text-anchor="middle" font-size="22" font-weight="bold">Application B</text></a>
+<text x="2300" y="227" text-anchor="middle" font-size="18" font-weight="normal">libstart startup</text>
+<path d="M 2300 273 V 838" fill="none" stroke="#637983" stroke-width="2" stroke-dasharray="6 6"/>
+<a href="../../boot/bootloader.picoc#L41"><text x="382.5" y="306" text-anchor="middle" font-size="22" font-weight="normal">boot_main: load kernel at SRAM offset 0</text></a>
+<path d="M 145 318 H 617" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../boot/bootloader.picoc#L21"><text x="632.5" y="370" text-anchor="middle" font-size="22" font-weight="normal">start_loaded_kernel: SP / BAF ← stack_start</text></a>
+<path d="M 145 382 H 1117" fill="none" stroke="#17313a" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#control)"/>
+<a href="../../boot/bootloader.picoc#L38"><text x="382.5" y="434" text-anchor="middle" font-size="22" font-weight="normal">MOVE CS PC → kernel _start</text></a>
+<path d="M 145 446 H 617" fill="none" stroke="#17313a" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#control)"/>
+<a href="../../kernel/exception.picoc#L11"><text x="870.0" y="498" text-anchor="middle" font-size="22" font-weight="normal">main: activate_kernel_stack_boundary</text></a>
+<path d="M 620 510 H 1117" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../kernel/kmalloc.picoc#L17"><text x="745.0" y="539" text-anchor="middle" font-size="22" font-weight="normal">main: init_kernel_heap</text></a>
+<a href="../../kernel/kmalloc.picoc#L17"><text x="745.0" y="562" text-anchor="middle" font-size="22" font-weight="normal">→ heap_init_region</text></a>
+<path d="M 620 574 H 867" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../kernel/kernel.picoc#L47"><text x="1025.0" y="626" text-anchor="middle" font-size="22" font-weight="normal">load_process → init</text></a>
+<path d="M 620 638 H 1427" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../system/init.picoc#L119"><text x="1575.0" y="690" text-anchor="middle" font-size="22" font-weight="normal">init loads shell</text></a>
+<path d="M 1430 702 H 1717" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../user/shell.picoc#L1213"><text x="1865.0" y="754" text-anchor="middle" font-size="22" font-weight="normal">shell loads application A</text></a>
+<path d="M 1720 766 H 2007" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+<a href="../../user/shell.picoc#L1213"><text x="2010.0" y="818" text-anchor="middle" font-size="22" font-weight="normal">shell loads application B</text></a>
+<path d="M 1720 830 H 2297" fill="none" stroke="#17313a" stroke-width="3" marker-end="url(#load)"/>
+</g></svg>
