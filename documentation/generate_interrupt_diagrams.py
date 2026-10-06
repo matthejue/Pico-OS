@@ -137,8 +137,8 @@ def timer_memory():
 
 
 def exception_cs():
-    f = Figure(1640, 381, "How exception entry compares interrupted CS with kernel CS",
-               "SRAM regions appear in address order with schematic widths. Kernel CS points to the start of kernel .text. A process's activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. Zero selects kernel panic and a nonzero value selects process termination.")
+    f = Figure(1640, 421, "How exception entry compares interrupted CS with kernel CS",
+               "SRAM regions appear in address order with schematic widths. Kernel CS points to the start of kernel .text. A process's activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. An arrow maps pushed ACC to diff, the abbreviated interrupted_kernel_cs_difference parameter. Zero selects kernel panic and a nonzero value selects process termination.")
     f.box(24, 24, 1125, 170, "kernel")
     f.text(36, 51, "Kernel region", 20, True)
     f.box(40, 65, 660, 113, "free")
@@ -158,21 +158,23 @@ def exception_cs():
     f.text(149, 221, f"kernel CS = {CS:#010x}", 18, True)
     f.arrow([(1161, 234), (1161, 180)], True)
     f.text(1173, 221, "process CS differs from kernel CS", 18, True)
-    f.box(24, 263, 350, 94, "saved")
+    f.box(24, 263, 350, 134, "saved")
     f.text(36, 293, "A · MOVE BAF ACC", 20, True)
     f.text(36, 326, "ACC = interrupted CS", 18)
     f.arrow([(376, 310), (424, 310)])
-    f.box(426, 263, 350, 94, "active")
+    f.box(426, 263, 350, 134, "active")
     f.text(438, 293, "B · SUB ACC CS", 20, True)
     f.text(438, 326, "ACC = interrupted CS − kernel CS", 18)
     f.arrow([(778, 310), (826, 310)])
-    f.box(828, 263, 350, 94, "kernel")
+    f.box(828, 263, 350, 134, "kernel")
     f.text(840, 293, "C · PUSH ACC", 20, True)
     f.text(840, 326, "Kernel-stack argument = difference", 17)
     f.arrow([(1180, 310), (1228, 310)])
-    f.box(1230, 263, 385, 94, "free")
-    f.text(1242, 293, "D · handle_cpu_exception()", 20, True)
-    f.text(1242, 322, "0 → kernel panic\n≠ 0 → process termination", 17)
+    f.box(1230, 263, 385, 134, "free")
+    f.text(1242, 293, "D · handle_cpu_exception(diff)", 20, True)
+    f.text(1242, 326, "pushed ACC", 17)
+    f.arrow([(1350, 320), (1556, 320), (1556, 300)])
+    f.text(1242, 353, "diff = 0 → kernel panic\ndiff ≠ 0 → process termination", 17)
     f.save("exception-cs-comparison.svg")
 
 

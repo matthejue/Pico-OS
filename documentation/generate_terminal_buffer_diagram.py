@@ -34,8 +34,10 @@ def main():
         "waiting_queue_ptr points back to the embedded input_waiters queue. "
         "Other globals, heap allocations and PCB fields are omitted. "
         "Descriptors select the terminal by device path, not a stored pointer.",
-        width=1669, height=686,
+        width=1669, height=612, show_address_direction=False,
     )
+    # Trim the space formerly reserved for the surrounding notes.
+    figure.parts.append('<g transform="translate(0 -48)">')
 
     # Keep the overview's regions and widths consistent with section 8.1.
     figure.row(80, 90, [
@@ -68,11 +70,18 @@ def main():
     ])
     figure.band("other_globals_left", "other_globals_right", 570, "Kernel Image · .data")
     figure.band("header_a", "other_allocations", 570, "Kernel Heap", HEAP_EMPHASIS)
-    # Expand the two storage regions without crossing the overview's bands.
-    figure.cells["data"] = (202, 80, 180, 150)
-    figure.cells["kernel_heap"] = (382, 80, 690, 150)
+    # Connect the actual storage-box corners to their expanded regions.
     figure.expand("data", "other_globals_left", "other_globals_right")
-    figure.expand("kernel_heap", "header_a", "other_allocations")
+    # Offset the heap's left guide along both box edges so it does not
+    # coincide with the .data guide at their shared boundary.
+    x, y, width, height = figure.cells["kernel_heap"]
+    left, top, _, _ = figure.cells["header_a"]
+    right, _, right_width, _ = figure.cells["other_allocations"]
+    figure.parts.append(
+        f'<path d="M {x + 24} {y + height} L {left + 24} {top} '
+        f'M {x + width} {y + height} L {right + right_width} {top}" '
+        'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>'
+    )
     figure.box(102, 360, 930, 210, "none", FOCUS, 3)
     figure.label(567, 401, "terminal · struct Terminal", size=24, bold=True,
                  link="kernel/filesystem/terminal.picoc#L12")
@@ -122,8 +131,7 @@ def main():
     figure.parts.append(pointer("M 1012 476 H 1032 V 296 H 1160 V 360"))
     figure.parts.append(pointer("M 1012 528 H 1072 V 324 H 1190 V 360"))
     figure.parts.append(pointer("M 1185 478 H 1142 V 628 H 874 V 570", METADATA))
-    figure.label(32, 660, "Example: empty ring · one foreground reader waiting for input",
-                 size=16, anchor="start")
+    figure.parts.append('</g>')
     figure.save()
 
 

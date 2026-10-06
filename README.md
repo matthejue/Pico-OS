@@ -10,7 +10,7 @@ follow the numbered chapters in the [contents](#contents). For source builds
 and development, see the [development workflow](documentation/development_workflow.md).
 
 PicoOS has **15 libraries**, **18 user applications** including the [`shell`](user/shell.picoc),
-and **37 syscalls**. See [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies), [`13.1 Applications, library calls, and host requests`](#131-applications-library-calls-and-host-requests), and [`2.4.2.2.1 System-call groups`](#24221-system-call-groups) for their interfaces.
+and **37 syscalls**. See [`10.2 Library overview and dependencies`](#102-library-overview-and-dependencies), [`13.2 Applications, library calls, and host requests`](#132-applications-library-calls-and-host-requests), and [`2.4.2.2.1 System-call groups`](#24221-system-call-groups) for their interfaces.
 
 [POSIX](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap01.html)
 standardizes Unix interfaces and command behavior, including processes,
@@ -492,9 +492,10 @@ teaching uses, AI use, and limitations.
    - [12.6 Input/output redirection](#126-inputoutput-redirection)
    - [12.7 Sequential file-backed pipelines](#127-sequential-file-backed-pipelines)
 1. [User applications and commands](#13-user-applications-and-commands)
-   - [13.1 Applications, library calls, and host requests](#131-applications-library-calls-and-host-requests)
-      - [13.1.1 Command behavior and supported options](#1311-command-behavior-and-supported-options)
-      - [13.1.2 Command errors and exit statuses](#1312-command-errors-and-exit-statuses)
+   - [13.1 Writing a simple user application](#131-writing-a-simple-user-application)
+   - [13.2 Applications, library calls, and host requests](#132-applications-library-calls-and-host-requests)
+      - [13.2.1 Command behavior and supported options](#1321-command-behavior-and-supported-options)
+      - [13.2.2 Command errors and exit statuses](#1322-command-errors-and-exit-statuses)
 1. [Test system](#14-test-system)
    - [14.1 Library, OS, shell, and boot test categories](#141-library-os-shell-and-boot-test-categories)
       - [14.1.1 Files that make up a test](#1411-files-that-make-up-a-test)
@@ -3261,7 +3262,10 @@ prepares the exception handler in these steps:
 
 The diagram follows step 3, showing how the difference between interrupted
 `CS` in `BAF` and kernel `CS` becomes the argument passed on the kernel stack
-to [`handle_cpu_exception()`](kernel/exception.picoc#L70).
+to [`handle_cpu_exception(diff)`](kernel/exception.picoc#L70). In box D,
+`diff` abbreviates the parameter
+[`interrupted_kernel_cs_difference`](kernel/exception.picoc#L70), and the
+arrow shows that it receives the pushed `ACC` value.
 User `CS` comes from the PCB's [`activation.cs`](kernel/process/process.header#L27),
 restored by [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21).
 
@@ -4017,10 +4021,11 @@ The caller's [`pending_load`](kernel/process/process.header#L68) points to a
 [`ProcessLoad`](kernel/process/process_loader.picoc#L14) that retains the destination
 and transfer progress between syscalls. No child PCB exists yet.
 
-The diagram follows the image from host storage through UART into SRAM.
-Dashed arrows show data movement, and solid arrows show stored pointers.
-Only the image words after the header are copied into the User Process Image.
-The user heap and stack are reserved but remain uninitialized:
+The diagram follows the image from host storage through UART into SRAM,
+using dashed arrows for data movement and solid arrows for stored pointers.
+The kernel consumes the five-word header and copies only the following image
+words into the User Process Image. The user heap and stack are reserved but
+remain uninitialized:
 
 ![EPROM, the complete peripheral mapping, and SRAM with CPU-polling and DMA transfer paths into the newly allocated User Process Image, while the caller owns ProcessLoad](documentation/images/process-load-transfer.svg)
 
@@ -4140,8 +4145,9 @@ Starting finishes the process setup in this order:
    pointer arrays, and update [`activation.sp`](kernel/process/process.header#L25) and [`activation.baf`](kernel/process/process.header#L26).
 5. Set [`state`](kernel/process/process.header#L33) to [`READY`](kernel/process/process.header#L13) and return success.
 
-The figure highlights the new stack, descriptor table, and changed PCB
-fields. The heap remains reserved until userspace startup:
+The diagram shows the descriptor and stack changes in SRAM, with the caller's
+arguments and environment in separate buffers. The user heap remains reserved
+until userspace startup:
 
 ![Run changes inside the same SRAM layout: inherited descriptor table, copied caller arguments and environment, new stack and activation pointers, and state NEW to READY](documentation/images/process-run-setup.svg)
 
@@ -4369,42 +4375,26 @@ At first dispatch, [`initialize_environment()`](library/stdlib/env.picoc#L97) co
 its strings into the child heap, then assigns [`environ`](library/stdlib/env.picoc#L4). Later environment
 changes affect neither the initial stack nor the parent's copies.
 
-The first diagram separates init's read operation from the variables it stores.
-The arrow toward the file is a read request. The arrow back carries file contents
-to [`read_environment()`](system/init.picoc#L19), which calls
-[`setenv(name, value, true)`](library/stdlib/env.picoc#L126) for each entry.
-The file supplies data and performs no operation itself. The shell receives
-independent copies when init calls [`run(shell_pid, NULL, NULL)`](library/unistd/process.picoc#L31).
-The example shows [`loading_bar_enabled`](config/config.header#L5) set to `true`:
+The tree follows `PATH` from [`init`](system/init.picoc) through the
+[`shell`](user/shell.picoc) and two child generations. Each box shows only the
+`PATH` entry in that process's [`environ`](library/stdlib/env.picoc#L4), after
+any local change. The three branches remove, change, or keep the entry, then
+pass their result to another child through
+[`run(cpid, "arg1", NULL)`](library/unistd/process.picoc#L31). `cpid1` through
+`cpid6` denote the PIDs returned by preceding
+[`load()`](library/unistd/process.picoc#L17) calls:
 
-![Init reads config/environment.txt, stores entries through setenv in its own environ array, optionally adds PICOOS_LOADING_BAR, and starts the shell with independent environment copies](documentation/images/process-environment-origin.svg)
+![Environment inheritance tree from init to shell, then three children that remove PATH, change PATH to /test, or keep PATH=/user, and their respective children inheriting each branch's resulting environment](documentation/images/process-environment-propagation.svg)
 
-The [`shell`](user/shell.picoc) passes its environment to applications by calling
-[`run()`](library/unistd/process.picoc#L31) with a `NULL` environment argument
-inside [`run_process()`](user/shell.picoc#L1034). Its `export NAME=value` built-in
-calls [`setenv()`](library/stdlib/env.picoc#L126) to update the shell's own
-[`environ`](library/stdlib/env.picoc#L4). The second diagram expands one
-[`run(child_pid, "arg1 arg2", NULL)`](library/unistd/process.picoc#L31) call.
-Solid arrows show stored pointers. Dashed arrows show string copies and newly
-built pointer arrays. Each destination array points to its own string copies.
-The kernel also copies the arguments into
-[`argv`](kernel/process/process_arguments.picoc#L140), independently of the environment:
+The [`shell`](user/shell.picoc) passes its environment through the `NULL`
+environment argument inside [`run_process()`](user/shell.picoc#L1034).
+Its `export NAME=value` built-in calls
+[`setenv()`](library/stdlib/env.picoc#L126) to update the shell's own
+[`environ`](library/stdlib/env.picoc#L4). The changes in the tree happen in the
+shell's children, so the shell and the other branches keep `PATH=/user`.
 
-![A run call selects the caller's environ through RunProcessRequest.environment, the kernel copies it into the child's initial envp stack array, and initialize_environment makes the child's independent heap copy](documentation/images/process-environment-propagation.svg)
-
-The following alternatives apply to an application that inherited the shell's
-environment. Each row starts with `PATH=/user` and `PICOOS_LOADING_BAR=true`,
-then shows what its next child receives through
-[`run(child_pid, "arg1 arg2", NULL)`](library/unistd/process.picoc#L31):
-
-| Application's change before starting its child | Environment copied to that child |
-| --- | --- |
-| No change | `PATH=/user`, `PICOOS_LOADING_BAR=true` |
-| [`unsetenv("PICOOS_LOADING_BAR")`](library/stdlib/env.picoc#L157) | `PATH=/user`, loading-bar variable absent |
-| [`setenv("PATH", "/user:/test", true)`](library/stdlib/env.picoc#L126) | `PATH=/user:/test`, `PICOOS_LOADING_BAR=true` |
-
-[`unsetenv("PICOOS_LOADING_BAR")`](library/stdlib/env.picoc#L157) removes and frees an entry.
-[`setenv("PATH", "/user:/test", true)`](library/stdlib/env.picoc#L126) replaces one. These changes affect the
+[`unsetenv("PATH")`](library/stdlib/env.picoc#L157) removes and frees an entry.
+[`setenv("PATH", "/test", true)`](library/stdlib/env.picoc#L126) replaces one. These changes affect the
 caller and children started afterward. Existing processes keep their copies.
 [`getenv()`](library/stdlib/env.picoc#L115) returns a pointer to the value or `NULL`. [`10.2.7.3 Environment operations in env.picoc`](#10273-environment-operations-in-envpicoc) covers the API.
 
@@ -5207,17 +5197,39 @@ sets its [`state`](kernel/process/process.header#L33) to
 with the boundary computed by
 [`process_stack_boundary(process)`](kernel/exception.picoc#L18).
 
-The layout below follows PCB 5 from the scheduler example. The kernel call
-places the PCB pointer and boundary at entry `SP + 2` and `SP + 3`.
-The restoration function loads the pointer into `BAF`, which then addresses
-PCB 5's embedded [`activation`](kernel/process/process.header#L40). Purple
-arrows show the fixed-offset register loads in execution order. Restoring
-[`activation.sp`](kernel/process/process.header#L25) selects PCB 5's user
-stack, and `RTI` obtains the saved `PC` from that stack at `SP + 1`.
-The PCB supplies the registers, while the user stack supplies the return
-address:
+The diagram follows PCB 5 from the scheduler example. Its left region is
+SRAM in the Kernel Heap. PCB 5 contains an embedded
+[`activation`](kernel/process/process.header#L40) of type
+[`ActivationRecord`](kernel/process/process.header#L21), whose fields hold
+saved register values. The middle region contains the actual CPU registers.
+`SP` holds a stack address, `CS` and `DS` hold the code and data base
+addresses, and `IN1`, `IN2`, `ACC`, and `BAF` hold the remaining process
+context. Arrows copy values from PCB fields into these CPU registers.
+The fields appear in struct order, with offsets relative to the PCB pointer.
+The numbered actions show the restoration sequence:
 
-![dispatcher_jump_to_process reads the PCB pointer and boundary from the kernel stack, restores PCB 5.activation through BAF, selects the user stack by restoring SP, installs the boundary, and restores BAF last. RTI reads PC from the selected user stack at SP + 1 and resumes at saved PC + 1.](documentation/images/process-dispatcher-restore.svg)
+![PCB 5's activation fields live in SRAM's Kernel Heap and are copied into a separate CPU register bank. Restored SP points to the saved ACC cell in PCB 5's user stack in SRAM's Process Payload A. RTI reads the saved PC from the next stack cell at SP + 1, updates CPU PC and SP, and resumes the process in its .text. The stack boundary is installed in a separate periphery register.](documentation/images/process-dispatcher-restore.svg)
+
+The right region is PCB 5's user process allocation in SRAM. Its stack rows
+show **addresses and stored values**, so `SP + 1` names the memory cell one
+address above the cell selected by the CPU's `SP`. Before `RTI`, `SP` points
+to the saved `ACC` cell and the next cell contains the saved `PC`.
+`RTI` actually reads that next cell, advances `SP` by one, and sets the CPU's
+`PC` to the saved value plus one. Execution resumes at that address in the
+process's `.text`. The return address remains on the user stack, with no
+`PC` field in [`activation`](kernel/process/process.header#L40).
+
+The separate [`STACK_HEAP_BOUNDARY_REGISTER`](kernel/exception.header#L5)
+is a memory-mapped periphery register. It holds the address limit used to
+detect stack growth into the user heap. Its position in the diagram is
+separate from both SRAM and the CPU register bank.
+
+Before the pictured loads, the kernel call places the PCB pointer and
+boundary on the **kernel stack**, at entry `SP + 2` and `SP + 3`.
+[`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) reads the
+pointer into `BAF` and the boundary into `IN1`. Here entry `SP` still selects
+the kernel stack. Loading [`activation.sp`](kernel/process/process.header#L25)
+then changes the CPU's `SP` to select the pictured user stack.
 
 The naked function creates no additional PicoC frame. Its complete
 restoration sequence is:
@@ -5250,19 +5262,17 @@ void dispatcher_jump_to_process(struct ProcessControlBlock *process, int stack_b
 [`dispatcher_jump_to_process()`](kernel/dispatcher.picoc#L21) restores the
 selected process in these steps:
 
-1. Read the PCB pointer into `BAF` and the precomputed stack boundary into
-   `IN1` from the kernel call's arguments.
-2. Load [`activation.sp`](kernel/process/process.header#L25) into `SP` before
+1. Load [`activation.sp`](kernel/process/process.header#L25) into `SP` before
    changing the boundary. Reversing this order could make a nested interrupt
    compare the still-active kernel stack against a user-process limit.
-3. Call [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2)
+2. Call [`write_stack_heap_boundary_from_in1()`](common/periphery_asm.header#L2)
    to install the selected process's limit. This inline helper has no C frame,
    so it is usable after selecting the process stack. Its complete explanation
    is in [`2.4.2.1.1 Stack-boundary helpers`](#24211-stack-boundary-helpers).
-4. Load `CS`, `DS`, `IN1`, `IN2`, and `ACC` from the selected PCB's
+3. Load `CS`, `DS`, `IN1`, `IN2`, and `ACC` from the selected PCB's
    [`activation`](kernel/process/process.header#L40). Restore `BAF` last,
    because it holds the PCB pointer while the other values are read.
-5. Execute `RTI` as explained in
+4. Execute `RTI` as explained in
    [`2.4.2.4 Restoring process context with RTI`](#2424-restoring-process-context-with-rti).
    For a new process, its prepared PC is `CS - 1`, so execution starts at `CS`.
 
@@ -6357,12 +6367,14 @@ Call-local requests remain in the calling function's stack frame. In
 [`waitpid()`](library/sys/wait/wait.picoc#L14), the
 [`WaitPidRequest`](common/syscall.header#L61) and the separate
 [`status`](library/sys/wait/wait.picoc#L15) integer both live on the parent's
-User Process Stack. The diagram shows how the request's
+User Process Stack. The request occupies two memory cells, one for the child
+PID and one for the result address. The separate integer occupies a third
+cell. The diagram shows how the request's
 [`status`](common/syscall.header#L63) pointer and the parent PCB's
 [`waiting_status_ptr`](kernel/process/process.header#L44) reference the same
 integer while the parent waits for its child:
 
-![The waitpid request and parent PCB point to the same stack-local status integer](documentation/images/process-waitpid-references.svg)
+![User stack memory cells show the two-cell WaitPidRequest and separate integer status cell, with request.status and PCB 1 waiting_status_ptr both pointing to the integer](documentation/images/process-waitpid-references.svg)
 
 [`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) passes `&request`
 through `IN1`, leaving the request on the User Process Stack. When the parent
@@ -6478,7 +6490,8 @@ calling [`waitpid()`](library/sys/wait/wait.picoc#L14):
 | [`libwait.reti_blocks`](library/sys/wait/libwait.reti_blocks) | Generated RETI code blocks for the library functions, supplied to the linker |
 | [`libwait.st`](library/sys/wait/libwait.st) | Generated symbol table containing function signatures and type information. The compiler reads it alongside the code blocks when linking calls from an application |
 
-The complete public header establishes the caller's view of the library:
+The complete public header, [`library/sys/wait/wait.header`](library/sys/wait/wait.header),
+establishes the caller's view of the library:
 
 ```c
 #pragma once
@@ -6490,22 +6503,62 @@ int waitpid(int pid);
 bool WIFSTOPPED(int status);
 ```
 
-For example, [`shell.picoc`](user/shell.picoc) includes this header and calls
-[`waitpid()`](library/sys/wait/wait.picoc#L14) for its foreground child. These
-lines from the shell show the include and the call that stores the returned
-status in [`last_command_exit_status`](user/shell.picoc#L29):
+For example, [`user/shell.picoc`](user/shell.picoc) includes this header and calls
+[`waitpid()`](library/sys/wait/wait.picoc#L14) for its foreground child. The file
+outline below shows the include, the result variable, and
+[`run_process()`](user/shell.picoc#L1034), which stores the returned status in
+[`last_command_exit_status`](user/shell.picoc#L29). Unrelated declarations,
+redirection setup, and status reporting are omitted with `// ...`:
 
 ```c
 #include "../library/sys/wait/wait.header"
+// ...
 
-last_command_exit_status = waitpid(pid);
+int last_command_exit_status = 0;
+// ...
+
+bool run_process(
+    int pid,
+    char *arguments,
+    bool background,
+    char *stdin_path,
+    char *stdout_path,
+    bool append_stdout,
+    char *stderr_path,
+    bool append_stderr
+) {
+    char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
+    // ...
+    bool started;
+
+    // ...
+    started = run(pid, expand_variables(
+                           arguments,
+                           expanded_arguments,
+                           SHELL_COMMAND_BUFFER_CAPACITY),
+                  NULL);
+    // ...
+
+    if (!started) {
+        // ...
+    } else if (background) {
+        last_background_process_id = pid;
+    } else {
+        set_foreground_process(pid);
+        last_command_exit_status = waitpid(pid);
+        set_foreground_process(0);
+        // ...
+    }
+    return started;
+}
+// ...
 ```
 
 Including the header gives the compiler the signature. The implementation
 is supplied during linking.
 
-The library compilation unit is deliberately small. Its complete contents
-are:
+The library compilation unit, [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc),
+collects the implementation through a single include. Its complete contents are:
 
 ```c
 #include "wait.picoc"
@@ -8185,10 +8238,84 @@ PicoOS> rm.bin pipeline-input.txt pipeline-output.txt
 
 [`user/`](user/) contains **18 applications**, the shell and 17 standalone commands.
 Init lives separately in [`system/`](system/). Applications normally change only
-their own environment, directory, and descriptors. This chapter lists
-commands, options, and error behavior.
+their own environment, directory, and descriptors. This chapter first shows
+how to write and build a user application, then lists commands, options,
+and error behavior.
 
-## 13.1 Applications, library calls, and host requests
+## 13.1 Writing a simple user application
+[\[↑ TOC\]](#contents)
+
+A user application includes library headers and defines its program in
+`main`. This example starts the existing [`ls.bin`](user/ls.picoc) command
+as a child process to list the current directory, waits for it to finish,
+and returns its exit status. Save the following code as `list_directory.picoc`
+in [`user/`](user/):
+
+```c
+#include "../library/unistd/unistd.header"
+#include "../library/sys/wait/wait.header"
+
+int main(void) {
+    int pid = load("/user/ls.bin");
+
+    if (pid == 0) {
+        return 1;
+    }
+    if (!run(pid, NULL, NULL)) {
+        unload(pid);
+        return 1;
+    }
+    return waitpid(pid);
+}
+```
+
+[`load()`](library/unistd/process.picoc#L17) loads the binary and creates a
+child [`ProcessControlBlock`](kernel/process/process.header#L31), with
+[`parent_pid`](kernel/process/process.header#L57) set to the caller's PID and
+[`state`](kernel/process/process.header#L33) set to
+[`NEW`](kernel/process/process.header#L12). It returns the child PID or `0`
+on failure. [`run()`](library/unistd/process.picoc#L31) sets the child's state
+to [`READY`](kernel/process/process.header#L13) so the scheduler can select it.
+The two `NULL` arguments mean no command arguments and inheritance of the
+parent's environment. If starting fails, [`unload()`](library/unistd/process.picoc#L47)
+removes the child that was loaded.
+
+[`waitpid(pid)`](library/sys/wait/wait.picoc#L14) waits on this child's
+[`waiters`](kernel/process/process.header#L46) queue if it has not yet terminated,
+then collects its termination status and releases its remaining process
+resources. Here, that status becomes the application's return value.
+[`7.2.2 Child waiting with waitpid`](#722-child-waiting-with-waitpid)
+also explains status delivery when a child is stopped by a signal.
+
+From the repository root, compile the source and its libraries into
+`binary/user/list_directory.reti`, then assemble it into
+`binary/user/list_directory.bin`:
+
+```console
+$ mkdir -p binary/user
+$ picoc_compiler --direct-source-link -O1 -s \
+    user/list_directory.picoc library/unistd/libunistd.picoc \
+    library/sys/wait/libwait.picoc library/stdlib/libstdlib.picoc \
+    -C library/start/libstart.picoc -o binary/user/list_directory.reti
+$ reti_emulator -a binary/user/list_directory.reti
+```
+
+`--direct-source-link` compiles and links the listed sources in one step.
+The headers declare the library functions, while the `.picoc` library
+sources provide their implementations. `-C` selects
+[`libstart`](library/start/libstart.picoc), which initializes the process
+heap and environment and calls [`exit()`](library/stdlib/exit.picoc#L3)
+with the return value from `main`. The compiler also writes the `.sections`
+file that `reti_emulator -a` uses to create the loadable `.bin` file.
+
+With PicoOS running from [`binary/`](binary/), invoke the application at the
+shell prompt. The shell finds the new binary in `/user`:
+
+```console
+PicoOS> list_directory.bin
+```
+
+## 13.2 Applications, library calls, and host requests
 [\[↑ TOC\]](#contents)
 
 The table links each entry point and identifies its library calls and host
@@ -8232,7 +8359,7 @@ destination request.
 All applications except [`echo.bin`](user/echo.picoc) use [`command_is_help()`](common/user_command.picoc#L13) for a sole help
 argument. Echo prints `-h` and `--help` as ordinary text.
 
-### 13.1.1 Command behavior and supported options
+### 13.2.1 Command behavior and supported options
 [\[↑ TOC\]](#contents)
 
 The following list records accepted operands and differences from familiar
@@ -8326,7 +8453,7 @@ PicoOS> rmdir.bin demo
 After [`SIGKILL`](common/signal.header#L5), the existence probe fails, but [`ps.bin`](user/ps.picoc) still shows the
 uncollected zombie. The pipeline uses the temporary-file sequence from [`12.7 Sequential file-backed pipelines`](#127-sequential-file-backed-pipelines).
 
-### 13.1.2 Command errors and exit statuses
+### 13.2.2 Command errors and exit statuses
 [\[↑ TOC\]](#contents)
 
 Commands write results to stdout and diagnostics to stderr. Multi-path

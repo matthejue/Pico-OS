@@ -114,10 +114,7 @@ def render(slug, title, blocks, highlighted):
     parts.append(text(ORIGIN, 76, "first_block", size=12, anchor="start"))
     parts.append(f'<path d="M {ORIGIN + 6} 82 L {positions[0]} {TOP - 3}" '
                  'stroke="#405ea8" stroke-width="1.5" marker-end="url(#arrow)"/>')
-    parts.append(text(ORIGIN, 273, "Header offsets in RETI cells from region start",
-                      size=14, anchor="start"))
     parts.append(text(x, TOP + HEIGHT + 22, str(REGION_CELLS), size=13, anchor="end"))
-    parts.append(text(x, 273, "Increasing addresses →", size=14, anchor="end"))
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="292" '
            f'viewBox="0 0 {width} 292" role="img" aria-labelledby="title desc">\n'
            f'<title id="title">{escape(title)}</title>\n'

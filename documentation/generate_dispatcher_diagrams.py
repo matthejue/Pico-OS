@@ -1,8 +1,8 @@
 """Generate the save, state-change and restore diagrams for README 6.3–6.4.
 
-Run with Python 3. SRAM uses the chapter 3 grouping bands and colors. Lower
-panels show field assignments, labeled with exact RETI cell offsets. They are
-not additional allocations. Keep headings and explanations in the README.
+Run with Python 3. The save diagram uses the chapter 3 SRAM grouping bands.
+The restore diagram separates SRAM, CPU registers and periphery, retaining
+the same region names and colors. Keep overall headings in the README.
 SVGs retain accessible descriptions and links to the source definitions.
 """
 
@@ -153,49 +153,94 @@ def state_change():
 
 def restore_context():
     f = Figure("dispatcher-restore", "Restore PCB 5.activation and return through its user stack with RTI",
-               "The same SRAM regions as the save diagram now contain the selected PCB 5. "
-               "active_process already points to PCB 5 and its state is RUNNING. The naked function "
-               "reads process from kernel entry SP + 2 into BAF and stack_boundary from SP + 3 into IN1. "
-               "BAF temporarily addresses the PCB. Fixed PCB offsets restore SP first, then the "
-               "stack boundary, then CS, DS, IN1, IN2, ACC and BAF last. The lower panels show "
-               "the loads in execution order. RTI reads the saved PC at restored SP + 1, increments "
-               "SP and continues at saved PC + 1. PC is not a PCB activation field.",
-               width=2200, height=1120, show_address_direction=False)
-    sram_context(f, 5, saving=False)
-    f.row(560, 70, [
-        ("entry_sp", 180, ("entry SP + 0", "free cell"), MUTED),
-        ("return", 240, ("entry SP + 1", "C return address"), MUTED),
-        ("arg_process", 300, ("entry SP + 2", "process → BAF"), ALLOCATED, f"{DISPATCHER}#L23"),
-        ("arg_boundary", 300, ("entry SP + 3", "stack_boundary → IN1"), ALLOCATED, f"{DISPATCHER}#L24"),
-    ])
-    loads = (("sp", 11, 25), ("cs", 13, 27), ("ds", 14, 28),
-             ("in1", 8, 22), ("in2", 9, 23), ("acc", 10, 24), ("baf", 12, 26))
-    for index, (name, offset, line) in enumerate(loads):
-        # Leave one row between SP and CS for the boundary installation.
-        y = 670 + index * 48 + (48 if index else 0)
-        f.box(140, y, 480, 48, ALLOCATED)
-        f.box(620, y, 220, 48, MUTED)
-        f.label(380, y + 31, f"activation.{name}", size=22, link=f"{PCB}#L{line}")
-        f.label(730, y + 31, f"PCB 5 + {offset}", size=19)
-        path(f, f"M 845 {y + 24} H 996", METADATA)
-        f.box(1000, y, 260, 48, ALLOCATED)
-        f.label(1130, y + 31, "BAF (last)" if name == "baf" else name.upper(),
-                size=24, bold=True)
+               "Three separate regions show PCB 5 in SRAM's Kernel Heap, the CPU, and PCB 5's "
+               "user stack and code in SRAM's Process Payload A. activation is embedded in PCB 5. "
+               "Its seven fields are shown in struct order and arrows copy their values into CPU "
+               "registers. Numbered actions show SP restored first, the periphery stack boundary "
+               "installed second, and the remaining registers restored third, with BAF last. "
+               "The SP register stores an address pointing to the saved ACC cell in the user stack. "
+               "SP and SP + 1 in the stack's address column denote SRAM addresses, not registers. "
+               "RTI actually reads the saved PC from the cell at SP + 1, advances SP by one, and "
+               "sets the CPU PC to saved PC + 1 to resume in the selected process's .text. "
+               "The stack addresses are shown before RTI. The separate memory-mapped "
+               "STACK_HEAP_BOUNDARY_REGISTER detects stack growth into the user heap.",
+               width=1800, height=890, show_address_direction=False)
 
-    f.row(660, 75, [
-        ("saved_sp", 300, ("SP",), ALLOCATED, f"{PCB}#L25"),
-        ("saved_pc", 350, ("SP + 1", "PC"), PC_FILL),
-    ], x=1460)
-    path(f, "M 1265 694 H 1455", POINTER)
-    f.box(1000, 726, 1110, 32, MUTED)
-    f.label(1555, 749, "STACK_HEAP_BOUNDARY_REGISTER ← IN1", size=20,
+    # Region labels establish where each object lives. These are separate
+    # detail views, not neighboring cells in one physical memory rectangle.
+    f.box(32, 32, 500, 590, "white", thickness=2)
+    f.label(282, 70, "SRAM · Kernel Heap", size=27, bold=True)
+    f.box(52, 96, 460, 506, MUTED)
+    f.label(282, 132, "Payload B · PCB 5", size=27, bold=True, link=f"{PCB}#L31")
+    f.label(282, 167, "state = RUNNING", size=23, link=f"{PCB}#L33")
+    f.label(282, 207, "activation · saved register values", size=24,
+            link=f"{PCB}#L40")
+
+    f.box(770, 32, 330, 828, "white", thickness=2)
+    f.label(935, 70, "CPU", size=29, bold=True)
+    f.label(935, 111, "Live registers", size=25)
+
+    f.label(651, 161, "3 Load remaining", size=22, color=METADATA)
+    f.label(651, 190, "registers", size=22, color=METADATA)
+    roles = {"sp": "SP · stack pointer", "cs": "CS · code base",
+             "ds": "DS · data base", "baf": "BAF (restored last)"}
+    for index, (name, offset, line) in enumerate(REGISTERS):
+        y = 224 + index * 52
+        f.box(72, y, 420, 52, ALLOCATED)
+        f.label(94, y + 34, f"activation.{name}", size=25, anchor="start",
+                link=f"{PCB}#L{line}")
+        f.label(469, y + 34, f"PCB + {offset}", size=21, anchor="end")
+        f.box(800, y, 270, 52, ALLOCATED)
+        f.label(935, y + 34, roles.get(name, name.upper()), size=23, bold=True)
+        path(f, f"M 497 {y + 26} H 795", ADDRESS if name == "sp" else METADATA)
+    f.label(651, 393, "1 Load SP", size=24, color=ADDRESS)
+
+    f.box(1230, 32, 538, 828, "white", thickness=2)
+    f.label(1499, 70, "SRAM · Process Payload A", size=27, bold=True)
+    f.label(1499, 111, "PCB 5's user process", size=25)
+    f.box(1250, 280, 498, 280, MUTED)
+    f.label(1499, 316, "User Process Stack", size=27, bold=True)
+    f.label(1499, 349, "Addresses shown before RTI", size=23)
+    f.label(1340, 375, "Address", size=21)
+    f.label(1590, 375, "Stored value", size=21)
+    for y, address, value, fill in (
+        (380, "SP", "saved ACC", ALLOCATED),
+        (432, "SP + 1", "saved PC", PC_FILL),
+    ):
+        f.box(1270, y, 140, 52, MUTED)
+        f.box(1410, y, 318, 52, fill)
+        f.label(1340, y + 34, address, size=25, bold=True)
+        f.label(1569, y + 34, value, size=25, bold=True)
+    f.label(1499, 527, "Each row is one SRAM cell", size=23)
+    path(f, "M 1075 406 H 1265", POINTER)
+    f.label(1170, 391, "points to", size=22, color=POINTER)
+
+    # The boundary is a periphery register, not a member of the CPU register
+    # bank or a divider between register rows. IN1 holds it only temporarily.
+    f.box(32, 674, 680, 186, MUTED, thickness=2)
+    f.label(372, 709, "Periphery · memory-mapped register", size=26, bold=True)
+    f.label(372, 745, "2 Install stack limit", size=24,
+            link="common/periphery_asm.header#L2")
+    f.label(372, 782, "STACK_HEAP_BOUNDARY_REGISTER ← IN1", size=24,
             link="kernel/exception.header#L5")
-    f.box(1460, 945, 650, 95, PC_FILL)
-    f.label(1785, 972, "RTI: PC ← memory[SP + 1]", size=22,
-            link=f"{DISPATCHER}#L40")
-    f.label(1785, 1001, "SP ← SP + 1", size=22)
-    f.label(1785, 1030, "resume at PC + 1", size=22)
-    path(f, "M 1935 735 V 784 H 2140 V 992 H 2115", METADATA)
+    f.label(372, 814, "IN1 temporarily holds stack_boundary", size=23,
+            link=f"{DISPATCHER}#L24")
+    f.label(372, 844, "Detects stack growth into the user heap", size=23)
+
+    # The saved-PC read is an actual data transfer performed by RTI. The
+    # outgoing arrow identifies the resumed instruction in the process code.
+    f.box(800, 674, 270, 156, PC_FILL)
+    f.label(935, 710, "4 Execute RTI", size=25, bold=True, link=f"{DISPATCHER}#L40")
+    f.label(935, 752, "PC ← saved PC + 1", size=23)
+    f.label(935, 793, "SP ← SP + 1", size=24)
+    path(f, "M 1733 458 H 1758 V 602 H 1160 V 702 H 1075", METADATA)
+    f.label(1499, 590, "RTI reads this saved PC", size=24, color=METADATA)
+    f.box(1270, 674, 458, 156, PC_FILL)
+    f.label(1499, 710, "User Process Image · .text", size=25, bold=True)
+    f.label(1499, 752, "Instruction at saved PC + 1", size=25)
+    f.label(1499, 793, "Process 5 resumes here", size=26, bold=True)
+    path(f, "M 1075 780 H 1265", POINTER)
+    f.label(1170, 762, "PC points to", size=22, color=POINTER)
     f.save()
 
 

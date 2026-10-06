@@ -1,7 +1,7 @@
 """Generate the environment diagrams in README section 4.2.2.2.1.
 
-Run with Python 3. Reuse the chapter 4 SVG style and keep read requests,
-returned file contents, stored pointers, and copies explicitly labeled.
+Run with Python 3. Reuse the chapter 4 SVG style. The propagation tree keeps
+one variable and labels process-start arrows with concrete run calls.
 """
 
 from generate_process_diagrams import Figure
@@ -56,10 +56,8 @@ def origin():
         "its own environ. The shell receives independent stack and heap copies. "
         "Leftward arrows are read requests, rightward arrows return file contents "
         "or copy environment data. The file performs no operation itself.",
-        width=1800, height=510, show_address_direction=False,
+        width=1800, height=440, show_address_direction=False,
     )
-    f.label(32, 32, "1. Init reads configuration and starts the shell", size=26,
-            bold=True, anchor="start")
     f.box(32, 145, 300, 180, MUTED, thickness=2)
     f.label(182, 183, "Configuration file", size=25, bold=True)
     f.label(182, 223, "config/environment.txt", size=22,
@@ -86,7 +84,6 @@ def origin():
             size=19, link=SETENV)
     arrow(f, 910, 309, 910, 325)
     environment(f, 680, 325, 460)
-    f.label(910, 491, "Array and strings in init's User Process Heap", size=22)
 
     frame(f, 1460, 308, "shell process", "user/shell.picoc")
     f.label(1614, 175, "Own environ array", size=23, link=ENV)
@@ -103,74 +100,71 @@ def origin():
     f.label(1310, 345, "copies init's values", size=21)
     arrow(f, 1140, 400, 1480, 400, copy=True)
     f.label(1310, 433, "via shell stack → heap", size=20)
-    f.label(1614, 491, "Independent storage", size=22)
+    # Keep the process frames and copy paths, with a small margin around them.
+    f.parts = ['<g transform="translate(0,-40)">', *f.parts, '</g>']
     f.save()
 
 
 def propagation():
+    """Show independent environment changes across two child generations."""
     f = Figure(
-        "environment-propagation", "A run call copies the caller's environment twice",
-        "The shell calls run(child_pid, arg1 arg2, NULL). The library stores the caller's "
-        "environ pointer in the caller-local RunProcessRequest.environment. The kernel "
-        "store_process_arguments function copies strings into the child's initial "
-        "stack and builds the envp pointer array for them. At first dispatch, start_process calls "
-        "initialize_environment, which creates the child's independent heap array and "
-        "strings and assigns the child's environ global. Solid arrows are stored "
-        "pointers and dashed arrows are copies. The PCB stores activation.sp, "
-        "activation.baf and state, but no environment pointer.",
-        width=1800, height=535, show_address_direction=False,
+        "environment-propagation", "Environment inheritance through three process branches",
+        "Init passes PATH=/user to the shell with run(shell_pid, NULL, NULL). "
+        "The shell starts three processes using run with a NULL environment argument. "
+        "Process 1 removes PATH with unsetenv, process 2 changes PATH to /test with "
+        "setenv, and process 3 leaves PATH=/user unchanged. Each starts its own child. "
+        "Process 4 inherits no PATH, process 5 inherits PATH=/test, and process 6 "
+        "inherits PATH=/user. Every box shows only PATH from its own environ after the local "
+        "operation. Arrows show concrete run calls, not shared pointers.",
+        width=1920, height=1080, show_address_direction=False,
     )
-    f.label(32, 32, "2. One run() call: caller → child stack → child heap", size=26,
-            bold=True, anchor="start")
-    frame(f, 32, 520, "Caller: shell process", "user/shell.picoc#L1034")
-    f.label(292, 132, 'run(child_pid, "arg1 arg2", NULL)', size=24,
-            bold=True, link=RUN)
-    f.box(52, 148, 480, 109, MUTED)
-    f.label(292, 176, "RunProcessRequest request (caller stack)", size=19,
-            bold=True, link=REQUEST)
-    f.label(292, 204, 'pid = child_pid, arguments = "arg1 arg2"',
-            size=22, link=REQUEST)
-    f.label(292, 234, "environment = current_environment()", size=22,
-            link="library/unistd/process.picoc#L37")
-    f.label(292, 298, "current_environment() returns environ", size=21,
-            link="library/stdlib/env.picoc#L6")
-    # request.environment and environ point to the same caller heap array.
+
+    def process(x, y, width, name, value, *, operation="", operation_link="",
+                changed=False, link=ENV):
+        height = 170 if operation else 130
+        stroke = "#9c3d15" if changed else POINTER
+        f.box(x, y, width, height, ALLOCATED, stroke, thickness=2.5)
+        center = x + width / 2
+        f.label(center, y + 44, name, size=32, bold=True, link=link)
+        if operation:
+            f.label(center, y + 91, operation, size=28,
+                    color=stroke if changed else "#43576a", link=operation_link)
+        f.label(center, y + height - 28, value, size=32, bold=changed,
+                color=stroke, link=ENV)
+
+    def edge(path, x, y, call):
+        f.parts.append(
+            f'<path d="{path}" fill="none" stroke="{POINTER}" '
+            f'stroke-width="3" marker-end="url(#{POINTER[1:]})"/>'
+        )
+        # Keep the function call on the edge readable where it crosses the line.
+        f.box(x - 260, y - 29, 520, 39, "white", "none")
+        f.label(x, y, call, size=28, link=RUN)
+
+    process(710, 24, 500, "init", "PATH=/user", link="system/init.picoc#L100")
+    process(710, 250, 500, "shell", "PATH=/user", link="user/shell.picoc")
+    edge("M 960 154 V 250", 960, 211, "run(shell_pid, NULL, NULL)")
+
+    # Each cpid identifies a separately loaded process, not a fixed PID value.
+    branches = (
+        (90, 1, 4, 'unsetenv("PATH")', "library/stdlib/env.picoc#L157", "PATH absent"),
+        (710, 2, 5, 'setenv("PATH", "/test", true)', SETENV, "PATH=/test"),
+        (1330, 3, 6, "no change", "", "PATH=/user"),
+    )
+    # A shared junction makes the shell's three direct children clear at a glance.
     f.parts.append(
-        f'<path d="M 52 234 H 16 V 403 H 52" fill="none" '
-        f'stroke="{POINTER}" stroke-width="2.5" '
-        f'marker-end="url(#{POINTER[1:]})"/>'
+        f'<path d="M 960 380 V 427 M 340 427 H 1580" fill="none" '
+        f'stroke="{POINTER}" stroke-width="3"/>'
     )
-    environment(f, 52, 325, 480)
-    f.label(292, 491, "Caller keeps its own heap array and strings", size=21)
-
-    frame(f, 720, 480, "Kernel: prepares child stack", "kernel/process/process_arguments.picoc#L125")
-    f.label(960, 154, "store_process_arguments(", size=23, bold=True,
-            link="kernel/process/process_arguments.picoc#L125")
-    f.label(960, 190, "process, request.arguments,", size=23,
-            link="kernel/process/process_arguments.picoc#L125")
-    f.label(960, 226, "request.environment)", size=23,
-            link="common/syscall.header#L58")
-    f.label(960, 285, "Writes into the child's User Process Stack", size=21)
-    environment(f, 740, 325, 440, stack=True)
-    f.label(626, 363, "1. copy", size=23, bold=True, color=POINTER)
-    arrow(f, 532, 403, 740, 403, copy=True)
-
-    frame(f, 1330, 438, "Child: first dispatch", "library/start/start.picoc#L7")
-    f.label(1549, 155, "start_process() calls", size=23,
-            link="library/start/start.picoc#L7")
-    f.label(1549, 192, "initialize_environment(envp)", size=23,
-            bold=True, link=INITIALIZE)
-    f.label(1549, 243, "Assigns child's own environ", size=23, link=ENV)
-    f.label(1549, 285, "Allocates in child's User Process Heap", size=21)
-    environment(f, 1350, 325, 398)
-    f.label(1265, 363, "2. copy", size=23, bold=True, color=POINTER)
-    arrow(f, 1180, 403, 1350, 403, copy=True)
-    f.label(1549, 491, "Later setenv() affects only this process", size=21, link=SETENV)
-
-    f.label(960, 491, "PCB: activation.sp / activation.baf updated",
-            size=20, link="kernel/process/process_arguments.picoc#L241")
-    f.label(960, 525, "state = READY, no environment pointer", size=21,
-            link="kernel/process/process.header#L31")
+    for x, child, grandchild, operation, operation_link, value in branches:
+        center = x + 250
+        process(x, 540, 500, f"Process {child}", value,
+                operation=operation, operation_link=operation_link, changed=child != 3)
+        process(x, 916, 500, f"Process {grandchild}", value, changed=child != 3)
+        edge(f"M {center} 427 V 540", center, 493,
+             f'run(cpid{child}, "arg1", NULL)')
+        edge(f"M {center} 710 V 916", center, 817,
+             f'run(cpid{grandchild}, "arg1", NULL)')
     f.save()
 
 

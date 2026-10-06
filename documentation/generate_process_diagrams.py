@@ -363,7 +363,7 @@ def load_transfer():
                "through UART RX. CPU polling or optional DMA copies only binary payload words into "
                "the allocated User Process Image. A temporary ProcessLoad in the Kernel Heap is "
                "referenced by the caller PCB's pending_load field. No child PCB exists yet.",
-               width=1824, height=850, show_address_direction=False)
+               width=1824, height=725, show_address_direction=False)
     f.row(175, 100, [("eprom", 140, ("EPROM", "0x00000000", "bootloader"), MUTED),
                      ("uart", 220, ("UART", "+0 TX · +1 RX", "+2 status"), ALLOCATED,
                       "../RETI-Emulator/include/uart.h"),
@@ -405,8 +405,8 @@ def load_transfer():
     f.arrow("dma", "uimage", "DMA: source = UART RX → destination = base_address", 390,
             below=True, color=POINTER, label_x=1320, dashed=True)
     f.focus("uimage")
-    f.label(32, 823, "The five-word header is consumed by the kernel. It is not copied into the User Process Image.",
-            anchor="start", size=16)
+    # Keep only the diagram, with a small margin around the host and transfer paths.
+    f.parts = ['<g transform="translate(0,-55)">', *f.parts, '</g>']
     f.save()
 
 
@@ -478,9 +478,7 @@ def run_setup():
                "process_list_head, process_list_tail and active_process do not change during run setup. "
                "entry_pc_address identifies the new entry PC cell; highest_stack_address identifies "
                "the final stack cell. Caller input buffers "
-               "are shown separately below the child's contiguous memory layout.", width=1824, height=1040, show_address_direction=False)
-    f.label(32, 99, "mark_process_ready_with_arguments(): descriptor copy → stack copy → state = READY",
-            anchor="start", size=16, color=FOCUS)
+               "are shown separately below the child's contiguous memory layout.", width=1824, height=870, show_address_direction=False)
     memory_snapshot(f, running=True)
     f.focus("fds")
     f.focus("ustack")
@@ -492,8 +490,8 @@ def run_setup():
                          858, 1809, -25, 650, METADATA)
     f.copy_to_right_edge("arguments", "ustack", "request.arguments → token copies",
                          883, 1817, 25, 1430, ADDRESS)
-    f.label(32, 1005, "Caller inputs are separate buffers. libstart initializes the child heap and clones its environment after dispatch.",
-            anchor="start", size=16)
+    # Match the completed-load diagram's origin and leave room for the caller buffers.
+    f.parts = ['<g transform="translate(0,-125)">', *f.parts, '</g>']
     f.save()
 
 

@@ -26,7 +26,7 @@ def main():
         "copied /notes.txt string. Standard descriptors have separate terminal "
         "path copies, omitted along with other allocations. Header letters "
         "identify the illustrated blocks, not a fixed allocation order.",
-        width=1669, height=686,
+        width=1669, height=612, show_address_direction=False,
     )
 
     figure.row(80, 90, [
@@ -63,8 +63,8 @@ def main():
     cells.append(("omitted_after", 50, ("…",), MUTED))
     figure.row(360, 210, cells)
     figure.band("header_A", "omitted_after", 570, "Kernel Heap · expanded", HEAP_EMPHASIS)
-    # Start expansion guides below the SRAM hierarchy bands.
-    figure.cells["kernel_heap"] = (382, 80, 690, 150)
+    # Connect the guides directly to the highlighted Kernel Heap box.
+    figure.cells["kernel_heap"] = (382, 80, 690, 120)
     figure.expand("kernel_heap", "header_A", "omitted_after")
 
     def payload_label(key, value, y, link, size=19):
@@ -118,8 +118,8 @@ def main():
     figure.parts.append(figure_pointer(
         f"M {array_x + 3 * 70 + 35} 552 V 628 H {path_x + 24} V 570"
     ))
-    figure.label(32, 660, "Other allocations omitted · one descriptor path shown", size=16,
-                 anchor="start")
+    # Keep a 32-unit margin around the core visualization for presentation slides.
+    figure.parts = ['<g transform="translate(0,-48)">', *figure.parts, '</g>']
     figure.save()
 
 
