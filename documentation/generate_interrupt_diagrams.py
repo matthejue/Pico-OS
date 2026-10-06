@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from diagram_style import style_svg
+from generate_memory_layout_diagrams import ALLOCATED, HEADER, MUTED, Cell, Diagram, TOP
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,10 +47,10 @@ class Figure:
         if label:
             self.text(x + 12, y + 26, label, size)
 
-    def arrow(self, points, dashed=False):
+    def arrow(self, points, dashed=False, *, color="#27617b", marker="arrow"):
         d = "M " + " L ".join(f"{x} {y}" for x, y in points)
-        self.parts.append(f'<path d="{d}" fill="none" stroke="#27617b" stroke-width="2" '
-                          f'{"stroke-dasharray=\"5 4\"" if dashed else ""} marker-end="url(#arrow)"/>')
+        self.parts.append(f'<path d="{d}" fill="none" stroke="{color}" stroke-width="2" '
+                          f'{"stroke-dasharray=\"5 4\"" if dashed else ""} marker-end="url(#{marker})"/>')
 
     def save(self, name):
         self.parts.append("</g></svg>")
@@ -114,69 +115,121 @@ def memory_map():
     f.save('interrupt-controller-initialization.svg')
 
 
-def timer_memory():
-    f = Figure(1640, 340, "Why the timer compares the saved PC with kernel DS",
-               "The kernel .text lies before .data and its DS boundary. User process .text lies in the Process and Shared Data Heap above the kernel region.")
-    f.text(24, 32, "SRAM offsets increase left to right · widths are schematic", 18)
-    f.box(24, 86, 1125, 170, "kernel")
-    f.text(36, 113, "Kernel region", 20, True)
-    f.box(40, 127, 660, 113, "free")
-    f.text(52, 153, "Kernel image", 18, True)
-    for x, w, label, color in [(52, 85, ".ivt\n0–4", "pc"),
-                               (137, 279, f".text · kernel code\n5–{SECTIONS['datasegment_start']-1}", "active"),
-                               (416, 269, f".data · kernel globals\n{SECTIONS['datasegment_start']}–{SECTIONS['heap_start']-1}", "saved")]:
-        f.box(x, 164, w, 62, color, label, 17)
+def context_memory_cells():
+    """Keep kernel regions identical in the timer and exception SRAM rows."""
     hs = SECTIONS["heap_start"]
     he = hs + SECTIONS["heap_size"] - 1
-    f.box(716, 127, 208, 113, "kernel", f"Kernel heap\n{hs}–{he}", 17)
-    f.box(924, 127, 208, 113, "kernel", f"Kernel stack\n{he+1}–{K-BASE}", 17)
-    f.box(1149, 86, 466, 170, "unused", f"Process and Shared Data Heap\n{PM-BASE}–262143\n\nProcess .text (normal user PCs)\nShared-data payloads", 18)
-    f.arrow([(416, 296), (416, 228)], True)
-    f.text(428, 283, f"kernel DS = {DS:#010x}", 18, True)
-    f.text(24, 323, "saved PC < kernel DS → kernel execution", 19, True)
-    f.text(910, 323, "saved PC > kernel DS → user process", 19, True)
+    return [
+        Cell("ivt", 85, (".ivt", "0–4"), MUTED),
+        Cell("text", 279, (".text · kernel code", f"5–{SECTIONS['datasegment_start']-1}"), ALLOCATED),
+        Cell("data", 269, (".data · kernel globals", f"{SECTIONS['datasegment_start']}–{hs-1}"), MUTED),
+        Cell("heap", 208, ("Kernel objects", f"{hs}–{he}"), MUTED),
+        Cell("stack", 208, ("grows ←", f"{he+1}–{K-BASE}"), MUTED, bold_lines=0),
+    ]
+
+
+def context_memory_bands(outer_first="outer"):
+    return [
+        [("ivt", "data", "Kernel Image", MUTED),
+         ("heap", "heap", "Kernel Heap", MUTED),
+         ("stack", "stack", "Kernel Stack", MUTED),
+         (outer_first, "outer", "Process and Shared Data Heap", MUTED)],
+        [("ivt", "stack", "Kernel", MUTED),
+         (outer_first, "outer", "After the Kernel region", MUTED)],
+    ]
+
+
+def timer_memory():
+    description = (
+        "Continuous SRAM in increasing offset order, with illustrative widths. "
+        "Adjacent .ivt, .text and .data sections form the Kernel Image, followed "
+        "immediately by the Kernel Heap, Kernel Stack and Process and Shared Data Heap. "
+        "Kernel DS points to the start of .data. Kernel code is below this boundary "
+        "and user-process code is above it. Grouping bands match the Section 3 memory layouts."
+    )
+    cells = context_memory_cells() + [
+        Cell("outer", 466, ("Process .text (normal user PCs)", "Shared Data Payloads",
+                            f"{PM-BASE}–262143"), MUTED),
+    ]
+    layout = Diagram("timer-pc", "Why the timer compares the saved PC with kernel DS",
+                     description, cells, context_memory_bands())
+    f = Figure(layout.right + 32, 360, layout.title, description)
+    # Reuse Section 3's cells and shared dividers without its heading or legend.
+    f.parts.append(f'<g transform="translate(0 {80-TOP})">')
+    f.parts.extend(layout.parts)
+    f.parts.append('</g>')
+    ds_x, _ = layout.positions["data"]
+    f.arrow([(ds_x, 24), (ds_x, 78)], True)
+    f.text(ds_x + 12, 48, f"kernel DS = {DS:#010x}", 18, True)
+    f.text(32, 335, "saved PC ≤ kernel DS → kernel branch", 19, True)
+    f.text(layout.positions["outer"][0], 335, "saved PC > kernel DS → process branch", 19, True)
     f.save("timer-pc-memory-layout.svg")
 
 
 def exception_cs():
-    f = Figure(1640, 421, "How exception entry compares interrupted CS with kernel CS",
-               "SRAM regions appear in address order with schematic widths. Kernel CS points to the start of kernel .text. A process's activation.cs points to its own .text. Exception entry preserves interrupted CS in BAF, installs kernel CS, and pushes their difference for handle_cpu_exception. An arrow maps pushed ACC to diff, the abbreviated interrupted_kernel_cs_difference parameter. Zero selects kernel panic and a nonzero value selects process termination.")
-    f.box(24, 24, 1125, 170, "kernel")
-    f.text(36, 51, "Kernel region", 20, True)
-    f.box(40, 65, 660, 113, "free")
-    f.text(52, 91, "Kernel image", 18, True)
-    for x, w, label, color in [(52, 85, ".ivt", "pc"),
-                               (137, 279, ".text · kernel code", "active"),
-                               (416, 269, ".data · kernel globals", "saved")]:
-        f.box(x, 102, w, 62, color, label, 17)
-    f.box(716, 65, 208, 113, "kernel", "Kernel heap", 17)
-    f.box(924, 65, 208, 113, "kernel", "Kernel stack", 17)
-    f.box(1149, 24, 466, 170, "unused")
-    f.text(1161, 51, "Process and Shared Data Heap", 18)
-    f.box(1161, 65, 442, 113, "active")
-    f.text(1173, 91, "One process's .text", 18, True)
-    f.text(1173, 122, "Start = process->activation.cs", 18)
-    f.arrow([(137, 234), (137, 166)], True)
-    f.text(149, 221, f"kernel CS = {CS:#010x}", 18, True)
-    f.arrow([(1161, 234), (1161, 180)], True)
-    f.text(1173, 221, "process CS differs from kernel CS", 18, True)
-    f.box(24, 263, 350, 134, "saved")
-    f.text(36, 293, "A · MOVE BAF ACC", 20, True)
-    f.text(36, 326, "ACC = interrupted CS", 18)
-    f.arrow([(376, 310), (424, 310)])
-    f.box(426, 263, 350, 134, "active")
-    f.text(438, 293, "B · SUB ACC CS", 20, True)
-    f.text(438, 326, "ACC = interrupted CS − kernel CS", 18)
-    f.arrow([(778, 310), (826, 310)])
-    f.box(828, 263, 350, 134, "kernel")
-    f.text(840, 293, "C · PUSH ACC", 20, True)
-    f.text(840, 326, "Kernel-stack argument = difference", 17)
-    f.arrow([(1180, 310), (1228, 310)])
-    f.box(1230, 263, 385, 134, "free")
-    f.text(1242, 293, "D · handle_cpu_exception(diff)", 20, True)
-    f.text(1242, 326, "pushed ACC", 17)
-    f.arrow([(1350, 320), (1556, 320), (1556, 300)])
-    f.text(1242, 353, "diff = 0 → kernel panic\ndiff ≠ 0 → process termination", 17)
+    description = (
+        "Continuous SRAM in increasing offset order with the same kernel cells and "
+        "grouping bands as the timer and Section 3 memory layouts. Kernel CS points "
+        "to kernel .text. ProcessControlBlock.activation.cs points to .text inside "
+        "Process Payload A, following its outer Block Header A. This example omits "
+        "the optional process .ivt. Other process and shared-data blocks are omitted. "
+        "Exception entry preserves interrupted CS in BAF, installs kernel CS, and "
+        "pushes their difference for handle_cpu_exception. A gray value-transfer "
+        "arrow points directly to diff, the abbreviated interrupted_kernel_cs_difference "
+        "parameter. Zero selects kernel panic and a nonzero value selects process termination."
+    )
+    cells = context_memory_cells() + [
+        Cell("outer_header", 80, ("Block", "Header A"), HEADER, "common/heap.header#L5"),
+        Cell("process_text", 180, ("Process Payload A", ".text · process code"), ALLOCATED,
+             "kernel/process/process.header#L27"),
+        Cell("process_rest", 150, (".data", "User Process Heap", "User Process Stack"), ALLOCATED,
+             bold_lines=0),
+        Cell("outer", 56, ("…",), MUTED, bold_lines=0),
+    ]
+    layout = Diagram("exception-cs", "How exception entry compares interrupted CS with kernel CS",
+                     description, cells, context_memory_bands("outer_header"))
+    f = Figure(layout.right + 32, 518, layout.title, description)
+    for marker, color in (("address-arrow", "#26715b"), ("value-arrow", "#526472")):
+        f.parts.append(f'<defs><marker id="{marker}" viewBox="0 0 10 10" refX="9" '
+                       'refY="5" markerWidth="7" markerHeight="7" orient="auto">'
+                       f'<path d="M 0 0 L 10 5 L 0 10 z" fill="{color}"/></marker></defs>')
+    f.parts.append(f'<g transform="translate(0 {80-TOP})">')
+    f.parts.extend(layout.parts)
+    f.parts.append('</g>')
+    kernel_cs_x, _ = layout.positions["text"]
+    process_cs_x, _ = layout.positions["process_text"]
+    for x in (kernel_cs_x, process_cs_x):
+        f.arrow([(x, 24), (x, 78)], True, color="#26715b", marker="address-arrow")
+    f.text(kernel_cs_x + 12, 48, f"kernel CS = {CS:#010x}", 18, True)
+    f.text(process_cs_x + 12, 48, "process->activation.cs", 18, True)
+    f.text(32, 327, "SRAM offsets increase →   ·   Widths are illustrative", 15)
+
+    # Value transfers use gray, matching the shared README diagram convention.
+    y = 360
+    step_width = 340
+    step_gap = 36
+    step_x = tuple(32 + i * (step_width + step_gap) for i in range(4))
+    for x in step_x[:3]:
+        f.box(x, y, step_width, 134, "unused")
+        f.arrow([(x + step_width + 2, y + 47), (x + step_width + step_gap - 2, y + 47)],
+                color="#526472", marker="value-arrow")
+    f.text(step_x[0] + 12, y + 30, "A · MOVE BAF ACC", 20, True)
+    f.text(step_x[0] + 12, y + 63, "ACC = interrupted CS", 18)
+    f.text(step_x[1] + 12, y + 30, "B · SUB ACC CS", 20, True)
+    f.text(step_x[1] + 12, y + 63, "ACC = interrupted CS − kernel CS", 18)
+    f.text(step_x[2] + 12, y + 30, "C · PUSH ACC", 20, True)
+    f.text(step_x[2] + 12, y + 63, "Kernel-stack argument = difference", 17)
+    handler_x = step_x[3]
+    f.box(handler_x, y, layout.right - handler_x, 134, "free")
+    # Anchor the parameter independently of the rendered function-name width.
+    diff_x = layout.right - 58
+    f.text(diff_x - 18, y + 30, "D · handle_cpu_exception(", 20, True, anchor="end")
+    f.text(diff_x, y + 30, "diff", 20, True, anchor="middle")
+    f.text(diff_x + 18, y + 30, ")", 20, True)
+    f.text(handler_x + 12, y + 63, "pushed ACC", 17)
+    f.arrow([(handler_x + 120, y + 57), (diff_x, y + 57), (diff_x, y + 37)],
+            color="#526472", marker="value-arrow")
+    f.text(handler_x + 12, y + 90, "diff = 0 → kernel panic\ndiff ≠ 0 → process termination", 17)
     f.save("exception-cs-comparison.svg")
 
 

@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2354" height="611" viewBox="0 0 2354 611" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="2354" height="496" viewBox="0 50 2354 496" role="img" aria-labelledby="title desc">
 <title id="title">From Shared Memory Entries to Shared Data Payloads in SRAM</title>
 <desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Each depicted heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain Shared Memory Entry 1 and Shared Memory Entry 2. Their address fields reach Shared Data Payloads A and C, immediately after their outer headers. Kernel Heap Payload B contains PCB 1, whose Process Payload B is shown for context. Only the two shared-data address pointers are drawn. Other allocations are omitted.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#25734f"/></marker></defs>
 <rect width="2354" height="611" fill="white"/>
 <g font-family="Cantarell, sans-serif">
-<text x="32" y="28" text-anchor="start" font-size="15" font-weight="normal" fill="#17313a">Low to high addresses →   ·   Widths are illustrative</text><rect x="32" y="310" width="70" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<rect x="32" y="310" width="70" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#17313a">5 cells</text>
 <rect x="102" y="310" width="100" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
 <text x="152.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.text</text><text x="152.0" y="405.0" text-anchor="middle" font-size="13.196480938416421" font-weight="normal" fill="#17313a">kernel code</text>
@@ -77,7 +77,6 @@
 <rect x="1669.5" y="137" width="70" height="18" fill="white" stroke="none" stroke-width="1"/>
 <text x="1704.5" y="151" text-anchor="middle" font-size="14" font-weight="normal" fill="#25734f">address</text>
 <rect x="582" y="310" width="210" height="156" fill="none" stroke="#805916" stroke-width="3"/>
-<rect x="862" y="310" width="210" height="156" fill="none" stroke="#805916" stroke-width="3"/>
-<rect x="1142" y="310" width="210" height="156" fill="none" stroke="#805916" stroke-width="3"/><text x="32" y="591" text-anchor="start" font-size="14" font-weight="normal" fill="#17313a">Gray: block headers   ·   Teal: allocated payloads   ·   Green: free payloads</text>
+<rect x="1142" y="310" width="210" height="156" fill="none" stroke="#805916" stroke-width="3"/>
 </g>
 </svg>

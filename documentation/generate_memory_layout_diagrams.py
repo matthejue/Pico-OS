@@ -338,7 +338,8 @@ def shared_memory_list():
     ]
     fig = sram(
         "shared-list", "Global shared-memory list and entry names in SRAM",
-        "Kernel .ivt, .text and .data form the outlined Kernel Image. "
+        "Kernel .ivt, .text and .data form the Kernel Image. Only .data is outlined "
+        "to mark the kernel globals containing the shared-memory list head. "
         "The global shared_memory_list_head in kernel .data points to Shared Memory Entry 1. "
         "SharedMemoryEntry.next links Entry 1 to Entry 2, whose next is NULL. Each entry and "
         "its copied name occupy separate Kernel Heap payloads. name points to the corresponding "
@@ -356,8 +357,7 @@ def shared_memory_list():
               target_shift=60)
     for source, target in (("kpA", "kpB"), ("kpC", "kpD")):
         fig.arrow(source, target, "name", lane=275, color=ADDRESS, source_shift=-50)
-    fig.highlight("ivt", "data")
-    for key in ("kpA", "kpC"):
+    for key in ("data", "kpA", "kpC"):
         x, width = fig.positions[key]
         fig.parts.append(fig.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
                                   stroke_width=3))
@@ -431,18 +431,19 @@ def shared_memory_payload_links():
     )
     mapping.arrow("kpA", "opA", "address", lane=80, color=ADDRESS, source_shift=-55)
     mapping.arrow("kpC", "opC", "address", lane=150, color=ADDRESS, source_shift=-55)
-    for key in ("kpA", "kpB", "kpC"):
+    for key in ("kpA", "kpC"):
         x, width = mapping.positions[key]
         mapping.parts.append(mapping.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
                                           stroke_width=3))
-    mapping.save()
+    mapping.save(notes=False, top=50, bottom=mapping.bottom + 20)
 
 
 def shared_memory_attachments():
     """Show the same PCB attachment lists in SRAM and as logical lists."""
     fig = sram(
         "shared-attachments", "Per-process shared-memory attachment lists within SRAM",
-        "Kernel .ivt, .text and .data form the outlined Kernel Image. "
+        "Kernel .ivt, .text and .data form the Kernel Image. Only .data is outlined "
+        "to mark the kernel globals containing the shared-memory list head. "
         "Two PCBs, three SharedMemoryAttachment objects and two SharedMemoryEntry objects "
         "occupy seven separate Kernel Heap payloads. PCB 1 links Attachment 1 then Attachment 2, "
         "which reference Entry 1 and Entry 2. PCB 2 links Attachment 3, which also references "
@@ -483,8 +484,7 @@ def shared_memory_attachments():
                                       ("kpE", "kpF", 645, 65)):
         fig.arrow(source, target, "entry", lane=lane, color=METADATA, below=True,
                   target_shift=shift)
-    fig.highlight("ivt", "data")
-    for key in ("kpA", "kpB", "kpC", "kpD", "kpE", "kpF", "kpG"):
+    for key in ("data", "kpA", "kpB", "kpC", "kpD", "kpE", "kpF", "kpG"):
         x, width = fig.positions[key]
         fig.parts.append(fig.rect(x, TOP, width, CELL_HEIGHT, "none", stroke=FOCUS,
                                   stroke_width=3))

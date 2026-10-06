@@ -1,37 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="340" viewBox="0 0 1640 340" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1579" height="360" viewBox="0 0 1579 360" role="img" aria-labelledby="title desc">
 <title id="title">Why the timer compares the saved PC with kernel DS</title>
-<desc id="desc">The kernel .text lies before .data and its DS boundary. User process .text lies in the Process and Shared Data Heap above the kernel region.</desc>
+<desc id="desc">Continuous SRAM in increasing offset order, with illustrative widths. Adjacent .ivt, .text and .data sections form the Kernel Image, followed immediately by the Kernel Heap, Kernel Stack and Process and Shared Data Heap. Kernel DS points to the start of .data. Kernel code is below this boundary and user-process code is above it. Grouping bands match the Section 3 memory layouts.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
 <g font-family="Cantarell, sans-serif" fill="#17313a">
-<text x="24" y="32" font-size="18" font-weight="normal" text-anchor="start">SRAM offsets increase left to right · widths are schematic</text>
-<rect x="24" y="86" width="1125" height="170" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
-<text x="36" y="113" font-size="20" font-weight="bold" text-anchor="start">Kernel region</text>
-<rect x="40" y="127" width="660" height="113" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
-<text x="52" y="153" font-size="18" font-weight="bold" text-anchor="start">Kernel image</text>
-<rect x="52" y="164" width="85" height="62" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
-<text x="64" y="190" font-size="17" font-weight="normal" text-anchor="start">.ivt</text>
-<text x="64" y="212" font-size="17" font-weight="normal" text-anchor="start">0–4</text>
-<rect x="137" y="164" width="279" height="62" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
-<text x="149" y="190" font-size="17" font-weight="normal" text-anchor="start">.text · kernel code</text>
-<text x="149" y="212" font-size="17" font-weight="normal" text-anchor="start">5–40754</text>
-<rect x="416" y="164" width="269" height="62" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
-<text x="428" y="190" font-size="17" font-weight="normal" text-anchor="start">.data · kernel globals</text>
-<text x="428" y="212" font-size="17" font-weight="normal" text-anchor="start">40755–41485</text>
-<rect x="716" y="127" width="208" height="113" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
-<text x="728" y="153" font-size="17" font-weight="normal" text-anchor="start">Kernel heap</text>
-<text x="728" y="175" font-size="17" font-weight="normal" text-anchor="start">41486–45581</text>
-<rect x="924" y="127" width="208" height="113" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
-<text x="936" y="153" font-size="17" font-weight="normal" text-anchor="start">Kernel stack</text>
-<text x="936" y="175" font-size="17" font-weight="normal" text-anchor="start">45582–48297</text>
-<rect x="1149" y="86" width="466" height="170" fill="#f4f8f8" stroke="#637983" stroke-width="1.5"/>
-<text x="1161" y="112" font-size="18" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
-<text x="1161" y="135" font-size="18" font-weight="normal" text-anchor="start">48298–262143</text>
-<text x="1161" y="158" font-size="18" font-weight="normal" text-anchor="start"></text>
-<text x="1161" y="181" font-size="18" font-weight="normal" text-anchor="start">Process .text (normal user PCs)</text>
-<text x="1161" y="204" font-size="18" font-weight="normal" text-anchor="start">Shared-data payloads</text>
-<path d="M 416 296 L 416 228" fill="none" stroke="#167b84" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
-<text x="428" y="283" font-size="18" font-weight="bold" text-anchor="start">kernel DS = 0x80009f33</text>
-<text x="24" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC &lt; kernel DS → kernel execution</text>
-<text x="910" y="323" font-size="19" font-weight="bold" text-anchor="start">saved PC &gt; kernel DS → user process</text>
+<g transform="translate(0 -230)">
+<rect x="32" y="310" width="85" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="74.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.ivt</text><text x="74.5" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">0–4</text>
+<rect x="117" y="310" width="279" height="156" fill="#d8efef" stroke="none" stroke-width="1"/>
+<text x="256.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.text · kernel code</text><text x="256.5" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">5–40754</text>
+<rect x="396" y="310" width="269" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="530.5" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.data · kernel globals</text><text x="530.5" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">40755–41485</text>
+<rect x="665" y="310" width="208" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="769.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">Kernel objects</text><text x="769.0" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">41486–45581</text>
+<rect x="873" y="310" width="208" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="977.0" y="384.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">grows ←</text><text x="977.0" y="405.0" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">45582–48297</text>
+<rect x="1081" y="310" width="466" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="1314.0" y="373.5" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">Process .text (normal user PCs)</text><text x="1314.0" y="394.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">Shared Data Payloads</text><text x="1314.0" y="415.5" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">48298–262143</text>
+<rect x="32" y="466" width="633" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="348.5" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">Kernel Image</text>
+<rect x="665" y="466" width="208" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="769.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">Kernel Heap</text>
+<path d="M 665 466 v 30" fill="none" stroke="#637983" stroke-width="1.5"/>
+<rect x="873" y="466" width="208" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="977.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">Kernel Stack</text>
+<path d="M 873 466 v 30" fill="none" stroke="#637983" stroke-width="1.5"/>
+<rect x="1081" y="466" width="466" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="1314.0" y="486" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">Process and Shared Data Heap</text>
+<path d="M 1081 466 v 30" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 32 466 H 1547" fill="none" stroke="#637983" stroke-width="1.5"/>
+<rect x="32" y="496" width="1049" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="556.5" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">Kernel</text>
+<rect x="1081" y="496" width="466" height="30" fill="#f4f8f8" stroke="none" stroke-width="1"/>
+<text x="1314.0" y="516" text-anchor="middle" font-size="15" font-weight="bold" fill="#17313a">After the Kernel region</text>
+<path d="M 1081 496 v 30" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 32 496 H 1547" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 117 310 v 156" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 396 310 v 156" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 665 310 v 156" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 873 310 v 156" fill="none" stroke="#637983" stroke-width="1.5"/>
+<path d="M 1081 310 v 156" fill="none" stroke="#637983" stroke-width="1.5"/>
+<rect x="32" y="310" width="1515" height="216" fill="none" stroke="#637983" stroke-width="1.5"/>
+</g>
+<path d="M 396 24 L 396 78" fill="none" stroke="#167b84" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<text x="408" y="48" font-size="18" font-weight="bold" text-anchor="start">kernel DS = 0x80009f33</text>
+<text x="32" y="335" font-size="19" font-weight="bold" text-anchor="start">saved PC ≤ kernel DS → kernel branch</text>
+<text x="1081" y="335" font-size="19" font-weight="bold" text-anchor="start">saved PC &gt; kernel DS → process branch</text>
 </g></svg>

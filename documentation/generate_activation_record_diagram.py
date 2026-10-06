@@ -67,7 +67,7 @@ def generate():
         f.label(x + 85, 397, name, size=24, bold=True, link=f"{HEADER}#L{22 + index}")
     f.box(272, 335, 1190, 85, "none", FOCUS, 3)
 
-    f.label(1410, 482, "Process stack", size=22, bold=True)
+    f.label(1410, 482, "Process stack of Process 1", size=22, bold=True)
     f.box(1100, 505, 290, 70, MUTED)
     f.box(1390, 505, 290, 70, "#eadffa")
     f.label(1245, 534, "activation.sp", size=20, link=f"{HEADER}#L25")

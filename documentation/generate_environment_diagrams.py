@@ -1,7 +1,8 @@
 """Generate the environment diagrams in README section 4.2.2.2.1.
 
-Run with Python 3. Reuse the chapter 4 SVG style. The propagation tree keeps
-one variable and labels process-start arrows with concrete run calls.
+Run with Python 3. Reuse the chapter 4 SVG style. The propagation tree shows
+kernel startup and the configuration source, then follows one variable and
+labels process-start arrows with concrete run calls.
 """
 
 from generate_process_diagrams import Figure
@@ -106,9 +107,15 @@ def origin():
 
 
 def propagation():
-    """Show independent environment changes across two child generations."""
+    """Show environment origin and changes across two child generations."""
     f = Figure(
-        "environment-propagation", "Environment inheritance through three process branches",
+        "environment-propagation", "Environment origin and inheritance through three process branches",
+        "The kernel loads system/init.bin with load_process, prepares an empty "
+        "environment with init_request.environment = NULL and "
+        "mark_process_ready_with_arguments, then starts init with "
+        "dispatcher_start_next_process. Init starts with an empty environ array. "
+        "Its read_environment function opens and reads config/environment.txt, "
+        "then setenv stores PATH=/user in its own environ. "
         "Init passes PATH=/user to the shell with run(shell_pid, NULL, NULL). "
         "The shell starts three processes using run with a NULL environment argument. "
         "Process 1 removes PATH with unsetenv, process 2 changes PATH to /test with "
@@ -141,9 +148,41 @@ def propagation():
         f.box(x - 260, y - 29, 520, 39, "white", "none")
         f.label(x, y, call, size=28, link=RUN)
 
-    process(710, 24, 500, "init", "PATH=/user", link="system/init.picoc#L100")
-    process(710, 250, 500, "shell", "PATH=/user", link="user/shell.picoc")
-    edge("M 960 154 V 250", 960, 211, "run(shell_pid, NULL, NULL)")
+    # Kernel startup and file reads are separate from environment inheritance.
+    f.box(32, 24, 550, 210, MUTED, thickness=2.5)
+    f.label(307, 62, "Kernel", size=32, bold=True, link="kernel/kernel.picoc#L31")
+    f.label(307, 102, 'load_process("system/init.bin", ...)', size=24,
+            link="kernel/process/process_loader.picoc#L305")
+    f.label(307, 139, "init_request.environment = NULL", size=24,
+            link="kernel/kernel.picoc#L48")
+    f.label(307, 174, "mark_process_ready_with_arguments(&init_request)", size=20,
+            link="kernel/process/process_arguments.picoc#L241")
+    f.label(307, 212, "dispatcher_start_next_process()", size=24,
+            link="kernel/dispatcher.picoc#L55")
+    arrow(f, 582, 102, 710, 102)
+    f.label(646, 89, "loads", size=24)
+    arrow(f, 582, 204, 710, 204)
+    f.label(646, 191, "starts", size=24)
+
+    f.box(710, 24, 500, 210, ALLOCATED, POINTER, thickness=2.5)
+    f.label(960, 62, "init", size=32, bold=True, link="system/init.picoc#L100")
+    f.label(960, 99, "Starts with an empty environ array", size=24, link=ENV)
+    f.label(960, 135, "read_environment()", size=28, link=INIT)
+    f.label(960, 172, 'setenv("PATH", "/user", true)', size=26, link=SETENV)
+    f.label(960, 212, "environ: PATH=/user", size=32, color=POINTER, link=ENV)
+
+    f.box(1460, 24, 428, 210, MUTED, thickness=2.5)
+    f.label(1674, 65, "Configuration file", size=30, bold=True)
+    f.label(1674, 111, "config/environment.txt", size=28,
+            link="config/environment.txt")
+    f.label(1674, 200, "PATH=/user", size=32, link="config/environment.txt")
+    arrow(f, 1210, 135, 1460, 135)
+    f.label(1335, 122, "open() + read()", size=24, link=INIT)
+    arrow(f, 1460, 198, 1210, 198)
+    f.label(1335, 185, "PATH=/user", size=26)
+
+    process(710, 290, 500, "shell", "PATH=/user", link="user/shell.picoc")
+    edge("M 960 234 V 290", 960, 270, "run(shell_pid, NULL, NULL)")
 
     # Each cpid identifies a separately loaded process, not a fixed PID value.
     branches = (
@@ -153,7 +192,7 @@ def propagation():
     )
     # A shared junction makes the shell's three direct children clear at a glance.
     f.parts.append(
-        f'<path d="M 960 380 V 427 M 340 427 H 1580" fill="none" '
+        f'<path d="M 960 420 V 457 M 340 457 H 1580" fill="none" '
         f'stroke="{POINTER}" stroke-width="3"/>'
     )
     for x, child, grandchild, operation, operation_link, value in branches:
@@ -161,7 +200,7 @@ def propagation():
         process(x, 540, 500, f"Process {child}", value,
                 operation=operation, operation_link=operation_link, changed=child != 3)
         process(x, 916, 500, f"Process {grandchild}", value, changed=child != 3)
-        edge(f"M {center} 427 V 540", center, 493,
+        edge(f"M {center} 457 V 540", center, 493,
              f'run(cpid{child}, "arg1", NULL)')
         edge(f"M {center} 710 V 916", center, 817,
              f'run(cpid{grandchild}, "arg1", NULL)')

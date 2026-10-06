@@ -632,8 +632,9 @@ def termination_status():
     heap_fill = "#f6e8d5"
     status_fill = "#f6eee5"
     f = Figure("termination-status", "Where a child's termination status is stored",
-               "Continuous SRAM has a Kernel Image, Kernel Heap with separate parent and child "
-               "PCB allocations, Kernel Stack, and Process and Shared Data Heap with separate "
+               "Continuous SRAM has a Kernel Image, Kernel Heap with separate "
+               "PCB A (parent) and PCB B (child) allocations, Kernel Stack, and "
+               "Process and Shared Data Heap with separate "
                "parent and child payloads. Expanded PCB fields show the parent's saved status "
                "pointer and the child's exit_status. The parent payload expands into image, "
                "heap, and stack, then into the suspended syscall and waitpid frames. "
@@ -647,10 +648,10 @@ def termination_status():
         ("text", 100, (".text", "kernel code"), MUTED),
         ("data", 130, (".data", "kernel globals"), MUTED),
         ("kha", 60, ("Block", "Header A"), HEADER),
-        ("parent", 190, ("Payload A", "PCB 1 · parent", "ProcessControlBlock"), ALLOCATED,
+        ("parent", 190, ("Payload A", "PCB A · parent", "ProcessControlBlock"), ALLOCATED,
          "kernel/process/process.header#L31"),
         ("khb", 60, ("Block", "Header B"), HEADER),
-        ("child", 190, ("Payload B", "PCB 2 · child", "ProcessControlBlock"), ALLOCATED,
+        ("child", 190, ("Payload B", "PCB B · child", "ProcessControlBlock"), ALLOCATED,
          "kernel/process/process.header#L31"),
         ("kother", 60, ("Other", "blocks"), MUTED),
         ("kstack", 130, ("Kernel Stack", "kernel calls", "grows ←"), MUTED),
@@ -671,17 +672,17 @@ def termination_status():
 
     # Show selected attributes inside their allocated PCBs, linked to definitions.
     for name, x, title, fields in (
-        ("p", 32, "PCB 1 · parent", [
+        ("p", 32, "PCB A · parent", [
             ("pid", "pid = 1", 32),
             ("state", "state = BLOCKED → READY", 33),
             ("ptr", "waiting_status_ptr = &status", 44),
             ("base", "base_address → Process Payload A", 34),
         ]),
-        ("c", 422, "PCB 2 · child", [
+        ("c", 422, "PCB B · child", [
             ("pid", "pid = 2 · parent_pid = 1", 57),
             ("exit", "exit_status = 7", 60),
             ("state", "state = ZOMBIE", 33),
-            ("waiters", "waiters.head / tail = &PCB 1", 46),
+            ("waiters", "waiters.head / tail = &PCB A", 46),
         ]),
     ):
         f.row(390, 42, [(name + "title", 350, (title,), ALLOCATED,
@@ -715,6 +716,10 @@ def termination_status():
     f.band("pheap", "pheap", 520, "User Process Heap", heap_fill)
     f.band("pstack", "pstack", 520, "User Process Stack", ALLOCATED)
     expand_box("pa", "ptext", "pstack")
+    f.label(1346, 342, "Process Payload of Process A", size=18, bold=True,
+            link="kernel/process/process.header#L34")
+    f.label(1250, 378, "User Process Heap of Process A", size=14, bold=True,
+            link="kernel/process/process.header#L36")
 
     f.row(780, 120, [
         ("unused", 100, ("Unused", "stack cells"), FREE),
@@ -743,6 +748,8 @@ def termination_status():
     f.band("caller", "startup", 900, "Older stack contents")
     f.band("rpid", "pidarg", 930, "waitpid() stack frame")
     expand_box("pstack", "unused", "startup")
+    f.label(32, 690, "User Process Stack of Process A", size=18, bold=True,
+            anchor="start", link="library/sys/wait/wait.picoc#L14")
     f.arrow("helper", "rpid", "IN1 = &request at INT 0", 712,
             color=ADDRESS, label_x=610)
     f.arrow("rstatus", "status", "request.status = &status", 706,

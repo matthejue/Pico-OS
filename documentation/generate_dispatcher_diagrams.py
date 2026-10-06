@@ -26,6 +26,13 @@ def path(f, d, color=POINTER):
                    f'stroke-width="2" marker-end="url(#{color[1:]})"/>')
 
 
+def step_number(f, x, baseline, number, color=METADATA):
+    """Draw a circled action number beside its label."""
+    f.parts.append(f'<circle cx="{x}" cy="{baseline - 8}" r="16" '
+                   f'fill="white" stroke="{color}" stroke-width="2"/>')
+    f.label(x, baseline - 1, number, size=20, bold=True, color=color)
+
+
 def sram_context(f, number, *, saving):
     """Same SRAM regions for both directions of a context switch."""
     stack_lines = ("Kernel Stack", "caller_context") if saving else (
@@ -152,12 +159,18 @@ def state_change():
 
 
 def restore_context():
-    f = Figure("dispatcher-restore", "Restore PCB 5.activation and return through its user stack with RTI",
-               "Three separate regions show PCB 5 in SRAM's Kernel Heap, the CPU, and PCB 5's "
-               "user stack and code in SRAM's Process Payload A. activation is embedded in PCB 5. "
+    f = Figure("dispatcher-restore", "Restore PCB 1.activation and return through its user stack with RTI",
+               "This standalone example uses PCB 1 as the selected process. "
+               "Three separate regions show PCB 1 in SRAM's Kernel Heap, the CPU, and PCB 1's "
+               "user stack and code in SRAM's Process Payload A. activation is embedded in PCB 1. "
                "Its seven fields are shown in struct order and arrows copy their values into CPU "
-               "registers. Numbered actions show SP restored first, the periphery stack boundary "
+               "registers. The PCB and stack tables each show lower addresses at the top and "
+               "higher addresses at the bottom, with downward address-order arrows. The user "
+               "process image is above the heap, which is above the stack, matching SRAM address order. "
+               "Circled action numbers show SP restored first, the periphery stack boundary "
                "installed second, and the remaining registers restored third, with BAF last. "
+               "Step 4 executes the CPU instruction RTI, meaning return from interrupt. "
+               "Step numbers describe the action order, not process numbers. "
                "The SP register stores an address pointing to the saved ACC cell in the user stack. "
                "SP and SP + 1 in the stack's address column denote SRAM addresses, not registers. "
                "RTI actually reads the saved PC from the cell at SP + 1, advances SP by one, and "
@@ -171,7 +184,7 @@ def restore_context():
     f.box(32, 32, 500, 590, "white", thickness=2)
     f.label(282, 70, "SRAM · Kernel Heap", size=27, bold=True)
     f.box(52, 96, 460, 506, MUTED)
-    f.label(282, 132, "Payload B · PCB 5", size=27, bold=True, link=f"{PCB}#L31")
+    f.label(282, 132, "Payload B · PCB 1", size=27, bold=True, link=f"{PCB}#L31")
     f.label(282, 167, "state = RUNNING", size=23, link=f"{PCB}#L33")
     f.label(282, 207, "activation · saved register values", size=24,
             link=f"{PCB}#L40")
@@ -180,8 +193,9 @@ def restore_context():
     f.label(935, 70, "CPU", size=29, bold=True)
     f.label(935, 111, "Live registers", size=25)
 
-    f.label(651, 161, "3 Load remaining", size=22, color=METADATA)
-    f.label(651, 190, "registers", size=22, color=METADATA)
+    step_number(f, 610, 161, 3)
+    f.label(634, 161, "Load", size=22, color=METADATA, anchor="start")
+    f.label(651, 190, "remaining registers", size=22, color=METADATA)
     roles = {"sp": "SP · stack pointer", "cs": "CS · code base",
              "ds": "DS · data base", "baf": "BAF (restored last)"}
     for index, (name, offset, line) in enumerate(REGISTERS):
@@ -189,37 +203,64 @@ def restore_context():
         f.box(72, y, 420, 52, ALLOCATED)
         f.label(94, y + 34, f"activation.{name}", size=25, anchor="start",
                 link=f"{PCB}#L{line}")
-        f.label(469, y + 34, f"PCB + {offset}", size=21, anchor="end")
+        if index in (0, len(REGISTERS) - 1):
+            f.label(469, y + 23, f"PCB + {offset}", size=21, anchor="end")
+            f.label(469, y + 44,
+                    "Lower address" if index == 0 else "Higher address",
+                    size=16, anchor="end", color=ADDRESS)
+        else:
+            f.label(469, y + 34, f"PCB + {offset}", size=21, anchor="end")
         f.box(800, y, 270, 52, ALLOCATED)
         f.label(935, y + 34, roles.get(name, name.upper()), size=23, bold=True)
         path(f, f"M 497 {y + 26} H 795", ADDRESS if name == "sp" else METADATA)
-    f.label(651, 393, "1 Load SP", size=24, color=ADDRESS)
+    path(f, "M 61 238 V 574", ADDRESS)
+    f.label(282, 649, "PCB addresses increase ↓", size=22, color=ADDRESS)
+    step_number(f, 584, 393, 1, ADDRESS)
+    f.label(608, 393, "Load SP", size=24, color=ADDRESS, anchor="start")
 
     f.box(1230, 32, 538, 828, "white", thickness=2)
     f.label(1499, 70, "SRAM · Process Payload A", size=27, bold=True)
-    f.label(1499, 111, "PCB 5's user process", size=25)
-    f.box(1250, 280, 498, 280, MUTED)
-    f.label(1499, 316, "User Process Stack", size=27, bold=True)
-    f.label(1499, 349, "Addresses shown before RTI", size=23)
-    f.label(1340, 375, "Address", size=21)
-    f.label(1590, 375, "Stored value", size=21)
+    f.label(1499, 111, "PCB 1's user process", size=25)
+    f.label(1499, 149, "Lower addresses", size=22, color=ADDRESS)
+    path(f, "M 1240 176 V 782", ADDRESS)
+    f.label(1499, 790, "Higher addresses", size=22, color=ADDRESS)
+
+    # Keep the process regions in physical address order: image, heap, stack.
+    f.box(1270, 170, 458, 156, PC_FILL)
+    f.label(1499, 206, "User Process Image · .text", size=25, bold=True)
+    f.label(1499, 248, "Instruction at saved PC + 1", size=25)
+    f.label(1499, 289, "Process 1 resumes here", size=26, bold=True)
+    f.box(1270, 348, 458, 70, MUTED)
+    f.label(1499, 392, "User Process Heap", size=25, bold=True)
+
+    f.box(1250, 450, 498, 280, MUTED)
+    f.label(1499, 486, "User Process Stack", size=27, bold=True)
+    f.label(1499, 519, "Addresses shown before RTI", size=23)
+    f.label(1340, 545, "Address", size=21)
+    f.label(1590, 545, "Stored value", size=21)
     for y, address, value, fill in (
-        (380, "SP", "saved ACC", ALLOCATED),
-        (432, "SP + 1", "saved PC", PC_FILL),
+        (550, "SP", "saved ACC", ALLOCATED),
+        (602, "SP + 1", "saved PC", PC_FILL),
     ):
         f.box(1270, y, 140, 52, MUTED)
         f.box(1410, y, 318, 52, fill)
-        f.label(1340, y + 34, address, size=25, bold=True)
+        f.label(1340, y + 23, address, size=25, bold=True)
+        f.label(1340, y + 44,
+                "Lower address" if address == "SP" else "Higher address",
+                size=16, color=ADDRESS)
         f.label(1569, y + 34, value, size=25, bold=True)
-    f.label(1499, 527, "Each row is one SRAM cell", size=23)
-    path(f, "M 1075 406 H 1265", POINTER)
-    f.label(1170, 391, "points to", size=22, color=POINTER)
+    path(f, "M 1259 564 V 640", ADDRESS)
+    f.label(1499, 686, "Stack addresses increase ↓", size=22, color=ADDRESS)
+    f.label(1499, 716, "Each row is one SRAM cell", size=21)
+    path(f, "M 1075 406 H 1195 V 576 H 1265", POINTER)
+    f.label(1160, 391, "points to", size=22, color=POINTER)
 
     # The boundary is a periphery register, not a member of the CPU register
     # bank or a divider between register rows. IN1 holds it only temporarily.
     f.box(32, 674, 680, 186, MUTED, thickness=2)
     f.label(372, 709, "Periphery · memory-mapped register", size=26, bold=True)
-    f.label(372, 745, "2 Install stack limit", size=24,
+    step_number(f, 253, 745, 2)
+    f.label(277, 745, "Install stack limit", size=24, anchor="start",
             link="common/periphery_asm.header#L2")
     f.label(372, 782, "STACK_HEAP_BOUNDARY_REGISTER ← IN1", size=24,
             link="kernel/exception.header#L5")
@@ -230,17 +271,16 @@ def restore_context():
     # The saved-PC read is an actual data transfer performed by RTI. The
     # outgoing arrow identifies the resumed instruction in the process code.
     f.box(800, 674, 270, 156, PC_FILL)
-    f.label(935, 710, "4 Execute RTI", size=25, bold=True, link=f"{DISPATCHER}#L40")
-    f.label(935, 752, "PC ← saved PC + 1", size=23)
-    f.label(935, 793, "SP ← SP + 1", size=24)
-    path(f, "M 1733 458 H 1758 V 602 H 1160 V 702 H 1075", METADATA)
-    f.label(1499, 590, "RTI reads this saved PC", size=24, color=METADATA)
-    f.box(1270, 674, 458, 156, PC_FILL)
-    f.label(1499, 710, "User Process Image · .text", size=25, bold=True)
-    f.label(1499, 752, "Instruction at saved PC + 1", size=25)
-    f.label(1499, 793, "Process 5 resumes here", size=26, bold=True)
-    path(f, "M 1075 780 H 1265", POINTER)
-    f.label(1170, 762, "PC points to", size=22, color=POINTER)
+    step_number(f, 852, 710, 4)
+    f.label(876, 710, "Execute RTI", size=24, bold=True, anchor="start",
+            link=f"{DISPATCHER}#L40")
+    f.label(935, 743, "Return from interrupt", size=21)
+    f.label(935, 779, "PC ← saved PC + 1", size=23)
+    f.label(935, 811, "SP ← SP + 1", size=24)
+    path(f, "M 1733 628 H 1758 V 758 H 1160 V 702 H 1075", METADATA)
+    f.label(1499, 753, "RTI reads this saved PC", size=22, color=METADATA)
+    path(f, "M 1075 780 H 1115 V 844 H 1788 V 248 H 1733", POINTER)
+    f.label(1499, 827, "PC points to the resumed instruction", size=22, color=POINTER)
     f.save()
 
 
