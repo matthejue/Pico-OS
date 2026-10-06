@@ -3,6 +3,7 @@
 
 #define LOADING_BAR_WIDTH 10
 
+// Writes the operation and path over UART when enabled without loading stdio
 void uart_print_loading_bar_label(
     bool show_loading_bar,
     char *operation,
@@ -17,6 +18,7 @@ void uart_print_loading_bar_label(
     uart_print_character('\n');
 }
 
+// Draws a ten-cell progress bar and percentage over UART without loading stdio
 void uart_print_loading_bar(int filled, int percentage) {
     int index = 0;
 

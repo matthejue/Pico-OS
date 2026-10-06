@@ -1,5 +1,6 @@
 #include "string.header"
 
+// Counts characters up to '\0' for kernel code and strlen() without linking the full string library
 int string_length(char *value) {
     int length = 0;
 

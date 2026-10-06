@@ -1,6 +1,7 @@
 #include "decimal.header"
 #include "stddef.header"
 
+// Writes decimal digits and returns their count without loading stdio's formatting code
 int append_decimal(char *buffer, int value) {
     char digits[12];
     int digit_count = 0;

@@ -10,6 +10,7 @@
 #define CAT_INPUT_LINE_CAPACITY 80
 #define CAT_CTRL_D 4
 
+// Writes the path and error message to stderr through command_write() without loading stdio
 void print_path_error(char *path, char *message) {
     command_write(STDERR_FILENO, "cat: ");
     command_write(STDERR_FILENO, path);
@@ -26,12 +27,14 @@ void cat_usage(int file_descriptor) {
     );
 }
 
+// Echoes an input character to stderr when enabled without loading stdio
 void echo_input_character(char character, bool echo_input) {
     if (echo_input) {
         write(STDERR_FILENO, &character, 1);
     }
 }
 
+// Writes bytes unchanged to files or escapes terminal controls without loading stdio
 int write_file_contents(char *buffer, int count, bool terminal_output) {
     char output[CAT_BUFFER_SIZE * 4];
     char *hex_digits = "0123456789abcdef";

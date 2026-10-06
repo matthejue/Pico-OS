@@ -6,6 +6,7 @@
 #include "../../library/sys/mman/mman.header"
 #include "../../library/unistd/unistd.header"
 
+// Counts and writes text to stdout without loading stdio or string
 void write_text(char *text) {
     int length = 0;
 

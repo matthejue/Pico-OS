@@ -1,0 +1,8 @@
+#pragma once
+
+#include "../../library/mutex/mutex.header"
+
+struct SharedState {
+    int workers;
+    struct mutex mutex;
+};

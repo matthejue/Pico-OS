@@ -1,6 +1,7 @@
 #include "mman.header"
 #include "../../../common/syscall.header"
 
+// Invokes INT 0 with ACC/IN1 and returns IN2 without loading unistd into SRAM
 int invoke_mman_syscall(int number, int argument) {
     int result;
 

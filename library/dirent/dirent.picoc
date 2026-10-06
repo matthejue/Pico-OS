@@ -1,7 +1,17 @@
 #include "dirent.header"
 #include "../stdlib/stdlib.header"
-#include "../unistd/unistd.header"
 #include "../../common/syscall.header"
+
+// Invokes INT 0 with ACC/IN1 and returns IN2 without loading unistd into SRAM
+int invoke_dirent_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF IN2 0");
+    return result;
+}
 
 #define DIRECTORY_BUFFER_CAPACITY 512
 
@@ -24,7 +34,7 @@ DIR *opendir(char *path) {
     request.path = path;
     request.buffer = directory->contents;
     request.capacity = DIRECTORY_BUFFER_CAPACITY;
-    directory->length = invoke_syscall(
+    directory->length = invoke_dirent_syscall(
         SYSCALL_READ_DIRECTORY,
         (int)&request
     );

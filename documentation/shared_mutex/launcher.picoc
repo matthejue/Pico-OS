@@ -1,0 +1,31 @@
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks ../../library/mutex/libmutex.reti_blocks
+
+#include "shared.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
+
+int main(void) {
+    int shared_memory_id;
+    int first_worker;
+    int second_worker;
+    struct SharedState *shared_state;
+
+    shared_memory_id = shm_open(
+        "shared-memory-mutex",
+        sizeof(struct SharedState)
+    );
+    shared_state = (struct SharedState *)mmap(shared_memory_id);
+    shared_state->workers = 0;
+    mutex_init(&(shared_state->mutex));
+
+    first_worker = load("documentation/shared_mutex/worker.bin");
+    second_worker = load("documentation/shared_mutex/worker.bin");
+    run(first_worker, NULL, NULL);
+    run(second_worker, NULL, NULL);
+
+    waitpid(first_worker);
+    waitpid(second_worker);
+    shm_unlink("shared-memory-mutex");
+    return 0;
+}

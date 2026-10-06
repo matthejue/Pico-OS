@@ -557,11 +557,11 @@ def shared_memory_destruction():
 
     stages = (
         ("1  Open", "shm_open(name, size)", "Create Entry 1 and its data",
-         "library/sys/mman/mman.picoc#L15", 0, False, ()),
+         "library/sys/mman/mman.picoc#L16", 0, False, ()),
         ("2  Map", "mmap(id) in each process", "Both receive the same address",
-         "library/sys/mman/mman.picoc#L23", 2, False, (1, 2)),
+         "library/sys/mman/mman.picoc#L24", 2, False, (1, 2)),
         ("3  Unlink", "shm_unlink(name)", "Remove the name, keep the data",
-         "library/sys/mman/mman.picoc#L27", 2, True, (1, 2)),
+         "library/sys/mman/mman.picoc#L28", 2, True, (1, 2)),
         ("4  Release one mapping", "remove_process(PCB 1)", "Release PCB 1's attachment",
          "kernel/process/process.picoc#L209", 1, True, (2,)),
         ("5  Release the last mapping", "remove_process(PCB 2)", "Release PCB 2's attachment",

@@ -5,6 +5,7 @@
 
 struct Heap process_heap;
 
+// Raises the heap-full syscall on failed positive allocations without linking unistd
 void *require_process_heap_allocation(void *memory, int size) {
     if (memory == NULL && size > 0) {
         // SYSCALL_PROCESS_HEAP_FULL
@@ -15,6 +16,7 @@ void *require_process_heap_allocation(void *memory, int size) {
     return memory;
 }
 
+// Fetches the heap bounds and initializes the allocator without linking unistd
 void init_process_heap(void) {
     int heap_start;
     int heap_size;

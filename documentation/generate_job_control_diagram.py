@@ -27,12 +27,9 @@ def main():
         "last_command_exit_status = 0 are inline integers, not allocations "
         "or pointers. The exit status is an example previous command result, "
         "not the result of the pending wait. PID 2 remains tracked during fg. "
-        "The bottom comparison shows positive child ownership with waitpid "
-        "and terminal SIGINT/SIGTSTP, versus negative shell ownership with "
-        "no shell wait and SIGTTIN when the background child reads the "
-        "terminal. fg assigns ownership before SIGCONT. Other PCB fields, "
+        "Other PCB fields, "
         "wait links, descriptor allocations and allocator links are omitted.",
-        width=1834, height=790,
+        width=1834, height=670, show_address_direction=False,
     )
 
     def arrow(path, colour=POINTER, dashed=False):
@@ -52,7 +49,7 @@ def main():
         ("kernel_stack", 100, ("Kernel", "Stack"), MUTED),
         ("outer_a", 50, ("Block", "Header", "A"), HEADER, "common/heap.header#L5"),
         ("shell", 280, ("Process Payload A", "shell", "image · heap · stack"), ALLOCATED,
-         "user/shell.picoc#L1448"),
+         "user/shell.picoc#L1453"),
         ("outer_b", 50, ("Block", "Header", "B"), HEADER, "common/heap.header#L5"),
         ("child", 200, ("Process Payload B", "child", "image · heap · stack"), ALLOCATED),
     ])
@@ -98,7 +95,7 @@ def main():
         ("user_data", 900, (), MUTED),
         ("user_heap", 350, ("User Process Heap",), ALLOCATED),
         ("user_stack", 360, ("User Process Stack", "waitpid() call frame"), MUTED,
-         "library/sys/wait/wait.picoc#L14"),
+         "library/sys/wait/wait.picoc#L15"),
     ])
     figure.band("user_text", "user_data", 600, "User Process Image")
     figure.band("user_heap", "user_heap", 600, "User Process Heap · malloc", HEAP_EMPHASIS)
@@ -115,21 +112,6 @@ def main():
         figure.label(x, 540, name, size=20, link=f"user/shell.picoc#L{line}")
         figure.label(x, 579, f"{value}   ({meaning})", size=23, bold=True)
 
-    # Two short mode cards carry the signal semantics without more pointer lines.
-    figure.box(32, 690, 875, 76, ALLOCATED)
-    figure.box(927, 690, 875, 76, MUTED)
-    figure.label(55, 718, "Foreground · target = +2", size=22, bold=True,
-                 anchor="start", link="kernel/signal.picoc#L148")
-    figure.label(55, 750, "shell waits · Ctrl+C → SIGINT · Ctrl+Z → SIGTSTP", size=20,
-                 anchor="start", link="kernel/signal.picoc#L192")
-    figure.label(950, 718, "Background · target = −1", size=22, bold=True,
-                 anchor="start", link="kernel/signal.picoc#L148")
-    figure.label(950, 750, "shell reads commands · child terminal read → SIGTTIN", size=20,
-                 anchor="start", link="kernel/filesystem/terminal.picoc#L134")
-    figure.label(55, 432, "Solid: stored address", size=18, anchor="start", color=ADDRESS)
-    figure.label(360, 432, "Dashed arrow: PID lookup", size=18, anchor="start", color=FOCUS)
-    figure.label(1802, 432, "fg: ownership → SIGCONT → waitpid()", size=18, anchor="end",
-                 link="user/shell.picoc#L1127")
     figure.save()
 
 

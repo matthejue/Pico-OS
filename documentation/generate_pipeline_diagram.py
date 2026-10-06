@@ -63,7 +63,7 @@ def main():
 
     # Stage 1: redirect the shell, start the producer, restore, then wait.
     y = 60
-    x = card(0, y, "1  Redirect stdout", "user/shell.picoc#L1003")
+    x = card(0, y, "1  Redirect stdout", "user/shell.picoc#L1008")
     operation(x, y + 74, "open(TMP) → 3", "library/fcntl/fcntl.picoc#L5")
     operation(x, y + 109, "dup2(1, 6)", "library/unistd/io.picoc#L58")
     operation(x, y + 144, "dup2(3, 1)", "library/unistd/io.picoc#L58")
@@ -78,13 +78,13 @@ def main():
                  link="kernel/filesystem/file_descriptor.picoc#L99")
     snapshot(1, y, "producer", "0 T-in · 1 TMP · 2 T-err", "3–7 free")
 
-    x = card(2, y, "3  Restore shell", "user/shell.picoc#L966")
+    x = card(2, y, "3  Restore shell", "user/shell.picoc#L971")
     operation(x, y + 86, "dup2(6, 1)", "library/unistd/io.picoc#L58")
     operation(x, y + 130, "close(6)", "library/unistd/io.picoc#L54")
     snapshot(2, y, "shell", "0 T-in · 1 T-out · 2 T-err", "3–7 free")
 
-    x = card(3, y, "4  Wait for producer", "library/sys/wait/wait.picoc#L14")
-    operation(x, y + 95, "waitpid(producer)", "library/sys/wait/wait.picoc#L14")
+    x = card(3, y, "4  Wait for producer", "library/sys/wait/wait.picoc#L15")
+    operation(x, y + 95, "waitpid(producer)", "library/sys/wait/wait.picoc#L15")
     figure.label(x, y + 150, "Producer has finished", size=23, bold=True)
     figure.box(xs[3], y + 194, width, 92, ALLOCATED, FOCUS, 2)
     figure.label(x, y + 230, "TMP", size=24, bold=True,
@@ -94,11 +94,11 @@ def main():
     # The return path stays outside the cards and their stage labels.
     arrow("M 1604 346 V 375 H 16 V 573 H 32", FOCUS)
     figure.label(920, 369, "Producer finishes before consumer starts", size=21,
-                 bold=True, color=FOCUS, link="user/shell.picoc#L798")
+                 bold=True, color=FOCUS, link="user/shell.picoc#L803")
 
     # Stage 2: stdout is set up first, then stdin, reusing free slot 3.
     y = 430
-    x = card(0, y, "5  Redirect stdout and stdin", "user/shell.picoc#L1034")
+    x = card(0, y, "5  Redirect stdout and stdin", "user/shell.picoc#L1039")
     for centre, label, operations in (
         (x - 100, "stdout first", (
             ("open(OUT) → 3", "library/fcntl/fcntl.picoc#L5"),
@@ -125,15 +125,15 @@ def main():
                  link="kernel/filesystem/file_descriptor.picoc#L99")
     snapshot(1, y, "consumer", "0 TMP · 1 OUT · 2 T-err", "3–7 free")
 
-    x = card(2, y, "7  Restore shell", "user/shell.picoc#L966")
+    x = card(2, y, "7  Restore shell", "user/shell.picoc#L971")
     operation(x, y + 74, "dup2(5, 0)", "library/unistd/io.picoc#L58")
     operation(x, y + 109, "close(5)", "library/unistd/io.picoc#L54")
     operation(x, y + 144, "dup2(6, 1)", "library/unistd/io.picoc#L58")
     operation(x, y + 179, "close(6)", "library/unistd/io.picoc#L54")
     snapshot(2, y, "shell", "0 T-in · 1 T-out · 2 T-err", "3–7 free")
 
-    x = card(3, y, "8  Wait, then remove TMP", "user/shell.picoc#L799")
-    operation(x, y + 86, "waitpid(consumer)", "library/sys/wait/wait.picoc#L14")
+    x = card(3, y, "8  Wait, then remove TMP", "user/shell.picoc#L804")
+    operation(x, y + 86, "waitpid(consumer)", "library/sys/wait/wait.picoc#L15")
     arrow(f"M {x} {y + 102} V {y + 132}")
     operation(x, y + 162, "unlink(TMP)", "library/unistd/file_removal.picoc#L4")
     figure.box(xs[3], y + 194, width, 92, ALLOCATED)

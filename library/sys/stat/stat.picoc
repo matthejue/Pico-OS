@@ -1,10 +1,20 @@
 #include "stat.header"
-#include "../../unistd/unistd.header"
 #include "../../../common/syscall.header"
+
+// Invokes INT 0 with ACC/IN1 and returns IN2 without loading unistd into SRAM
+int invoke_stat_syscall(int number, int argument) {
+    int result;
+
+    asm("LOADIN BAF ACC 3");
+    asm("LOADIN BAF IN1 4");
+    asm("INT 0");
+    asm("STOREIN BAF IN2 0");
+    return result;
+}
 
 int mkdir(char *path) {
     if (path == NULL) {
         return -1;
     }
-    return invoke_syscall(SYSCALL_MKDIR, (int)path);
+    return invoke_stat_syscall(SYSCALL_MKDIR, (int)path);
 }

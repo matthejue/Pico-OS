@@ -1,0 +1,18 @@
+// dependencies: ../../library/sys/mman/libmman.reti_blocks ../../library/mutex/libmutex.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "shared.header"
+#include "../../library/sys/mman/mman.header"
+#include "../../library/schedule/schedule.header"
+
+int main(void) {
+    int shared_memory_id;
+    struct SharedState *shared_state;
+
+    shared_memory_id = shm_open("shared-memory-mutex", 0);
+    shared_state = (struct SharedState *)mmap(shared_memory_id);
+    mutex_lock(&(shared_state->mutex));
+    shared_state->workers = shared_state->workers + 1;
+    yield();
+    mutex_unlock(&(shared_state->mutex));
+    return 0;
+}

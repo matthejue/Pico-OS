@@ -11,10 +11,10 @@ from generate_memory_layout_diagrams import ALLOCATED, MUTED, POINTER
 
 ENV = "library/stdlib/env.picoc#L4"
 RUN = "library/unistd/process.picoc#L31"
-INIT = "system/init.picoc#L19"
-SETENV = "library/stdlib/env.picoc#L126"
+INIT = "system/init.picoc#L20"
+SETENV = "library/stdlib/env.picoc#L129"
 REQUEST = "common/syscall.header#L55"
-INITIALIZE = "library/stdlib/env.picoc#L97"
+INITIALIZE = "library/stdlib/env.picoc#L100"
 
 
 def arrow(f, x1, y1, x2, y2, *, copy=False):
@@ -65,7 +65,7 @@ def origin():
             link="config/environment.txt")
     f.label(182, 270, "PATH=/user", size=25)
 
-    frame(f, 660, 500, "init process", "system/init.picoc#L100")
+    frame(f, 660, 500, "init process", "system/init.picoc#L101")
     f.label(910, 129, "Starts with an empty environ array", size=22, link=ENV)
     f.box(680, 148, 460, 99, MUTED)
     f.label(910, 178, "read_environment()", size=24, bold=True, link=INIT)
@@ -165,7 +165,7 @@ def propagation():
     f.label(646, 191, "starts", size=24)
 
     f.box(710, 24, 500, 210, ALLOCATED, POINTER, thickness=2.5)
-    f.label(960, 62, "init", size=32, bold=True, link="system/init.picoc#L100")
+    f.label(960, 62, "init", size=32, bold=True, link="system/init.picoc#L101")
     f.label(960, 99, "Starts with an empty environ array", size=24, link=ENV)
     f.label(960, 135, "read_environment()", size=28, link=INIT)
     f.label(960, 172, 'setenv("PATH", "/user", true)', size=26, link=SETENV)
@@ -186,7 +186,7 @@ def propagation():
 
     # Each cpid identifies a separately loaded process, not a fixed PID value.
     branches = (
-        (90, 1, 4, 'unsetenv("PATH")', "library/stdlib/env.picoc#L157", "PATH absent"),
+        (90, 1, 4, 'unsetenv("PATH")', "library/stdlib/env.picoc#L160", "PATH absent"),
         (710, 2, 5, 'setenv("PATH", "/test", true)', SETENV, "PATH=/test"),
         (1330, 3, 6, "no change", "", "PATH=/user"),
     )

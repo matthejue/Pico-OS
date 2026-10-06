@@ -7,6 +7,7 @@
 #include "../../library/sys/mman/mman.header"
 
 // AI used: GitHub Copilot through GitHub Education
+// Builds the two decimal worker arguments with append_decimal() without loading stdio
 void build_worker_arguments(
     char *arguments,
     int worker_number,
@@ -22,6 +23,7 @@ void build_worker_arguments(
     arguments[length] = '\0';
 }
 
+// Counts and writes text to stdout without loading stdio or string
 void write_text(char *text) {
     int length = 0;
 

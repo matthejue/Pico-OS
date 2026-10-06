@@ -16,7 +16,7 @@
 <a href="../../kernel/process/process.header#L14"><text x="800" y="686" text-anchor="middle" font-size="38" font-weight="bold" fill="#25734f">RUNNING</text></a>
 <text x="800" y="734" text-anchor="middle" font-size="26" font-weight="normal" fill="#17313a">Executing on the CPU</text>
 <path d="M 532 340 H 1068" fill="none" stroke="#637983" stroke-width="4" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<a href="../../library/unistd/blocking.picoc#L19"><text x="800" y="300" text-anchor="middle" font-size="34" font-weight="bold" fill="#17313a">wakeup()</text></a>
+<a href="../../library/unistd/blocking.picoc#L17"><text x="800" y="300" text-anchor="middle" font-size="34" font-weight="bold" fill="#17313a">wakeup()</text></a>
 <a href="../../common/wait_queue.header#L5"><text x="800" y="384" text-anchor="middle" font-size="28" font-weight="normal" fill="#17313a">Leave wait queue</text></a>
 <path d="M 1260 432 C 1260 570 1108 700 992 700" fill="none" stroke="#637983" stroke-width="4" stroke-linejoin="miter" marker-end="url(#arrow)"/>
 <a href="../../kernel/scheduler.picoc#L12"><text x="1430" y="540" text-anchor="middle" font-size="26" font-weight="bold" fill="#17313a">Scheduler selects</text></a>

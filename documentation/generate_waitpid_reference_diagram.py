@@ -27,7 +27,7 @@ def main():
         "stack while the kernel retains only the result address for wakeup. "
         "Other allocations, PCB fields, and stack cells are omitted. "
         "Widths and local placement are illustrative.",
-        width=1640, height=632,
+        width=1640, height=632, show_address_direction=False,
     )
 
     figure.row(70, 82, [
@@ -40,7 +40,7 @@ def main():
         ("image", 160, ("User Process Image", ".text · .data", "optional .ivt"), MUTED),
         ("user_heap", 160, ("User Process Heap",), MUTED),
         ("user_stack", 326, ("User Process Stack", "waitpid() locals · grows ←"), ALLOCATED,
-         "library/sys/wait/wait.picoc#L14"),
+         "library/sys/wait/wait.picoc#L15"),
         ("outer_b", 60, ("Block", "Header B"), HEADER, "common/heap.header#L5"),
         ("free", 110, ("Free", "Payload B"), FREE),
     ])
@@ -85,11 +85,10 @@ def main():
                  link="kernel/process/process.header#L44")
     figure.label(322, 493, "&status", size=22)
     figure.label(322, 521, "address", size=18)
-    figure.label(322, 557, "Other PCB fields omitted", size=17)
 
     figure.box(688, 360, 900, 208, "white")
     figure.label(1138, 397, "waitpid() locals", size=24, bold=True,
-                 link="library/sys/wait/wait.picoc#L14")
+                 link="library/sys/wait/wait.picoc#L15")
     status_fill = "#f6eee5"
     for x, name, value, kind, fill, link in (
         (718, "int request.pid", "2", "integer value", ALLOCATED,
@@ -97,7 +96,7 @@ def main():
         (998, "int *request.status", "&status", "address", ALLOCATED,
          "common/syscall.header#L63"),
         (1278, "int status", "0 → child status", "integer value", status_fill,
-         "library/sys/wait/wait.picoc#L15"),
+         "library/sys/wait/wait.picoc#L16"),
     ):
         figure.box(x, 432, 280, 104, fill)
         figure.label(x + 140, 462, name, size=21, bold=True, link=link)

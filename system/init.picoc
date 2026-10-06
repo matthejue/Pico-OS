@@ -7,6 +7,7 @@
 
 #define INIT_ENVIRONMENT_CAPACITY 256
 
+// Counts and writes an error message to stderr without loading stdio or string
 void init_write_error(char *text) {
     int length = 0;
 

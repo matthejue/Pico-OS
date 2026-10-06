@@ -6,7 +6,7 @@
 <g font-family="Cantarell, sans-serif">
 <rect x="32" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
 <text x="190.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">1  Open</text>
-<a href="../../library/sys/mman/mman.picoc#L15"><text x="190.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_open(name, size)</text></a>
+<a href="../../library/sys/mman/mman.picoc#L16"><text x="190.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_open(name, size)</text></a>
 <text x="190.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Create Entry 1 and its data</text>
 <path d="M 348 138 H 373" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
 <text x="190.0" y="245" text-anchor="middle" font-size="18" font-weight="bold" fill="#17313a">No attachments yet</text>
@@ -23,7 +23,7 @@
 <text x="190.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
 <rect x="376" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
 <text x="534.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">2  Map</text>
-<a href="../../library/sys/mman/mman.picoc#L23"><text x="534.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">mmap(id) in each process</text></a>
+<a href="../../library/sys/mman/mman.picoc#L24"><text x="534.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">mmap(id) in each process</text></a>
 <text x="534.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Both receive the same address</text>
 <path d="M 692 138 H 717" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
 <rect x="386" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
@@ -49,7 +49,7 @@
 <text x="534.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
 <rect x="720" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
 <text x="878.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">3  Unlink</text>
-<a href="../../library/sys/mman/mman.picoc#L27"><text x="878.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_unlink(name)</text></a>
+<a href="../../library/sys/mman/mman.picoc#L28"><text x="878.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_unlink(name)</text></a>
 <text x="878.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Remove the name, keep the data</text>
 <path d="M 1036 138 H 1061" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
 <rect x="730" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>

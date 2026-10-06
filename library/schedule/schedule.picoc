@@ -1,6 +1,7 @@
 #include "schedule.header"
 #include "../../common/syscall.header"
 
+// Yields to another process through INT 0 without linking unistd for a single syscall
 void yield(void) {
     asm("LOADI IN1 0");
     asm("LOADI ACC 14"); // SYSCALL_YIELD

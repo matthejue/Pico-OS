@@ -18,11 +18,13 @@ int receive_word(void) {
     return word;
 }
 
+// Sends one character directly over UART without loading stdio's stream code
 int uart_print_character(int value) {
     send_byte_over_uart(value);
     return 0;
 }
 
+// Appends decimal digits at index and returns the next position without loading stdio
 int uart_append_decimal(char *buffer, int index, int value) {
     char digits[12];
     int digit_count = 0;
@@ -62,6 +64,7 @@ int uart_append_decimal(char *buffer, int index, int value) {
     return index;
 }
 
+// Converts an integer to text and sends it over UART without loading stdio
 void uart_print_integer(int value) {
     char buffer[12];
     int index = uart_append_decimal(buffer, 0, value);
@@ -70,6 +73,7 @@ void uart_print_integer(int value) {
     uart_print_string(buffer);
 }
 
+// Sends characters up to '\0' over UART without loading stdio
 void uart_print_string(char *value) {
     int index = 0;
 

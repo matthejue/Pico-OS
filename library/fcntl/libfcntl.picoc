@@ -1,3 +1,1 @@
-// dependencies: ../unistd/libunistd.reti_blocks
-
 #include "fcntl.picoc"

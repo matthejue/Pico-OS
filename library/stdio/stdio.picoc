@@ -16,12 +16,14 @@ FILE *standard_output_pointer = NULL;
 FILE *standard_error_pointer = NULL;
 bool standard_streams_use_file_descriptors = false;
 
+// Sends value through the UART syscall without loading unistd's other functions
 void send_byte_over_uart(int value) {
     asm("LOADIN BAF IN1 3");
     asm("LOADI ACC 28"); // SYSCALL_SEND_BYTE_OVER_UART
     asm("INT 0");
 }
 
+// Reads one UART byte through the compiler test ISR without requiring unistd or PicoOS
 int receive_byte_over_uart(void) {
     int value = 0;
 
@@ -32,6 +34,7 @@ int receive_byte_over_uart(void) {
     return value;
 }
 
+// Invokes INT 0 with ACC/IN1 and returns IN2 without loading unistd into SRAM
 int invoke_stdio_syscall(int number, int argument) {
     int result;
 

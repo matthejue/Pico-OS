@@ -32,7 +32,7 @@ def main():
         "No shell input, history or pipeline array is a malloc allocation. "
         "Indices and counts are integers, not pointers. Other processes and "
         "allocations are omitted, and header letters do not fix allocation order.",
-        width=1800, height=610,
+        width=1800, height=610, show_address_direction=False,
     )
 
     figure.row(105, 105, [
@@ -53,7 +53,7 @@ def main():
         ("kernel_stack", 95, ("Kernel", "Stack", "grows ←"), MUTED),
         ("outer_a", 50, ("Block", "Header", "A"), HEADER, "common/heap.header#L5"),
         ("shell", 280, ("Process Payload A", "shell image · user heap · stack"), ALLOCATED,
-         "user/shell.picoc#L1448"),
+         "user/shell.picoc#L1453"),
         ("outer_b", 50, ("Block", "Header", "B"), HEADER, "common/heap.header#L5"),
         ("other", 220, ("… other payloads …",), MUTED),
     ])
@@ -137,10 +137,10 @@ def main():
     figure.row(388, 152, [
         ("uh_a", 45, ("Block", "Header", "A"), HEADER, "common/heap.header#L5"),
         ("env_array", 100, ("environ[]", "pointers", "… NULL"), ALLOCATED,
-         "library/stdlib/env.picoc#L107"),
+         "library/stdlib/env.picoc#L110"),
         ("uh_b", 45, ("Block", "Header", "B"), HEADER, "common/heap.header#L5"),
         ("env_string", 190, ("Environment string", '"PATH=…\\0"'), ALLOCATED,
-         "library/stdlib/env.picoc#L20"),
+         "library/stdlib/env.picoc#L22"),
     ], x=1057)
     figure.label(1290, 375, "Environment", size=17, bold=True)
     pointer("M 1029 445 H 1041 V 301 H 1080 V 388", ADDRESS)
@@ -148,9 +148,9 @@ def main():
     pointer("M 1185 510 H 1260")
 
     for row, (label, link) in enumerate([
-        ("command[80] · main()", "user/shell.picoc#L1449"),
-        ("expanded_arguments[80]", "user/shell.picoc#L1044"),
-        ("Other call-frame locals", "user/shell.picoc#L271"),
+        ("command[80] · main()", "user/shell.picoc#L1454"),
+        ("expanded_arguments[80]", "user/shell.picoc#L1049"),
+        ("Other call-frame locals", "user/shell.picoc#L276"),
         ("Initial argv + envp strings", "kernel/process/process_arguments.picoc#L125"),
     ]):
         figure.label(1602.5, 408 + row * 32, label, size=16, link=link)

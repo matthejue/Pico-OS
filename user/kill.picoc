@@ -6,6 +6,7 @@
 #include "../library/stdlib/stdlib.header"
 #include "../library/unistd/unistd.header"
 
+// Compares two strings for equality without loading string just for strcmp()
 bool kill_text_matches(char *left, char *right) {
     int index = 0;
 

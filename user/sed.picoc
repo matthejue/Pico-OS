@@ -6,6 +6,7 @@
 #include "../library/stdlib/stdlib.header"
 #include "../library/unistd/unistd.header"
 
+// Compares pattern_length characters against a line slice without loading string
 bool text_starts_with(char *text, char *pattern, int pattern_length) {
     int pattern_index;
 
@@ -29,6 +30,7 @@ bool line_contains(char *line, int line_length, char *pattern, int pattern_lengt
     return false;
 }
 
+// Writes a line with matching text replaced, using unistd rather than loading stdio
 void write_substituted_line(
     char *line,
     int line_length,
@@ -54,6 +56,7 @@ void write_substituted_line(
     }
 }
 
+// Writes the replacement through command_write() without loading stdio
 void write_replacement(char *text) {
     command_write(STDOUT_FILENO, text);
     command_write(STDOUT_FILENO, "\n");

@@ -47,10 +47,12 @@ int shell_input_count = 0;
 
 bool eval(char *command);
 
+// Writes one character to stdout through unistd without loading stdio
 void shell_write_character(char character) {
     write_without_uart_escape_check(STDOUT_FILENO, &character, 1);
 }
 
+// Counts and writes text to the chosen descriptor without loading stdio
 void shell_write(int file_descriptor, char *text) {
     int length = 0;
 
@@ -60,10 +62,12 @@ void shell_write(int file_descriptor, char *text) {
     write_without_uart_escape_check(file_descriptor, text, length);
 }
 
+// Writes text to stdout through shell_write() without loading stdio
 void shell_write_string(char *text) {
     shell_write(STDOUT_FILENO, text);
 }
 
+// Writes text to stderr through shell_write() without loading stdio
 void shell_write_error_string(char *text) {
     shell_write(STDERR_FILENO, text);
 }
@@ -76,6 +80,7 @@ void shell_usage(int file_descriptor) {
     );
 }
 
+// Converts value with append_decimal() and writes it to stdout without loading stdio
 void shell_write_decimal(int value) {
     char buffer[12];
     int length = append_decimal(buffer, value);

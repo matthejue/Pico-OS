@@ -1,5 +1,6 @@
 #include "stdlib.header"
 
+// Exits with status through INT 0 without adding a dependency from stdlib to unistd
 void exit(int status) {
     // SYSCALL_EXIT
     asm("LOADI ACC 6");

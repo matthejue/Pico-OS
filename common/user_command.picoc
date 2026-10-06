@@ -1,6 +1,7 @@
 #include "user_command.header"
 #include "../library/unistd/unistd.header"
 
+// Counts and writes text to the selected descriptor without loading stdio or string
 void command_write(int file_descriptor, char *text) {
     int length = 0;
 
@@ -10,6 +11,7 @@ void command_write(int file_descriptor, char *text) {
     write(file_descriptor, text, length);
 }
 
+// Recognizes exactly -h and --help without loading string just for strcmp()
 bool command_is_help(char *argument) {
     return (
         argument[0] == '-' &&

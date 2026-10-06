@@ -710,7 +710,7 @@ def termination_status():
         ("pdata", 160, (".data", "process globals"), MUTED),
         ("pheap", 220, ("User Process Heap", "own allocator"), heap_fill),
         ("pstack", 512, ("User Process Stack", "suspended waitpid() call", "grows toward lower addresses ←"),
-         ALLOCATED, "library/sys/wait/wait.picoc#L14"),
+         ALLOCATED, "library/sys/wait/wait.picoc#L15"),
     ], x=820)
     f.band("ptext", "pdata", 520, "User Process Image")
     f.band("pheap", "pheap", 520, "User Process Heap", heap_fill)
@@ -726,13 +726,13 @@ def termination_status():
         ("context", 210, ("Saved syscall context", "registers + return PC"), MUTED,
          "interrupt_service_routines/os_isrs.picoc#L94"),
         ("helper", 210, ("invoke_waitpid_syscall", "frame + arguments", "argument = &request"), MUTED,
-         "library/sys/wait/wait.picoc#L4"),
+         "library/sys/wait/wait.picoc#L5"),
         ("rpid", 150, ("BAF_wait - 2", "request.pid = 2"), ALLOCATED,
          "common/syscall.header#L62"),
         ("rstatus", 200, ("BAF_wait - 1", "request.status", "= &status (address)"), ALLOCATED,
          "common/syscall.header#L63"),
         ("status", 200, ("BAF_wait + 0", "int status", "0 → 7 (integer value)"), status_fill,
-         "library/sys/wait/wait.picoc#L15"),
+         "library/sys/wait/wait.picoc#L16"),
         ("savedbaf", 130, ("BAF_wait + 1", "Saved caller BAF"), MUTED),
         ("returnpc", 140, ("BAF_wait + 2", "Return PC"), MUTED),
         ("pidarg", 130, ("BAF_wait + 3", "pid argument = 2"), MUTED),
@@ -749,7 +749,7 @@ def termination_status():
     f.band("rpid", "pidarg", 930, "waitpid() stack frame")
     expand_box("pstack", "unused", "startup")
     f.label(32, 690, "User Process Stack of Process A", size=18, bold=True,
-            anchor="start", link="library/sys/wait/wait.picoc#L14")
+            anchor="start", link="library/sys/wait/wait.picoc#L15")
     f.arrow("helper", "rpid", "IN1 = &request at INT 0", 712,
             color=ADDRESS, label_x=610)
     f.arrow("rstatus", "status", "request.status = &status", 706,
