@@ -4,6 +4,8 @@ from html import escape
 import json
 from pathlib import Path
 
+from diagram_style import style_svg
+
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "documentation/images"
@@ -52,7 +54,7 @@ class Figure:
     def save(self, name):
         self.parts.append("</g></svg>")
         OUTPUT.mkdir(exist_ok=True)
-        (OUTPUT / name).write_text("\n".join(self.parts) + "\n")
+        (OUTPUT / name).write_text(style_svg("\n".join(self.parts) + "\n"))
 
 
 def memory_map():

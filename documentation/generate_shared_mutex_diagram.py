@@ -2,7 +2,7 @@
 
 Run with Python 3. Reuse the README's sharp-corner SVG style and colours.
 Process boxes show responsibilities, not SRAM allocation order. Shared fields
-show their initial values. Launch arrows carry arguments, blue arrows show
+show their initial values. Launch arrows carry arguments, teal arrows show
 local pointers, and the green arrow shows the kernel entry's stored address.
 """
 

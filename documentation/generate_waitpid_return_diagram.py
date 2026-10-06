@@ -7,6 +7,8 @@ Detailed syscall entry and queue mechanics belong in the README prose.
 from html import escape
 from pathlib import Path
 
+from diagram_style import style_svg
+
 
 OUTPUT = Path(__file__).resolve().parent / "images" / "waitpid-return-paths.svg"
 INK = "#192c38"
@@ -89,7 +91,7 @@ def generate():
 
     parts.append("</g></svg>")
     OUTPUT.parent.mkdir(exist_ok=True)
-    OUTPUT.write_text("\n".join(parts) + "\n", encoding="utf-8")
+    OUTPUT.write_text(style_svg("\n".join(parts) + "\n"), encoding="utf-8")
 
 
 if __name__ == "__main__":

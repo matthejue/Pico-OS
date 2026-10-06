@@ -1,71 +1,71 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1294" height="292" viewBox="0 0 1294 292" role="img" aria-labelledby="title desc">
 <title id="title">Initial state: request 11 cells</title>
-<desc id="desc">One continuous horizontal heap region with adjacent headers and payloads sharing divider lines. Curved next arrows link headers in address order. Green payloads are free, blue payloads are allocated, and the orange outline marks the changed or selected block. Widths preserve memory positions across steps but are not to scale in cells.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker></defs>
+<desc id="desc">One continuous horizontal heap region with adjacent headers and payloads sharing divider lines. Curved next arrows link headers in address order. Green payloads are free, teal payloads are allocated, and the amber outline marks the changed or selected block. Widths preserve memory positions across steps but are not to scale in cells.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker></defs>
 <rect width="1294" height="292" fill="white"/>
-<g font-family="DejaVu Sans, sans-serif">
-<rect x="32" y="100" width="102" height="116" fill="#fff0cc"/>
-<text x="83.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
-<text x="83.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">A</text>
-<text x="83.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 8</text>
-<text x="83.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = false</text>
-<text x="83.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
-<rect x="134" y="100" width="144" height="116" fill="#deecff"/>
-<text x="206.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload A</text>
-<text x="206.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">ALLOCATED</text>
-<text x="206.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">8 cells</text>
-<text x="32" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">0</text>
-<rect x="278" y="100" width="102" height="116" fill="#fff0cc"/>
-<text x="329.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
-<text x="329.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">B</text>
-<text x="329.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 4</text>
-<text x="329.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = true</text>
-<text x="329.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
-<rect x="380" y="100" width="72" height="116" fill="#e5f3de"/>
-<text x="416.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload B</text>
-<text x="416.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">FREE</text>
-<text x="416.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">4 cells</text>
-<text x="278" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">11</text>
-<rect x="452" y="100" width="102" height="116" fill="#fff0cc"/>
-<text x="503.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
-<text x="503.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">C</text>
-<text x="503.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 12</text>
-<text x="503.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = false</text>
-<text x="503.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
-<rect x="554" y="100" width="216" height="116" fill="#deecff"/>
-<text x="662.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload C</text>
-<text x="662.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">ALLOCATED</text>
-<text x="662.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">12 cells</text>
-<text x="452" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">18</text>
-<rect x="770" y="100" width="102" height="116" fill="#fff0cc"/>
-<text x="821.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">Block Header</text>
-<text x="821.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">D</text>
-<text x="821.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">size = 16</text>
-<text x="821.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">free = true</text>
-<text x="821.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">3 cells</text>
-<rect x="872" y="100" width="390" height="116" fill="#e5f3de"/>
-<text x="1067.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">Payload D</text>
-<text x="1067.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#172b3a">FREE</text>
-<text x="1067.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#172b3a">16 cells</text>
-<rect x="770" y="100" width="492" height="116" fill="none" stroke="#9c3d15" stroke-width="3"/>
-<text x="770" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#172b3a">33</text>
-<rect x="32" y="100" width="1230" height="116" fill="none" stroke="#43576a"/>
-<path d="M 134.0 100 v 116" stroke="#43576a"/>
-<path d="M 278.0 100 v 116" stroke="#43576a"/>
-<path d="M 380.0 100 v 116" stroke="#43576a"/>
-<path d="M 452.0 100 v 116" stroke="#43576a"/>
-<path d="M 554.0 100 v 116" stroke="#43576a"/>
-<path d="M 770.0 100 v 116" stroke="#43576a"/>
-<path d="M 872.0 100 v 116" stroke="#43576a"/>
-<path d="M 83.0 100 C 83.0 46, 329.0 46, 329.0 96" fill="none" stroke="#405ea8" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="206.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#405ea8">next</text>
-<path d="M 329.0 100 C 329.0 46, 503.0 46, 503.0 96" fill="none" stroke="#405ea8" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="416.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#405ea8">next</text>
-<path d="M 503.0 100 C 503.0 46, 821.0 46, 821.0 96" fill="none" stroke="#405ea8" stroke-width="2" marker-end="url(#arrow)"/>
-<text x="662.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#405ea8">next</text>
-<text x="821.0" y="76" font-size="13" font-weight="normal" text-anchor="middle" fill="#405ea8">next = NULL</text>
-<text x="32" y="76" font-size="12" font-weight="normal" text-anchor="start" fill="#172b3a">first_block</text>
-<path d="M 38 82 L 83.0 97" stroke="#405ea8" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="1262" y="238" font-size="13" font-weight="normal" text-anchor="end" fill="#172b3a">52</text>
+<g font-family="Cantarell, sans-serif">
+<rect x="32" y="100" width="102" height="116" fill="#eaf3f4"/>
+<text x="83.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">Block Header</text>
+<text x="83.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">A</text>
+<text x="83.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">size = 8</text>
+<text x="83.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">free = false</text>
+<text x="83.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">3 cells</text>
+<rect x="134" y="100" width="144" height="116" fill="#d8efef"/>
+<text x="206.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">Payload A</text>
+<text x="206.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">ALLOCATED</text>
+<text x="206.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">8 cells</text>
+<text x="32" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#17313a">0</text>
+<rect x="278" y="100" width="102" height="116" fill="#eaf3f4"/>
+<text x="329.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">Block Header</text>
+<text x="329.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">B</text>
+<text x="329.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">size = 4</text>
+<text x="329.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">free = true</text>
+<text x="329.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">3 cells</text>
+<rect x="380" y="100" width="72" height="116" fill="#e7f3ea"/>
+<text x="416.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">Payload B</text>
+<text x="416.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">FREE</text>
+<text x="416.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">4 cells</text>
+<text x="278" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#17313a">11</text>
+<rect x="452" y="100" width="102" height="116" fill="#eaf3f4"/>
+<text x="503.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">Block Header</text>
+<text x="503.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">C</text>
+<text x="503.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">size = 12</text>
+<text x="503.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">free = false</text>
+<text x="503.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">3 cells</text>
+<rect x="554" y="100" width="216" height="116" fill="#d8efef"/>
+<text x="662.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">Payload C</text>
+<text x="662.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">ALLOCATED</text>
+<text x="662.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">12 cells</text>
+<text x="452" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#17313a">18</text>
+<rect x="770" y="100" width="102" height="116" fill="#eaf3f4"/>
+<text x="821.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">Block Header</text>
+<text x="821.0" y="144" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">D</text>
+<text x="821.0" y="166" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">size = 16</text>
+<text x="821.0" y="187" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">free = true</text>
+<text x="821.0" y="206" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">3 cells</text>
+<rect x="872" y="100" width="390" height="116" fill="#e7f3ea"/>
+<text x="1067.0" y="139" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">Payload D</text>
+<text x="1067.0" y="162" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">FREE</text>
+<text x="1067.0" y="185" font-size="13" font-weight="normal" text-anchor="middle" fill="#17313a">16 cells</text>
+<rect x="770" y="100" width="492" height="116" fill="none" stroke="#805916" stroke-width="3"/>
+<text x="770" y="238" font-size="13" font-weight="normal" text-anchor="start" fill="#17313a">33</text>
+<rect x="32" y="100" width="1230" height="116" fill="none" stroke="#637983"/>
+<path d="M 134.0 100 v 116" stroke="#637983"/>
+<path d="M 278.0 100 v 116" stroke="#637983"/>
+<path d="M 380.0 100 v 116" stroke="#637983"/>
+<path d="M 452.0 100 v 116" stroke="#637983"/>
+<path d="M 554.0 100 v 116" stroke="#637983"/>
+<path d="M 770.0 100 v 116" stroke="#637983"/>
+<path d="M 872.0 100 v 116" stroke="#637983"/>
+<path d="M 83.0 100 C 83.0 46, 329.0 46, 329.0 96" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="206.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#167b84">next</text>
+<path d="M 329.0 100 C 329.0 46, 503.0 46, 503.0 96" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="416.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#167b84">next</text>
+<path d="M 503.0 100 C 503.0 46, 821.0 46, 821.0 96" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="662.0" y="55" font-size="14" font-weight="normal" text-anchor="middle" fill="#167b84">next</text>
+<text x="821.0" y="76" font-size="13" font-weight="normal" text-anchor="middle" fill="#167b84">next = NULL</text>
+<text x="32" y="76" font-size="12" font-weight="normal" text-anchor="start" fill="#17313a">first_block</text>
+<path d="M 38 82 L 83.0 97" stroke="#167b84" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="1262" y="238" font-size="13" font-weight="normal" text-anchor="end" fill="#17313a">52</text>
 </g>
 </svg>

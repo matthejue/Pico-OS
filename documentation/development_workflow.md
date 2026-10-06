@@ -147,3 +147,21 @@ labels across related figures. Show relationships from the implementation and
 keep the diagrams readable on presentation slides. Use Mermaid for flowcharts
 and SVG for precise memory layouts, then render the result to check text and
 arrows.
+
+All README visuals share the palette and typography in
+[`diagram_style.py`](diagram_style.py): Cantarell, sharp rectangular corners,
+dark ink, gray outlines and grouping, pale teal allocated data, and pale green
+free data. Teal arrows show references, green arrows show addresses or the active
+process, and gray arrows show copies. Amber is reserved for an existing focus,
+changed field/block, or waiting state; ordinary headers and containers stay
+neutral. Keep explicit labels and line patterns so meaning does not depend on
+color alone.
+
+After editing that style, run `python3 documentation/style_readme_diagrams.py`
+and `python3 documentation/generate_timer_interval_plot.py` from the repository
+root. This updates the existing SVGs, Mermaid appearance directives and PDF
+rendering configuration without rebuilding diagram content. Mermaid spacing,
+directions and sequence options are retained. SVG generators apply the same
+style when saving, so future content updates retain the appearance. Review
+emphasis in the surrounding README context rather than treating every old
+accent as necessary.

@@ -1,117 +1,117 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1756" height="738" viewBox="0 0 1756 738" role="img" aria-labelledby="title desc">
 <title id="title">Shared-memory lifetime: open, map, unlink, release</title>
 <desc id="desc">Five snapshots of one shared-memory entry. shm_open creates Entry 1 and Shared Data Payload A with reference_count zero and unlink_requested false. mmap in the processes represented by PCB 1 and PCB 2 creates one attachment each, bringing reference_count to two. Both receive the same address. shm_unlink frees the name, sets name to NULL and unlink_requested to true, but leaves both attachments and the shared data alive. Final removal of PCB 1 releases its attachment and reduces reference_count to one. Final removal of PCB 2 reduces the count to zero, removes Entry 1 from the registry and frees the shared data and entry. Each PCB&#x27;s shared_memory_attachments list owns its attachment, whose entry pointer reaches Entry 1. Horizontal arrows show time. Vertical arrows show entry and address pointers. This example tracks Entry 1 only, without additional mappings after unlink. Cleanup requires both unlink_requested true and reference_count zero, regardless of their order.</desc>
-<defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#405ea8"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#785099"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#26715b"/></marker></defs>
+<defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#25734f"/></marker></defs>
 <rect width="1756" height="738" fill="white"/>
-<g font-family="DejaVu Sans, sans-serif">
-<rect x="32" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="190.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">1  Open</text>
-<a href="../../library/sys/mman/mman.picoc#L15"><text x="190.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">shm_open(name, size)</text></a>
-<text x="190.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Create Entry 1 and its data</text>
-<path d="M 348 138 H 373" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
-<text x="190.0" y="245" text-anchor="middle" font-size="18" font-weight="bold" fill="#172b3a">No attachments yet</text>
-<rect x="32" y="320" width="316" height="182" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/shared_memory.header#L8"><text x="190.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="190.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#172b3a">0</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="190.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">reference_count</text></a>
-<a href="../../kernel/shared_memory.header#L9"><text x="190.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">name = &quot;shared&quot;</text></a>
-<a href="../../kernel/shared_memory.header#L13"><text x="190.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">unlink_requested = false</text></a>
-<path d="M 190.0 502 V 559" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/shared_memory.header#L11"><text x="200.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#26715b">address</text></a>
-<rect x="32" y="562" width="316" height="58" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<text x="190.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Data Payload A</text>
-<text x="190.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Same allocation stays alive</text>
-<rect x="376" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="534.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">2  Map</text>
-<a href="../../library/sys/mman/mman.picoc#L23"><text x="534.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">mmap(id) in each process</text></a>
-<text x="534.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Both receive the same address</text>
-<path d="M 692 138 H 717" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
-<rect x="386" y="220" width="142" height="54" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/process/process.header#L55"><text x="457.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">PCB 1</text></a>
-<a href="../../kernel/shared_memory.header#L17"><text x="457.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">attachment</text></a>
-<path d="M 457.0 274 V 317" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
-<a href="../../kernel/shared_memory.header#L18"><text x="465.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#785099">entry</text></a>
-<rect x="540" y="220" width="142" height="54" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/process/process.header#L55"><text x="611.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">PCB 2</text></a>
-<a href="../../kernel/shared_memory.header#L17"><text x="611.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">attachment</text></a>
-<path d="M 611.0 274 V 317" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
-<a href="../../kernel/shared_memory.header#L18"><text x="619.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#785099">entry</text></a>
-<rect x="376" y="320" width="316" height="182" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/shared_memory.header#L8"><text x="534.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="534.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#172b3a">2</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="534.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">reference_count</text></a>
-<a href="../../kernel/shared_memory.header#L9"><text x="534.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">name = &quot;shared&quot;</text></a>
-<a href="../../kernel/shared_memory.header#L13"><text x="534.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">unlink_requested = false</text></a>
-<path d="M 534.0 502 V 559" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/shared_memory.header#L11"><text x="544.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#26715b">address</text></a>
-<rect x="376" y="562" width="316" height="58" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<text x="534.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Data Payload A</text>
-<text x="534.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Same allocation stays alive</text>
-<rect x="720" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="878.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">3  Unlink</text>
-<a href="../../library/sys/mman/mman.picoc#L27"><text x="878.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">shm_unlink(name)</text></a>
-<text x="878.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Remove the name, keep the data</text>
-<path d="M 1036 138 H 1061" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
-<rect x="730" y="220" width="142" height="54" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/process/process.header#L55"><text x="801.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">PCB 1</text></a>
-<a href="../../kernel/shared_memory.header#L17"><text x="801.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">attachment</text></a>
-<path d="M 801.0 274 V 317" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
-<a href="../../kernel/shared_memory.header#L18"><text x="809.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#785099">entry</text></a>
-<rect x="884" y="220" width="142" height="54" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/process/process.header#L55"><text x="955.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">PCB 2</text></a>
-<a href="../../kernel/shared_memory.header#L17"><text x="955.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">attachment</text></a>
-<path d="M 955.0 274 V 317" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
-<a href="../../kernel/shared_memory.header#L18"><text x="963.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#785099">entry</text></a>
-<rect x="720" y="320" width="316" height="182" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/shared_memory.header#L8"><text x="878.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="878.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#172b3a">2</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="878.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">reference_count</text></a>
-<a href="../../kernel/shared_memory.header#L9"><text x="878.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">name = NULL</text></a>
-<a href="../../kernel/shared_memory.header#L13"><text x="878.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">unlink_requested = true</text></a>
-<path d="M 878.0 502 V 559" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/shared_memory.header#L11"><text x="888.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#26715b">address</text></a>
-<rect x="720" y="562" width="316" height="58" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<text x="878.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Data Payload A</text>
-<text x="878.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Same allocation stays alive</text>
-<rect x="1064" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="1222.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">4  Release one mapping</text>
-<a href="../../kernel/process/process.picoc#L209"><text x="1222.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">remove_process(PCB 1)</text></a>
-<text x="1222.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Release PCB 1&#x27;s attachment</text>
-<path d="M 1380 138 H 1405" fill="none" stroke="#405ea8" stroke-width="1.5" marker-end="url(#405ea8)"/>
-<rect x="1228" y="220" width="142" height="54" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/process/process.header#L55"><text x="1299.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">PCB 2</text></a>
-<a href="../../kernel/shared_memory.header#L17"><text x="1299.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">attachment</text></a>
-<path d="M 1299.0 274 V 317" fill="none" stroke="#785099" stroke-width="1.5" marker-end="url(#785099)"/>
-<a href="../../kernel/shared_memory.header#L18"><text x="1307.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#785099">entry</text></a>
-<rect x="1064" y="320" width="316" height="182" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/shared_memory.header#L8"><text x="1222.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Memory Entry 1</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="1222.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#172b3a">1</text></a>
-<a href="../../kernel/shared_memory.header#L12"><text x="1222.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">reference_count</text></a>
-<a href="../../kernel/shared_memory.header#L9"><text x="1222.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">name = NULL</text></a>
-<a href="../../kernel/shared_memory.header#L13"><text x="1222.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">unlink_requested = true</text></a>
-<path d="M 1222.0 502 V 559" fill="none" stroke="#26715b" stroke-width="1.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/shared_memory.header#L11"><text x="1232.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#26715b">address</text></a>
-<rect x="1064" y="562" width="316" height="58" fill="#deecff" stroke="#43576a" stroke-width="1.5"/>
-<text x="1222.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Shared Data Payload A</text>
-<text x="1222.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Same allocation stays alive</text>
-<rect x="1408" y="90" width="316" height="96" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="1566.0" y="116" text-anchor="middle" font-size="16.33986928104575" font-weight="bold" fill="#172b3a">5  Release the last mapping</text>
-<a href="../../kernel/process/process.picoc#L209"><text x="1566.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">remove_process(PCB 2)</text></a>
-<text x="1566.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Release PCB 2&#x27;s attachment</text>
-<text x="1566.0" y="245" text-anchor="middle" font-size="18" font-weight="bold" fill="#172b3a">No attachments remain</text>
-<a href="../../kernel/shared_memory.header#L12"><text x="1566.0" y="276" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">reference_count: 1 → 0</text></a>
-<rect x="1408" y="320" width="316" height="182" fill="#f0f3f6" stroke="#43576a" stroke-width="1.5"/>
-<a href="../../kernel/shared_memory.header#L8"><text x="1566.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Entry 1 removed</text></a>
-<text x="1566.0" y="384" text-anchor="middle" font-size="19" font-weight="bold" fill="#172b3a">Destroy the unlinked entry</text>
-<a href="../../kernel/shared_memory.picoc#L69"><text x="1566.0" y="417" text-anchor="middle" font-size="14.421252371916509" font-weight="normal" fill="#172b3a">destroy_shared_memory_entry(entry)</text></a>
-<a href="../../kernel/psdmalloc.picoc#L47"><text x="1566.0" y="451" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">PSDFree((int)entry-&gt;address)</text></a>
-<a href="../../kernel/kmalloc.picoc#L38"><text x="1566.0" y="480" text-anchor="middle" font-size="17" font-weight="normal" fill="#172b3a">kfree(entry)</text></a>
-<rect x="1408" y="562" width="316" height="58" fill="#e5f3de" stroke="#43576a" stroke-width="1.5"/>
-<text x="1566.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#172b3a">Freed cells</text>
-<text x="1566.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#172b3a">Reusable by the heap</text>
-<rect x="32" y="649" width="1692" height="62" fill="#fff0cc" stroke="#43576a" stroke-width="1.5"/>
-<text x="878.0" y="674" text-anchor="middle" font-size="21" font-weight="bold" fill="#172b3a">Free the entry and data only when BOTH conditions hold</text>
-<a href="../../kernel/shared_memory.header#L13"><text x="856.0" y="699" text-anchor="end" font-size="19" font-weight="normal" fill="#172b3a">unlink_requested == true</text></a>
-<text x="878.0" y="699" text-anchor="middle" font-size="19" font-weight="normal" fill="#172b3a">and</text>
-<a href="../../kernel/shared_memory.header#L12"><text x="900.0" y="699" text-anchor="start" font-size="19" font-weight="normal" fill="#172b3a">reference_count == 0</text></a>
+<g font-family="Cantarell, sans-serif">
+<rect x="32" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="190.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">1  Open</text>
+<a href="../../library/sys/mman/mman.picoc#L15"><text x="190.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_open(name, size)</text></a>
+<text x="190.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Create Entry 1 and its data</text>
+<path d="M 348 138 H 373" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<text x="190.0" y="245" text-anchor="middle" font-size="18" font-weight="bold" fill="#17313a">No attachments yet</text>
+<rect x="32" y="320" width="316" height="182" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="190.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Memory Entry 1</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="190.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#17313a">0</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="190.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">reference_count</text></a>
+<a href="../../kernel/shared_memory.header#L9"><text x="190.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">name = &quot;shared&quot;</text></a>
+<a href="../../kernel/shared_memory.header#L13"><text x="190.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">unlink_requested = false</text></a>
+<path d="M 190.0 502 V 559" fill="none" stroke="#25734f" stroke-width="1.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/shared_memory.header#L11"><text x="200.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#25734f">address</text></a>
+<rect x="32" y="562" width="316" height="58" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<text x="190.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Data Payload A</text>
+<text x="190.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
+<rect x="376" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="534.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">2  Map</text>
+<a href="../../library/sys/mman/mman.picoc#L23"><text x="534.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">mmap(id) in each process</text></a>
+<text x="534.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Both receive the same address</text>
+<path d="M 692 138 H 717" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="386" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/process/process.header#L55"><text x="457.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">PCB 1</text></a>
+<a href="../../kernel/shared_memory.header#L17"><text x="457.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">attachment</text></a>
+<path d="M 457.0 274 V 317" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#785099)"/>
+<a href="../../kernel/shared_memory.header#L18"><text x="465.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#167b84">entry</text></a>
+<rect x="540" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/process/process.header#L55"><text x="611.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">PCB 2</text></a>
+<a href="../../kernel/shared_memory.header#L17"><text x="611.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">attachment</text></a>
+<path d="M 611.0 274 V 317" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#785099)"/>
+<a href="../../kernel/shared_memory.header#L18"><text x="619.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#167b84">entry</text></a>
+<rect x="376" y="320" width="316" height="182" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="534.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Memory Entry 1</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="534.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#17313a">2</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="534.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">reference_count</text></a>
+<a href="../../kernel/shared_memory.header#L9"><text x="534.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">name = &quot;shared&quot;</text></a>
+<a href="../../kernel/shared_memory.header#L13"><text x="534.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">unlink_requested = false</text></a>
+<path d="M 534.0 502 V 559" fill="none" stroke="#25734f" stroke-width="1.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/shared_memory.header#L11"><text x="544.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#25734f">address</text></a>
+<rect x="376" y="562" width="316" height="58" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<text x="534.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Data Payload A</text>
+<text x="534.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
+<rect x="720" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="878.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">3  Unlink</text>
+<a href="../../library/sys/mman/mman.picoc#L27"><text x="878.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">shm_unlink(name)</text></a>
+<text x="878.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Remove the name, keep the data</text>
+<path d="M 1036 138 H 1061" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="730" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/process/process.header#L55"><text x="801.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">PCB 1</text></a>
+<a href="../../kernel/shared_memory.header#L17"><text x="801.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">attachment</text></a>
+<path d="M 801.0 274 V 317" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#785099)"/>
+<a href="../../kernel/shared_memory.header#L18"><text x="809.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#167b84">entry</text></a>
+<rect x="884" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/process/process.header#L55"><text x="955.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">PCB 2</text></a>
+<a href="../../kernel/shared_memory.header#L17"><text x="955.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">attachment</text></a>
+<path d="M 955.0 274 V 317" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#785099)"/>
+<a href="../../kernel/shared_memory.header#L18"><text x="963.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#167b84">entry</text></a>
+<rect x="720" y="320" width="316" height="182" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="878.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Memory Entry 1</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="878.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#17313a">2</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="878.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">reference_count</text></a>
+<a href="../../kernel/shared_memory.header#L9"><text x="878.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">name = NULL</text></a>
+<a href="../../kernel/shared_memory.header#L13"><text x="878.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">unlink_requested = true</text></a>
+<path d="M 878.0 502 V 559" fill="none" stroke="#25734f" stroke-width="1.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/shared_memory.header#L11"><text x="888.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#25734f">address</text></a>
+<rect x="720" y="562" width="316" height="58" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<text x="878.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Data Payload A</text>
+<text x="878.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
+<rect x="1064" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="1222.0" y="116" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">4  Release one mapping</text>
+<a href="../../kernel/process/process.picoc#L209"><text x="1222.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">remove_process(PCB 1)</text></a>
+<text x="1222.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Release PCB 1&#x27;s attachment</text>
+<path d="M 1380 138 H 1405" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#405ea8)"/>
+<rect x="1228" y="220" width="142" height="54" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/process/process.header#L55"><text x="1299.0" y="242" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">PCB 2</text></a>
+<a href="../../kernel/shared_memory.header#L17"><text x="1299.0" y="264" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">attachment</text></a>
+<path d="M 1299.0 274 V 317" fill="none" stroke="#167b84" stroke-width="1.5" marker-end="url(#785099)"/>
+<a href="../../kernel/shared_memory.header#L18"><text x="1307.0" y="300" text-anchor="start" font-size="15" font-weight="normal" fill="#167b84">entry</text></a>
+<rect x="1064" y="320" width="316" height="182" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="1222.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Memory Entry 1</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="1222.0" y="386" text-anchor="middle" font-size="32" font-weight="bold" fill="#17313a">1</text></a>
+<a href="../../kernel/shared_memory.header#L12"><text x="1222.0" y="412" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">reference_count</text></a>
+<a href="../../kernel/shared_memory.header#L9"><text x="1222.0" y="449" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">name = NULL</text></a>
+<a href="../../kernel/shared_memory.header#L13"><text x="1222.0" y="479" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">unlink_requested = true</text></a>
+<path d="M 1222.0 502 V 559" fill="none" stroke="#25734f" stroke-width="1.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/shared_memory.header#L11"><text x="1232.0" y="538" text-anchor="start" font-size="16" font-weight="normal" fill="#25734f">address</text></a>
+<rect x="1064" y="562" width="316" height="58" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
+<text x="1222.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Shared Data Payload A</text>
+<text x="1222.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Same allocation stays alive</text>
+<rect x="1408" y="90" width="316" height="96" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="1566.0" y="116" text-anchor="middle" font-size="16.33986928104575" font-weight="bold" fill="#17313a">5  Release the last mapping</text>
+<a href="../../kernel/process/process.picoc#L209"><text x="1566.0" y="143" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">remove_process(PCB 2)</text></a>
+<text x="1566.0" y="169" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Release PCB 2&#x27;s attachment</text>
+<text x="1566.0" y="245" text-anchor="middle" font-size="18" font-weight="bold" fill="#17313a">No attachments remain</text>
+<a href="../../kernel/shared_memory.header#L12"><text x="1566.0" y="276" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">reference_count: 1 → 0</text></a>
+<rect x="1408" y="320" width="316" height="182" fill="#f4f8f8" stroke="#637983" stroke-width="1.5"/>
+<a href="../../kernel/shared_memory.header#L8"><text x="1566.0" y="347" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Entry 1 removed</text></a>
+<text x="1566.0" y="384" text-anchor="middle" font-size="19" font-weight="bold" fill="#17313a">Destroy the unlinked entry</text>
+<a href="../../kernel/shared_memory.picoc#L69"><text x="1566.0" y="417" text-anchor="middle" font-size="14.421252371916509" font-weight="normal" fill="#17313a">destroy_shared_memory_entry(entry)</text></a>
+<a href="../../kernel/psdmalloc.picoc#L47"><text x="1566.0" y="451" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">PSDFree((int)entry-&gt;address)</text></a>
+<a href="../../kernel/kmalloc.picoc#L38"><text x="1566.0" y="480" text-anchor="middle" font-size="17" font-weight="normal" fill="#17313a">kfree(entry)</text></a>
+<rect x="1408" y="562" width="316" height="58" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
+<text x="1566.0" y="586" text-anchor="middle" font-size="17" font-weight="bold" fill="#17313a">Freed cells</text>
+<text x="1566.0" y="609" text-anchor="middle" font-size="16" font-weight="normal" fill="#17313a">Reusable by the heap</text>
+<rect x="32" y="649" width="1692" height="62" fill="#eaf3f4" stroke="#637983" stroke-width="1.5"/>
+<text x="878.0" y="674" text-anchor="middle" font-size="21" font-weight="bold" fill="#17313a">Free the entry and data only when BOTH conditions hold</text>
+<a href="../../kernel/shared_memory.header#L13"><text x="856.0" y="699" text-anchor="end" font-size="19" font-weight="normal" fill="#17313a">unlink_requested == true</text></a>
+<text x="878.0" y="699" text-anchor="middle" font-size="19" font-weight="normal" fill="#17313a">and</text>
+<a href="../../kernel/shared_memory.header#L12"><text x="900.0" y="699" text-anchor="start" font-size="19" font-weight="normal" fill="#17313a">reference_count == 0</text></a>
 </g></svg>

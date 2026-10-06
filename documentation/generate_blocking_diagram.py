@@ -8,6 +8,8 @@ ordinary wait, without a stop signal. All boxes have sharp corners.
 from html import escape
 from pathlib import Path
 
+from diagram_style import style_svg
+
 
 OUTPUT = Path(__file__).resolve().parent / "images" / "blocking-cycle.svg"
 INK = "#172b3a"
@@ -70,7 +72,7 @@ class Figure:
     def save(self):
         self.parts.append("</g></svg>")
         OUTPUT.parent.mkdir(exist_ok=True)
-        OUTPUT.write_text("\n".join(self.parts) + "\n", encoding="utf-8")
+        OUTPUT.write_text(style_svg("\n".join(self.parts) + "\n"), encoding="utf-8")
 
 
 def generate():

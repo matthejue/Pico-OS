@@ -1,37 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="435" viewBox="0 0 1480 435" role="img" aria-labelledby="title desc">
 <title id="title">PicoOS build and boot</title><desc id="desc">PicoOS bootloader and kernel sources enter the PicoC-Compiler. The emulator runs bootloader.reti in EEPROM and assembles kernel.reti with kernel.sections to kernel.bin. The bootloader loads the binary through UART into SRAM and starts the kernel.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#334155"/></marker></defs>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#637983"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
-<g font-family="DejaVu Sans, sans-serif" fill="#172536">
-<rect x="20" y="95" width="290" height="255" fill="#fff8dc" stroke="#8a5a00" stroke-width="2"/>
-<text x="165" y="130" font-size="27" text-anchor="middle" font-weight="bold" fill="#172536">PicoOS</text>
-<text x="165" y="175" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">Source code in PicoC</text>
-<text x="165" y="225" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">bootloader.picoc</text>
-<text x="165" y="275" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">kernel.picoc</text>
-<rect x="385" y="95" width="290" height="255" fill="#fff8dc" stroke="#8a5a00" stroke-width="2"/>
-<text x="530" y="140" font-size="27" text-anchor="middle" font-weight="bold" fill="#172536">PicoC-Compiler</text>
-<text x="530" y="220" font-size="24" text-anchor="middle" font-weight="normal" fill="#172536">Compile and link</text>
-<polyline points="310,220 385,220" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<rect x="850" y="20" width="610" height="395" fill="#f1f7ff" stroke="#174a7e" stroke-width="2"/>
-<text x="1155" y="60" font-size="27" text-anchor="middle" font-weight="bold" fill="#172536">RETI-Emulator</text>
-<rect x="900" y="95" width="500" height="85" fill="#eaf4ff" stroke="#174a7e" stroke-width="2"/>
-<text x="1150.0" y="129.5" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">EEPROM: execute bootloader</text>
-<text x="1150.0" y="159.5" font-size="22" text-anchor="middle" font-weight="normal" fill="#172536">-e bootloader.reti</text>
-<polyline points="675,155 900,155" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<text x="775" y="130" font-size="19" text-anchor="middle" font-weight="normal" fill="#172536">bootloader.reti</text>
-<rect x="900" y="240" width="210" height="125" fill="#eaf4ff" stroke="#174a7e" stroke-width="2"/>
-<text x="1005.0" y="279.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">Assemble kernel</text>
-<text x="1005.0" y="309.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">-a kernel.reti</text>
-<text x="1005.0" y="339.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">→ kernel.bin</text>
-<polyline points="675,295 900,295" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<text x="775" y="258" font-size="19" text-anchor="middle" font-weight="normal" fill="#172536">kernel.reti</text>
-<text x="775" y="281" font-size="17" text-anchor="middle" font-weight="normal" fill="#172536">+ kernel.sections</text>
-<rect x="1190" y="240" width="210" height="125" fill="#fff8dc" stroke="#8a5a00" stroke-width="2"/>
-<text x="1295.0" y="279.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">SRAM</text>
-<text x="1295.0" y="309.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">Load and execute</text>
-<text x="1295.0" y="339.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#172536">PicoOS kernel</text>
-<polyline points="1110,305 1190,305" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<text x="1150" y="284" font-size="16" text-anchor="middle" font-weight="normal" fill="#172536">payload</text>
-<polyline points="1150,180 1150,205 1295,205 1295,240" fill="none" stroke="#334155" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
-<text x="1070" y="210" font-size="18" text-anchor="end" font-weight="normal" fill="#172536">UART load, then start</text>
+<g font-family="Cantarell, sans-serif" fill="#17313a">
+<rect x="20" y="95" width="290" height="255" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<text x="165" y="130" font-size="27" text-anchor="middle" font-weight="bold" fill="#17313a">PicoOS</text>
+<text x="165" y="175" font-size="22" text-anchor="middle" font-weight="normal" fill="#17313a">Source code in PicoC</text>
+<text x="165" y="225" font-size="22" text-anchor="middle" font-weight="normal" fill="#17313a">bootloader.picoc</text>
+<text x="165" y="275" font-size="22" text-anchor="middle" font-weight="normal" fill="#17313a">kernel.picoc</text>
+<rect x="385" y="95" width="290" height="255" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<text x="530" y="140" font-size="27" text-anchor="middle" font-weight="bold" fill="#17313a">PicoC-Compiler</text>
+<text x="530" y="220" font-size="24" text-anchor="middle" font-weight="normal" fill="#17313a">Compile and link</text>
+<polyline points="310,220 385,220" fill="none" stroke="#637983" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<rect x="850" y="20" width="610" height="395" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<text x="1155" y="60" font-size="27" text-anchor="middle" font-weight="bold" fill="#17313a">RETI-Emulator</text>
+<rect x="900" y="95" width="500" height="85" fill="#eaf5f5" stroke="#637983" stroke-width="2"/>
+<text x="1150.0" y="129.5" font-size="22" text-anchor="middle" font-weight="normal" fill="#17313a">EEPROM: execute bootloader</text>
+<text x="1150.0" y="159.5" font-size="22" text-anchor="middle" font-weight="normal" fill="#17313a">-e bootloader.reti</text>
+<polyline points="675,155 900,155" fill="none" stroke="#637983" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<text x="775" y="130" font-size="19" text-anchor="middle" font-weight="normal" fill="#17313a">bootloader.reti</text>
+<rect x="900" y="240" width="210" height="125" fill="#eaf5f5" stroke="#637983" stroke-width="2"/>
+<text x="1005.0" y="279.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">Assemble kernel</text>
+<text x="1005.0" y="309.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">-a kernel.reti</text>
+<text x="1005.0" y="339.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">→ kernel.bin</text>
+<polyline points="675,295 900,295" fill="none" stroke="#637983" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<text x="775" y="258" font-size="19" text-anchor="middle" font-weight="normal" fill="#17313a">kernel.reti</text>
+<text x="775" y="281" font-size="17" text-anchor="middle" font-weight="normal" fill="#17313a">+ kernel.sections</text>
+<rect x="1190" y="240" width="210" height="125" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<text x="1295.0" y="279.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">SRAM</text>
+<text x="1295.0" y="309.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">Load and execute</text>
+<text x="1295.0" y="339.5" font-size="20" text-anchor="middle" font-weight="normal" fill="#17313a">PicoOS kernel</text>
+<polyline points="1110,305 1190,305" fill="none" stroke="#637983" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<text x="1150" y="284" font-size="16" text-anchor="middle" font-weight="normal" fill="#17313a">payload</text>
+<polyline points="1150,180 1150,205 1295,205 1295,240" fill="none" stroke="#637983" stroke-width="2.5" stroke-linejoin="miter" marker-end="url(#arrow)"/>
+<text x="1070" y="210" font-size="18" text-anchor="end" font-weight="normal" fill="#17313a">UART load, then start</text>
 </g></svg>

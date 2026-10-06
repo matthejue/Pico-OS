@@ -569,6 +569,7 @@ Its [`TransformerPicoC`](https://github.com/matthejue/PicoC-Compiler/blob/fb5534
 which the [compiler passes](https://github.com/matthejue/PicoC-Compiler/blob/fb553487c96c6105689cbdf4d9caf61cc9d6434d/src/passes.py) lowered into RETI:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     source["One PicoC source file"]
 
@@ -595,9 +596,10 @@ flowchart LR
 
 The extended pipeline replaces Lark with Tree-sitter to parse preprocessed source.
 [`TransformerPicoC.build_ast()`](../PicoC-Compiler/source/ast_transformers.py#L111) converts the parse tree into a PicoC AST before per-file symbol, type, and lowering passes.
-Linking merges results, inserts startup code, and resolves addresses. Yellow stages mark additions or replacements:
+Linking merges results, inserts startup code, and resolves addresses. Amber stages mark additions or replacements:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     source["PicoC source files"]
 
@@ -632,8 +634,8 @@ flowchart LR
     source --> preprocessor --> preprocessed --> parser --> parse_tree -->|TransformerPicoC.build_ast| ast
     ast --> shrink --> blocks --> symbol --> typing --> anf --> reti_blocks
     reti_blocks --> merge --> patch --> reti --> output
-    classDef added fill:#fff2b2,stroke:#8a5a00,stroke-width:3px,color:#111
-    style preprocessing fill:#fff8dc,stroke:#8a5a00,stroke-width:3px,color:#111
+    classDef added fill:#fff1d6,stroke:#805916,stroke-width:3px,color:#17313a
+    style preprocessing fill:#fff1d6,stroke:#805916,stroke-width:3px,color:#17313a
 ```
 
 ### 1.1.2 Separate compilation, reusable artifacts, and linking
@@ -675,6 +677,7 @@ binary/basic_string.sections
 In C, the linker consumes object files and their embedded symbol tables:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TB
     SRC["libstring.c + included .h headers"] --> COMPILE["gcc -c -O2 libstring.c"]
     COMPILE --> OBJ["libstring.o"]
@@ -689,6 +692,7 @@ assembly using only registers, numeric operands, and labels needs no symbol
 table. The diagram shows the compiler-generated files:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TB
     SRC["libstring.picoc<br/>includes string.picoc / shared helpers"] --> COMPILE["picoc_compiler -c -O1 libstring.picoc"]
     COMPILE --> OBJ["libstring.reti_blocks"]
@@ -760,6 +764,7 @@ its value in `IN2` and jumps there to restore `BAF` and the return address.
 Keeping the result in `IN2` leaves `ACC` free for long jumps:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     return_a["return expression A"] --> epilogue["function_epilogue"]
     return_b["return expression B"] --> epilogue
@@ -1429,6 +1434,7 @@ the matching `.sections` file and prepends five big-endian layout words through
 `-S PATH` selects another metadata file. The diagram shows both inputs:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TB
     RETI["program.reti<br/>linked RETI instructions and data"] --> ASSEMBLE["reti_emulator -a program.reti"]
     SECTIONS["program.sections<br/>linked layout metadata"] -->|automatically found beside program.reti| ASSEMBLE
@@ -1682,6 +1688,7 @@ over the USB-to-UART connection. The diagram follows requests and responses
 through that connection:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     UART["RETI UART controller"] <-->|"UART bytes<br/>host requests / responses"| ADAPTER["UART-to-USB adapter"]
     ADAPTER <-->|"USB connection<br/>host requests / responses"| SERVICE
@@ -1699,7 +1706,7 @@ During development, the emulator models UART and serves those requests
 directly:
 
 ```mermaid
-%%{init: {"flowchart": {"nodeSpacing": 20, "rankSpacing": 45, "wrappingWidth": 300}}}%%
+%%{init: {"flowchart":{"nodeSpacing":20,"rankSpacing":45,"wrappingWidth":300},"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     subgraph HOST["Host operating system"]
         direction LR
@@ -1750,7 +1757,7 @@ Replies arrive on the same UART stream. A [`load`](#123-uart-host-service-protoc
 count followed by file bytes. `ESC` below means byte 27:
 
 ```mermaid
-%%{init: {"sequence": {"wrap": false, "actorMargin": 60, "width": 180, "height": 45, "messageMargin": 25, "mirrorActors": false, "diagramMarginY": 35}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
+%%{init: {"sequence":{"wrap":false,"actorMargin":60,"width":180,"height":45,"messageMargin":25,"mirrorActors":false,"diagramMarginY":35},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
 sequenceDiagram
     participant P as PicoOS loader
     participant H as RETI-Emulator host
@@ -1764,7 +1771,7 @@ Ranged reads return a byte count and payload. Metadata and status requests
 return one big-endian value:
 
 ```mermaid
-%%{init: {"sequence": {"wrap": false, "actorMargin": 60, "width": 180, "height": 45, "messageMargin": 25, "mirrorActors": false, "diagramMarginY": 35}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
+%%{init: {"sequence":{"wrap":false,"actorMargin":60,"width":180,"height":45,"messageMargin":25,"mirrorActors":false,"diagramMarginY":35},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
 sequenceDiagram
     participant P as PicoOS
     participant H as RETI-Emulator host
@@ -2158,6 +2165,7 @@ follows the request through execution and either direct restoration or
 scheduling. [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) explains that choice:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ENTRY["<b>syscall_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_syscall()</b>"]
     HANDLE -->|returns| RETURN["<b>syscall_interrupt_return()</b><br/>caller_context[4] = IN2<br/>dispatcher_reschedule_if_requested()"]
@@ -2571,6 +2579,7 @@ syscall return path in
 [`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace):
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ENTRY["<b>timer_interrupt()</b><br/>Save context"] --> CHECK{"saved PC ><br/>kernel DS?"}
     CHECK -->|no: kernel| REQUEST_K["<b>dispatcher_request_reschedule()</b><br/>reschedule_requested = true"]
@@ -2831,6 +2840,7 @@ and resumes the interrupted context. The diagram follows the choice between
 a terminal signal and ordinary input:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ENTRY["<b>uart_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_uart_interrupt()</b><br/>Read + acknowledge byte<br/>handle_terminal_signal_character()"]
     HANDLE --> SIGNAL{"Ctrl+C / Ctrl+Z?"}
@@ -3036,6 +3046,7 @@ Interrupt delivery follows the priority rules in
 [`2.6.4 UART nesting and interrupt priorities`](#264-uart-nesting-and-interrupt-priorities):
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ENTRY["<b>dma_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_dma_interrupt()</b><br/>wakeup_wait_queue(&dma_waiters)"]
     HANDLE --> QUEUE{"dma_waiters.head != NULL?"}
@@ -3186,6 +3197,7 @@ service routine 3 directly, bypassing device mappings and priorities. The
 diagram shows why the faulting context does not resume:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ENTRY["<b>cpu_exception_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_cpu_exception()</b><br/>Read cause<br/>print_cpu_exception_message()"]
     HANDLE --> KERNEL{"interrupted CS = kernel CS?"}
@@ -3482,7 +3494,7 @@ descriptors that manage these allocations:
 The diagram locates the three heaps in SRAM and expands one Process Payload
 into its image, heap, and stack.
 
-![Continuous SRAM with the Kernel Heap, Process and Shared Data Heap, and nested User Process Heap highlighted by orange outlines and grouping bands, four blocks per heap, concrete kernel payload examples, and a dashed expansion of Process Payload A into its image, heap, and stack](documentation/images/memory-sram-overview.svg)
+![Continuous SRAM with the Kernel Heap, Process and Shared Data Heap, and nested User Process Heap highlighted by amber outlines and grouping bands, four blocks per heap, concrete kernel payload examples, and a dashed expansion of Process Payload A into its image, heap, and stack](documentation/images/memory-sram-overview.svg)
 
 These current offsets come from [`kernel/kernel.sections`](kernel/kernel.sections) and
 [`kernel/memory_constants.header`](kernel/memory_constants.header). They are relative to [`SRAM_BASE`](kernel/memory_constants.header#L1) and change
@@ -3655,6 +3667,7 @@ each user image. The two boxes compare direct allocator calls using the kernel's
 with calls using each user image's own [`process_heap`](library/stdlib/malloc.picoc#L6):
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     subgraph K["Kernel target"]
         direction TB
@@ -3690,6 +3703,7 @@ the address or moves the payload. A failed move preserves the old block.
 A null pointer allocates, while a nonpositive size frees:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     R["Resize an existing block"] --> FIT{"Current payload large enough?"}
     FIT -->|Yes| SHRINK["heap_split_block<br/>heap_merge_free_blocks"]
@@ -3710,9 +3724,9 @@ merge scan illustrated next.
 ### 3.6.3 Allocation and repeated coalescing example
 [\[↑ TOC\]](#contents)
 
-This 52-cell example follows an allocation and two frees. Yellow boxes are
-headers, blue payloads are allocated, and green payloads are free. Arrows
-show `next` links. The orange outline marks the changed block. Offsets count
+This 52-cell example follows an allocation and two frees. Gray boxes are
+headers, teal payloads are allocated, and green payloads are free. Arrows
+show `next` links. The amber outline marks the changed block. Offsets count
 cells, although drawn widths are not proportional to sizes.
 
 #### 3.6.3.1 Initial state and first-fit search
@@ -3913,7 +3927,7 @@ termination. Removal ends the PCB's lifetime. [`6. Scheduling and context switch
 [`7. Blocking, wait queues, signals, and mutexes`](#7-blocking-wait-queues-signals-and-mutexes) explains blocking and signal suspension:
 
 ```mermaid
-%%{init: {"themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
+%%{init: {"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
 stateDiagram-v2
     [*] --> NEW: completed load
     NEW --> READY: run and build initial stack
@@ -4177,11 +4191,11 @@ resumes; these figures show the prepared startup stack.
 ##### 4.2.2.1.1 User process stack placement
 [\[↑ TOC\]](#contents)
 
-The blue highlight locates one process's stack after its image and heap.
+The teal highlight locates one process's stack after its image and heap.
 The lower view expands Process Payload A, excluding its outer allocator
 header. Other processes have their own stacks in separate Process Payloads:
 
-![Complete SRAM expanded into Process Payload A, with both the payload and its User Process Stack highlighted by matching blue fills and thick blue borders](documentation/images/process-stack-placement.svg)
+![Complete SRAM expanded into Process Payload A, with both the payload and its User Process Stack highlighted by matching teal fills and thick amber borders](documentation/images/process-stack-placement.svg)
 
 [`base_address`](kernel/process/process.header#L34) starts the payload, and [`size`](kernel/process/process.header#L35) includes image, heap, and
 stack. Its highest stack cell is `base_address + size - 1`. Growth proceeds
@@ -4443,7 +4457,7 @@ stack frames. `BAF_wait` denotes the frame base of
 one 32-bit RETI cell. The three local-cell offsets follow the generated
 [`waitpid()` code](library/sys/wait/libwait.reti_blocks). The PCB fields show
 status delivery before child removal. Solid arrows locate the result cell
-through stored pointers, the dashed purple arrow shows the kernel's write
+through stored pointers, the dashed gray arrow shows the kernel's write
 when the parent is already waiting, and gray dashed lines connect expanded
 views of the same memory:
 
@@ -4875,9 +4889,9 @@ states unchanged.
 pointers. [`start`](kernel/scheduler.picoc#L13) records where this search
 began so the scan can stop after one pass.
 [`candidate`](kernel/scheduler.picoc#L14) points to the PCB currently being
-checked. The blue arrow shows
+checked. The teal arrow shows
 [`process_list_head`](kernel/process/process.picoc#L16). The green arrow shows
-[`active_process`](kernel/process/process.picoc#L18), and the orange arrows
+[`active_process`](kernel/process/process.picoc#L18), and the amber arrows
 show [`start`](kernel/scheduler.picoc#L13) and
 [`candidate`](kernel/scheduler.picoc#L14) separately so their positions remain
 visible as the scan advances. Steps 1–3 follow the scan
@@ -4927,7 +4941,7 @@ assumes PCB 5's [`state`](kernel/process/process.header#L33) is now
 PCB 4 and PCB 5, so [`candidate`](kernel/scheduler.picoc#L14) becomes `NULL`.
 The second loop resets [`candidate`](kernel/scheduler.picoc#L14) to
 [`first_process()`](kernel/process/process.picoc#L28) and checks the part
-of the list before [`start`](kernel/scheduler.picoc#L13). The orange arrow
+of the list before [`start`](kernel/scheduler.picoc#L13). The amber arrow
 leaves `NULL` and leads back to PCB 1, showing this reassignment:
 
 ![List-end variation: with start at PCB 4 and active_process at PCB 3, the scan skips PCB 4 in state STOPPED and PCB 5 in state BLOCKED, reaches candidate NULL, resets candidate to the list head, and returns PCB 1 in state READY](documentation/images/scheduler-scan-end.svg)
@@ -5082,8 +5096,8 @@ The kernel-call argument
 [`caller_context`](kernel/dispatcher.picoc#L71) points to the free cell just
 below the saved `DS`.
 
-The lower panels connect each stack offset to the field it updates. Purple
-arrows copy the values at offsets 1 through 6. The blue address arrow shows
+The lower panels connect each stack offset to the field it updates. Gray
+arrows copy the values at offsets 1 through 6. The teal address arrow shows
 why [`activation.sp`](kernel/process/process.header#L25) receives
 `caller_context + 6`, the address of the saved `ACC` cell. The saved `PC`
 remains at `caller_context + 7`, which is
@@ -5409,6 +5423,7 @@ intrusive waiter links. Normal [`waitpid()`](library/sys/wait/wait.picoc#L14) al
 but the queue representation supports several entries:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     subgraph A["PCB A: process being waited on<br/>kernel heap"]
         AW["waiters: embedded wait_queue"]
@@ -5691,6 +5706,7 @@ The dotted arrow shows this effect on the waiting process, which retries
 process returns from [`mutex_unlock()`](library/mutex/mutex.picoc#L25):
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TD
     A["mutex_lock: call testset"] --> B{"Old lock value?"}
     B -->|false| C["Lock changed from 0 to 1<br/>enter critical section"]
@@ -5777,6 +5793,7 @@ Inheritance always copies 0–2. It copies 3–4 only when their [`kind`](kernel
 unlike Unix shared open-file descriptions.
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     subgraph PARENT["parent entries[0..7]"]
         P02["0, 1, 2<br/>always copy"]
@@ -6320,6 +6337,7 @@ Nested boxes show containment, and arrows identify pointer fields. The
 dotted terminal edge means path-based selection, rather than a pointer:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     subgraph PCB["ProcessControlBlock / PCB: one Kernel Heap allocation"]
         P["PCB fields"]
@@ -7169,17 +7187,17 @@ comes from the host over UART, with DMA when enabled. Solid arrows show
 loading, and dotted arrows show register setup and control transfer:
 
 ```mermaid
-%%{init: {"sequence": {"height": 90}, "themeCSS": "rect { rx: 0 !important; ry: 0 !important; }"}}%%
+%%{init: {"sequence":{"height":90},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
 sequenceDiagram
-    box rgb(232, 248, 248) EPROM
+    box #f4f8f8 EPROM
         participant B as Bootloader<br/>.text and .data
     end
-    box rgb(255, 248, 237) Kernel-reserved SRAM
+    box #f4f8f8 Kernel-reserved SRAM
         participant K as Kernel image<br/>0–41485<br/>.ivt: 0–4<br/>.text from 5<br/>.data from 40755
         participant KH as Kernel heap<br/>41486–45581
         participant KS as Kernel stack<br/>45582–48297
     end
-    box rgb(239, 252, 242) Process and Shared Data Heap
+    box #f4f8f8 Process and Shared Data Heap
         participant I as Init image<br/>libstart startup
         participant SH as Shell image<br/>libstart startup
         participant A as Application A<br/>libstart startup
@@ -7983,6 +8001,7 @@ In step 2, [`open()`](library/fcntl/fcntl.picoc#L5) opens `OUT` as descriptor 3 
 descriptor table remains unchanged:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     OUT["OUT"] -->|"open()"| S3["shell fd 3: OUT"]
     S1["shell fd 1: T-out"] -->|"dup2(1, 6)"| S6["shell fd 6: saved T-out"]
@@ -7993,6 +8012,7 @@ In step 3, [`dup2(3, 1)`](library/unistd/io.picoc#L58) installs an independent c
 Descriptor 6 keeps the saved terminal output for later restoration:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     O3["shell fd 3: OUT"] -->|"dup2(3, 1)"| O1["shell fd 1: OUT"]
     O3 -->|"close(3)"| OF["shell fd 3: free"]
@@ -8007,6 +8027,7 @@ PCB's [`file_descriptors`](kernel/process/process.header#L42) pointer.
 and never examines 5–7. The diagram follows stdout and its saved copy:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     ST["PCB 1 · shell<br/>fd 1: OUT<br/>fd 6: saved T-out"]
     CT["PCB 2 · child<br/>fd 1: OUT copy<br/>fd 6: free"]
@@ -8019,6 +8040,7 @@ stdout back with [`dup2(6, 1)`](library/unistd/io.picoc#L58) and then calls
 because its entry and path were copied independently:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     R6["shell fd 6: saved T-out"] -->|"dup2(6, 1)"| R1["shell fd 1: T-out"]
     R1 -->|"close(6)"| RF["shell fd 6: free"]
@@ -8488,6 +8510,7 @@ The diagram shows category targets and expected-output sources. Boot, OS,
 and shell tests all execute the full startup chain:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TD
     T["63 Tests<br/><code>make test</code>"] --> L["13 Library Tests<br/><code>make test-lib</code>"]
     T --> B["1 Boot Test<br/><code>make test-boot</code>"]
@@ -8509,6 +8532,7 @@ A library class is one top-level `.picoc` file. Other classes use a
 directory of fixtures. These examples show one library and one OS class:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart TD
     T["<code>test/</code>"] --> L["<code>basic_printf_newline_escape.picoc</code><br/>one Library test"]
     T --> O["<code>hello_world/</code><br/>one OS test"]
@@ -8572,6 +8596,7 @@ compiler or emulator error, missing output, or five-second timeout fails
 the test.
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     M["Source metadata in <code>.picoc</code>"] --> R["Compiled RETI program"]
     M --> E["Generated <code>.expected_output</code>"]
@@ -8638,6 +8663,7 @@ process with pid 5 created
 The complete path is therefore:
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     I["<code>input.txt</code>"] --> S["Shell <code>load</code> and <code>run</code> built-ins"]
     S --> L["<code>launcher.bin</code>"]
@@ -8684,6 +8710,7 @@ for the next prompt before continuing. More complex classes can include
 private applications and data.
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     I["<code>input.txt</code>"] --> R["Runner waits for <code>PicoOS&gt;</code>"]
     R --> S["Shell"]
@@ -8719,6 +8746,7 @@ bootloader, followed by kernel, init, and shell. The runner sends `echo.bin`
 and [`poweroff.bin`](user/poweroff.picoc#L12) after their prompts.
 
 ```mermaid
+%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
 flowchart LR
     B["EPROM <code>bootloader.reti</code>"] --> K["<code>kernel.bin</code>"]
     K --> I["<code>init.bin</code>"]
@@ -9029,7 +9057,7 @@ Each child's [`parent_pid`](kernel/process/process.header#L57) records the
 launcher's PID.
 
 The diagram shows the whole setup. Dashed arrows show the parent starting
-the children and passing arguments. Blue arrows show the three processes'
+the children and passing arguments. Teal arrows show the three processes'
 local pointers reaching **one shared region**, whose fields are shown with
 their initial values. The green arrow is the kernel's stored payload address:
 

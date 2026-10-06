@@ -2,15 +2,15 @@
   <title id="title">TSL DS ACC 2: atomic access to one SRAM word</title>
   <desc id="desc">Four adjacent, equally sized 32-bit SRAM word cells are separated by lines, with omitted memory at both ends. DS is 0x80000040, and offset 2 selects the cell at 0x80000042. TSL DS ACC 2 copies that cell's old value 0 into ACC and changes the same cell to 1 atomically. Neighboring cells remain unchanged.</desc>
   <rect width="1440" height="404" fill="white"/>
-  <g font-family="DejaVu Sans, sans-serif" fill="#172536">
-    <text x="60" y="78" font-family="DejaVu Sans Mono, monospace" font-size="21">DS = 0x80000040; DS + 2 = 0x80000042</text>
+  <g font-family="Cantarell, sans-serif" fill="#17313a">
+    <text x="60" y="78" font-family="Cantarell, sans-serif" font-size="21">DS = 0x80000040; DS + 2 = 0x80000042</text>
 
     <text x="60" y="122" font-size="21">Each cell is one 32-bit word; addresses increase by 1 per cell.</text>
     <!-- One SRAM outline with equal-width word cells, plus omitted memory at both ends. -->
-    <rect x="60" y="146" width="1320" height="132" fill="#f1f5f9"/>
-    <path d="M720 146 H1005 V278 H720 Z" fill="#fff2b2"/>
-    <rect x="60" y="146" width="1320" height="132" fill="none" stroke="#475569" stroke-width="2"/>
-    <path d="M150 146 V278 M435 146 V278 M720 146 V278 M1005 146 V278 M1290 146 V278" fill="none" stroke="#475569" stroke-width="2"/>
+    <rect x="60" y="146" width="1320" height="132" fill="#f4f8f8"/>
+    <path d="M720 146 H1005 V278 H720 Z" fill="#fff1d6"/>
+    <rect x="60" y="146" width="1320" height="132" fill="none" stroke="#637983" stroke-width="2"/>
+    <path d="M150 146 V278 M435 146 V278 M720 146 V278 M1005 146 V278 M1290 146 V278" fill="none" stroke="#637983" stroke-width="2"/>
     <g text-anchor="middle">
       <text x="105" y="222" font-size="32">…</text>
       <text x="1335" y="222" font-size="32">…</text>
@@ -20,7 +20,7 @@
         <text x="862.5" y="178">DS + 2 (target)</text>
         <text x="1147.5" y="178">DS + 3</text>
       </g>
-      <g font-family="DejaVu Sans Mono, monospace" font-size="21">
+      <g font-family="Cantarell, sans-serif" font-size="21">
         <text x="292.5" y="212">0x80000040</text>
         <text x="577.5" y="212">0x80000041</text>
         <text x="862.5" y="212">0x80000042</text>
@@ -29,7 +29,7 @@
       <g font-size="21">
         <text x="292.5" y="253">unchanged</text>
         <text x="577.5" y="253">unchanged</text>
-        <text x="862.5" y="255" font-size="30" font-weight="bold" fill="#8a5a00">0 → 1</text>
+        <text x="862.5" y="255" font-size="30" font-weight="bold" fill="#805916">0 → 1</text>
         <text x="1147.5" y="253">unchanged</text>
       </g>
     </g>

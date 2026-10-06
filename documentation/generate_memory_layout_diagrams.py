@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 
+from diagram_style import style_svg
+
 
 OUTPUT = Path(__file__).parent / "images"
 HEADER = "#fff0cc"
@@ -219,10 +221,10 @@ class Diagram:
                             size=15, anchor="start") if notes else "")
                + "\n".join(self.parts)
                + (self.text(LEFT, self.height - 20,
-                            "Yellow: block headers   ·   Blue: allocated payloads   ·   Green: free payloads",
+                            "Gray: block headers   ·   Teal: allocated payloads   ·   Green: free payloads",
                             size=14, anchor="start") if notes else "")
                + "\n</g>\n</svg>\n")
-        (OUTPUT / f"memory-{self.slug}.svg").write_text(svg)
+        (OUTPUT / f"memory-{self.slug}.svg").write_text(style_svg(svg, name=f"memory-{self.slug}"))
 
 
 def blocks(prefix, payloads, header_width=80, payload_width=170):
@@ -658,7 +660,7 @@ def shared_memory_destruction():
            f'<desc id="desc">{escape(description)}</desc>\n<defs>{defs}</defs>\n'
            f'<rect width="{width}" height="{height}" fill="white"/>\n'
            '<g font-family="DejaVu Sans, sans-serif">\n' + "\n".join(parts) + '\n</g></svg>\n')
-    (OUTPUT / "memory-shared-destruction.svg").write_text(svg)
+    (OUTPUT / "memory-shared-destruction.svg").write_text(style_svg(svg, name="memory-shared-destruction"))
 
 
 def main():
@@ -689,8 +691,8 @@ def main():
                     "contain four illustrative blocks linked by BlockHeader.next. Kernel payloads A, B and C "
                     "contain PCB 1 (struct ProcessControlBlock), its binary_path string (PCB-owned path copy), "
                     "and a Shared Memory Entry (struct SharedMemoryEntry); payload D is free. "
-                    "Dashed lines connect the bottom corners of the blue Process Payload A box to its "
-                    "expanded layout. Orange outlines and orange grouping bands mark "
+                    "Dashed lines connect the bottom corners of the teal Process Payload A box to its "
+                    "expanded layout. Amber outlines and amber grouping bands mark "
                     "the Kernel Heap, Process and Shared Data Heap, and nested User Process Heap. "
                     "Process Payload C belongs to another process and outer Payload D is free. "
                     "Both kernel-managed heap descriptors and list roots "

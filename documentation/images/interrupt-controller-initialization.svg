@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1720" height="800" viewBox="0 0 1720 800" role="img" aria-labelledby="title desc">
 <title id="title">Interrupt-controller initialization in the RETI memory map</title>
 <desc id="desc">EPROM, periphery and SRAM in address order. Individual entries of two int[3] arrays in kernel .data write the six controller registers. The kernel image contains .ivt, .text and .data, followed by kernel heap and stack. Process and shared data occupy the remaining heap.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#27617b"/></marker></defs>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker></defs>
 <rect width="100%" height="100%" fill="white"/>
-<g font-family="DejaVu Sans, sans-serif" fill="#192c38">
+<g font-family="Cantarell, sans-serif" fill="#17313a">
 <text x="1455" y="38" font-size="21" font-weight="normal" text-anchor="start">Addresses →</text>
-<rect x="24" y="90" width="205" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="24" y="90" width="205" height="690" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="36" y="125" font-size="23" font-weight="bold" text-anchor="start">EPROM</text>
 <text x="36" y="160" font-size="18" font-weight="normal" text-anchor="start">0x00000000</text>
 <text x="36" y="215" font-size="21" font-weight="normal" text-anchor="start">Bootloader</text>
-<rect x="249" y="90" width="540" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="249" y="90" width="540" height="690" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="263" y="125" font-size="23" font-weight="bold" text-anchor="start">Periphery</text>
 <text x="263" y="160" font-size="18" font-weight="normal" text-anchor="start">0x40000000</text>
 <text x="267" y="215" font-size="22" font-weight="normal" text-anchor="start">…</text>
@@ -17,68 +17,68 @@
 <text x="275" y="329" font-size="21" font-weight="bold" text-anchor="start">ISR mapping</text>
 <text x="275" y="493" font-size="21" font-weight="bold" text-anchor="start">Priority</text>
 <text x="267" y="674" font-size="22" font-weight="normal" text-anchor="start">…</text>
-<rect x="910" y="90" width="786" height="690" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="910" y="90" width="786" height="690" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="924" y="125" font-size="23" font-weight="bold" text-anchor="start">SRAM</text>
 <text x="1470" y="125" font-size="18" font-weight="normal" text-anchor="start">0x80000000</text>
-<rect x="924" y="143" width="758" height="580" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="924" y="143" width="758" height="580" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="938" y="174" font-size="22" font-weight="bold" text-anchor="start">Kernel</text>
-<rect x="936" y="188" width="734" height="460" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="936" y="188" width="734" height="460" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="950" y="216" font-size="21" font-weight="bold" text-anchor="start">Kernel image</text>
-<rect x="950" y="229" width="240" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="950" y="229" width="240" height="42" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="962" y="255" font-size="21" font-weight="normal" text-anchor="start">.ivt</text>
-<rect x="1190" y="229" width="466" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="1190" y="229" width="466" height="42" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="1202" y="255" font-size="21" font-weight="normal" text-anchor="start">.text</text>
-<rect x="950" y="281" width="706" height="353" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="950" y="281" width="706" height="353" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="964" y="308" font-size="21" font-weight="bold" text-anchor="start">.data</text>
 <text x="964" y="329" font-size="19" font-weight="normal" text-anchor="start">interrupt_device_isrs</text>
 <text x="964" y="493" font-size="19" font-weight="normal" text-anchor="start">interrupt_device_priorities</text>
-<rect x="264" y="343" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="343" width="510" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="371" font-size="21" font-weight="normal" text-anchor="start">0x40000003</text>
 <text x="482" y="371" font-size="21" font-weight="normal" text-anchor="start">Timer</text>
 <text x="744" y="371" font-size="23" font-weight="bold" text-anchor="end">1</text>
-<rect x="964" y="343" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="343" width="678" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="371" font-size="23" font-weight="normal" text-anchor="start">[0] = 1</text>
-<rect x="264" y="383" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="383" width="510" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="411" font-size="21" font-weight="normal" text-anchor="start">0x40000004</text>
 <text x="482" y="411" font-size="21" font-weight="normal" text-anchor="start">DMA</text>
 <text x="744" y="411" font-size="23" font-weight="bold" text-anchor="end">4</text>
-<rect x="964" y="383" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="383" width="678" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="411" font-size="23" font-weight="normal" text-anchor="start">[1] = 4</text>
-<rect x="264" y="423" width="510" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="423" width="510" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="451" font-size="21" font-weight="normal" text-anchor="start">0x40000005</text>
 <text x="482" y="451" font-size="21" font-weight="normal" text-anchor="start">UART</text>
 <text x="744" y="451" font-size="23" font-weight="bold" text-anchor="end">2</text>
-<rect x="964" y="423" width="678" height="40" fill="#dceefa" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="423" width="678" height="40" fill="#d8efef" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="451" font-size="23" font-weight="normal" text-anchor="start">[2] = 2</text>
-<rect x="264" y="507" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="507" width="510" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="535" font-size="21" font-weight="normal" text-anchor="start">0x40000006</text>
 <text x="482" y="535" font-size="21" font-weight="normal" text-anchor="start">Timer</text>
 <text x="744" y="535" font-size="23" font-weight="bold" text-anchor="end">1</text>
-<rect x="964" y="507" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="507" width="678" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="535" font-size="23" font-weight="normal" text-anchor="start">[0] = 1</text>
-<rect x="264" y="547" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="547" width="510" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="575" font-size="21" font-weight="normal" text-anchor="start">0x40000007</text>
 <text x="482" y="575" font-size="21" font-weight="normal" text-anchor="start">DMA</text>
 <text x="744" y="575" font-size="23" font-weight="bold" text-anchor="end">1</text>
-<rect x="964" y="547" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="547" width="678" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="575" font-size="23" font-weight="normal" text-anchor="start">[1] = 1</text>
-<rect x="264" y="587" width="510" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="264" y="587" width="510" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="275" y="615" font-size="21" font-weight="normal" text-anchor="start">0x40000008</text>
 <text x="482" y="615" font-size="21" font-weight="normal" text-anchor="start">UART</text>
 <text x="744" y="615" font-size="23" font-weight="bold" text-anchor="end">2</text>
-<rect x="964" y="587" width="678" height="40" fill="#fff1c7" stroke="#526472" stroke-width="1.5"/>
+<rect x="964" y="587" width="678" height="40" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
 <text x="980" y="615" font-size="23" font-weight="normal" text-anchor="start">[2] = 2</text>
-<rect x="936" y="665" width="367" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="936" y="665" width="367" height="42" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="948" y="691" font-size="21" font-weight="normal" text-anchor="start">Kernel heap</text>
-<rect x="1303" y="665" width="367" height="42" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="1303" y="665" width="367" height="42" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="1315" y="691" font-size="21" font-weight="normal" text-anchor="start">Kernel stack</text>
-<rect x="924" y="737" width="758" height="32" fill="#ffffff" stroke="#526472" stroke-width="1.5"/>
+<rect x="924" y="737" width="758" height="32" fill="#ffffff" stroke="#637983" stroke-width="1.5"/>
 <text x="936" y="763" font-size="20" font-weight="normal" text-anchor="start">Process and Shared Data Heap</text>
-<defs><marker id="write-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#526472"/></marker></defs>
-<path d="M 964 363 L 776 363" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
-<path d="M 964 403 L 776 403" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
-<path d="M 964 443 L 776 443" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
-<path d="M 964 527 L 776 527" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
-<path d="M 964 567 L 776 567" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
-<path d="M 964 607 L 776 607" fill="none" stroke="#526472" stroke-width="2" marker-end="url(#write-arrow)"/>
+<defs><marker id="write-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#637983"/></marker></defs>
+<path d="M 964 363 L 776 363" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 403 L 776 403" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 443 L 776 443" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 527 L 776 527" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 567 L 776 567" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
+<path d="M 964 607 L 776 607" fill="none" stroke="#637983" stroke-width="2" marker-end="url(#write-arrow)"/>
 </g></svg>

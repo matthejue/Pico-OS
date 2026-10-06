@@ -1,12 +1,14 @@
 """Generate README chapter 4 diagrams from the verified PicoOS memory model.
 
 Run from any directory with Python 3. All widths are illustrative. Neighboring
-regions share boundaries, pointers use curved arrows, and orange outlines mark
+regions share boundaries, pointers use curved arrows, and amber outlines mark
 the region or fields discussed. No raster assets or external packages are used.
 """
 
 from html import escape
 from pathlib import Path
+
+from diagram_style import style_svg
 
 from generate_memory_layout_diagrams import (
     ADDRESS, ALLOCATED, FOCUS, FREE, HEADER, HEAP_EMPHASIS, LINE, METADATA, MUTED, POINTER, sram,
@@ -137,7 +139,7 @@ class Figure:
                f'<desc id="desc">{escape(self.description)}</desc><defs>{defs}</defs>'
                f'<rect width="{self.width}" height="{self.height}" fill="white"/>'
                '<g font-family="DejaVu Sans, sans-serif">' + "".join(self.parts) + '</g></svg>\n')
-        (OUTPUT / f"process-{self.slug}.svg").write_text(svg)
+        (OUTPUT / f"process-{self.slug}.svg").write_text(style_svg(svg, name=f"process-{self.slug}"))
 
 
 def process_list_diagram(slug, *, with_payloads=False):
@@ -271,9 +273,9 @@ def placement():
     f = Figure("stack-placement", "One user-process stack in the SRAM hierarchy",
                "The complete SRAM contains a Kernel area and the Process and Shared Data Heap. "
                "Each process is one independent allocator payload containing a User Process Image, "
-               "User Process Heap and User Process Stack. A pale peach grouping band and thick red "
+               "User Process Heap and User Process Stack. A pale amber grouping band and thick amber "
                "outline mark the entire Process and Shared Data Heap. Process Payload A and its User Process "
-               "Stack are highlighted with matching blue fills and thick red outlines.",
+               "Stack are highlighted with matching teal fills and thick amber outlines.",
                height=490, show_address_direction=False)
     f.row(100, 90, [("kernel", 430, ("Kernel area", "image · heap · stack"), MUTED),
                     ("ha", 100, ("Block", "Header A"), HEADER),

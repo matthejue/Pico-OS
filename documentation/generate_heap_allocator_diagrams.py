@@ -3,6 +3,8 @@
 from html import escape
 from pathlib import Path
 
+from diagram_style import style_svg
+
 
 OUTPUT = Path(__file__).parent / "images"
 HEADER_CELLS = 3
@@ -120,7 +122,7 @@ def render(slug, title, blocks, highlighted):
            f'<title id="title">{escape(title)}</title>\n'
            '<desc id="desc">One continuous horizontal heap region with adjacent headers and payloads sharing divider lines. '
            'Curved next arrows link headers in address order. Green payloads are free, '
-           'blue payloads are allocated, and the orange outline marks the changed or selected block. '
+           'teal payloads are allocated, and the amber outline marks the changed or selected block. '
            'Widths preserve memory positions across steps but are not to scale in cells.</desc>\n'
            '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" '
            'markerWidth="6" markerHeight="6" orient="auto-start-reverse">'
@@ -128,7 +130,7 @@ def render(slug, title, blocks, highlighted):
            f'<rect width="{width}" height="292" fill="white"/>\n'
            '<g font-family="DejaVu Sans, sans-serif">\n'
            + "\n".join(parts) + "\n</g>\n</svg>\n")
-    (OUTPUT / f"heap-{slug}.svg").write_text(svg)
+    (OUTPUT / f"heap-{slug}.svg").write_text(style_svg(svg))
 
 
 def main():

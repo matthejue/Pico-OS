@@ -2,82 +2,82 @@
 <title id="title">Variation: PCB 5&#x27;s state is BLOCKED, so the scan reaches NULL</title>
 <desc id="desc">This variation starts after saving PCB 3&#x27;s context, with PCB 3 still current and its state READY. PCB 5&#x27;s state is now BLOCKED. With start PCB 4, the scheduler skips PCB 4 and PCB 5, reaching candidate NULL. It then assigns candidate to first_process(), PCB 1. The second loop returns PCB 1 in state READY. active_process stays PCB 3 during both scheduler loops. The wrap arrow is an assignment, not a PCB next link.</desc>
 <defs>
-<marker id="43576a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#43576a"/></marker>
-<marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#26715b"/></marker>
-<marker id="9c3d15" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#9c3d15"/></marker>
-<marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#405ea8"/></marker>
+<marker id="43576a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#637983"/></marker>
+<marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#25734f"/></marker>
+<marker id="9c3d15" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#805916"/></marker>
+<marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#167b84"/></marker>
 </defs>
 <rect width="1600" height="520" fill="white"/>
-<g font-family="DejaVu Sans, sans-serif">
-<a href="../../kernel/scheduler.picoc#L12"><text x="32" y="85" text-anchor="start" font-size="25" font-weight="bold" fill="#172b3a">A. Reach NULL</text></a>
-<rect x="460" y="60" width="165" height="78" fill="#deecff" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="542.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 1</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="542.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
-<path d="M 628 100 H 653" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="642.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="660" y="60" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="742.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 2</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="742.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: BLOCKED</text></a>
-<path d="M 828 100 H 853" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="842.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="860" y="60" width="165" height="78" fill="#deecff" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="942.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 3</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="942.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
-<path d="M 1028 100 H 1053" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1042.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="1060" y="60" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="1142.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 4</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="1142.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: STOPPED</text></a>
-<path d="M 1228 100 H 1253" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1242.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="1260" y="60" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="1342.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 5</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="1342.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: BLOCKED</text></a>
-<path d="M 1428 100 H 1474" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1453.0" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<a href="../../kernel/process/process.header#L53"><text x="1515" y="107" text-anchor="middle" font-size="22" font-weight="normal" fill="#172b3a">NULL</text></a>
-<a href="../../kernel/process/process.picoc#L18"><text x="942.5" y="32" text-anchor="middle" font-size="21" font-weight="normal" fill="#26715b">active_process</text></a>
-<path d="M 942.5 40 V 57" fill="none" stroke="#26715b" stroke-width="2.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/process/process.picoc#L16"><text x="32" y="205" text-anchor="start" font-size="21" font-weight="normal" fill="#405ea8">process_list_head</text></a>
-<path d="M 250 198 H 478 V 141" fill="none" stroke="#405ea8" stroke-width="2.5" marker-end="url(#405ea8)"/>
-<a href="../../kernel/scheduler.picoc#L12"><text x="1142.5" y="32" text-anchor="middle" font-size="21" font-weight="normal" fill="#9c3d15">start</text></a>
-<path d="M 1142.5 40 V 57" fill="none" stroke="#9c3d15" stroke-width="2.5" marker-end="url(#9c3d15)"/>
-<a href="../../kernel/scheduler.picoc#L12"><text x="1495" y="187" text-anchor="end" font-size="21" font-weight="normal" fill="#9c3d15">candidate == NULL</text></a>
-<path d="M 1515 124 V 223 H 542.5 V 141" fill="none" stroke="#9c3d15" stroke-width="2.5" marker-end="url(#9c3d15)"/>
-<a href="../../kernel/process/process.picoc#L28"><text x="1010" y="212" text-anchor="middle" font-size="21" font-weight="normal" fill="#9c3d15">candidate = first_process()</text></a>
-<a href="../../kernel/scheduler.picoc#L12"><text x="32" y="315" text-anchor="start" font-size="25" font-weight="bold" fill="#172b3a">B. Select PCB 1</text></a>
-<rect x="460" y="290" width="165" height="78" fill="#deecff" stroke="#9c3d15" stroke-width="3"/>
-<a href="../../kernel/process/process.header#L31"><text x="542.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 1</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="542.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
-<path d="M 628 330 H 653" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="642.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="660" y="290" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="742.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 2</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="742.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: BLOCKED</text></a>
-<path d="M 828 330 H 853" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="842.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="860" y="290" width="165" height="78" fill="#deecff" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="942.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 3</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="942.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: READY</text></a>
-<path d="M 1028 330 H 1053" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1042.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="1060" y="290" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="1142.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 4</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="1142.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: STOPPED</text></a>
-<path d="M 1228 330 H 1253" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1242.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<rect x="1260" y="290" width="165" height="78" fill="#f0f3f6" stroke="#43576a" stroke-width="2"/>
-<a href="../../kernel/process/process.header#L31"><text x="1342.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#172b3a">PCB 5</text></a>
-<a href="../../kernel/process/process.header#L33"><text x="1342.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#172b3a">state: BLOCKED</text></a>
-<path d="M 1428 330 H 1474" fill="none" stroke="#43576a" stroke-width="2.5" marker-end="url(#43576a)"/>
-<a href="../../kernel/process/process.header#L53"><text x="1453.0" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#172b3a">next</text></a>
-<a href="../../kernel/process/process.header#L53"><text x="1515" y="337" text-anchor="middle" font-size="22" font-weight="normal" fill="#172b3a">NULL</text></a>
-<a href="../../kernel/process/process.picoc#L18"><text x="942.5" y="262" text-anchor="middle" font-size="21" font-weight="normal" fill="#26715b">active_process</text></a>
-<path d="M 942.5 270 V 287" fill="none" stroke="#26715b" stroke-width="2.5" marker-end="url(#26715b)"/>
-<a href="../../kernel/process/process.picoc#L16"><text x="32" y="435" text-anchor="start" font-size="21" font-weight="normal" fill="#405ea8">process_list_head</text></a>
-<path d="M 250 428 H 478 V 371" fill="none" stroke="#405ea8" stroke-width="2.5" marker-end="url(#405ea8)"/>
-<a href="../../kernel/scheduler.picoc#L12"><text x="1142.5" y="262" text-anchor="middle" font-size="21" font-weight="normal" fill="#9c3d15">start</text></a>
-<path d="M 1142.5 270 V 287" fill="none" stroke="#9c3d15" stroke-width="2.5" marker-end="url(#9c3d15)"/>
-<a href="../../kernel/scheduler.picoc#L12"><text x="542.5" y="417" text-anchor="middle" font-size="21" font-weight="normal" fill="#9c3d15">candidate</text></a>
-<path d="M 542.5 397 V 371" fill="none" stroke="#9c3d15" stroke-width="2.5" marker-end="url(#9c3d15)"/>
+<g font-family="Cantarell, sans-serif">
+<a href="../../kernel/scheduler.picoc#L12"><text x="32" y="85" text-anchor="start" font-size="25" font-weight="bold" fill="#17313a">A. Reach NULL</text></a>
+<rect x="460" y="60" width="165" height="78" fill="#d8efef" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="542.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 1</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="542.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: READY</text></a>
+<path d="M 628 100 H 653" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="642.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="660" y="60" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="742.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 2</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="742.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: BLOCKED</text></a>
+<path d="M 828 100 H 853" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="842.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="860" y="60" width="165" height="78" fill="#d8efef" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="942.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 3</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="942.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: READY</text></a>
+<path d="M 1028 100 H 1053" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1042.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="1060" y="60" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1142.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 4</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1142.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: STOPPED</text></a>
+<path d="M 1228 100 H 1253" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1242.5" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="1260" y="60" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1342.5" y="89" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 5</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1342.5" y="119" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: BLOCKED</text></a>
+<path d="M 1428 100 H 1474" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1453.0" y="86" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<a href="../../kernel/process/process.header#L53"><text x="1515" y="107" text-anchor="middle" font-size="22" font-weight="normal" fill="#17313a">NULL</text></a>
+<a href="../../kernel/process/process.picoc#L18"><text x="942.5" y="32" text-anchor="middle" font-size="21" font-weight="normal" fill="#25734f">active_process</text></a>
+<path d="M 942.5 40 V 57" fill="none" stroke="#25734f" stroke-width="2.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/process/process.picoc#L16"><text x="32" y="205" text-anchor="start" font-size="21" font-weight="normal" fill="#167b84">process_list_head</text></a>
+<path d="M 250 198 H 478 V 141" fill="none" stroke="#167b84" stroke-width="2.5" marker-end="url(#405ea8)"/>
+<a href="../../kernel/scheduler.picoc#L12"><text x="1142.5" y="32" text-anchor="middle" font-size="21" font-weight="normal" fill="#805916">start</text></a>
+<path d="M 1142.5 40 V 57" fill="none" stroke="#805916" stroke-width="2.5" marker-end="url(#9c3d15)"/>
+<a href="../../kernel/scheduler.picoc#L12"><text x="1495" y="187" text-anchor="end" font-size="21" font-weight="normal" fill="#805916">candidate == NULL</text></a>
+<path d="M 1515 124 V 223 H 542.5 V 141" fill="none" stroke="#805916" stroke-width="2.5" marker-end="url(#9c3d15)"/>
+<a href="../../kernel/process/process.picoc#L28"><text x="1010" y="212" text-anchor="middle" font-size="21" font-weight="normal" fill="#805916">candidate = first_process()</text></a>
+<a href="../../kernel/scheduler.picoc#L12"><text x="32" y="315" text-anchor="start" font-size="25" font-weight="bold" fill="#17313a">B. Select PCB 1</text></a>
+<rect x="460" y="290" width="165" height="78" fill="#d8efef" stroke="#805916" stroke-width="3"/>
+<a href="../../kernel/process/process.header#L31"><text x="542.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 1</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="542.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: READY</text></a>
+<path d="M 628 330 H 653" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="642.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="660" y="290" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="742.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 2</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="742.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: BLOCKED</text></a>
+<path d="M 828 330 H 853" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="842.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="860" y="290" width="165" height="78" fill="#d8efef" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="942.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 3</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="942.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: READY</text></a>
+<path d="M 1028 330 H 1053" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1042.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="1060" y="290" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1142.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 4</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1142.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: STOPPED</text></a>
+<path d="M 1228 330 H 1253" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1242.5" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<rect x="1260" y="290" width="165" height="78" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
+<a href="../../kernel/process/process.header#L31"><text x="1342.5" y="319" text-anchor="middle" font-size="22" font-weight="bold" fill="#17313a">PCB 5</text></a>
+<a href="../../kernel/process/process.header#L33"><text x="1342.5" y="349" text-anchor="middle" font-size="18" font-weight="normal" fill="#17313a">state: BLOCKED</text></a>
+<path d="M 1428 330 H 1474" fill="none" stroke="#637983" stroke-width="2.5" marker-end="url(#43576a)"/>
+<a href="../../kernel/process/process.header#L53"><text x="1453.0" y="316" text-anchor="middle" font-size="14" font-weight="normal" fill="#17313a">next</text></a>
+<a href="../../kernel/process/process.header#L53"><text x="1515" y="337" text-anchor="middle" font-size="22" font-weight="normal" fill="#17313a">NULL</text></a>
+<a href="../../kernel/process/process.picoc#L18"><text x="942.5" y="262" text-anchor="middle" font-size="21" font-weight="normal" fill="#25734f">active_process</text></a>
+<path d="M 942.5 270 V 287" fill="none" stroke="#25734f" stroke-width="2.5" marker-end="url(#26715b)"/>
+<a href="../../kernel/process/process.picoc#L16"><text x="32" y="435" text-anchor="start" font-size="21" font-weight="normal" fill="#167b84">process_list_head</text></a>
+<path d="M 250 428 H 478 V 371" fill="none" stroke="#167b84" stroke-width="2.5" marker-end="url(#405ea8)"/>
+<a href="../../kernel/scheduler.picoc#L12"><text x="1142.5" y="262" text-anchor="middle" font-size="21" font-weight="normal" fill="#805916">start</text></a>
+<path d="M 1142.5 270 V 287" fill="none" stroke="#805916" stroke-width="2.5" marker-end="url(#9c3d15)"/>
+<a href="../../kernel/scheduler.picoc#L12"><text x="542.5" y="417" text-anchor="middle" font-size="21" font-weight="normal" fill="#805916">candidate</text></a>
+<path d="M 542.5 397 V 371" fill="none" stroke="#805916" stroke-width="2.5" marker-end="url(#9c3d15)"/>
 </g></svg>

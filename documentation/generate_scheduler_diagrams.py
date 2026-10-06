@@ -8,6 +8,8 @@ Only short step labels accompany the lists. Explanations stay in the README.
 from html import escape
 from pathlib import Path
 
+from diagram_style import style_svg
+
 from generate_memory_layout_diagrams import POINTER
 
 
@@ -129,7 +131,7 @@ class Figure:
     def save(self):
         self.parts.append('</g></svg>')
         OUTPUT.mkdir(exist_ok=True)
-        (OUTPUT / f"scheduler-{self.slug}.svg").write_text("\n".join(self.parts) + "\n")
+        (OUTPUT / f"scheduler-{self.slug}.svg").write_text(style_svg("\n".join(self.parts) + "\n"))
 
 
 def generate():
