@@ -6463,12 +6463,15 @@ Call-local requests remain in the calling function's stack frame. In
 [`status`](library/sys/wait/wait.picoc#L15) integer both live on the parent's
 User Process Stack. The request occupies two memory cells, one for the child
 PID and one for the result address. The separate integer occupies a third
-cell. The diagram shows how the request's
+cell. The diagram uses the SRAM layout from
+[`3.2 SRAM image and heap hierarchy`](#32-sram-image-and-heap-hierarchy),
+with lower addresses on the left. It expands the Kernel Heap and the parent's
+User Process Stack to show how the request's
 [`status`](common/syscall.header#L63) pointer and the parent PCB's
 [`waiting_status_ptr`](kernel/process/process.header#L44) reference the same
 integer while the parent waits for its child:
 
-![User stack memory cells show the two-cell WaitPidRequest and separate integer status cell, with request.status and PCB 1 waiting_status_ptr both pointing to the integer](documentation/images/process-waitpid-references.svg)
+![SRAM with the Kernel Heap on the left and Process Payload A's image, heap, and stack on the right. Matching expanded Kernel Heap and User Process Stack containers show PCB 1 after Block Header A, the two-cell WaitPidRequest, and the separate int status, with request.status and waiting_status_ptr both pointing to that integer](documentation/images/process-waitpid-references.svg)
 
 [`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L4) passes `&request`
 through `IN1`, leaving the request on the User Process Stack. When the parent
@@ -6597,59 +6600,8 @@ int waitpid(int pid);
 bool WIFSTOPPED(int status);
 ```
 
-For example, [`user/shell.picoc`](user/shell.picoc) includes this header and calls
-[`waitpid()`](library/sys/wait/wait.picoc#L14) for its foreground child. The file
-outline below shows the include, the result variable, and
-[`run_process()`](user/shell.picoc#L1034), which stores the returned status in
-[`last_command_exit_status`](user/shell.picoc#L29). Unrelated declarations,
-redirection setup, and status reporting are omitted with `// ...`:
-
-```c
-#include "../library/sys/wait/wait.header"
-// ...
-
-int last_command_exit_status = 0;
-// ...
-
-bool run_process(
-    int pid,
-    char *arguments,
-    bool background,
-    char *stdin_path,
-    char *stdout_path,
-    bool append_stdout,
-    char *stderr_path,
-    bool append_stderr
-) {
-    char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
-    // ...
-    bool started;
-
-    // ...
-    started = run(pid, expand_variables(
-                           arguments,
-                           expanded_arguments,
-                           SHELL_COMMAND_BUFFER_CAPACITY),
-                  NULL);
-    // ...
-
-    if (!started) {
-        // ...
-    } else if (background) {
-        last_background_process_id = pid;
-    } else {
-        set_foreground_process(pid);
-        last_command_exit_status = waitpid(pid);
-        set_foreground_process(0);
-        // ...
-    }
-    return started;
-}
-// ...
-```
-
-Including the header gives the compiler the signature. The implementation
-is supplied during linking.
+Applications include this header so the compiler can check calls against the
+public signatures. The function implementations are supplied during linking.
 
 The library compilation unit, [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc),
 collects the implementation through a single include. Its complete contents are:
@@ -7936,10 +7888,28 @@ The shell's `$?` still holds the previous result during this wait.
 [`7.1.2 Child waiting with waitpid`](#712-child-waiting-with-waitpid)
 explains the queue and stack-result pointers omitted from this overview.
 
-This excerpt shows descriptor restoration before ownership transfer,
-followed by waiting and ownership reset:
+The file outline from [`user/shell.picoc`](user/shell.picoc) below connects the
+library includes and shell state to [`run_process()`](user/shell.picoc#L1034).
+After starting the child, it restores the shell's descriptors before choosing
+between recording a background PID and waiting for a foreground child.
+[`waitpid()`](library/sys/wait/wait.picoc#L14) supplies the status stored in
+[`last_command_exit_status`](user/shell.picoc#L29), and
+[`WIFSTOPPED()`](library/sys/wait/wait.picoc#L25) determines whether to retain
+that child in [`last_background_process_id`](user/shell.picoc#L30).
+Unrelated declarations and redirection setup, including its error paths,
+are omitted with `// ...`. [`12.6 Input/output redirection`](#126-inputoutput-redirection)
+explains that setup.
 
 ```c
+#include "../library/unistd/unistd.header"
+#include "../library/fcntl/fcntl.header"
+#include "../library/sys/wait/wait.header"
+// ...
+
+int last_command_exit_status = 0;
+int last_background_process_id = 0;
+// ...
+
 bool run_process(
     int pid,
     char *arguments,
@@ -7950,6 +7920,12 @@ bool run_process(
     char *stderr_path,
     bool append_stderr
 ) {
+    char expanded_arguments[SHELL_COMMAND_BUFFER_CAPACITY];
+    bool stdin_redirected = false;
+    bool stdout_redirected = false;
+    bool stderr_redirected = false;
+    bool started;
+
     // ...
     started = run(pid, expand_variables(
                            arguments,
@@ -7968,10 +7944,19 @@ bool run_process(
         set_foreground_process(pid);
         last_command_exit_status = waitpid(pid);
         set_foreground_process(0);
-        // ...
+        report_foreground_process_status(
+            pid,
+            last_command_exit_status
+        );
+        if (WIFSTOPPED(last_command_exit_status)) {
+            last_background_process_id = pid;
+        } else if (last_background_process_id == pid) {
+            last_background_process_id = 0;
+        }
     }
     return started;
 }
+// ...
 ```
 
 The shell changes the kernel's [`foreground_process_target`](kernel/signal.picoc#L12)
