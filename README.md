@@ -1325,13 +1325,19 @@ complete program layout exists yet.
 
 The final [`reti()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L311)
 pass calculates the offsets from the linked `.ivt`, `.text`, and `.data`
-sections. [`_entries_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L271)
-counts the emitted RETI words, ignoring comments. The global-data extent is
-the greatest offset-plus-size value among global data symbols, calculated by
-[`_data_segment_symbol_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L274).
-Taking the larger data size ensures that the heap begins after all static
-storage, including storage represented by symbol metadata rather than emitted
-data words. The default metadata is calculated as follows:
+sections. Heap placement uses two sizes from the compiler outputs:
+
+| Size | Source and calculation |
+| --- | --- |
+| Words in `.data` | Emitted data entries in the linked `.reti_blocks` files, counted by [`_entries_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L271) |
+| Global-data extent | Global-variable records from the linked `.st` symbol tables. [`_data_segment_symbol_size()`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L274) takes the largest `addr + size`, where `addr` is the variable's offset from `DS` and `size` its cell count |
+
+Without `-O1`, `.data` is empty but globals still need storage recorded in the
+symbol table. Both sizes describe the same region, so `max()` reserves enough
+space without counting it twice. Adding
+[`datasegment_start`](../PicoC-Compiler/source/passes/linking/reti_pass.py#L341)
+places [`heap_start`](kernel/process/process.header#L36) after that region.
+The default metadata is calculated as follows:
 
 | Entry | Default value |
 | --- | --- |
@@ -3027,6 +3033,12 @@ They connect the emulator's fault detection to the kernel handler:
 | ---: | --- | --- |
 | 10, [`STACK_HEAP_BOUNDARY_REGISTER`](kernel/exception.header#L5) | PicoOS | `0` disables stack protection. Any other value is the active boundary, the emulator raises a stack-overflow exception when an instruction decreases `SP` to a value below it. [`activate_kernel_stack_boundary()`](kernel/exception.picoc#L11) writes [`KERNEL_HEAP_START`](kernel/memory_constants.header#L3) + [`KERNEL_HEAP_SIZE`](kernel/memory_constants.header#L4) − 1. A process boundary is [`base_address`](kernel/process/process.header#L34) + [`heap_start`](kernel/process/process.header#L36) + [`heap_size`](kernel/process/process.header#L37) − 1. |
 | 11, [`CPU_EXCEPTION_CAUSE_REGISTER`](kernel/exception.header#L6) | RETI CPU/emulator | `0` means no exception has been recorded, `1` means division or modulo by zero, `2` means stack overflow, and `3` means illegal instruction. Guest writes are ignored. [`handle_cpu_exception()`](kernel/exception.picoc#L70) reads this value after exception entry. |
+
+[`STACK_HEAP_BOUNDARY_REGISTER`](kernel/exception.header#L5) marks the last
+heap cell. The process example shows how decreasing `SP` below that boundary
+raises stack overflow. Kernel stack protection uses the same comparison.
+
+![SP points to the next free stack cell, the boundary register marks the last heap cell, and the CPU rejects a decrease of SP below that boundary](documentation/images/stack-heap-boundary.svg)
 
 Exception entry saves the faulting PC minus one. The naked handler abandons
 that context, so it does not save the other registers:
