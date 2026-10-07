@@ -45,7 +45,6 @@ class WaitFigure(Figure):
                'role="img" aria-labelledby="title desc">'
                f'<title id="title">{escape(self.title)}</title>'
                f'<desc id="desc">{escape(self.description)}</desc><defs>{defs}</defs>'
-               '<rect width="100%" height="100%" fill="white"/>'
                '<g font-family="Cantarell, sans-serif">' + "".join(self.parts) + '</g></svg>\n')
         OUTPUT.mkdir(exist_ok=True)
         (OUTPUT / f"{self.slug}.svg").write_text(style_svg(svg), encoding="utf-8")

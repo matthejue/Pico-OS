@@ -3,7 +3,7 @@
   "fontFamily": "Cantarell, sans-serif",
   "themeVariables": {
     "fontFamily": "Cantarell, sans-serif",
-    "background": "#ffffff",
+    "background": "transparent",
     "primaryColor": "#f4f8f8",
     "primaryTextColor": "#17313a",
     "primaryBorderColor": "#637983",

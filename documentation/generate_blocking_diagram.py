@@ -43,7 +43,6 @@ class Figure:
             'markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
             f'<path d="M 0 0 L 10 5 L 0 10 Z" fill="{LINE}"/></marker>',
             '</defs>',
-            '<rect width="1600" height="900" fill="white"/>',
             '<g font-family="DejaVu Sans, sans-serif">',
         ]
 

@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="picoos-diagram-15" width="1962.46875" class="flowchart" viewBox="0 0 1962.46875 263.578125" role="img" height="263.578125" aria-labelledby="interrupt-exception-path-title" preserveAspectRatio="xMidYMid meet">
   <title id="interrupt-exception-path-title">2.8.1 CPU exception entry and registers</title>
-  <rect x="0" y="0" width="1962.46875" height="263.578125" fill="#ffffff" />
   <g>
     <marker id="picoos-diagram-15_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />

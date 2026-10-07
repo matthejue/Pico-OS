@@ -61,7 +61,7 @@ MERMAID_THEME = {
     "fontFamily": FONT,
     "themeVariables": {
         "fontFamily": FONT,
-        "background": "#ffffff",
+        "background": "transparent",
         "primaryColor": PANEL,
         "primaryTextColor": INK,
         "primaryBorderColor": LINE,

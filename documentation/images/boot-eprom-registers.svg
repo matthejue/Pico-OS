@@ -2,7 +2,6 @@
 <title id="title">Register destinations after bootloader _start</title>
 <desc id="desc">Immediately after MOVE ACC PC, before boot_main creates its stack frame. CS points to EPROM offset zero, ACC and PC to boot_main in bootloader .text, DS to bootloader .data, and SP and BAF to the highest SRAM cell. Green dashed arrows show absolute register addresses. The narrow final SRAM cell is the initial temporary stack location. Addresses increase from left to right. SRAM labels are cell offsets. Memory widths are illustrative.</desc>
 <defs><marker id="address" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#25734f"/></marker></defs>
-<rect width="1800" height="420" fill="white"/>
 <g font-family="Cantarell, sans-serif" fill="#17313a">
 <rect x="32" y="144" width="500" height="198" fill="#fff1d6" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
 <rect x="532" y="144" width="160" height="198" fill="#f4f8f8" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>

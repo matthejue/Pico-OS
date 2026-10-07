@@ -39,7 +39,7 @@ def generate():
         parts.append(f'<marker id="{name}" viewBox="0 0 10 10" refX="9" refY="5" '
                      'markerWidth="7" markerHeight="7" orient="auto">'
                      f'<path d="M 0 0 L 10 5 L 0 10 Z" fill="{color}"/></marker>')
-    parts.extend(['</defs>', '<rect width="2460" height="866" fill="white"/>',
+    parts.extend(['</defs>',
                   f'<g font-family="{FONT}" fill="{INK}">'])
 
     def rect(x, y, width, height, fill, *, opacity=1):

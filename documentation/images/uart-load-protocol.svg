@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-9" width="614" viewBox="-50 -35 614 265" role="img" height="265" aria-labelledby="uart-load-protocol-title" preserveAspectRatio="xMidYMid meet">
   <title id="uart-load-protocol-title">1.2.3 UART host-service protocol</title>
-  <rect x="-50" y="-35" width="614" height="265" fill="#ffffff" />
   <g>
     <line id="actor1" x1="424" y1="45" x2="424" y2="2000" class="actor-line 200" stroke-width="2px" stroke="#637983" name="H" fill="#f4f8f8" />
     <g id="root-1">

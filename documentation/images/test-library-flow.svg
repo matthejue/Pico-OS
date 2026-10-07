@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-25" width="1298.96875" class="flowchart" viewBox="0 0 1298.96875 198" role="img" height="198" aria-labelledby="test-library-flow-title" preserveAspectRatio="xMidYMid meet">
   <title id="test-library-flow-title">14.1.2 Library test example</title>
-  <rect x="0" y="0" width="1298.96875" height="198" fill="#ffffff" />
   <g>
     <marker id="picoos-diagram-25_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />

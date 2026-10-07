@@ -215,7 +215,6 @@ class Diagram:
                f'<title id="title">{escape(self.title)}</title>\n'
                f'<desc id="desc">{escape(self.description)}</desc>\n'
                f'<defs>{defs}</defs>\n'
-               f'<rect width="{width}" height="{self.height}" fill="white"/>\n'
                '<g font-family="DejaVu Sans, sans-serif">\n'
                + (self.text(LEFT, 28, "Low to high addresses →   ·   Widths are illustrative",
                             size=15, anchor="start") if notes else "")
@@ -658,7 +657,6 @@ def shared_memory_destruction():
            f'viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">\n'
            '<title id="title">Shared-memory lifetime: open, map, unlink, release</title>\n'
            f'<desc id="desc">{escape(description)}</desc>\n<defs>{defs}</defs>\n'
-           f'<rect width="{width}" height="{height}" fill="white"/>\n'
            '<g font-family="DejaVu Sans, sans-serif">\n' + "\n".join(parts) + '\n</g></svg>\n')
     (OUTPUT / "memory-shared-destruction.svg").write_text(style_svg(svg, name="memory-shared-destruction"))
 

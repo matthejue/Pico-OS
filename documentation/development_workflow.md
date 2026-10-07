@@ -152,8 +152,9 @@ arrows.
 All README visuals share the palette and typography in
 [`diagram_style.py`](diagram_style.py): Cantarell, sharp rectangular corners,
 dark ink, gray outlines and grouping, pale teal allocated data, and pale green
-free data. Teal arrows show references, green arrows show addresses or the active
-process, and gray arrows show copies. Amber is reserved for an existing focus,
+free data. Keep the SVG canvas transparent; generators must omit full-canvas
+background rectangles. Teal arrows show references, green arrows show addresses
+or the active process, and gray arrows show copies. Amber is reserved for an existing focus,
 changed field/block, or waiting state; ordinary headers and containers stay
 neutral. Keep explicit labels and line patterns so meaning does not depend on
 color alone.

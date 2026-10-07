@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="picoos-diagram-11" width="1965.9375" class="flowchart" viewBox="0 0 1965.9375 338.171875" role="img" height="338.171875" aria-labelledby="interrupt-syscall-path-title" preserveAspectRatio="xMidYMid meet">
   <title id="interrupt-syscall-path-title">2.4.2 System-call entry, execution, and return to userspace</title>
-  <rect x="0" y="0" width="1965.9375" height="338.171875" fill="#ffffff" />
   <g>
     <marker id="picoos-diagram-11_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />

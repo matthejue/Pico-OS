@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-2" width="3973.8125" class="flowchart" viewBox="0 0 3973.8125 188" role="img" height="188" aria-labelledby="compiler-picoos-pipeline-title" preserveAspectRatio="xMidYMid meet">
   <title id="compiler-picoos-pipeline-title">1.1.1 Compilation pipeline and compiler passes</title>
-  <rect x="0" y="0" width="3973.8125" height="188" fill="#ffffff" />
   <g>
     <marker id="picoos-diagram-2_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />

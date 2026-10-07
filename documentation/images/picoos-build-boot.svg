@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1480" height="435" viewBox="0 0 1480 435" role="img" aria-labelledby="title desc">
 <title id="title">PicoOS build and boot</title><desc id="desc">PicoOS bootloader and kernel sources enter the PicoC-Compiler. The emulator runs bootloader.reti in EEPROM and assembles kernel.reti with kernel.sections to kernel.bin. The bootloader loads the binary through UART into SRAM and starts the kernel.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#637983"/></marker></defs>
-<rect width="100%" height="100%" fill="white"/>
 <g font-family="Cantarell, sans-serif" fill="#17313a">
 <rect x="20" y="95" width="290" height="255" fill="#f4f8f8" stroke="#637983" stroke-width="2"/>
 <text x="165" y="130" font-size="27" text-anchor="middle" font-weight="bold" fill="#17313a">PicoOS</text>

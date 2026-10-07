@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-18" width="1047.89453125" class="statediagram" viewBox="0 0 1047.89453125 882" role="img" height="882" aria-labelledby="process-state-transitions-title" preserveAspectRatio="xMidYMid meet">
   <title id="process-state-transitions-title">4.1.1 Process states and transitions</title>
-  <rect x="0" y="0" width="1047.89453125" height="882" fill="#ffffff" />
   <g>
     <defs>
       <marker id="picoos-diagram-18_stateDiagram-barbEnd" refX="19" refY="7" markerWidth="20" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto">

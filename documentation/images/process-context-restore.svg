@@ -2,7 +2,6 @@
 <title id="title">Restoring Process 1 among three processes: RTI returns the PC to its .text</title>
 <desc id="desc">Three processes each have a process image containing optional .ivt, .text and .data, followed by a process heap and stack. The selected PCB 1 restores each CPU register from a separate activation field. SP points one cell below the return PC saved by the last hardware or software interrupt on Process 1's stack. RTI reads that saved PC, increments SP, and sets PC to the saved PC plus one. An arrow points to the resumed instruction inside Process 1's .text. Processes 2 and 3 retain their own memory layouts.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#167b84"/></marker><marker id="resume-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#25734f"/></marker></defs>
-<rect y="20" width="1840" height="590" fill="white"/>
 <g font-family="Cantarell, sans-serif" fill="#17313a">
 <rect x="24" y="112" width="252" height="446" fill="white" stroke="#637983" stroke-width="1.5"/>
 <a href="../../kernel/process/process.header#L31"><text x="40" y="145" font-size="23" font-weight="bold" text-anchor="start">PCB 1</text></a>

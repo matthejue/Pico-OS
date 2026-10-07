@@ -2,7 +2,6 @@
 <title id="title">From PCBs to Process Payloads in SRAM</title>
 <desc id="desc">Kernel .ivt, .text and .data form the Kernel Image, followed by the Kernel Heap and Kernel Stack. The Process and Shared Data Heap follows the Kernel area. Each depicted heap has three Block Headers A, B and C. Kernel Heap Payloads A and C contain PCB 1 and PCB 2. Kernel Heap Payload B contains one SharedMemoryEntry. The PCBs&#x27; base_address fields reach Process Payloads A and C. Both addresses identify payload cells immediately after the corresponding outer headers.</desc>
 <defs><marker id="405ea8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="785099" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker><marker id="26715b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#25734f"/></marker></defs>
-<rect width="2354" height="611" fill="white"/>
 <g font-family="Cantarell, sans-serif">
 <rect x="32" y="310" width="70" height="156" fill="#f4f8f8" stroke="none" stroke-width="1"/>
 <text x="67.0" y="384.0" text-anchor="middle" font-size="14" font-weight="bold" fill="#17313a">.ivt</text><text x="67.0" y="405.0" text-anchor="middle" font-size="13.824884792626728" font-weight="normal" fill="#17313a">5 cells</text>

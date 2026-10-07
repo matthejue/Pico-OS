@@ -34,7 +34,6 @@ class Figure:
             '<defs><marker id="address" viewBox="0 0 10 10" refX="9" refY="5" '
             'markerWidth="7" markerHeight="7" orient="auto">'
             f'<path d="M 0 0 L 10 5 L 0 10 Z" fill="{GREEN}"/></marker></defs>',
-            '<rect width="1800" height="420" fill="white"/>',
             f'<g font-family="{FONT}" fill="{INK}">',
         ]
 

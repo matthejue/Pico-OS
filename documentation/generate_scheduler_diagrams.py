@@ -53,7 +53,6 @@ class Figure:
             )
         self.parts += [
             '</defs>',
-            f'<rect width="1600" height="{self.height}" fill="white"/>',
             '<g font-family="DejaVu Sans, sans-serif">',
         ]
 

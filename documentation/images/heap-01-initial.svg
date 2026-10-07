@@ -2,7 +2,6 @@
 <title id="title">Initial state: request 11 cells</title>
 <desc id="desc">One continuous horizontal heap region with adjacent headers and payloads sharing divider lines. Curved next arrows link headers in address order. Green payloads are free, teal payloads are allocated, and the amber outline marks the changed or selected block. Widths preserve memory positions across steps but are not to scale in cells.</desc>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#167b84"/></marker></defs>
-<rect width="1294" height="292" fill="white"/>
 <g font-family="Cantarell, sans-serif">
 <rect x="32" y="100" width="102" height="116" fill="#eaf3f4"/>
 <text x="83.0" y="124" font-size="13" font-weight="bold" text-anchor="middle" fill="#17313a">Block Header</text>

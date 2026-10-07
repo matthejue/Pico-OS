@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="picoos-diagram-12" width="1671.421875" class="flowchart" viewBox="0 0 1671.421875 246" role="img" height="246" aria-labelledby="interrupt-timer-path-title" preserveAspectRatio="xMidYMid meet">
   <title id="interrupt-timer-path-title">2.5.1 Timer interrupt path</title>
-  <rect x="0" y="0" width="1671.421875" height="246" fill="#ffffff" />
   <g>
     <marker id="picoos-diagram-12_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />

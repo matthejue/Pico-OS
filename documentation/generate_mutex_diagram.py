@@ -25,7 +25,6 @@ def generate():
         'markerWidth="7" markerHeight="7" orient="auto">'
         f'<path d="M 0 0 L 10 5 L 0 10 Z" fill="{TEAL}"/>'
         '</marker></defs>',
-        '<rect width="1360" height="720" fill="#ffffff"/>',
         '<g font-family="Cantarell, sans-serif" '
         f'fill="{INK}" text-anchor="middle">',
     ]

@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="354" viewBox="0 50 1440 354" role="img" aria-labelledby="title desc">
   <title id="title">TSL DS ACC 2: atomic access to one SRAM word</title>
   <desc id="desc">Four adjacent, equally sized 32-bit SRAM word cells are separated by lines, with omitted memory at both ends. DS is 0x80000040, and offset 2 selects the cell at 0x80000042. TSL DS ACC 2 copies that cell's old value 0 into ACC and changes the same cell to 1 atomically. Neighboring cells remain unchanged.</desc>
-  <rect width="1440" height="404" fill="white"/>
   <g font-family="Cantarell, sans-serif" fill="#17313a">
     <text x="60" y="78" font-family="Cantarell, sans-serif" font-size="21">DS = 0x80000040; DS + 2 = 0x80000042</text>
 

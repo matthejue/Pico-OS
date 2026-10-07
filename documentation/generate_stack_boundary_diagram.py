@@ -125,7 +125,6 @@ def generate():
         'viewBox="0 0 1480 590" role="img" aria-labelledby="title desc">'
         '<title id="title">Stack pointer and heap boundary protection</title>'
         f'<desc id="desc">{escape(description)}</desc><defs>{defs}</defs>'
-        '<rect width="1480" height="590" fill="white"/>'
         f'<g font-family="{FONT}">' + "".join(parts) + '</g></svg>\n'
     )
     OUTPUT.write_text(style_svg(svg, name="stack-heap-boundary"))

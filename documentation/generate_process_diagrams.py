@@ -137,7 +137,6 @@ class Figure:
                'role="img" aria-labelledby="title desc">'
                f'<title id="title">{escape(self.title)}</title>'
                f'<desc id="desc">{escape(self.description)}</desc><defs>{defs}</defs>'
-               f'<rect width="{self.width}" height="{self.height}" fill="white"/>'
                '<g font-family="DejaVu Sans, sans-serif">' + "".join(self.parts) + '</g></svg>\n')
         (OUTPUT / f"process-{self.slug}.svg").write_text(style_svg(svg, name=f"process-{self.slug}"))
 
