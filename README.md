@@ -45,16 +45,6 @@ requests the kernel binary over UART, reads its header, and copies the
 payload into SRAM. [`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header) explains the binary format, and [`1.1.9 Generated memory constants for the bootloader and kernel`](#119-generated-memory-constants-for-the-bootloader-and-kernel) explains the
 generated memory headers.
 
-Each stage passes the following files or runtime requests to the next:
-
-| Producer | Contract | Consumer |
-| --- | --- | --- |
-| PicoC-Compiler | Linked [`.reti`](../PicoC-Compiler/source/passes/linking/reti_pass.py), `.sections`, generated memory headers, and `.debuginfo` | RETI-Emulator assembler/debugger and PicoOS low-level builds |
-| RETI-Emulator assembler | Five-word layout header followed by encoded RETI words in `.bin` | EPROM bootloader and kernel process loader |
-| PicoOS libraries | Syscall number plus direct value/pointer or stack-local request structure | Interrupt entry, [`handle_syscall()`](kernel/syscall.picoc#L16), and the owning kernel subsystem |
-| Kernel subsystems | PCBs, activations, queues, descriptor/shared-memory state, and periphery-register writes | Scheduler/dispatcher and emulated RETI hardware |
-| PicoOS UART host request protocol | Bounded `<ESC>...<ESC>/` requests and big-endian responses | RETI-Emulator host file services, or a companion serial host on hardware |
-
 ## Build and run
 [\[↓ TOC\]](#contents)
 
