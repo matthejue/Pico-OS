@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-27" width="1802.515625" class="flowchart" viewBox="0 0 1802.515625 186" role="img" height="186" aria-labelledby="test-shell-flow-title" preserveAspectRatio="xMidYMid meet">
+  <title id="test-shell-flow-title">14.1.4 Shell test example</title>
+  <rect x="0" y="0" width="1802.515625" height="186" fill="#ffffff" />
+  <g>
+    <marker id="picoos-diagram-27_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto">
+      <path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto">
+      <polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" />
+    </marker>
+    <marker id="picoos-diagram-27_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <g class="root">
+      <g class="clusters" />
+      <g class="edgePaths">
+        <path d="M128.016,47L132.182,47C136.349,47,144.682,47,152.349,47C160.016,47,167.016,47,170.516,47L174.016,47" id="picoos-diagram-27-L_I_R_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M418.672,47L422.839,47C427.005,47,435.339,47,443.005,47C450.672,47,457.672,47,461.172,47L464.672,47" id="picoos-diagram-27-L_R_S_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M563.938,47L568.104,47C572.271,47,580.604,47,588.271,47C595.938,47,602.938,47,606.438,47L609.938,47" id="picoos-diagram-27-L_S_A_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M873.938,47L878.104,47C882.271,47,890.604,47,898.271,47C905.938,47,912.938,47,916.438,47L919.938,47" id="picoos-diagram-27-L_A_C_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1144.281,47L1148.448,47C1152.615,47,1160.948,47,1168.615,47C1176.281,47,1183.281,47,1186.781,47L1190.281,47" id="picoos-diagram-27-L_C_O_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1411.438,47L1415.604,47C1419.771,47,1428.104,47,1439.552,50.855C1450.999,54.709,1465.561,62.419,1472.842,66.274L1480.123,70.128" id="picoos-diagram-27-L_O_D_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1404.422,151L1409.758,151C1415.094,151,1425.766,151,1438.382,147.145C1450.999,143.291,1465.561,135.581,1472.842,131.726L1480.123,127.872" id="picoos-diagram-27-L_E_D_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1607.875,99L1612.042,99C1616.208,99,1624.542,99,1632.208,99C1639.875,99,1646.875,99,1650.375,99L1653.875,99" id="picoos-diagram-27-L_D_P_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-27_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+      </g>
+      <g class="edgeLabels">
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+      </g>
+      <g class="nodes">
+        <g class="node default  " id="picoos-diagram-27-flowchart-I-0" transform="translate(68.0078125, 47)">
+          <rect class="basic label-container" x="-60.0078125" y="-27" width="120.015625" height="54" rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1.5px" />
+          <g class="label" transform="translate(-30.0078125, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">input.txt</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-R-1" transform="translate(298.34375, 47)">
+          <rect class="basic label-container" x="-120.328125" y="-27" width="240.65625" height="54" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-90.328125, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Runner waits for </text><text x="120.4375" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">PicoOS&gt;</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-S-3" transform="translate(516.3046875, 47)">
+          <rect class="basic label-container" x="-47.6328125" y="-27" width="95.265625" height="54" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-17.6328125, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Shell</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-A-5" transform="translate(743.9375, 47)">
+          <rect class="basic label-container" x="-130" y="-39" width="260" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-100, -24)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="36.390625" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Command or test </text><text x="60.8125" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">application</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-C-7" transform="translate(1034.109375, 47)">
+          <rect class="basic label-container" x="-110.171875" y="-27" width="220.34375" height="54" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-80.171875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Captured UART output</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-O-9" transform="translate(1302.859375, 47)">
+          <rect class="basic label-container" x="-108.578125" y="-27" width="217.15625" height="54" rx="0" ry="0" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-78.578125, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Normalized </text><text x="86.375" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">output.txt</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-D-11" transform="translate(1534.65625, 99)">
+          <rect class="basic label-container" x="-73.21875" y="-27" width="146.4375" height="54" rx="0" ry="0" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-43.21875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Comparison</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-E-12" transform="translate(1302.859375, 151)">
+          <rect class="basic label-container" x="-101.5625" y="-27" width="203.125" height="54" rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1.5px" />
+          <g class="label" transform="translate(-71.5625, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">expected_output.txt</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-27-flowchart-P-15" transform="translate(1726.1953125, 99)">
+          <rect class="basic label-container" x="-68.3203125" y="-27" width="136.640625" height="54" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+          <g class="label" transform="translate(-38.3203125, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Pass or fail</text></g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <defs>
+    <filter id="picoos-diagram-27-drop-shadow" height="130%" width="130%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <defs>
+    <filter id="picoos-diagram-27-drop-shadow-small" height="150%" width="150%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <linearGradient id="picoos-diagram-27-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#637983" stop-opacity="1" />
+    <stop offset="100%" stop-color="#637983" stop-opacity="1" />
+  </linearGradient>
+</svg>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="420" viewBox="0 0 1800 420" role="img" aria-labelledby="title desc">
+<title id="title">Register destinations after bootloader _start</title>
+<desc id="desc">Immediately after MOVE ACC PC, before boot_main creates its stack frame. CS points to EPROM offset zero, ACC and PC to boot_main in bootloader .text, DS to bootloader .data, and SP and BAF to the highest SRAM cell. Green dashed arrows show absolute register addresses. The narrow final SRAM cell is the initial temporary stack location. Addresses increase from left to right. SRAM labels are cell offsets. Memory widths are illustrative.</desc>
+<defs><marker id="address" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#25734f"/></marker></defs>
+<rect width="1800" height="420" fill="white"/>
+<g font-family="Cantarell, sans-serif" fill="#17313a">
+<rect x="32" y="144" width="500" height="198" fill="#fff1d6" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="532" y="144" width="160" height="198" fill="#f4f8f8" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="692" y="144" width="818" height="198" fill="#e7f3ea" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="1510" y="144" width="258" height="198" fill="#d8efef" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="32" y="144" width="500" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="282.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">EPROM · 0x00000000</text>
+<rect x="532" y="144" width="160" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">Periphery</text>
+<rect x="692" y="144" width="1076" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1230.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">SRAM · 0x80000000</text>
+<rect x="32" y="180" width="138" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L9"><text x="101.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">_start()</text></a>
+<a href="../../boot/bootloader.picoc#L9"><text x="101.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">offset 0</text></a>
+<rect x="170" y="180" width="212" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L41"><text x="276.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">boot_main()</text></a>
+<a href="../../boot/bootloader.picoc#L41"><text x="276.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">entry in .text</text></a>
+<path d="M 170 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="382" y="180" width="150" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.sections"><text x="457.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Bootloader data</text></a>
+<a href="../../boot/bootloader.sections"><text x="457.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">3165–3289</text></a>
+<path d="M 382 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="532" y="180" width="160" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Memory-mapped</text>
+<text x="612.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">I/O</text>
+<text x="612.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">0x40000000</text>
+<rect x="692" y="180" width="1044" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/memory_constants.header#L3"><text x="1214.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Available SRAM</text></a>
+<a href="../../boot/memory_constants.header#L3"><text x="1214.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">Temporary bootloader stack grows ←</text></a>
+<a href="../../boot/memory_constants.header#L3"><text x="1214.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">SRAM offsets 0–262143</text></a>
+<rect x="1736" y="180" width="32" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<path d="M 1736 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="32" y="310" width="350" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="207.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">.text · bootloader code</text>
+<rect x="382" y="310" width="150" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="457.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">.data</text>
+<path d="M 382 310 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="532" y="310" width="160" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a"></text>
+<rect x="692" y="310" width="1076" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1230.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">Temporary stack starts at the highest SRAM cell</text>
+<path d="M 32 180 H 1768 M 32 310 H 1768 M 532 144 V 342 M 692 144 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="32" y="144" width="1736" height="198" fill="none" stroke="#637983" stroke-width="1.5" fill-opacity="1"/>
+<path d="M 32 28 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="46" y="48" font-size="21" font-weight="bold" text-anchor="start" fill="#25734f">CS = 0x00000000</text>
+<text x="46" y="73" font-size="17" font-weight="normal" text-anchor="start" fill="#17313a">EPROM base</text>
+<path d="M 170 84 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="184" y="104" font-size="21" font-weight="bold" text-anchor="start" fill="#25734f">ACC = PC</text>
+<a href="../../boot/bootloader.picoc#L41"><text x="184" y="129" font-size="17" font-weight="normal" text-anchor="start" fill="#17313a">CS + boot_main</text></a>
+<path d="M 382 28 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="396" y="48" font-size="21" font-weight="bold" text-anchor="start" fill="#25734f">DS = 0x00000c5d</text>
+<a href="../../boot/memory_constants.header#L2"><text x="396" y="73" font-size="17" font-weight="normal" text-anchor="start" fill="#17313a">CS + eprom_ds_start</text></a>
+<path d="M 1752 28 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="1738" y="48" font-size="21" font-weight="bold" text-anchor="end" fill="#25734f">SP = BAF = 0x8003ffff</text>
+<a href="../../boot/memory_constants.header#L3"><text x="1738" y="73" font-size="17" font-weight="normal" text-anchor="end" fill="#17313a">SRAM base + 262143</text></a>
+<a href="../../boot/bootloader.picoc#L41"><text x="32" y="387" font-size="18" font-weight="normal" text-anchor="start" fill="#17313a">At the jump to boot_main(), before its stack frame changes SP and BAF.</text></a>
+</g></svg>

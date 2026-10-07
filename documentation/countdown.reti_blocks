@@ -1,15 +1,19 @@
   .ivt
   .text
 _start:
-  LOADI32 IN1 3
-  # Save the starting value on the stack.
+  # Save registers.
   PUSH IN1
+  PUSH ACC
+  LOADI32 IN1 16777219
+  LOADI32 ACC 16777216
+  SUB IN1 ACC
 loop:
   SUBI IN1 1
   MOVE IN1 ACC
   JUMP32> loop
 done:
-  # Restore the saved value into IN2.
-  POP IN2
+  # Restore registers.
+  POP ACC
+  POP IN1
   JUMP 0
   .data

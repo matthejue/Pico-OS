@@ -569,75 +569,13 @@ The original compiler used Lark to turn one PicoC source file into a parse tree.
 Its [`TransformerPicoC`](https://github.com/matthejue/PicoC-Compiler/blob/fb553487c96c6105689cbdf4d9caf61cc9d6434d/src/ast_transformers.py#L10) converted that tree into a PicoC AST,
 which the [compiler passes](https://github.com/matthejue/PicoC-Compiler/blob/fb553487c96c6105689cbdf4d9caf61cc9d6434d/src/passes.py) lowered into RETI:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    source["One PicoC source file"]
-
-    subgraph frontend["Lexing and parsing"]
-        lexer["Lark lexer and parser"]
-        tree["Parse tree"]
-        ast["PicoC AST"]
-    end
-
-    subgraph compilation["Single-file compilation passes"]
-        shrink["picoc_shrink"]
-        blocks["picoc_blocks"]
-        anf["picoc_anf"]
-        reti_blocks["reti_blocks"]
-        patch["reti_patch"]
-        reti["reti"]
-    end
-
-    output["One RETI program"]
-
-    source --> lexer --> tree -->|TransformerPicoC| ast
-    ast --> shrink --> blocks --> anf --> reti_blocks --> patch --> reti --> output
-```
+![1.1.1 Compilation pipeline and compiler passes](documentation/images/compiler-original-pipeline.svg)
 
 The extended pipeline replaces Lark with Tree-sitter to parse preprocessed source.
 [`TransformerPicoC.build_ast()`](../PicoC-Compiler/source/ast_transformers.py#L111) converts the parse tree into a PicoC AST before per-file symbol, type, and lowering passes.
 Linking merges results, inserts startup code, and resolves addresses. Amber stages mark additions or replacements:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    source["PicoC source files"]
-
-    subgraph preprocessing["Preprocessing"]
-        preprocessor["Includes, macros, and line splicing"]:::added
-        preprocessed["Preprocessed source"]:::added
-    end
-
-    subgraph frontend["Lexing and parsing"]
-        parser["Tree-sitter lexer and parser"]:::added
-        parse_tree["Tree-sitter parse tree"]
-        ast["PicoC AST"]
-    end
-
-    subgraph compilation["Per-file compilation passes"]
-        shrink["picoc_shrink"]
-        blocks["picoc_blocks"]
-        symbol["PicoC symbols<br/>picoc_symbol"]:::added
-        typing["PicoC typing<br/>picoc_typing"]:::added
-        anf["picoc_anf"]
-        reti_blocks["reti_blocks"]
-    end
-
-    subgraph linking["Program-wide linking passes"]
-        merge["Merge code / global symbols<br/>Insert startup code"]:::added
-        patch["reti_patch"]
-        reti["reti"]
-    end
-
-    output["Linked RETI program"]
-
-    source --> preprocessor --> preprocessed --> parser --> parse_tree -->|TransformerPicoC.build_ast| ast
-    ast --> shrink --> blocks --> symbol --> typing --> anf --> reti_blocks
-    reti_blocks --> merge --> patch --> reti --> output
-    classDef added fill:#fff1d6,stroke:#805916,stroke-width:3px,color:#17313a
-    style preprocessing fill:#fff1d6,stroke:#805916,stroke-width:3px,color:#17313a
-```
+![1.1.1 Compilation pipeline and compiler passes](documentation/images/compiler-picoos-pipeline.svg)
 
 ### 1.1.2 Separate compilation, reusable artifacts, and linking
 [\[↑ TOC\]](#contents)
@@ -677,33 +615,14 @@ binary/basic_string.sections
 
 In C, the linker consumes object files and their embedded symbol tables:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TB
-    SRC["libstring.c + included .h headers"] --> COMPILE["gcc -c -O2 libstring.c"]
-    COMPILE --> OBJ["libstring.o"]
-    OBJ --> LINK["gcc -o basic_string libstring.o basic_string.o ..."]
-    MORE["basic_string.o, ..."] --> LINK
-    LINK --> OUT["basic_string<br/>executable binary"]
-```
+![1.1.2 Separate compilation, reusable artifacts, and linking](documentation/images/compiler-gcc-linking.svg)
 
 Compiler-generated `.reti_blocks` inputs use matching `.st` symbol tables
 in the same directory, which the compiler reads automatically. Hand-written
 assembly using only registers, numeric operands, and labels needs no symbol
 table. The diagram shows the compiler-generated files:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TB
-    SRC["libstring.picoc<br/>includes string.picoc / shared helpers"] --> COMPILE["picoc_compiler -c -O1 libstring.picoc"]
-    COMPILE --> OBJ["libstring.reti_blocks"]
-    COMPILE --> SYMBOLS["libstring.st<br/>JSON symbol table"]
-    OBJ --> LINK["picoc_compiler -O1 -o basic_string.reti<br/>libstring.reti_blocks basic_string.reti_blocks ..."]
-    SYMBOLS -.->|automatically read with libstring.reti_blocks| LINK
-    MORE["basic_string.reti_blocks, ..."] --> LINK
-    LINK --> RETI["basic_string.reti"]
-    LINK --> SECTIONS["basic_string.sections"]
-```
+![1.1.2 Separate compilation, reusable artifacts, and linking](documentation/images/compiler-picoc-linking.svg)
 
 `-o` names the linked output. PicoC keeps its metadata in separate files:
 `.st` for symbols, `.sections` for memory layout, and `.debuginfo` for debugging.
@@ -764,15 +683,7 @@ Every ordinary function has one `<function>_epilogue` block. A return puts
 its value in `IN2` and jumps there to restore `BAF` and the return address.
 Keeping the result in `IN2` leaves `ACC` free for long jumps:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    return_a["return expression A"] --> epilogue["function_epilogue"]
-    return_b["return expression B"] --> epilogue
-    return_void["return"] --> epilogue
-    epilogue --> restore["Restore BAF"]
-    restore --> caller["Jump to saved return address"]
-```
+![1.1.3.2 Shared function epilogue and return values](documentation/images/compiler-shared-epilogue.svg)
 
 This example shows the callee returning a value and the caller cleaning up
 its argument:
@@ -1439,13 +1350,7 @@ the matching `.sections` file and prepends five big-endian layout words through
 [`assemble_sram_program_to_binary()`](../RETI-Emulator/source/reti_emulator_main.c#L107).
 `-S PATH` selects another metadata file. The diagram shows both inputs:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TB
-    RETI["program.reti<br/>linked RETI instructions and data"] --> ASSEMBLE["reti_emulator -a program.reti"]
-    SECTIONS["program.sections<br/>linked layout metadata"] -->|automatically found beside program.reti| ASSEMBLE
-    ASSEMBLE --> BIN["program.bin<br/>five-word big-endian layout header<br/>encoded RETI instructions + data words"]
-```
+![1.1.8 Linked .sections metadata and the five-word binary header](documentation/images/compiler-binary-assembly.svg)
 
 For example, with the `.sections` values above, assembling an illustrative
 [`program.reti`](../PicoC-Compiler/source/passes/linking/reti_pass.py) produces this five-word header:
@@ -1693,42 +1598,12 @@ On hardware, a host program serves PicoOS filesystem and terminal requests
 over the USB-to-UART connection. The diagram follows requests and responses
 through that connection:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    UART["RETI UART controller"] <-->|"UART bytes<br/>host requests / responses"| ADAPTER["UART-to-USB adapter"]
-    ADAPTER <-->|"USB connection<br/>host requests / responses"| SERVICE
-    subgraph HOST["Host operating system"]
-        SERVICE["Dedicated host-side service software<br/>interpret escape-sequence requests"]
-        TERMINAL["Terminal"]
-        FILES["Sandboxed host filesystem"]
-        SERVICE -->|normal UART output| TERMINAL
-        SERVICE -->|"host request: mkdir, touch, write, ..."| FILES
-        FILES -->|data or result for host response| SERVICE
-    end
-```
+![1.2.3 UART host-service protocol](documentation/images/uart-physical-host-service.svg)
 
 During development, the emulator models UART and serves those requests
 directly:
 
-```mermaid
-%%{init: {"flowchart":{"nodeSpacing":20,"rankSpacing":45,"wrappingWidth":300},"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    subgraph HOST["Host operating system"]
-        direction LR
-        subgraph EMU["RETI-Emulator"]
-            direction LR
-            GUEST["PicoOS on<br/>emulated RETI"]
-            UART["Emulated UART<br/>controller"]
-            SERVICE["Built-in<br/>host-service parser"]
-            GUEST <-->|UART send / receive bytes| UART
-            UART <-->|host requests / responses| SERVICE
-        end
-        SERVICE -->|normal UART output| TERMINAL["Host terminal<br/>launches the emulator"]
-        SERVICE -->|sandboxed filesystem operation| FILES["Sandboxed host filesystem<br/>Launch directory = PicoOS /"]
-        FILES -->|data or result| SERVICE
-    end
-```
+![1.2.3 UART host-service protocol](documentation/images/uart-emulated-host-service.svg)
 
 The emulator's [`guest_filesystem.c`](../RETI-Emulator/source/guest_filesystem.c) uses its launch directory as PicoOS `/`.
 It normalizes `..` within that root and blocks symbolic-link escapes. Host
@@ -1762,34 +1637,12 @@ separate and inspect the emulated machine.
 Replies arrive on the same UART stream. A [`load`](#123-uart-host-service-protocol) response contains a word
 count followed by file bytes. `ESC` below means byte 27:
 
-```mermaid
-%%{init: {"sequence":{"wrap":false,"actorMargin":60,"width":180,"height":45,"messageMargin":25,"mirrorActors":false,"diagramMarginY":35},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
-sequenceDiagram
-    participant P as PicoOS loader
-    participant H as RETI-Emulator host
-
-    P->>H: ESC load path ESC /
-    H-->>P: total word count (big-endian 32-bit)
-    H-->>P: complete file payload
-```
+![1.2.3 UART host-service protocol](documentation/images/uart-load-protocol.svg)
 
 Ranged reads return a byte count and payload. Metadata and status requests
 return one big-endian value:
 
-```mermaid
-%%{init: {"sequence":{"wrap":false,"actorMargin":60,"width":180,"height":45,"messageMargin":25,"mirrorActors":false,"diagramMarginY":35},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
-sequenceDiagram
-    participant P as PicoOS
-    participant H as RETI-Emulator host
-
-    P->>H: ESC file-size path ESC /
-    H-->>P: file size (big-endian 32-bit)
-    P->>H: ESC read-range offset count path ESC /
-    H-->>P: returned byte count (big-endian 32-bit)
-    H-->>P: requested byte range
-    P->>H: ESC is-directory path ESC /
-    H-->>P: status value
-```
+![1.2.3 UART host-service protocol](documentation/images/uart-file-requests.svg)
 
 For [`load`](#123-uart-host-service-protocol), `UINT32_MAX` signals failure. Boot and the initial init load use
 this complete-file stream. Later process loads use `file-size` and
@@ -2170,23 +2023,7 @@ The ISR installs the kernel context and calls [`handle_syscall()`](kernel/syscal
 follows the request through execution and either direct restoration or
 scheduling. [`2.4.2.3 Selecting the return path`](#2423-selecting-the-return-path) explains that choice:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    ENTRY["<b>syscall_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_syscall()</b>"]
-    HANDLE -->|returns| RETURN["<b>syscall_interrupt_return()</b><br/>caller_context[4] = IN2<br/>dispatcher_reschedule_if_requested()"]
-    RETURN --> CHECK{"reschedule_requested?"}
-    CHECK -->|false| RESTORE["<b>syscall_interrupt_restore()</b><br/>activate_current_process_stack_boundary()<br/>RTI"]
-    CHECK -->|true| DISPATCH["Dispatcher<br/>RTI"]
-    HANDLE -->|blocks / yields / exits| DISPATCH
-    HANDLE -->|shutdown or reboot| SYSTEM["Halt or restart"]
-    click ENTRY "interrupt_service_routines/os_isrs.picoc#L94"
-    click HANDLE "kernel/syscall.picoc#L16"
-    click RETURN "interrupt_service_routines/os_isrs.picoc#L133"
-    click CHECK "kernel/dispatcher.picoc#L8"
-    click RESTORE "interrupt_service_routines/os_isrs.picoc#L148"
-    click DISPATCH "kernel/dispatcher.picoc#L57"
-```
+![2.4.2 System-call entry, execution, and return to userspace](documentation/images/interrupt-syscall-path.svg)
 
 #### 2.4.2.1 Entering kernel context
 [\[↑ TOC\]](#contents)
@@ -2584,23 +2421,7 @@ A deferred request is handled at a later scheduling point, including the
 syscall return path in
 [`2.4.2 System-call entry, execution, and return to userspace`](#242-system-call-entry-execution-and-return-to-userspace):
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    ENTRY["<b>timer_interrupt()</b><br/>Save context"] --> CHECK{"saved PC ><br/>kernel DS?"}
-    CHECK -->|no: kernel| REQUEST_K["<b>dispatcher_request_reschedule()</b><br/>reschedule_requested = true"]
-    REQUEST_K --> RETURN["<b>timer_interrupt_kernel_return()</b><br/>RTI: kernel work"]
-    CHECK -->|yes: userspace| PROCESS["<b>timer_interrupt_process()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"]
-    PROCESS --> SWITCH["<b>dispatcher_switch_from_context(caller_context)</b><br/>Save process->activation<br/>RUNNING state becomes READY"]
-    SWITCH --> RESTORE["Dispatcher<br/>Clear reschedule_requested<br/>RTI: selected process"]
-    click ENTRY "interrupt_service_routines/os_isrs.picoc#L32"
-    click CHECK "interrupt_service_routines/os_isrs.picoc#L51"
-    click REQUEST_K "kernel/dispatcher.picoc#L10"
-    click RETURN "interrupt_service_routines/os_isrs.picoc#L62"
-    click PROCESS "interrupt_service_routines/os_isrs.picoc#L74"
-    click SWITCH "kernel/dispatcher.picoc#L71"
-    click RESTORE "#64-restoring-the-selected-process-and-returning-with-rti"
-```
+![2.5.1 Timer interrupt path](documentation/images/interrupt-timer-path.svg)
 
 #### 2.5.1.1 Saving context and selecting the timer branch
 [\[↑ TOC\]](#contents)
@@ -2849,20 +2670,7 @@ UART reception enters service routine 2 at priority 2. It handles one byte
 and resumes the interrupted context. The diagram follows the choice between
 a terminal signal and ordinary input:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    ENTRY["<b>uart_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_uart_interrupt()</b><br/>Read + acknowledge byte<br/>handle_terminal_signal_character()"]
-    HANDLE --> SIGNAL{"Ctrl+C / Ctrl+Z?"}
-    SIGNAL -->|yes: signal handled| RETURN["<b>uart_interrupt_return()</b><br/>RTI"]
-    SIGNAL -->|no: input byte| INPUT["<b>enqueue_terminal_byte()</b><br/>complete_pending_terminal_read()"]
-    INPUT --> RETURN
-    click ENTRY "interrupt_service_routines/os_isrs.picoc#L185"
-    click HANDLE "kernel/filesystem/terminal.picoc#L213"
-    click SIGNAL "kernel/signal.picoc#L192"
-    click INPUT "kernel/filesystem/terminal.picoc#L49"
-    click RETURN "interrupt_service_routines/os_isrs.picoc#L210"
-```
+![2.6 UART receive interrupt path](documentation/images/interrupt-uart-path.svg)
 
 ### 2.6.1 Entering kernel segments on the interrupted stack
 [\[↑ TOC\]](#contents)
@@ -3055,20 +2863,7 @@ the handler's call to [`wakeup_wait_queue(&dma_waiters)`](kernel/process/process
 Interrupt delivery follows the priority rules in
 [`2.6.4 UART nesting and interrupt priorities`](#264-uart-nesting-and-interrupt-priorities):
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    ENTRY["<b>dma_interrupt()</b><br/>Save context"] --> HANDLE["<b>handle_dma_interrupt()</b><br/>wakeup_wait_queue(&dma_waiters)"]
-    HANDLE --> QUEUE{"dma_waiters.head != NULL?"}
-    QUEUE -->|yes| WAKE["Wake FIFO head"]
-    QUEUE -->|no| RETURN["<b>dma_interrupt_return()</b><br/>RTI"]
-    WAKE --> RETURN
-    click ENTRY "interrupt_service_routines/os_isrs.picoc#L223"
-    click HANDLE "kernel/dma.picoc#L40"
-    click QUEUE "kernel/dma.picoc#L6"
-    click WAKE "kernel/process/process.picoc#L395"
-    click RETURN "interrupt_service_routines/os_isrs.picoc#L246"
-```
+![2.7 DMA completion interrupt path](documentation/images/interrupt-dma-path.svg)
 
 ### 2.7.1 Entering kernel segments on the interrupted stack
 [\[↑ TOC\]](#contents)
@@ -3206,22 +3001,7 @@ Division or modulo by zero, stack overflow, and illegal instructions enter
 service routine 3 directly, bypassing device mappings and priorities. The
 diagram shows why the faulting context does not resume:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    ENTRY["<b>cpu_exception_interrupt()</b><br/>write_stack_heap_boundary_from_in1()<br/>activate_kernel_stack_boundary()"] --> HANDLE["<b>handle_cpu_exception()</b><br/>Read cause<br/>print_cpu_exception_message()"]
-    HANDLE --> KERNEL{"interrupted CS = kernel CS?"}
-    KERNEL -->|yes: kernel panic| HALT["<b>shutdown()</b><br/>JUMP 0"]
-    KERNEL -->|no: process error| EXIT["<b>exit_process()</b><br/>PROCESS_EXIT_STATUS_EXCEPTION<br/>dispatcher_start_next_process()"]
-    EXIT -->|no processes remain| HALT
-    EXIT -->|process selected| RESTORE["<b>dispatcher_jump_to_process()</b><br/>RTI: selected process"]
-    click ENTRY "interrupt_service_routines/os_isrs.picoc#L161"
-    click HANDLE "kernel/exception.picoc#L70"
-    click KERNEL "kernel/exception.picoc#L72"
-    click HALT "kernel/kernel.picoc#L15"
-    click EXIT "kernel/process/process.picoc#L430"
-    click RESTORE "kernel/dispatcher.picoc#L21"
-```
+![2.8.1 CPU exception entry and registers](documentation/images/interrupt-exception-path.svg)
 
 #### 2.8.1.1 Entering kernel context after a fault
 [\[↑ TOC\]](#contents)
@@ -3682,20 +3462,7 @@ each user image. The two boxes compare direct allocator calls using the kernel's
 [`kernel_heap`](kernel/kmalloc.picoc#L7) and [`process_shared_data_heap`](kernel/psdmalloc.picoc#L7)
 with calls using each user image's own [`process_heap`](library/stdlib/malloc.picoc#L6):
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    subgraph K["Kernel target"]
-        direction TB
-        KW["kmalloc / krealloc / kfree<br/>kernel_heap"] -->|direct calls| KC["common/heap.picoc<br/>heap_alloc_from / heap_realloc_from / heap_free_from"]
-        PW["PSDMalloc / PSDRealloc / PSDFree<br/>process_shared_data_heap"] -->|direct calls| KC
-    end
-    subgraph L["Each userspace target: libstdlib"]
-        direction TB
-        LW["malloc / realloc / free<br/>process_heap in this image"] -->|direct calls| LC["same common/heap.picoc source<br/>heap_alloc_from / heap_realloc_from / heap_free_from"]
-    end
-    K ~~~ L
-```
+![3.6.1 Common allocator linkage and function reference](documentation/images/heap-allocator-linkage.svg)
 
 The table covers the common allocator. Sizes count cells. Free and realloc
 require a valid pointer from the supplied heap and recover its header by
@@ -3718,21 +3485,7 @@ For a valid block and positive size, this graph shows when realloc keeps
 the address or moves the payload. A failed move preserves the old block.
 A null pointer allocates, while a nonpositive size frees:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    R["Resize an existing block"] --> FIT{"Current payload large enough?"}
-    FIT -->|Yes| SHRINK["heap_split_block<br/>heap_merge_free_blocks"]
-    SHRINK --> SAME["Return original pointer"]
-    FIT -->|No| NEXT{"Immediate next block free and combined space enough?"}
-    NEXT -->|Yes| GROW["Absorb next header and payload<br/>heap_split_block"]
-    GROW --> SAME
-    NEXT -->|No| ALLOC["heap_alloc_from"]
-    ALLOC --> OK{"Allocation succeeded?"}
-    OK -->|No| KEEP["Return NULL<br/>Old block remains allocated"]
-    OK -->|Yes| COPY["heap_copy_cells<br/>heap_free_from old block"]
-    COPY --> NEW["Return replacement pointer"]
-```
+![3.6.2 Reallocation decisions](documentation/images/heap-reallocation-decisions.svg)
 
 Growth absorbs at most one successor. Shrinking and freeing run the repeated
 merge scan illustrated next.
@@ -3943,28 +3696,7 @@ The diagram follows normal startup, scheduling, waits, signals, and
 termination. Removal ends the PCB's lifetime. [`6. Scheduling and context switching`](#6-scheduling-and-context-switching) explains scheduling, and
 [`7. Blocking, wait queues, signals, and mutexes`](#7-blocking-wait-queues-signals-and-mutexes) explains blocking and signal suspension:
 
-```mermaid
-%%{init: {"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }","theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"}}}%%
-stateDiagram-v2
-    [*] --> NEW: completed load
-    NEW --> READY: run and build initial stack
-    READY --> RUNNING: dispatcher
-    RUNNING --> READY: timer or yield
-    RUNNING --> BLOCKED: waitpid, sleep, empty stdin, or DMA load
-    BLOCKED --> READY: wakeup, input, or DMA completion
-    READY --> STOPPED: stop signal
-    RUNNING --> STOPPED: stop signal
-    BLOCKED --> STOPPED: stop signal remembers BLOCKED
-    STOPPED --> BLOCKED: SIGCONT while still queued
-    STOPPED --> READY: SIGCONT when wait is satisfied
-    STOPPED --> STOPPED: pending terminal read without input ownership
-    NEW --> ZOMBIE: termination or unload
-    READY --> ZOMBIE: termination or signal
-    RUNNING --> ZOMBIE: exit or fatal signal
-    BLOCKED --> ZOMBIE: fatal signal
-    STOPPED --> ZOMBIE: fatal signal
-    ZOMBIE --> [*]: collection, orphan cleanup, or unload
-```
+![4.1.1 Process states and transitions](documentation/images/process-state-transitions.svg)
 
 ### 4.1.2 Global process list and current process
 [\[↑ TOC\]](#contents)
@@ -5286,21 +5018,7 @@ Here PCB A is the child and embeds the queue. B, C, and D illustrate
 intrusive waiter links. Normal [`waitpid()`](library/sys/wait/wait.picoc#L15) allows only A's parent to wait,
 but the queue representation supports several entries:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    subgraph A["PCB A: process being waited on<br/>kernel heap"]
-        AW["waiters: embedded wait_queue"]
-    end
-    AW -->|head| B["PCB B: waiting process<br/>kernel heap"]
-    B -->|wait_next| C["PCB C: waiting process<br/>kernel heap"]
-    C -->|wait_next| D["PCB D: waiting process<br/>kernel heap"]
-    D -->|wait_next| N["NULL"]
-    AW -->|tail| D
-    B -. waiting_queue_ptr .-> AW
-    C -. waiting_queue_ptr .-> AW
-    D -. waiting_queue_ptr .-> AW
-```
+![7.1 Wait queues and PCB links](documentation/images/wait-queue-pcb-links.svg)
 
 In the diagram, A's [`waiters`](kernel/process/process.header#L46) is the queue
 object embedded in the child PCB. Each waiting PCB's
@@ -5772,7 +5490,7 @@ void mutex_unlock(struct mutex *m) {
 An old `0` means acquisition. An old `1` means contention. Its result uses
 the normal PicoC return register.
 
-The flowchart shows acquisition and unlock. During
+The flowchart shows acquisition in the upper row and unlock in the lower row. During
 [`mutex_unlock()`](library/mutex/mutex.picoc#L25),
 [`wakeup_wait_queue()`](kernel/process/process.picoc#L395) checks the
 [`head`](common/wait_queue.header#L6) of the mutex's
@@ -5782,22 +5500,7 @@ The dotted arrow shows this effect on the waiting process, which retries
 [`testset()`](library/mutex/mutex.picoc#L3) when scheduled. The unlocking
 process returns from [`mutex_unlock()`](library/mutex/mutex.picoc#L25):
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TD
-    A["mutex_lock: call testset"] --> B{"Old lock value?"}
-    B -->|false| C["Lock changed from 0 to 1<br/>enter critical section"]
-    B -->|true| D["sleep on mutex.waiters"]
-    D --> E["Waiting process resumes when scheduled"]
-    E --> A
-    C --> F["mutex_unlock: clear lock, then call wakeup"]
-    F --> G{"Queue empty?<br/>mutex.waiters.head == NULL"}
-    G -->|Yes| H["Wake nobody"]
-    G -->|No| W["Remove first PCB from mutex.waiters<br/>wake that process"]
-    H --> R["mutex_unlock returns"]
-    W --> R
-    W -.-> E
-```
+![7.3 Mutexes with test-and-set and wait queues](documentation/images/mutex-lock-wakeup.svg)
 
 The field table describes the shared state, followed by the library
 operations and their queue syscalls:
@@ -5869,23 +5572,7 @@ Inheritance always copies 0–2. It copies 3–4 only when their [`kind`](kernel
 [`FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L13), and skips 5–7. Each entry and path is independent,
 unlike Unix shared open-file descriptions.
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    subgraph PARENT["parent entries[0..7]"]
-        P02["0, 1, 2<br/>always copy"]
-        P34["3, 4<br/>copy only FILE kind"]
-        P57["5, 6, 7<br/>never examine"]
-    end
-    subgraph CHILD["new child table and array"]
-        C02["0, 1, 2<br/>deep copies"]
-        C34["3, 4<br/>FILE deep copies or FREE"]
-        C57["5, 6, 7<br/>FREE"]
-    end
-    P02 --> C02
-    P34 -->|"conditional"| C34
-    P57 -. "not inherited" .-> C57
-```
+![8.1 Per-process file-descriptor table](documentation/images/file-descriptor-inheritance.svg)
 
 [`free_file_descriptor()`](kernel/filesystem/filesystem.picoc#L27) selects the lowest free slot in 0–4. With standard
 streams open, two slots remain. Closing a standard stream makes its slot
@@ -6413,50 +6100,7 @@ be referenced directly.
 Nested boxes show containment, and arrows identify pointer fields. The
 dotted terminal edge means path-based selection, rather than a pointer:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    subgraph PCB["ProcessControlBlock / PCB: one Kernel Heap allocation"]
-        P["PCB fields"]
-        A["activation: embedded ActivationRecord"]
-        W["waiters: embedded wait_queue<br/>other processes waiting for this process"]
-    end
-    W -->|head| WA["first waiting PCB"]
-    WA -->|wait_next| WZ["last waiting PCB"]
-    W -->|tail| WZ
-    WA -->|waiting_queue_ptr| W
-    P -->|next| PN["next PCB in global process list"]
-    P -->|base_address| IMG["Process Payload: PSDMalloc<br/>User Process Image / User Process Heap / User Process Stack"]
-    A -->|"sp and baf"| ST["saved process stack frame and return PC<br/>inside that Process Payload"]
-    P -->|file_descriptors| FDT["FileDescriptorTable<br/>separate kmalloc allocation"]
-    subgraph ARRAY["one separate kmalloc allocation: FileDescriptor entries 0–7"]
-        FD["entries[fd]<br/>kind / flags / offset / path"]
-    end
-    FDT -->|entries| FD
-    FD -->|path| PATH["separate kmalloc path string"]
-    subgraph TERM["global Terminal object: kernel .data"]
-        TROOT["Terminal fields"]
-        INPUT["input_buffer[128]<br/>embedded ring storage"]
-        INPUTQ["input_waiters<br/>embedded wait_queue"]
-    end
-    TROOT -->|contains| INPUT
-    TROOT -->|contains| INPUTQ
-    INPUTQ -->|head / tail| READER["waiting reader PCB<br/>kernel heap"]
-    READER -->|waiting_queue_ptr| INPUTQ
-    PATH -. "terminal-device path selects" .-> TROOT
-    P -->|"binary_path / working_directory"| STR["separate kmalloc strings"]
-    P -->|pending_load| LOAD["ProcessLoad: kmalloc<br/>path copy and unfinished PSDMalloc Process Payload"]
-    P -->|shared_memory_attachments| ATT["SharedMemoryAttachment: kmalloc"]
-    ATT -->|next| ATT2["next attachment or NULL"]
-    ATT -->|entry| SE["SharedMemoryEntry: kmalloc"]
-    SE -->|next| SE2["next registry entry or NULL"]
-    SE -->|name| NAME["kmalloc name or NULL after unlink"]
-    SE -->|address| SH["shared data: PSDMalloc"]
-    P -->|waiting_queue_ptr| Q["queue currently containing this PCB<br/>may belong to another PCB, terminal, DMA, or userspace"]
-    P -->|wait_next| WP["next PCB in that wait queue or NULL"]
-    P -->|waiting_status_ptr| STATUS["parent's stack-local waitpid status<br/>inside its Process Payload, or NULL"]
-    P -->|pending_terminal_read_buffer| BUF["pending read destination<br/>caller stack, .data, heap, or shared data"]
-```
+![9.2 Containment and reference relationships](documentation/images/process-containment-references.svg)
 
 Call-local requests remain in the calling function's stack frame. In
 [`waitpid()`](library/sys/wait/wait.picoc#L15), the
@@ -6888,46 +6532,26 @@ declarations. A dependency adds code to the user image:
 | [`sys/reboot`](library/sys/reboot/) | Restart and power-off | Own syscall helper |
 | [`sys/stat`](library/sys/stat/) | Directory creation | Own syscall helper |
 
-Small local helpers keep standalone library and program images small.
-Including a header supplies declarations; linking its implementation adds
-code and, where present, global data to the image that occupies SRAM.
-If only a short operation is needed, implementing it locally can save memory
-compared with adding a whole library dependency. Keep this choice limited
-to short, easily maintained helpers.
+Each private syscall helper loads the syscall number into `ACC` and its
+argument into `IN1`, executes `INT 0`, and returns the result from `IN2`.
+These few instructions let libraries such as [`sys/wait`](library/sys/wait/)
+call the kernel without linking the other `unistd` functions into their
+process image. A library that already needs `unistd` uses
+[`invoke_syscall()`](library/unistd/process.picoc#L7) instead.
 
-The libraries marked **Own syscall helper** above use the same syscall ABI
-as [`invoke_syscall()`](library/unistd/process.picoc#L7). Their small bridges
-avoid linking [`unistd`](library/unistd/) solely to enter the kernel.
-[`schedule`](library/schedule/) and [`stdlib`](library/stdlib/) similarly use
-short inline syscalls. Keeping `stdlib` independent also avoids a dependency
-cycle, since `unistd` already uses it for environment access.
-If a library needs another `unistd` operation, it should reuse
-`invoke_syscall()` rather than define a second bridge.
-[`mutex`](library/mutex/) needs `unistd` for wait-queue operations, and
-[`sleep()`](library/unistd/blocking.picoc#L9) and
-[`wakeup()`](library/unistd/blocking.picoc#L17) use its shared bridge.
+Plain-text output follows the same approach.
+[`command_write()`](common/user_command.picoc#L5) counts the characters in a
+string and passes them to `write()`. Init and the shell have similar
+writers, while [`shell_write_decimal()`](user/shell.picoc#L84) converts an
+integer with [`append_decimal()`](common/decimal.picoc#L5) before writing it.
+These short helpers need no `stdio` streams or format parser. Environment
+handling and signal-name comparisons likewise use short loops without
+adding the full `string` library. Avoiding an otherwise unused library
+leaves more SRAM for the process heap and stack.
 
-The same choice applies to output. [`command_write()`](common/user_command.picoc#L5),
-[`init_write_error()`](system/init.picoc#L11), the
-[`shell text writer`](user/shell.picoc#L56), and small test writers use the
-`unistd` descriptor I/O they already need. Their short functions avoid
-linking [`stdio`](library/stdio/) just to print plain text.
-[`shell_write_decimal()`](user/shell.picoc#L84) reuses the small
-[`append_decimal()`](common/decimal.picoc#L5) converter instead of adding a
-general format parser. Applications that need formatted streams can use
-`stdio`; [`echo`](user/echo.picoc), for example, already uses it.
-
-Simple string operations follow this convention too.
-[`stdlib`'s length, copy, and prefix helpers](library/stdlib/env.picoc#L11),
-[`command_is_help()`](common/user_command.picoc#L15), and
-[`kill_text_matches()`](user/kill.picoc#L10) avoid linking
-[`string`](library/string/) solely for a short loop or fixed comparison.
-Boot and kernel [`UART output helpers`](common/uart_protocol.picoc#L22)
-also avoid stream and formatting code, but have an additional requirement:
-they must access raw UART output before userspace streams and syscalls are
-available. Comments above these helpers identify the avoided dependency
-and any such execution-context requirement. The memory benefit applies
-when the larger library would otherwise be absent from that image.
+The [`UART helpers`](common/uart_protocol.picoc#L22) send characters directly
+through the UART backend. Boot and kernel code need this path before
+userspace streams and syscalls are available.
 
 The function tables list syscalls and conditional UART host requests.
 `file-size <path>`, for example, abbreviates the complete
@@ -7386,8 +7010,9 @@ These three functions implement loading and control transfer:
 | [`boot_main(void)`](boot/bootloader.picoc#L41) | Jumps into the kernel on success, halts on a missing or undersized image | Requests [`kernel/kernel.bin`](binary/kernel/kernel.bin), consumes the five header words, and copies the payload to SRAM | [`uart_send_host_request()`](common/uart_protocol.picoc#L86), [`receive_word()`](common/uart_protocol.picoc#L7), [`uart_print_string()`](common/uart_protocol.picoc#L77), [`uart_print_loading_bar_label()`](common/loading_bar.picoc#L7), [`receive_words_to_sram()`](common/sram_loader.picoc#L6), jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21)<br>**Host request:** `load kernel/kernel.bin` | **Bootloader functions:** [`_start()`](boot/bootloader.picoc#L9) |
 | [`start_loaded_kernel(void)`](boot/bootloader.picoc#L21) | Does not return | Adds the SRAM base to the header's code/data/stack offsets, replaces the boot stack, and sets kernel `CS`, `DS`, `SP`, and `BAF` | Jumps to the generated kernel [`_start`](kernel/kernel.reti#L7), which calls [`main()`](kernel/kernel.picoc#L31) | **Bootloader functions:** [`boot_main()`](boot/bootloader.picoc#L41) |
 
-The initial entry establishes the segments and temporary stack before any
-ordinary PicoC call frames are needed:
+The initial [`_start()`](boot/bootloader.picoc#L9) entry in
+[`boot/bootloader.picoc`](boot/bootloader.picoc) establishes the segments
+and temporary stack before any ordinary PicoC call frames are needed:
 
 ```c
 __attribute__((naked))
@@ -7402,6 +7027,14 @@ void _start(void) {
     asm("MOVE ACC PC"); // JUMP to boot_main in EPROM
 }
 ```
+
+The memory map shows the register destinations immediately after the jump to
+[`boot_main()`](boot/bootloader.picoc#L41), before its stack frame changes `SP` and `BAF`.
+Green arrows mark absolute addresses. `CS`, `DS`, `ACC`, and `PC` point into EPROM,
+while `SP` and `BAF` point to the highest SRAM cell. The segment and stack values
+come from [`boot/memory_constants.header`](boot/memory_constants.header):
+
+![Bootloader entry register destinations. CS points to the EPROM base, ACC and PC to boot_main, DS to bootloader data, and SP and BAF to the highest SRAM cell.](documentation/images/boot-eprom-registers.svg)
 
 [`boot_main()`](boot/bootloader.picoc#L41) requests [`kernel/kernel.bin`](binary/kernel/kernel.bin), reads its header, and loads
 only the payload at [`SRAM_BASE`](kernel/memory_constants.header#L1). The first five payload words are `.ivt`,
@@ -7452,6 +7085,21 @@ void boot_main(void) {
 }
 ```
 
+**The loading function:**
+
+- Requests [`kernel/kernel.bin`](binary/kernel/kernel.bin) from the host
+  over UART and halts with a diagnostic if the image is missing or its
+  reported word count is smaller than the five-word header.
+- Reads the code, data, and stack offsets, discards the two heap fields,
+  and uses [`SRAM_MAX_ADDRESS`](boot/memory_constants.header#L1) when the
+  stack offset is `-1`.
+- Copies the payload after the header to [`SRAM_BASE`](kernel/memory_constants.header#L1)
+  through [`receive_words_to_sram()`](common/sram_loader.picoc#L6), which
+  uses polling or DMA and optionally updates the loading bar according to
+  [`loading_bar_enabled`](config/config.header#L5).
+- Jumps to [`start_loaded_kernel()`](boot/bootloader.picoc#L21) to install
+  the kernel's registers and enter its code.
+
 [`start_loaded_kernel()`](boot/bootloader.picoc#L21) still runs in EPROM. It adds the SRAM base to the
 header offsets, installs kernel registers, and writes `CS` to `PC`:
 
@@ -7477,6 +7125,15 @@ void start_loaded_kernel(void) {
     asm("MOVE CS PC"); // JUMP to CS
 }
 ```
+
+The offsets read through the bootloader's `BAF` become absolute SRAM addresses
+in `CS`, `DS`, and `SP`. The memory map shows their destinations after `BAF`
+receives the new stack pointer and `PC` receives `CS`, before the generated
+kernel [`_start`](kernel/kernel.reti#L7) executes. Green arrows mark those addresses,
+and the grey register values remain offsets. The values and region boundaries
+use the current [`kernel/kernel.sections`](kernel/kernel.sections) layout:
+
+![Kernel handoff register destinations. CS and PC point to kernel text, DS to kernel data, and SP and BAF to the highest kernel stack cell. ACC, IN1, and IN2 retain code_start, data_start, and stack_start offsets.](documentation/images/boot-kernel-registers.svg)
 
 `MOVE CS PC` enters the generated kernel [`_start`](kernel/kernel.reti#L7) at `0x80000005`. It is
 a jump without a bootloader return address. Changing segment registers
@@ -7521,6 +7178,29 @@ int main(void) {
 }
 ```
 
+**Kernel startup:**
+
+- Installs the kernel stack boundary and initializes
+  [`kernel_heap`](kernel/kmalloc.picoc#L7) and
+  [`process_shared_data_heap`](kernel/psdmalloc.picoc#L7) before loading
+  any process.
+- Clears [`terminal`](kernel/filesystem/terminal.picoc#L12)'s input state
+  and wait queue, resets the process list and
+  [`next_process_id`](kernel/process/process.picoc#L19) to start at PID 1,
+  and initializes the shared-memory registry through
+  [`initialize_shared_memory()`](kernel/shared_memory.picoc#L9).
+- Initializes DMA when active and assigns the device interrupt service
+  routines and priorities through
+  [`interrupt_controller_initialize()`](kernel/interrupt_controller.picoc#L41).
+- Loads init and fills [`init_request`](kernel/kernel.picoc#L33) with its
+  PID and `NULL` arguments and environment.
+  [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241)
+  prepares the initial stack and sets init's
+  [`ProcessControlBlock.state`](kernel/process/process.header#L33) to
+  [`PROCESS_STATE_READY`](kernel/process/process.header#L13).
+- Activates the timer and dispatches init if preparation succeeds.
+  Otherwise, returns `0` to the generated entry, which halts.
+
 The globals reside in kernel `.data`, while [`init_request`](kernel/kernel.picoc#L33) is local to the
 kernel stack. It supplies the initial arguments to run setup. [`9.3 Kernel global variables and process-list roots`](#93-kernel-global-variables-and-process-list-roots) lists
 the globals.
@@ -7562,6 +7242,17 @@ void reboot(void) {
     asm("LOADI PC 0");
 }
 ```
+
+These two functions end the current execution in different ways:
+
+- [`shutdown()`](kernel/kernel.picoc#L15) halts with `JUMP 0` without
+  releasing kernel or process allocations.
+- [`reboot()`](kernel/kernel.picoc#L19) disables every device interrupt
+  and clears
+  [`INTERRUPT_CONTROLLER_TIMER_INTERVAL_REGISTER`](kernel/interrupt_controller.header#L18)
+  and [`STACK_HEAP_BOUNDARY_REGISTER`](kernel/exception.header#L5).
+- It then sets `PC` to `0` with `LOADI PC 0`, restarting execution at the
+  EPROM bootloader's [`_start()`](boot/bootloader.picoc#L9).
 
 Userspace selects these actions through [`reboot()`](library/sys/reboot/reboot.picoc#L15). Kernel failure paths
 and final-process exit can also halt. [`11.3.7 When init terminates`](#1137-when-init-terminates) describes the signal-path
@@ -7612,7 +7303,9 @@ and descriptors, while loading already copied the directory.
 ### 11.3.3 Loading, starting, and waiting for the shell
 [\[↑ TOC\]](#contents)
 
-After configuration, init repeatedly loads, starts, and waits for one shell:
+Init's [`main()`](system/init.picoc#L101) in
+[`system/init.picoc`](system/init.picoc) configures its environment, then
+repeatedly loads, starts, and waits for one shell:
 
 ```c
 int main(void) {
@@ -7648,6 +7341,24 @@ int main(void) {
     }
 }
 ```
+
+**The session loop:**
+
+- Reads [`config/environment.txt`](config/environment.txt) through
+  [`read_environment()`](system/init.picoc#L20) and, when
+  [`loading_bar_enabled`](config/config.header#L5) is true, sets
+  [`PICOOS_LOADING_BAR`](common/loading_bar.header#L5) in init's environment.
+- Loads the shell through [`load()`](library/unistd/process.picoc#L17),
+  then starts it through [`run()`](library/unistd/process.picoc#L31).
+  The two `NULL` arguments supply no extra command arguments and inherit
+  init's environment. Run setup also copies init's file descriptors.
+- Waits for that exact shell PID through
+  [`waitpid()`](library/sys/wait/wait.picoc#L15), ignores the returned
+  status, and loads another shell when the wait returns, including after
+  a reported stop.
+- Returns `1` if environment configuration, loading, or starting fails.
+  The shell launch failures also write a diagnostic through
+  [`init_write_error()`](system/init.picoc#L11).
 
 [`waitpid()`](library/sys/wait/wait.picoc#L15) selects that exact shell. Loading uses the polling or DMA path
 from [`4.2.1 Loading a process (load library call)`](#421-loading-a-process-load-library-call), while [`11.3.2 Initial environment configuration`](#1132-initial-environment-configuration) explains configuration parsing.
@@ -8132,10 +7843,15 @@ the shell's parent-death [`SIGKILL`](common/signal.header#L5), allowing terminat
 A conventional Unix shell uses `fork()`, redirects the child's descriptors,
 and calls `exec()` to replace its image. The parent keeps its own table.
 
-PicoOS has neither process cloning nor image replacement. Its [`load()`](library/unistd/process.picoc#L17)
-creates a [`NEW`](kernel/process/process.header#L12) process, and [`run()`](library/unistd/process.picoc#L31) copies caller state before setting
-[`READY`](kernel/process/process.header#L13). The shell therefore redirects its own descriptors, starts the
-child with that snapshot, and restores itself. Paging is not inherently
+PicoOS has neither process cloning nor image replacement. The shell first calls
+[`load()`](library/unistd/process.picoc#L17) to create the child with its own
+initial terminal descriptors and
+[`state = PROCESS_STATE_NEW`](kernel/process/process.header#L33).
+It then redirects its own descriptors. [`run()`](library/unistd/process.picoc#L31)
+copies those descriptors into the child before setting the child's
+[`state`](kernel/process/process.header#L33) to
+[`PROCESS_STATE_READY`](kernel/process/process.header#L13).
+The shell restores its own descriptors after that call. Paging is not inherently
 required for `fork()`, so its absence alone does not explain this design.
 
 [`dup2()`](library/unistd/io.picoc#L58) deep-copies the path and scalar fields into the target entry.
@@ -8153,8 +7869,11 @@ kernel resolves the filename to `/output.txt`. The file's contents live
 on the emulator host, outside SRAM. SRAM stores the descriptor entries
 and copies of the path string, not the file's contents.
 
-Each diagram expands the Kernel Heap from
+The first diagram locates the Kernel Heap within the SRAM layout from
 [`3.2 SRAM image and heap hierarchy`](#32-sram-image-and-heap-hierarchy).
+Dashed lines connect the bottom corners of its Kernel Heap band to the
+expanded view below. Later diagrams show only the expanded Kernel Heap,
+since the surrounding SRAM layout and host storage remain unchanged.
 The shell's [`ProcessControlBlock`](kernel/process/process.header#L31), its
 [`FileDescriptorTable`](kernel/filesystem/file_descriptor.header#L22), the
 [`entries`](kernel/filesystem/file_descriptor.header#L23) array, and each
@@ -8176,11 +7895,33 @@ for terminal input, output, and error output. Slots 3–7 initially have
 [`kind = FILE_DESCRIPTOR_FREE`](kernel/filesystem/file_descriptor.header#L9)
 and [`path = NULL`](kernel/filesystem/file_descriptor.header#L19).
 The diagrams expand only the path strings for slots 1, 3, and 6.
-Block letters and widths are illustrative.
-Solid arrows follow stored pointers, and amber outlines mark changed
-entries. Other allocations and the entries' flags and offsets are omitted.
+Each outlined group belongs to the process named at its top. Within a group,
+the upper row contains that process's PCB, descriptor table, and descriptor
+entries. The boxes below it are that same process's copied path strings.
+When both processes are shown, the shell's group is above the child's group.
+Block letters and widths are illustrative. Teal arrows follow stored pointers.
+Amber call labels point to the entries or tables they change, and amber outlines
+mark changed entries. Numbers in the call labels give the order within that
+step. Other allocations and the entries' flags and offsets are omitted.
 
-First, [`redirect_output()`](user/shell.picoc#L1008) calls
+First, the shell calls [`load()`](library/unistd/process.picoc#L17) for `COMMAND`,
+using [`load_from_path()`](user/shell.picoc#L1191) to search
+[`PATH`](user/shell.picoc#L1192) when the command contains no directory.
+The kernel loads the executable into a separate Process Payload and creates
+the child's PCB through [`create_process()`](kernel/process/process.picoc#L89).
+That function's
+[`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L36)
+call allocates the child's initial table, eight entries, and terminal path
+copies. The child's
+[`state`](kernel/process/process.header#L33) is
+[`PROCESS_STATE_NEW`](kernel/process/process.header#L12), so it cannot execute
+yet. The diagram shows the shell's descriptors above and the child's
+independent initial descriptors below. The host output file has not yet
+been opened:
+
+![The initial SRAM overview after load(). The upper outlined group contains shell process 1's descriptors and copied terminal path. The lower group contains child process 2's independent initial terminal descriptors and copied path, with state NEW. An amber load() label points to the child's initial table.](documentation/images/process-redirection-load.svg)
+
+After loading, [`redirect_output()`](user/shell.picoc#L1008) calls
 [`open()`](library/fcntl/fcntl.picoc#L15) with
 [`O_WRONLY | O_CREAT | O_TRUNC`](common/file.header#L10).
 [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) creates
@@ -8189,9 +7930,11 @@ first free ordinary slot in this example. The shell then calls
 [`dup2(1, 6)`](library/unistd/io.picoc#L58) to save its terminal stdout.
 [`duplicate_file_descriptor()`](kernel/filesystem/file_descriptor.picoc#L163)
 copies the entry's kind, flags, offset, and path string into slot 6.
-If opening fails, the shell's descriptor table remains unchanged:
+If opening fails, the shell's descriptor table remains unchanged.
+This step shows only the shell's group because the child's initial
+descriptors remain unchanged:
 
-![SRAM overview with the Kernel Heap expanded into shell PCB 1, its descriptor table, eight entries, and separate path allocations. Slot 3 names the host file /output.txt and slot 6 saves terminal stdout. The host file contents are outside SRAM.](documentation/images/process-redirection-save.svg)
+![Shell process 1's descriptor group after open() creates slot 3 for /output.txt and dup2(1, 6) saves terminal stdout. The call labels point to the affected entries. The boxes below the entries are the shell's separate copied path strings.](documentation/images/process-redirection-save.svg)
 
 Next, [`dup2(3, 1)`](library/unistd/io.picoc#L58) replaces shell stdout
 with an independent copy of slot 3. Both entries now have
@@ -8203,7 +7946,7 @@ but each owns a separate `/output.txt` path string.
 which frees slot 3's path string and resets that entry. Slot 1's path
 survives, and slot 6 still saves terminal stdout:
 
-![The same SRAM and Kernel Heap layout after installing stdout. Shell descriptor 1 points to its own /output.txt string, descriptor 3 is FREE with no path allocation, and descriptor 6 retains its separate terminal path copy.](documentation/images/process-redirection-install.svg)
+![Shell process 1's descriptor group after dup2(3, 1) installs redirected stdout and close(3) frees the temporary descriptor's path. The call labels point to entries 1 and 3. Copied paths below belong to the shell, while the child's initial descriptors are still unchanged and omitted.](documentation/images/process-redirection-install.svg)
 
 Then [`run()`](library/unistd/process.picoc#L31) reaches
 [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241).
@@ -8216,7 +7959,7 @@ table, array, and path copies are separate Kernel Heap allocations.
 Its descriptor 1 therefore names the same host file through its own
 path string, while descriptor 6 remains free:
 
-![SRAM overview with two rows of separate Kernel Heap allocations. Shell PCB 1 and child PCB 2 each reach their own descriptor table and eight-entry array. Both stdout entries own independent /output.txt path strings. Only the shell has the saved terminal descriptor 6.](documentation/images/process-redirection-inherit.svg)
+![The upper group contains shell process 1's unchanged descriptors and paths. The lower group contains child process 2's descriptors and paths after run() copies the shell's descriptors and sets the child's state to READY. Both stdout entries own independent /output.txt strings. Only the shell has saved terminal descriptor 6.](documentation/images/process-redirection-inherit.svg)
 
 Finally, [`restore_standard_descriptors()`](user/shell.picoc#L971) restores
 the shell's terminal stdout with [`dup2(6, 1)`](library/unistd/io.picoc#L58),
@@ -8228,7 +7971,7 @@ names `/output.txt`. Its writes reach the host file through
 uses that entry's path and advances its offset. Restoration happens
 before the shell waits for a foreground child:
 
-![The same two Kernel Heap rows after shell restoration. Shell descriptor 1 again owns a terminal path, descriptor 6 is FREE with no path allocation, and child descriptor 1 still owns its independent /output.txt path. The host retains the output file outside SRAM.](documentation/images/process-redirection-restore.svg)
+![The upper group shows shell process 1 after dup2(6, 1) restores terminal stdout and close(6) releases the saved descriptor. The lower group shows child process 2's unchanged descriptors and paths, with stdout still naming /output.txt through its independent copy.](documentation/images/process-redirection-restore.svg)
 
 The implementation in
 [`kernel/process/process_arguments.picoc`](kernel/process/process_arguments.picoc#L241)
@@ -8461,75 +8204,60 @@ and error behavior.
 ## 13.1 Writing a simple user application
 [\[↑ TOC\]](#contents)
 
-A user application includes library headers and defines its program in
-`main`. This example starts the existing [`ls.bin`](user/ls.picoc) command
-as a child process to list the current directory, waits for it to finish,
-and returns its exit status. Save the following code as `list_directory.picoc`
-in [`user/`](user/):
+The complete [`add.picoc`](documentation/add.picoc) example takes two decimal
+integers as command arguments, adds them, and prints the result:
 
 ```c
-#include "../library/unistd/unistd.header"
-#include "../library/sys/wait/wait.header"
+#include "../library/stdio/stdio.header"
+#include "../library/stdlib/stdlib.header"
 
-int main(void) {
-    int pid = load("/user/ls.bin");
-
-    if (pid == 0) {
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        printf("Usage: add.bin NUMBER NUMBER\n");
         return 1;
     }
-    if (!run(pid, NULL, NULL)) {
-        unload(pid);
-        return 1;
-    }
-    return waitpid(pid);
+
+    printf("%d\n", atoi(argv[1]) + atoi(argv[2]));
+    return 0;
 }
 ```
 
-[`load()`](library/unistd/process.picoc#L17) loads the binary and creates a
-child [`ProcessControlBlock`](kernel/process/process.header#L31), with
-[`parent_pid`](kernel/process/process.header#L57) set to the caller's PID and
-[`state`](kernel/process/process.header#L33) set to
-[`NEW`](kernel/process/process.header#L12). It returns the child PID or `0`
-on failure. [`run()`](library/unistd/process.picoc#L31) sets the child's state
-to [`READY`](kernel/process/process.header#L13) so the scheduler can select it.
-The two `NULL` arguments mean no command arguments and inheritance of the
-parent's environment. If starting fails, [`unload()`](library/unistd/process.picoc#L47)
-removes the child that was loaded.
+[`main`](documentation/add.picoc#L4) checks that both arguments are present.
+[`atoi()`](library/stdlib/atoi.picoc#L4) converts their text to integers, and
+[`printf()`](library/stdio/stdio.picoc#L357) prints the sum.
+Returning `0` reports success, while `1` reports the wrong argument count.
 
-[`waitpid(pid)`](library/sys/wait/wait.picoc#L15) waits on this child's
-[`waiters`](kernel/process/process.header#L46) queue if it has not yet terminated,
-then collects its termination status and releases its remaining process
-resources. Here, that status becomes the application's return value.
-[`7.1.2 Child waiting with waitpid`](#712-child-waiting-with-waitpid)
-also explains status delivery when a child is stopped by a signal.
-
-From the repository root, compile the source and its libraries into
-`binary/user/list_directory.reti`, then assemble it into
-`binary/user/list_directory.bin`:
+From the repository root, compile the source with the two library implementations
+and the process startup code, then assemble the binary:
 
 ```console
-$ mkdir -p binary/user
+$ mkdir -p binary/documentation
 $ picoc_compiler --direct-source-link -O1 -s \
-    user/list_directory.picoc library/unistd/libunistd.picoc \
-    library/sys/wait/libwait.picoc library/stdlib/libstdlib.picoc \
-    -C library/start/libstart.picoc -o binary/user/list_directory.reti
-$ reti_emulator -a binary/user/list_directory.reti
+    documentation/add.picoc library/stdio/libstdio.picoc \
+    library/stdlib/libstdlib.picoc -C library/start/libstart.picoc \
+    -o binary/documentation/add.reti
+$ reti_emulator -a binary/documentation/add.reti
 ```
 
 `--direct-source-link` compiles and links the listed sources in one step.
-The headers declare the library functions, while the `.picoc` library
-sources provide their implementations. `-C` selects
-[`libstart`](library/start/libstart.picoc), which initializes the process
-heap and environment and calls [`exit()`](library/stdlib/exit.picoc#L4)
-with the return value from `main`. The compiler also writes the `.sections`
-file that `reti_emulator -a` uses to create the loadable `.bin` file.
+`-C` selects [`libstart`](library/start/libstart.picoc), which initializes the
+process heap and environment, calls [`main`](documentation/add.picoc#L4),
+and passes its return value to [`exit()`](library/stdlib/exit.picoc#L4).
+The compiler also writes the `.sections` file used by `reti_emulator -a`.
 
-With PicoOS running from [`binary/`](binary/), invoke the application at the
-shell prompt. The shell finds the new binary in `/user`:
+With PicoOS running from [`binary/`](binary/), run the example by its absolute
+PicoOS path. Loading messages are omitted:
 
 ```console
-PicoOS> list_directory.bin
+PicoOS> /documentation/add.bin 7 5
+12
 ```
+
+[`printf()`](library/stdio/stdio.picoc#L357) writes through the stdout descriptor
+in the table referenced by
+[`ProcessControlBlock.file_descriptors`](kernel/process/process.header#L42).
+The shell normally supplies the terminal, but can redirect this output to a file
+as explained in [`12.5 Redirection and pipelines`](#125-redirection-and-pipelines).
 
 ## 13.2 Applications, library calls, and host requests
 [\[↑ TOC\]](#contents)
@@ -8703,21 +8431,7 @@ from the exact OS launcher sequence.
 The diagram shows category targets and expected-output sources. Boot, OS,
 and shell tests all execute the full startup chain:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TD
-    T["63 Tests<br/><code>make test</code>"] --> L["13 Library Tests<br/><code>make test-lib</code>"]
-    T --> B["1 Boot Test<br/><code>make test-boot</code>"]
-    T --> S["49 System Tests<br/><code>make test-sys</code>"]
-    S --> O["23 OS Tests<br/><code>make test-os</code>"]
-    S --> H["26 Shell Tests<br/><code>make test-shell</code>"]
-    L --> LM["Expected output from<br/><code>// expected:</code> source metadata"]
-    B --> EF["Expected output from<br/><code>expected_output.txt</code>"]
-    O --> EF
-    H --> EF
-    LM --> LC["Compare actual Library output<br/>with expected output"]
-    EF --> SC["Compare normalized <code>output.txt</code><br/>with <code>expected_output.txt</code>"]
-```
+![14.1 Library, OS, shell, and boot test categories](documentation/images/test-categories.svg)
 
 ### 14.1.1 Files that make up a test
 [\[↑ TOC\]](#contents)
@@ -8725,16 +8439,7 @@ flowchart TD
 A library class is one top-level `.picoc` file. Other classes use a
 directory of fixtures. These examples show one library and one OS class:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart TD
-    T["<code>test/</code>"] --> L["<code>basic_printf_newline_escape.picoc</code><br/>one Library test"]
-    T --> O["<code>hello_world/</code><br/>one OS test"]
-    O --> I["<code>input.txt</code>"]
-    O --> E["<code>expected_output.txt</code>"]
-    O --> A["<code>launcher.picoc</code>"]
-    O --> P["<code>hello_world.picoc</code>"]
-```
+![14.1.1 Files that make up a test](documentation/images/test-file-layout.svg)
 
 Boot, OS, and shell classes require input and expected-output files.
 Private programs, headers, and data are optional. The table distinguishes
@@ -8789,16 +8494,7 @@ The runner ignores trailing whitespace per line. A differing output,
 compiler or emulator error, missing output, or five-second timeout fails
 the test.
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    M["Source metadata in <code>.picoc</code>"] --> R["Compiled RETI program"]
-    M --> E["Generated <code>.expected_output</code>"]
-    R --> A["Actual <code>.output</code>"]
-    E --> C["Exact line comparison"]
-    A --> C
-    C --> P["Pass or fail"]
-```
+![14.1.2 Library test example](documentation/images/test-library-flow.svg)
 
 ### 14.1.3 OS test example
 [\[↑ TOC\]](#contents)
@@ -8856,18 +8552,7 @@ process with pid 5 created
 
 The complete path is therefore:
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    I["<code>input.txt</code>"] --> S["Shell <code>load</code> and <code>run</code> built-ins"]
-    S --> L["<code>launcher.bin</code>"]
-    L --> H["<code>hello_world.bin</code>"]
-    H --> C["Captured emulator stdout"]
-    C --> O["Normalized <code>output.txt</code>"]
-    O --> D["Comparison"]
-    E["<code>expected_output.txt</code>"] --> D
-    D --> P["Pass or fail"]
-```
+![14.1.3 OS test example](documentation/images/test-os-flow.svg)
 
 A launcher can coordinate multiple processes, shared memory, signals,
 and scheduler events without adding host input commands.
@@ -8903,18 +8588,7 @@ Each command passes through shell parsing and execution. The runner waits
 for the next prompt before continuing. More complex classes can include
 private applications and data.
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    I["<code>input.txt</code>"] --> R["Runner waits for <code>PicoOS&gt;</code>"]
-    R --> S["Shell"]
-    S --> A["Command or test application"]
-    A --> C["Captured UART output"]
-    C --> O["Normalized <code>output.txt</code>"]
-    O --> D["Comparison"]
-    E["<code>expected_output.txt</code>"] --> D
-    D --> P["Pass or fail"]
-```
+![14.1.4 Shell test example](documentation/images/test-shell-flow.svg)
 
 ### 14.1.5 Boot test example
 [\[↑ TOC\]](#contents)
@@ -8939,19 +8613,7 @@ process with pid 4 created
 bootloader, followed by kernel, init, and shell. The runner sends `echo.bin`
 and [`poweroff.bin`](user/poweroff.picoc#L12) after their prompts.
 
-```mermaid
-%%{init: {"theme":"base","fontFamily":"Cantarell, sans-serif","themeVariables":{"fontFamily":"Cantarell, sans-serif","background":"#ffffff","primaryColor":"#f4f8f8","primaryTextColor":"#17313a","primaryBorderColor":"#637983","secondaryColor":"#eaf3f4","secondaryTextColor":"#17313a","secondaryBorderColor":"#637983","tertiaryColor":"#f4f8f8","tertiaryTextColor":"#17313a","tertiaryBorderColor":"#637983","lineColor":"#637983","textColor":"#17313a","edgeLabelBackground":"#ffffff","clusterBkg":"#f4f8f8","clusterBorder":"#637983","titleColor":"#17313a","actorBkg":"#f4f8f8","actorBorder":"#637983","actorTextColor":"#17313a","actorLineColor":"#637983","signalColor":"#637983","signalTextColor":"#17313a","labelBoxBkgColor":"#f4f8f8","labelBoxBorderColor":"#637983","labelTextColor":"#17313a","loopTextColor":"#17313a","noteBkgColor":"#eaf3f4","noteBorderColor":"#637983","noteTextColor":"#17313a","activationBkgColor":"#eaf3f4","activationBorderColor":"#637983","stateBkg":"#f4f8f8","stateBorder":"#637983","stateLabelColor":"#17313a","labelColor":"#17313a","altBackground":"#eaf3f4"},"themeCSS":"rect { rx: 0 !important; ry: 0 !important; } text, tspan, foreignObject, foreignObject * { font-family: Cantarell, sans-serif !important; }"}}%%
-flowchart LR
-    B["EPROM <code>bootloader.reti</code>"] --> K["<code>kernel.bin</code>"]
-    K --> I["<code>init.bin</code>"]
-    I --> S["<code>shell.bin</code>"]
-    S --> E["<code>echo.bin</code>"]
-    E --> C["Captured UART output"]
-    C --> O["Normalized <code>output.txt</code>"]
-    O --> D["Comparison"]
-    X["<code>expected_output.txt</code>"] --> D
-    D --> P["Pass or fail"]
-```
+![14.1.5 Boot test example](documentation/images/test-boot-flow.svg)
 
 The separate boot target provides a small startup check. OS and shell tests
 use the same [`RUNTIME_BOOT_ARGUMENTS`](run_os_tests.py#L28) and full boot sequence.
@@ -9139,8 +8801,8 @@ turns it into **resolved RETI assembly** in `.reti`, replacing labels with
 numeric addresses and expanding pseudoinstructions. The emulator then
 assembles the concrete instructions into machine code.
 
-This example saves `3` on the stack, counts down to zero, and restores the
-saved `3` into `IN2`. Write the following complete program in
+This example saves `IN1` and `ACC`, subtracts two large values to get `3`,
+counts down to zero, and restores both registers. Write the complete program in
 [`documentation/countdown.reti_blocks`](documentation/countdown.reti_blocks).
 The `.text` section contains the instructions. `.ivt` and `.data` remain empty
 because the program defines no interrupt service routines or global variables:
@@ -9149,26 +8811,33 @@ because the program defines no interrupt service routines or global variables:
   .ivt
   .text
 _start:
-  LOADI32 IN1 3
-  # Save the starting value on the stack.
+  # Save registers.
   PUSH IN1
+  PUSH ACC
+  LOADI32 IN1 16777219
+  LOADI32 ACC 16777216
+  SUB IN1 ACC
 loop:
   SUBI IN1 1
   MOVE IN1 ACC
   JUMP32> loop
 done:
-  # Restore the saved value into IN2.
-  POP IN2
+  # Restore registers.
+  POP ACC
+  POP IN1
   JUMP 0
   .data
 ```
 
-`LOADI32` loads the starting value and `PUSH` saves it. Each pass through
-`loop` subtracts one from `IN1`. `MOVE IN1 ACC` supplies the condition for
+`PUSH` saves both registers before the two `LOADI32` instructions load
+`16777219` and `16777216`. Both values require 25 bits and exceed the signed
+22-bit range of `LOADI`. `SUB IN1 ACC` leaves `3` in `IN1`, so the loop runs
+only three times. Each pass subtracts one from `IN1`. `MOVE IN1 ACC` supplies
+the condition for
 `JUMP32> loop`, which repeats while the counter is greater than zero.
 The label lets the linker calculate the target after expanding the
 pseudoinstructions. `JUMP32` uses `ACC` as scratch space, so the counter stays
-in `IN1`. At `done`, `POP` restores the saved value into `IN2`.
+in `IN1`. At `done`, `POP` restores `ACC` and `IN1` in reverse order.
 
 These are all four pseudoinstructions from
 [`1.1.7 RETI pseudoinstructions`](#117-reti-pseudoinstructions).
@@ -9192,14 +8861,22 @@ and instructions:
 
 ```reti
 # // Block('_start', [])
-# Instr(LOADI32, [IN1, 3])
-# write large immediate into IN1
-LOADI IN1 0
-MULTI IN1 1024
-ORI IN1 3
-# Save the starting value on the stack.
+# Save registers.
 SUBI SP 1
 STOREIN SP IN1 1
+SUBI SP 1
+STOREIN SP ACC 1
+# Instr(LOADI32, [IN1, 16777219])
+# write large immediate into IN1
+LOADI IN1 16384
+MULTI IN1 1024
+ORI IN1 3
+# Instr(LOADI32, [ACC, 16777216])
+# write large immediate into ACC
+LOADI ACC 16384
+MULTI ACC 1024
+ORI ACC 0
+SUB IN1 ACC
 # // Block('loop', [])
 SUBI IN1 1
 MOVE IN1 ACC
@@ -9208,18 +8885,21 @@ JUMP<= 6
 # write large immediate into ACC
 LOADI ACC 0
 MULTI ACC 1024
-ORI ACC 5
+ORI ACC 11
 ADD ACC CS
 MOVE ACC PC
 # // Block('done', [])
-# Restore the saved value into IN2.
-LOADIN SP IN2 1
+# Restore registers.
+LOADIN SP ACC 1
+ADDI SP 1
+LOADIN SP IN1 1
 ADDI SP 1
 JUMP 0
 ```
 
-Single-step the program and watch `IN1` go from `3` to `2`, `1`, and `0`.
-After `POP`, `IN2` contains `3` and `SP` has returned to its initial value.
+Single-step the loads and check `IN1 = 16777219` and `ACC = 16777216`.
+After `SUB IN1 ACC`, watch `IN1` go from `3` to `2`, `1`, and `0`.
+After both `POP` instructions, `IN1`, `ACC`, and `SP` have their initial values.
 `JUMP 0` jumps to itself and ends emulator execution. `-K` keeps the debugger
 open so the final state can be inspected.
 
@@ -9287,14 +8967,16 @@ would let both children enter the critical section at the same time.
 [\[↑ TOC\]](#contents)
 
 This example lets students follow two counter updates and mutex contention
-in the RETI emulator. The listings keep the shared declaration and complete
-entry functions, with dependency comments and includes omitted as `// ...`.
+in the RETI emulator. The listings show the complete source files, including
+dependency comments and all includes.
 The [`shared.header`](documentation/shared_mutex/shared.header) defines the
 same [`SharedState`](documentation/shared_mutex/shared.header#L5) layout
 for the parent and both children:
 
 ```c
-// ...
+#pragma once
+
+#include "../../library/mutex/mutex.header"
 
 struct SharedState {
     int workers;
@@ -9309,7 +8991,12 @@ creates and maps the region, sets
 Both children run the same binary without command-line arguments:
 
 ```c
-// ...
+// dependencies: ../../library/unistd/libunistd.reti_blocks ../../library/sys/wait/libwait.reti_blocks ../../library/sys/mman/libmman.reti_blocks ../../library/mutex/libmutex.reti_blocks
+
+#include "shared.header"
+#include "../../library/unistd/unistd.header"
+#include "../../library/sys/wait/wait.header"
+#include "../../library/sys/mman/mman.header"
 
 int main(void) {
     int shared_memory_id;
@@ -9346,7 +9033,11 @@ operation. [`yield()`](library/schedule/schedule.picoc#L5) gives the other
 child a chance to attempt locking while the mutex is still held:
 
 ```c
-// ...
+// dependencies: ../../library/sys/mman/libmman.reti_blocks ../../library/mutex/libmutex.reti_blocks ../../library/schedule/libschedule.reti_blocks
+
+#include "shared.header"
+#include "../../library/sys/mman/mman.header"
+#include "../../library/schedule/schedule.header"
 
 int main(void) {
     int shared_memory_id;
@@ -9374,8 +9065,7 @@ explains this lifetime. The similar
 counter using printed output.
 
 From the repository root, compile both sources with debug metadata and
-assemble the binaries into the PicoOS runtime directory. The complete
-source files contain the includes omitted above:
+assemble the binaries into the PicoOS runtime directory:
 
 ```console
 $ mkdir -p binary/documentation/shared_mutex

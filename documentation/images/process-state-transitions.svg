@@ -1,0 +1,271 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-18" width="1047.89453125" class="statediagram" viewBox="0 0 1047.89453125 882" role="img" height="882" aria-labelledby="process-state-transitions-title" preserveAspectRatio="xMidYMid meet">
+  <title id="process-state-transitions-title">4.1.1 Process states and transitions</title>
+  <rect x="0" y="0" width="1047.89453125" height="882" fill="#ffffff" />
+  <g>
+    <defs>
+      <marker id="picoos-diagram-18_stateDiagram-barbEnd" refX="19" refY="7" markerWidth="20" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M 19,7 L9,13 L14,7 L9,1 Z" fill="#167b84" stroke="#167b84" stroke-width="1px" />
+      </marker>
+    </defs>
+    <g class="root">
+      <g class="clusters" />
+      <g class="edgePaths">
+        <path d="M876.117,22L876.117,28.167C876.117,34.333,876.117,46.667,876.117,59C876.117,71.333,876.117,83.667,876.117,89.833L876.117,96" id="picoos-diagram-18-edge0" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M849.602,122.419L814.78,130.849C779.958,139.28,710.315,156.14,675.493,170.737C640.672,185.333,640.672,197.667,640.672,203.833L640.672,210" id="picoos-diagram-18-edge1" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M624.663,250L619.727,256.167C614.791,262.333,604.919,274.667,593.191,287.667C581.463,300.667,567.88,314.333,561.088,321.167L554.296,328" id="picoos-diagram-18-edge2" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M490.312,328L475.242,321.167C460.173,314.333,430.034,300.667,449.599,285.634C469.164,270.602,538.434,254.203,573.068,246.004L607.703,237.805" id="picoos-diagram-18-edge3" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M517.98,368L510.719,376.833C503.459,385.667,488.939,403.333,472.95,420.333C456.961,437.333,439.504,453.667,430.776,461.833L422.048,470" id="picoos-diagram-18-edge4" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M357.117,472.595L335.598,463.996C314.078,455.397,271.039,438.198,249.52,417.433C228,396.667,228,372.333,228,350C228,327.667,228,307.333,291.284,288.426C354.568,269.518,481.135,252.036,544.419,243.295L607.703,234.554" id="picoos-diagram-18-edge5" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M648.609,250L651.056,256.167C653.504,262.333,658.398,274.667,660.846,291C663.293,307.333,663.293,327.667,663.293,350C663.293,372.333,663.293,396.667,663.293,420.333C663.293,444,663.293,467,663.293,490C663.293,513,663.293,536,634.066,556.742C604.839,577.485,546.384,595.969,517.157,605.212L487.93,614.454" id="picoos-diagram-18-edge6" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M550.856,368L558.117,376.833C565.377,385.667,579.897,403.333,587.158,423.667C594.418,444,594.418,467,594.418,490C594.418,513,594.418,536,576.67,555.701C558.922,575.402,523.426,591.804,505.678,600.005L487.93,608.206" id="picoos-diagram-18-edge7" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M413.548,510L418.805,518.167C424.063,526.333,434.578,542.667,439.836,559C445.094,575.333,445.094,591.667,445.094,599.833L445.094,608" id="picoos-diagram-18-edge8" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M402.258,614.446L373.053,605.205C343.849,595.964,285.44,577.482,277.917,559.626C270.393,541.769,313.755,524.538,335.436,515.923L357.117,507.307" id="picoos-diagram-18-edge9" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M402.258,619.232L353.215,609.193C304.172,599.155,206.086,579.077,157.043,557.539C108,536,108,513,108,490C108,467,108,444,108,420.333C108,396.667,108,372.333,108,350C108,327.667,108,307.333,191.284,288.255C274.568,269.176,441.135,251.352,524.419,242.44L607.703,233.528" id="picoos-diagram-18-edge10" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M902.633,133.464L912.637,140.053C922.642,146.643,942.651,159.821,952.656,175.911C962.66,192,962.66,211,962.66,230C962.66,249,962.66,268,962.66,287.667C962.66,307.333,962.66,327.667,962.66,350C962.66,372.333,962.66,396.667,962.66,420.333C962.66,444,962.66,467,962.66,490C962.66,513,962.66,536,962.66,559C962.66,582,962.66,605,962.66,626C962.66,647,962.66,666,951.175,681.667C939.689,697.333,916.718,709.667,905.232,715.833L893.747,722" id="picoos-diagram-18-edge12" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M673.641,238.361L705.605,246.468C737.569,254.574,801.497,270.787,833.462,289.06C865.426,307.333,865.426,327.667,865.426,350C865.426,372.333,865.426,396.667,865.426,420.333C865.426,444,865.426,467,865.426,490C865.426,513,865.426,536,865.426,559C865.426,582,865.426,605,865.426,626C865.426,647,865.426,666,864.46,681.667C863.494,697.333,861.561,709.667,860.595,715.833L859.629,722" id="picoos-diagram-18-edge13" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M578.605,361.605L610.757,371.504C642.908,381.403,707.21,401.202,739.361,422.601C771.512,444,771.512,467,771.512,490C771.512,513,771.512,536,771.512,559C771.512,582,771.512,605,771.512,626C771.512,647,771.512,666,780.706,681.667C789.9,697.333,808.289,709.667,817.483,715.833L826.677,722" id="picoos-diagram-18-edge14" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M444.227,500.433L484.976,510.194C525.725,519.955,607.224,539.478,647.973,560.739C688.723,582,688.723,605,688.723,626C688.723,647,688.723,666,710.37,682.854C732.017,699.709,775.311,714.418,796.958,721.772L818.605,729.127" id="picoos-diagram-18-edge15" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M487.93,641.216L511.581,648.514C535.233,655.811,582.536,670.405,637.649,685.615C692.762,700.824,755.684,716.647,787.145,724.559L818.605,732.471" id="picoos-diagram-18-edge16" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M856.496,762L856.496,770.167C856.496,778.333,856.496,794.667,856.496,810.999C856.496,827.331,856.496,843.662,856.496,851.828L856.496,859.993" id="picoos-diagram-18-edge17" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M429.517,648L426.402,652C423.286,656,417.056,664,425.363,668C433.671,672,456.517,672,464.824,668C473.132,664,466.901,656,463.786,652L460.67,648" id="picoos-diagram-18-edge11" class=" edge-thickness-normal edge-pattern-solid transition" marker-end="url(#picoos-diagram-18_stateDiagram-barbEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+      </g>
+      <g class="edgeLabels">
+        <g class="edgeLabel" transform="translate(876.1171875, 59)">
+          <g class="label" transform="translate(-55.2265625, -12)">
+            <g class="svg-label">
+              <rect x="0.000008286820389002969" y="-6.044985667585934e-8" width="110.45310949139139" height="24.00000172707979" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000008286820389002969" y="-6.044985667585934e-8" width="110.45310949139139" height="24.00000172707979" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000008286820389002969" y="17.99998692969192" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">completed load</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(640.671875, 173)">
+          <g class="label" transform="translate(-88.09375, -12)">
+            <g class="svg-label">
+              <rect x="-0.000015342744859481172" y="-0.000006161988892472436" width="176.18748538964974" height="24.00001317121425" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000015342744859481172" y="-0.000006161988892472436" width="176.18748538964974" height="24.00001317121425" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000015342744859481172" y="17.999984642864376" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">run and build initial stack</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(591.37643, 290.69291)">
+          <g class="label" transform="translate(-37.3046875, -12)">
+            <g class="svg-label">
+              <rect x="-0.000009775044304660696" y="0.0000053173119454186235" width="74.60940898183401" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000009775044304660696" y="0.0000053173119454186235" width="74.60940898183401" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000009775044304660696" y="17.99998086331925" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">dispatcher</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(455.49447, 273.83765)">
+          <g class="label" transform="translate(-47.078125, -12)">
+            <g class="svg-label">
+              <rect x="-0.000003420002826715063" y="0.000003520908933296596" width="94.1562652941688" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000003420002826715063" y="0.000003520908933296596" width="94.1562652941688" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000003420002826715063" y="17.999979066916296" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">timer or yield</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(473.28083, 422.06395)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="-0.000012324887791237416" y="-0.000007465350847724039" width="200.00001312076108" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000012324887791237416" y="-0.000007465350847724039" width="200.00001312076108" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="1.2656173930164414" y="17.999998598348327" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">waitpid, sleep, empty stdin, </text><text x="55.93751308868053" y="41.99999651071664" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">or DMA load</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(228, 348)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="-0.000003504612692495357" y="-0.00000889635299472502" width="200.00001312076117" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000003504612692495357" y="-0.00000889635299472502" width="200.00001312076117" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="17.718743881240357" y="17.999997167346237" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">wakeup, input, or DMA </text><text x="59.68749774081641" y="41.99999507971455" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">completion</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(663.29296875, 421)">
+          <g class="label" transform="translate(-38.5625, -12)">
+            <g class="svg-label">
+              <rect x="0.000009479947948420886" y="0.00000278350887583656" width="77.1249823240131" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000009479947948420886" y="0.00000278350887583656" width="77.1249823240131" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000009479947948420886" y="17.999978329516182" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">stop signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(594.41796875, 490)">
+          <g class="label" transform="translate(-38.5625, -12)">
+            <g class="svg-label">
+              <rect x="-0.000003125702619399817" y="-0.00001466256668436472" width="77.1249823240131" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000003125702619399817" y="-0.00001466256668436472" width="77.1249823240131" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000003125702619399817" y="17.999991401132547" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">stop signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(445.09375, 559)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="0.000004672172281061648" y="-0.000015805980410732445" width="200.00001312076114" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000004672172281061648" y="-0.000015805980410732445" width="200.00001312076114" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="16.765631134458715" y="17.999990257718764" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">stop signal remembers </text><text x="64.43750073603496" y="42.00001868777895" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">BLOCKED</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(247.91531, 565.6082)">
+          <g class="label" transform="translate(-98.0625, -12)">
+            <g class="svg-label">
+              <rect x="-0.000005966945309410221" y="-0.00000747502053854987" width="196.12501393466562" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000005966945309410221" y="-0.00000747502053854987" width="196.12501393466562" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000005966945309410221" y="17.999998588678636" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">SIGCONT while still queued</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(108, 421)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="-2.190382932809598e-7" y="-0.000011431521215854445" width="199.9999978619152" height="48.0000263424285" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-2.190382932809598e-7" y="-0.000011431521215854445" width="199.9999978619152" height="48.0000263424285" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="18.453124427525225" y="17.99999463217796" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">SIGCONT when wait is </text><text x="70.14062636883158" y="41.999992544546274" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">satisfied</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(445.09375, 700)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="0.000004672172281061648" y="0.000021520432710531168" width="200.00001312076114" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000004672172281061648" y="0.000021520432710531168" width="200.00001312076114" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="19.82811203293022" y="17.999966548748148" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">pending terminal read </text><text x="13.14061762144894" y="41.99999497880833" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">without input ownership</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(962.66015625, 421)">
+          <g class="label" transform="translate(-77.234375, -12)">
+            <g class="svg-label">
+              <rect x="0.000004714718897957937" y="0.00000278350887583656" width="154.46871546346642" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000004714718897957937" y="0.00000278350887583656" width="154.46871546346642" height="23.999997912368315" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000004714718897957937" y="17.999978329516182" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">termination or unload</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(865.42578125, 490)">
+          <g class="label" transform="translate(-73.9140625, -12)">
+            <g class="svg-label">
+              <rect x="0.000020841050854869536" y="-0.00001466256668436472" width="147.82812674441413" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000020841050854869536" y="-0.00001466256668436472" width="147.82812674441413" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000020841050854869536" y="17.999991401132547" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">termination or signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(771.51171875, 559)">
+          <g class="label" transform="translate(-62.7890625, -12)">
+            <g class="svg-label">
+              <rect x="0.000017402959997525613" y="0.000028926741492796282" width="125.57810483787591" height="23.999967394676446" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000017402959997525613" y="0.000028926741492796282" width="125.57810483787591" height="23.999967394676446" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000017402959997525613" y="17.99997395505693" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">exit or fatal signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(688.72265625, 628)">
+          <g class="label" transform="translate(-38.8828125, -12)">
+            <g class="svg-label">
+              <rect x="-0.000018989928776136367" y="-0.000019037025936086138" width="77.76567074747186" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000018989928776136367" y="-0.000019037025936086138" width="77.76567074747186" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000018989928776136367" y="17.99998702667324" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">fatal signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(652.20944, 690.62555)">
+          <g class="label" transform="translate(-38.8828125, -12)">
+            <g class="svg-label">
+              <rect x="0.00002800482081966038" y="-0.000029727620471931004" width="77.76560971208801" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.00002800482081966038" y="-0.000029727620471931004" width="77.76560971208801" height="24.000028430060183" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.00002800482081966038" y="17.999976336078817" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">fatal signal</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(856.49609375, 811)">
+          <g class="label" transform="translate(-100, -24)">
+            <g class="svg-label">
+              <rect x="0.0000123831334803981" y="0.000008050424639804987" width="200.0000131207612" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.0000123831334803981" y="0.000008050424639804987" width="200.0000131207612" height="47.99999582473663" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="2.8750231003481304" y="18.000014114123815" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">collection, orphan cleanup, </text><text x="66.26564026174674" y="41.99998150880026" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">or unload</text></g>
+          </g>
+        </g>
+      </g>
+      <g class="nodes">
+        <g class="node default" id="picoos-diagram-18-state-root_start-0" transform="translate(876.1171875, 15)">
+          <circle class="state-start" r="7" width="14" height="14" fill="#637983" stroke="#637983" stroke-width="1px" />
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-NEW-12" transform="translate(876.1171875, 116)">
+          <rect class="basic label-container" rx="0" ry="0" x="-26.515625" y="-20" width="53.03125" height="40" fill="#f4f8f8" stroke="#637983" stroke-width="1.5px" />
+          <g class="label" transform="translate(-18.515625, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.000023064399670147395" y="17.999985786278145" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">NEW</text></g>
+          </g>
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-READY-13" transform="translate(640.671875, 230)">
+          <rect class="basic label-container" rx="0" ry="0" x="-32.96875" y="-20" width="65.9375" height="40" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-24.96875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="-0.000024171523705263098" y="17.999983499450593" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">READY</text></g>
+          </g>
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-RUNNING-14" transform="translate(534.41796875, 348)">
+          <rect class="basic label-container" rx="0" ry="0" x="-44.1875" y="-20" width="88.375" height="40" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+          <g class="label" transform="translate(-36.1875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="-0.000004312118051075231" y="17.999980864684403" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">RUNNING</text></g>
+          </g>
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-BLOCKED-15" transform="translate(400.671875, 490)">
+          <rect class="basic label-container" rx="0" ry="0" x="-43.5546875" y="-20" width="87.109375" height="40" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-35.5546875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="-0.00001223899812430318" y="17.999991401132547" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">BLOCKED</text></g>
+          </g>
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-STOPPED-16" transform="translate(445.09375, 628)">
+          <rect class="basic label-container" rx="0" ry="0" x="-42.8359375" y="-20" width="85.671875" height="40" fill="#f4d5d2" stroke="#d9534f" stroke-width="1.5px" />
+          <g class="label" transform="translate(-34.8359375, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.0000034444614129824913" y="17.99998702667324" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">STOPPED</text></g>
+          </g>
+        </g>
+        <g class="node  statediagram-state " id="picoos-diagram-18-state-ZOMBIE-17" transform="translate(856.49609375, 742)">
+          <rect class="basic label-container" rx="0" ry="0" x="-37.890625" y="-20" width="75.78125" height="40" fill="#f4f8f8" stroke="#637983" stroke-width="1.5px" />
+          <g class="label" transform="translate(-29.890625, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.000029590196845674654" y="17.999984739845786" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">ZOMBIE</text></g>
+          </g>
+        </g>
+        <g class="node default" id="picoos-diagram-18-state-root_end-17" transform="translate(856.49609375, 867)">
+          <g class="outer-path">
+            <path d="M7 0 C7 0.40517908122283747, 6.964012880168563 0.816513743121899, 6.893654271085456 1.2155372436685123 C6.823295662002349 1.6145607442151257, 6.716427752933756 2.013397210557766, 6.5778483455013586 2.394141003279681 C6.439268938068961 2.7748847960015954, 6.26476736710249 3.149104622578984, 6.062177826491071 3.4999999999999996 C5.859588285879653 3.8508953774210153, 5.622755194947063 4.189128084166967, 5.362311101832846 4.499513267805774 C5.10186700871863 4.809898451444582, 4.809898451444583 5.10186700871863, 4.499513267805775 5.362311101832846 C4.189128084166968 5.622755194947063, 3.8508953774210166 5.859588285879652, 3.500000000000001 6.06217782649107 C3.149104622578985 6.264767367102489, 2.7748847960015963 6.439268938068961, 2.3941410032796817 6.5778483455013586 C2.013397210557767 6.716427752933756, 1.6145607442151264 6.823295662002349, 1.2155372436685128 6.893654271085456 C0.8165137431218992 6.964012880168563, 0.4051790812228379 7, 4.286263797015736e-16 7 C-0.405179081222837 7, -0.8165137431218985 6.964012880168563, -1.2155372436685121 6.893654271085456 C-1.6145607442151257 6.823295662002349, -2.0133972105577667 6.716427752933756, -2.394141003279681 6.5778483455013586 C-2.774884796001595 6.439268938068961, -3.149104622578983 6.26476736710249, -3.4999999999999982 6.062177826491071 C-3.8508953774210135 5.859588285879653, -4.189128084166966 5.6227551949470636, -4.499513267805773 5.362311101832848 C-4.809898451444581 5.101867008718632, -5.101867008718628 4.809898451444586, -5.3623111018328435 4.499513267805779 C-5.622755194947059 4.189128084166971, -5.859588285879649 3.8508953774210206, -6.062177826491068 3.5000000000000053 C-6.264767367102486 3.14910462257899, -6.439268938068958 2.774884796001602, -6.577848345501356 2.394141003279688 C-6.716427752933754 2.0133972105577738, -6.823295662002347 1.614560744215134, -6.893654271085454 1.215537243668521 C-6.9640128801685615 0.816513743121908, -6.999999999999999 0.4051790812228472, -7 1.0183126166254463e-14 C-7.000000000000001 -0.40517908122282686, -6.964012880168565 -0.8165137431218878, -6.893654271085459 -1.215537243668501 C-6.823295662002352 -1.6145607442151142, -6.716427752933759 -2.0133972105577542, -6.577848345501363 -2.394141003279669 C-6.439268938068967 -2.7748847960015834, -6.264767367102496 -3.149104622578972, -6.062177826491078 -3.4999999999999876 C-5.859588285879661 -3.8508953774210033, -5.6227551949470715 -4.1891280841669545, -5.362311101832856 -4.499513267805763 C-5.10186700871864 -4.809898451444571, -4.809898451444594 -5.10186700871862, -4.499513267805787 -5.362311101832836 C-4.189128084166979 -5.622755194947053, -3.850895377421028 -5.859588285879643, -3.5000000000000133 -6.062177826491062 C-3.1491046225789985 -6.264767367102482, -2.774884796001611 -6.439268938068954, -2.3941410032796973 -6.577848345501353 C-2.0133972105577835 -6.716427752933752, -1.6145607442151435 -6.823295662002345, -1.2155372436685306 -6.893654271085453 C-0.8165137431219176 -6.9640128801685615, -0.40517908122285695 -6.999999999999999, -1.9937625952807352e-14 -7 C0.4051790812228171 -7.000000000000001, 0.8165137431218781 -6.964012880168565, 1.2155372436684913 -6.89365427108546 C1.6145607442151044 -6.823295662002354, 2.013397210557745 -6.716427752933763, 2.3941410032796595 -6.5778483455013665 C2.774884796001574 -6.43926893806897, 3.149104622578963 -6.2647673671025, 3.499999999999979 -6.062177826491083 C3.8508953774209953 -5.859588285879665, 4.189128084166947 -5.622755194947077, 4.499513267805756 -5.362311101832862 C4.809898451444564 -5.1018670087186475, 5.101867008718613 -4.809898451444602, 5.362311101832829 -4.499513267805796 C5.622755194947046 -4.189128084166989, 5.859588285879637 -3.8508953774210393, 6.062177826491056 -3.500000000000025 C6.2647673671024755 -3.1491046225790105, 6.439268938068949 -2.774884796001623, 6.577848345501348 -2.3941410032797092 C6.716427752933747 -2.0133972105577955, 6.823295662002342 -1.6145607442151562, 6.893654271085451 -1.2155372436685434 C6.96401288016856 -0.8165137431219307, 6.982275711847575 -0.2025895406114567, 7 -3.2800750208310675e-14 C7.017724288152425 0.2025895406113911, 7.017724288152424 -0.2025895406114242, 7 0" stroke="none" stroke-width="0px" fill="#f4f8f8" />
+            <path d="M7 0 C7 0.40517908122283747, 6.964012880168563 0.816513743121899, 6.893654271085456 1.2155372436685123 C6.823295662002349 1.6145607442151257, 6.716427752933756 2.013397210557766, 6.5778483455013586 2.394141003279681 C6.439268938068961 2.7748847960015954, 6.26476736710249 3.149104622578984, 6.062177826491071 3.4999999999999996 C5.859588285879653 3.8508953774210153, 5.622755194947063 4.189128084166967, 5.362311101832846 4.499513267805774 C5.10186700871863 4.809898451444582, 4.809898451444583 5.10186700871863, 4.499513267805775 5.362311101832846 C4.189128084166968 5.622755194947063, 3.8508953774210166 5.859588285879652, 3.500000000000001 6.06217782649107 C3.149104622578985 6.264767367102489, 2.7748847960015963 6.439268938068961, 2.3941410032796817 6.5778483455013586 C2.013397210557767 6.716427752933756, 1.6145607442151264 6.823295662002349, 1.2155372436685128 6.893654271085456 C0.8165137431218992 6.964012880168563, 0.4051790812228379 7, 4.286263797015736e-16 7 C-0.405179081222837 7, -0.8165137431218985 6.964012880168563, -1.2155372436685121 6.893654271085456 C-1.6145607442151257 6.823295662002349, -2.0133972105577667 6.716427752933756, -2.394141003279681 6.5778483455013586 C-2.774884796001595 6.439268938068961, -3.149104622578983 6.26476736710249, -3.4999999999999982 6.062177826491071 C-3.8508953774210135 5.859588285879653, -4.189128084166966 5.6227551949470636, -4.499513267805773 5.362311101832848 C-4.809898451444581 5.101867008718632, -5.101867008718628 4.809898451444586, -5.3623111018328435 4.499513267805779 C-5.622755194947059 4.189128084166971, -5.859588285879649 3.8508953774210206, -6.062177826491068 3.5000000000000053 C-6.264767367102486 3.14910462257899, -6.439268938068958 2.774884796001602, -6.577848345501356 2.394141003279688 C-6.716427752933754 2.0133972105577738, -6.823295662002347 1.614560744215134, -6.893654271085454 1.215537243668521 C-6.9640128801685615 0.816513743121908, -6.999999999999999 0.4051790812228472, -7 1.0183126166254463e-14 C-7.000000000000001 -0.40517908122282686, -6.964012880168565 -0.8165137431218878, -6.893654271085459 -1.215537243668501 C-6.823295662002352 -1.6145607442151142, -6.716427752933759 -2.0133972105577542, -6.577848345501363 -2.394141003279669 C-6.439268938068967 -2.7748847960015834, -6.264767367102496 -3.149104622578972, -6.062177826491078 -3.4999999999999876 C-5.859588285879661 -3.8508953774210033, -5.6227551949470715 -4.1891280841669545, -5.362311101832856 -4.499513267805763 C-5.10186700871864 -4.809898451444571, -4.809898451444594 -5.10186700871862, -4.499513267805787 -5.362311101832836 C-4.189128084166979 -5.622755194947053, -3.850895377421028 -5.859588285879643, -3.5000000000000133 -6.062177826491062 C-3.1491046225789985 -6.264767367102482, -2.774884796001611 -6.439268938068954, -2.3941410032796973 -6.577848345501353 C-2.0133972105577835 -6.716427752933752, -1.6145607442151435 -6.823295662002345, -1.2155372436685306 -6.893654271085453 C-0.8165137431219176 -6.9640128801685615, -0.40517908122285695 -6.999999999999999, -1.9937625952807352e-14 -7 C0.4051790812228171 -7.000000000000001, 0.8165137431218781 -6.964012880168565, 1.2155372436684913 -6.89365427108546 C1.6145607442151044 -6.823295662002354, 2.013397210557745 -6.716427752933763, 2.3941410032796595 -6.5778483455013665 C2.774884796001574 -6.43926893806897, 3.149104622578963 -6.2647673671025, 3.499999999999979 -6.062177826491083 C3.8508953774209953 -5.859588285879665, 4.189128084166947 -5.622755194947077, 4.499513267805756 -5.362311101832862 C4.809898451444564 -5.1018670087186475, 5.101867008718613 -4.809898451444602, 5.362311101832829 -4.499513267805796 C5.622755194947046 -4.189128084166989, 5.859588285879637 -3.8508953774210393, 6.062177826491056 -3.500000000000025 C6.2647673671024755 -3.1491046225790105, 6.439268938068949 -2.774884796001623, 6.577848345501348 -2.3941410032797092 C6.716427752933747 -2.0133972105577955, 6.823295662002342 -1.6145607442151562, 6.893654271085451 -1.2155372436685434 C6.96401288016856 -0.8165137431219307, 6.982275711847575 -0.2025895406114567, 7 -3.2800750208310675e-14 C7.017724288152425 0.2025895406113911, 7.017724288152424 -0.2025895406114242, 7 0" stroke="#637983" stroke-width="2px" fill="none" stroke-dasharray="0px, 0px" />
+            <g>
+              <path d="M2.5 0 C2.5 0.14470681472244193, 2.487147457203058 0.29161205111496386, 2.46201938253052 0.4341204441673258 C2.436891307857982 0.5766288372196877, 2.3987241974763416 0.7190704323420595, 2.3492315519647713 0.8550503583141718 C2.299738906453201 0.991030284286284, 2.2374169168223177 1.124680222349637, 2.165063509461097 1.2499999999999998 C2.092710102099876 1.3753197776503625, 2.0081268553382365 1.496117172916774, 1.915111107797445 1.6069690242163481 C1.8220953602566536 1.7178208755159223, 1.7178208755159226 1.8220953602566536, 1.6069690242163484 1.915111107797445 C1.4961171729167742 2.0081268553382365, 1.375319777650363 2.0927101020998755, 1.2500000000000002 2.1650635094610964 C1.1246802223496375 2.2374169168223172, 0.9910302842862845 2.2997389064532, 0.8550503583141721 2.349231551964771 C0.7190704323420597 2.3987241974763416, 0.576628837219688 2.436891307857982, 0.43412044416732604 2.46201938253052 C0.291612051114964 2.487147457203058, 0.14470681472244212 2.5, 1.5308084989341916e-16 2.5 C-0.1447068147224418 2.5, -0.2916120511149638 2.487147457203058, -0.43412044416732576 2.46201938253052 C-0.5766288372196877 2.436891307857982, -0.7190704323420595 2.3987241974763416, -0.8550503583141718 2.3492315519647713 C-0.991030284286284 2.299738906453201, -1.124680222349637 2.2374169168223177, -1.2499999999999996 2.165063509461097 C-1.375319777650362 2.092710102099876, -1.4961171729167733 2.008126855338237, -1.6069690242163475 1.9151111077974459 C-1.7178208755159217 1.8220953602566548, -1.822095360256653 1.7178208755159234, -1.9151111077974443 1.6069690242163495 C-2.0081268553382357 1.4961171729167755, -2.0927101020998746 1.3753197776503645, -2.1650635094610955 1.250000000000002 C-2.2374169168223164 1.1246802223496395, -2.2997389064531992 0.9910302842862865, -2.34923155196477 0.8550503583141743 C-2.3987241974763407 0.7190704323420621, -2.436891307857981 0.5766288372196907, -2.4620193825305194 0.434120444167329 C-2.487147457203058 0.29161205111496724, -2.5 0.14470681472244545, -2.5 3.636830773662308e-15 C-2.5 -0.14470681472243818, -2.4871474572030587 -0.2916120511149599, -2.4620193825305208 -0.4341204441673218 C-2.436891307857983 -0.5766288372196837, -2.398724197476343 -0.7190704323420553, -2.3492315519647726 -0.8550503583141675 C-2.2997389064532023 -0.9910302842862798, -2.23741691682232 -1.1246802223496328, -2.165063509461099 -1.2499999999999956 C-2.092710102099878 -1.3753197776503583, -2.00812685533824 -1.4961171729167695, -1.9151111077974488 -1.606969024216344 C-1.8220953602566576 -1.7178208755159183, -1.7178208755159263 -1.82209536025665, -1.6069690242163523 -1.9151111077974416 C-1.4961171729167784 -2.0081268553382334, -1.3753197776503672 -2.0927101020998724, -1.2500000000000047 -2.1650635094610937 C-1.1246802223496422 -2.237416916822315, -0.9910302842862897 -2.299738906453198, -0.8550503583141776 -2.3492315519647686 C-0.7190704323420656 -2.3987241974763394, -0.5766288372196942 -2.4368913078579806, -0.43412044416733236 -2.462019382530519 C-0.29161205111497057 -2.4871474572030574, -0.1447068147224489 -2.4999999999999996, -7.120580697431198e-15 -2.5 C0.14470681472243463 -2.5000000000000004, 0.29161205111495647 -2.487147457203059, 0.4341204441673183 -2.4620193825305217 C0.5766288372196802 -2.436891307857984, 0.7190704323420518 -2.3987241974763442, 0.8550503583141642 -2.349231551964774 C0.9910302842862766 -2.2997389064532037, 1.1246802223496295 -2.2374169168223212, 1.2499999999999925 -2.165063509461101 C1.3753197776503554 -2.0927101020998804, 1.4961171729167668 -2.008126855338242, 1.6069690242163412 -1.915111107797451 C1.7178208755159157 -1.82209536025666, 1.8220953602566472 -1.7178208755159294, 1.915111107797439 -1.6069690242163557 C2.0081268553382308 -1.496117172916782, 2.09271010209987 -1.3753197776503712, 2.1650635094610915 -1.2500000000000089 C2.237416916822313 -1.1246802223496466, 2.299738906453196 -0.9910302842862939, 2.3492315519647673 -0.855050358314182 C2.3987241974763385 -0.71907043234207, 2.4368913078579792 -0.5766288372196986, 2.462019382530518 -0.4341204441673369 C2.487147457203057 -0.29161205111497523, 2.4936698970884197 -0.07235340736123454, 2.5 -1.1714553645825241e-14 C2.5063301029115803 0.07235340736121111, 2.50633010291158 -0.07235340736122292, 2.5 0" stroke="none" stroke-width="0px" fill="#637983" />
+              <path d="M2.5 0 C2.5 0.14470681472244193, 2.487147457203058 0.29161205111496386, 2.46201938253052 0.4341204441673258 C2.436891307857982 0.5766288372196877, 2.3987241974763416 0.7190704323420595, 2.3492315519647713 0.8550503583141718 C2.299738906453201 0.991030284286284, 2.2374169168223177 1.124680222349637, 2.165063509461097 1.2499999999999998 C2.092710102099876 1.3753197776503625, 2.0081268553382365 1.496117172916774, 1.915111107797445 1.6069690242163481 C1.8220953602566536 1.7178208755159223, 1.7178208755159226 1.8220953602566536, 1.6069690242163484 1.915111107797445 C1.4961171729167742 2.0081268553382365, 1.375319777650363 2.0927101020998755, 1.2500000000000002 2.1650635094610964 C1.1246802223496375 2.2374169168223172, 0.9910302842862845 2.2997389064532, 0.8550503583141721 2.349231551964771 C0.7190704323420597 2.3987241974763416, 0.576628837219688 2.436891307857982, 0.43412044416732604 2.46201938253052 C0.291612051114964 2.487147457203058, 0.14470681472244212 2.5, 1.5308084989341916e-16 2.5 C-0.1447068147224418 2.5, -0.2916120511149638 2.487147457203058, -0.43412044416732576 2.46201938253052 C-0.5766288372196877 2.436891307857982, -0.7190704323420595 2.3987241974763416, -0.8550503583141718 2.3492315519647713 C-0.991030284286284 2.299738906453201, -1.124680222349637 2.2374169168223177, -1.2499999999999996 2.165063509461097 C-1.375319777650362 2.092710102099876, -1.4961171729167733 2.008126855338237, -1.6069690242163475 1.9151111077974459 C-1.7178208755159217 1.8220953602566548, -1.822095360256653 1.7178208755159234, -1.9151111077974443 1.6069690242163495 C-2.0081268553382357 1.4961171729167755, -2.0927101020998746 1.3753197776503645, -2.1650635094610955 1.250000000000002 C-2.2374169168223164 1.1246802223496395, -2.2997389064531992 0.9910302842862865, -2.34923155196477 0.8550503583141743 C-2.3987241974763407 0.7190704323420621, -2.436891307857981 0.5766288372196907, -2.4620193825305194 0.434120444167329 C-2.487147457203058 0.29161205111496724, -2.5 0.14470681472244545, -2.5 3.636830773662308e-15 C-2.5 -0.14470681472243818, -2.4871474572030587 -0.2916120511149599, -2.4620193825305208 -0.4341204441673218 C-2.436891307857983 -0.5766288372196837, -2.398724197476343 -0.7190704323420553, -2.3492315519647726 -0.8550503583141675 C-2.2997389064532023 -0.9910302842862798, -2.23741691682232 -1.1246802223496328, -2.165063509461099 -1.2499999999999956 C-2.092710102099878 -1.3753197776503583, -2.00812685533824 -1.4961171729167695, -1.9151111077974488 -1.606969024216344 C-1.8220953602566576 -1.7178208755159183, -1.7178208755159263 -1.82209536025665, -1.6069690242163523 -1.9151111077974416 C-1.4961171729167784 -2.0081268553382334, -1.3753197776503672 -2.0927101020998724, -1.2500000000000047 -2.1650635094610937 C-1.1246802223496422 -2.237416916822315, -0.9910302842862897 -2.299738906453198, -0.8550503583141776 -2.3492315519647686 C-0.7190704323420656 -2.3987241974763394, -0.5766288372196942 -2.4368913078579806, -0.43412044416733236 -2.462019382530519 C-0.29161205111497057 -2.4871474572030574, -0.1447068147224489 -2.4999999999999996, -7.120580697431198e-15 -2.5 C0.14470681472243463 -2.5000000000000004, 0.29161205111495647 -2.487147457203059, 0.4341204441673183 -2.4620193825305217 C0.5766288372196802 -2.436891307857984, 0.7190704323420518 -2.3987241974763442, 0.8550503583141642 -2.349231551964774 C0.9910302842862766 -2.2997389064532037, 1.1246802223496295 -2.2374169168223212, 1.2499999999999925 -2.165063509461101 C1.3753197776503554 -2.0927101020998804, 1.4961171729167668 -2.008126855338242, 1.6069690242163412 -1.915111107797451 C1.7178208755159157 -1.82209536025666, 1.8220953602566472 -1.7178208755159294, 1.915111107797439 -1.6069690242163557 C2.0081268553382308 -1.496117172916782, 2.09271010209987 -1.3753197776503712, 2.1650635094610915 -1.2500000000000089 C2.237416916822313 -1.1246802223496466, 2.299738906453196 -0.9910302842862939, 2.3492315519647673 -0.855050358314182 C2.3987241974763385 -0.71907043234207, 2.4368913078579792 -0.5766288372196986, 2.462019382530518 -0.4341204441673369 C2.487147457203057 -0.29161205111497523, 2.4936698970884197 -0.07235340736123454, 2.5 -1.1714553645825241e-14 C2.5063301029115803 0.07235340736121111, 2.50633010291158 -0.07235340736122292, 2.5 0" stroke="#637983" stroke-width="2px" fill="none" stroke-dasharray="0px, 0px" />
+            </g>
+          </g>
+        </g>
+        <g class="label edgeLabel" id="STOPPED---STOPPED---1" transform="translate(470.82421875, 742)">
+          <rect width="0.1" height="0.1" rx="0" ry="0" fill="#ffffff" stroke="none" stroke-width="1px" opacity="0.5" />
+          <g class="label" transform="translate(0, 0)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="none" stroke-width="1px" opacity="0.5" />
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="label edgeLabel" id="STOPPED---STOPPED---2" transform="translate(415.65234375, 867)">
+          <rect width="0.1" height="0.1" rx="0" ry="0" fill="#ffffff" stroke="none" stroke-width="1px" opacity="0.5" />
+          <g class="label" transform="translate(0, 0)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="none" stroke-width="1px" opacity="0.5" />
+            <g class="svg-label" />
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <defs>
+    <filter id="picoos-diagram-18-drop-shadow" height="130%" width="130%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <defs>
+    <filter id="picoos-diagram-18-drop-shadow-small" height="150%" width="150%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <linearGradient id="picoos-diagram-18-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#637983" stop-opacity="1" />
+    <stop offset="100%" stop-color="#637983" stop-opacity="1" />
+  </linearGradient>
+</svg>

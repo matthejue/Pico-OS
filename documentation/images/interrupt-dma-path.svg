@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="picoos-diagram-14" width="1392.796875" class="flowchart" viewBox="0 0 1392.796875 266.953125" role="img" height="266.953125" aria-labelledby="interrupt-dma-path-title" preserveAspectRatio="xMidYMid meet">
+  <title id="interrupt-dma-path-title">2.7 DMA completion interrupt path</title>
+  <rect x="0" y="0" width="1392.796875" height="266.953125" fill="#ffffff" />
+  <g>
+    <marker id="picoos-diagram-14_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto">
+      <path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto">
+      <polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" />
+    </marker>
+    <marker id="picoos-diagram-14_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <g class="root">
+      <g class="clusters" />
+      <g class="edgePaths">
+        <path d="M184.578,133.477L188.745,133.477C192.911,133.477,201.245,133.477,208.911,133.477C216.578,133.477,223.578,133.477,227.078,133.477L230.578,133.477" id="picoos-diagram-14-L_ENTRY_HANDLE_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-14_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M552.781,133.477L556.948,133.477C561.115,133.477,569.448,133.477,577.115,133.477C584.781,133.477,591.781,133.477,595.281,133.477L598.781,133.477" id="picoos-diagram-14-L_HANDLE_QUEUE_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-14_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M830.435,156.776L840.448,159.06C850.462,161.343,870.489,165.91,885.966,168.193C901.443,170.477,912.37,170.477,917.833,170.477L923.297,170.477" id="picoos-diagram-14-L_QUEUE_WAKE_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-14_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M830.435,110.177L840.448,107.894C850.462,105.61,870.489,101.043,901.35,98.76C932.211,96.477,973.906,96.477,1013.638,96.477C1053.37,96.477,1091.138,96.477,1113.544,97.404C1135.95,98.332,1142.994,100.188,1146.516,101.116L1150.038,102.044" id="picoos-diagram-14-L_QUEUE_RETURN_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-14_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1103.906,170.477L1108.073,170.477C1112.24,170.477,1120.573,170.477,1128.262,169.549C1135.95,168.621,1142.994,166.765,1146.516,165.837L1150.038,164.909" id="picoos-diagram-14-L_WAKE_RETURN_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-14_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+      </g>
+      <g class="edgeLabels">
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(890.515625, 170.4765625)">
+          <g class="label" transform="translate(-11.78125, -12)">
+            <g class="svg-label">
+              <rect x="0" y="0" width="23.5625" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0" y="0" width="23.5625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0" y="0" width="23.5625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">yes</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(1015.6015625, 96.4765625)">
+          <g class="label" transform="translate(-9.078125, -12)">
+            <g class="svg-label">
+              <rect x="0" y="0" width="18.15625" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0" y="0" width="18.15625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0" y="0" width="18.15625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">no</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+      </g>
+      <g class="nodes">
+        <a xlink:href="../../interrupt_service_routines/os_isrs.picoc#L223" transform="translate(96.2890625, 133.4765625)" href="../../interrupt_service_routines/os_isrs.picoc#L223">
+          <g class="node default clickable " id="picoos-diagram-14-flowchart-ENTRY-0">
+            <rect class="basic label-container" x="-88.2890625" y="-39" width="176.578125" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+            <g class="label" transform="translate(-58.2890625, -24)">
+              <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="svg-label">
+                <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" font-weight="700" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">dma_interrupt()</text><text x="13.375" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Save context</text></g>
+            </g>
+          </g>
+        </a>
+        <a xlink:href="../../kernel/dma.picoc#L40" transform="translate(393.6796875, 133.4765625)" href="../../kernel/dma.picoc#L40">
+          <g class="node default clickable " id="picoos-diagram-14-flowchart-HANDLE-1">
+            <rect class="basic label-container" x="-159.1015625" y="-39" width="318.203125" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+            <g class="label" transform="translate(-129.1015625, -24)">
+              <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="svg-label">
+                <text x="41.84375" y="18" font-family="Cantarell, sans-serif" font-size="16px" font-weight="700" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">handle_dma_interrupt()</text><text x="0" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">wakeup_wait_queue(&amp;dma_waiters)</text></g>
+            </g>
+          </g>
+        </a>
+        <a xlink:href="../../kernel/dma.picoc#L6" transform="translate(728.2578125, 133.4765625)" href="../../kernel/dma.picoc#L6">
+          <g class="node default clickable " id="picoos-diagram-14-flowchart-QUEUE-3">
+            <polygon points="125.4765625,0 250.953125,-125.4765625 125.4765625,-250.953125 0,-125.4765625" class="label-container" transform="translate(-124.9765625, 125.4765625)" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+            <g class="label" transform="translate(-98.4765625, -12)">
+              <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="svg-label">
+                <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">dma_waiters.head != NULL?</text></g>
+            </g>
+          </g>
+        </a>
+        <a xlink:href="../../kernel/process/process.picoc#L395" transform="translate(1015.6015625, 170.4765625)" href="../../kernel/process/process.picoc#L395">
+          <g class="node default clickable " id="picoos-diagram-14-flowchart-WAKE-5">
+            <rect class="basic label-container" x="-88.3046875" y="-27" width="176.609375" height="54" rx="0" ry="0" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+            <g class="label" transform="translate(-58.3046875, -12)">
+              <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="svg-label">
+                <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Wake FIFO head</text></g>
+            </g>
+          </g>
+        </a>
+        <a xlink:href="../../interrupt_service_routines/os_isrs.picoc#L246" transform="translate(1269.3515625, 133.4765625)" href="../../interrupt_service_routines/os_isrs.picoc#L246">
+          <g class="node default clickable " id="picoos-diagram-14-flowchart-RETURN-7">
+            <rect class="basic label-container" x="-115.4453125" y="-39" width="230.890625" height="78" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+            <g class="label" transform="translate(-85.4453125, -24)">
+              <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="svg-label">
+                <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" font-weight="700" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">dma_interrupt_return()</text><text x="73.8125" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">RTI</text></g>
+            </g>
+          </g>
+        </a>
+      </g>
+    </g>
+  </g>
+  <defs>
+    <filter id="picoos-diagram-14-drop-shadow" height="130%" width="130%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <defs>
+    <filter id="picoos-diagram-14-drop-shadow-small" height="150%" width="150%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <linearGradient id="picoos-diagram-14-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#637983" stop-opacity="1" />
+    <stop offset="100%" stop-color="#637983" stop-opacity="1" />
+  </linearGradient>
+</svg>

@@ -1,0 +1,243 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-17" width="2187.796875" class="flowchart" viewBox="0 0 2187.796875 484.50390625" role="img" height="484.50390625" aria-labelledby="heap-reallocation-decisions-title" preserveAspectRatio="xMidYMid meet">
+  <title id="heap-reallocation-decisions-title">3.6.2 Reallocation decisions</title>
+  <rect x="0" y="0" width="2187.796875" height="484.50390625" fill="#ffffff" />
+  <g>
+    <marker id="picoos-diagram-17_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto">
+      <path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto">
+      <polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" />
+    </marker>
+    <marker id="picoos-diagram-17_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <g class="root">
+      <g class="clusters" />
+      <g class="edgePaths">
+        <path d="M234.734,208.168L238.901,208.168C243.068,208.168,251.401,208.168,259.068,208.168C266.734,208.168,273.734,208.168,277.234,208.168L280.734,208.168" id="picoos-diagram-17-L_R_FIT_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M496.003,141.436L513.048,125.697C530.093,109.957,564.183,78.479,612.318,62.739C660.453,47,722.633,47,785.152,47C847.672,47,910.531,47,949.311,47C988.091,47,1002.792,47,1010.142,47L1017.492,47" id="picoos-diagram-17-L_FIT_SHRINK_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1260.445,47L1266.366,47C1272.286,47,1284.128,47,1303.303,53.86C1322.479,60.72,1348.989,74.441,1362.244,81.301L1375.498,88.161" id="picoos-diagram-17-L_SHRINK_SAME_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M512.427,258.475L526.735,266.591C541.043,274.706,569.658,290.937,589.222,299.053C608.786,307.168,619.299,307.168,624.556,307.168L629.813,307.168" id="picoos-diagram-17-L_FIT_NEXT_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M886.602,257.958L901.067,250.965C915.532,243.972,944.461,229.986,964.522,222.993C984.583,216,995.776,216,1001.372,216L1006.969,216" id="picoos-diagram-17-L_NEXT_GROW_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1270.969,216L1275.135,216C1279.302,216,1287.635,216,1307.658,204.394C1327.681,192.788,1359.393,169.575,1375.249,157.969L1391.105,146.363" id="picoos-diagram-17-L_GROW_SAME_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M897.551,345.429L910.191,349.719C922.831,354.009,948.111,362.588,973.08,366.878C998.049,371.168,1022.708,371.168,1035.038,371.168L1047.367,371.168" id="picoos-diagram-17-L_NEXT_ALLOC_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1230.57,371.168L1241.47,371.168C1252.37,371.168,1274.169,371.168,1289.388,371.168C1304.607,371.168,1313.245,371.168,1317.564,371.168L1321.883,371.168" id="picoos-diagram-17-L_ALLOC_OK_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1504.729,339.343L1517.116,333.98C1529.502,328.618,1554.274,317.893,1572.257,312.53C1590.24,307.168,1601.432,307.168,1607.029,307.168L1612.625,307.168" id="picoos-diagram-17-L_OK_KEEP_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1504.729,402.993L1517.116,408.356C1529.502,413.718,1554.274,424.443,1573.517,429.806C1592.76,435.168,1606.474,435.168,1613.331,435.168L1620.188,435.168" id="picoos-diagram-17-L_OK_COPY_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+        <path d="M1865.891,435.168L1871.318,435.168C1876.745,435.168,1887.599,435.168,1896.526,435.168C1905.453,435.168,1912.453,435.168,1915.953,435.168L1919.453,435.168" id="picoos-diagram-17-L_COPY_NEW_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-17_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+      </g>
+      <g class="edgeLabels">
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(784.8125, 47)">
+          <g class="label" transform="translate(-12.578125, -12)">
+            <g class="svg-label">
+              <rect x="-0.000029898526236138423" y="-1.046310629249092e-7" width="25.156269713697952" height="23.999998947322922" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000029898526236138423" y="-1.046310629249092e-7" width="25.156269713697952" height="23.999998947322922" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.000029898526236138423" y="-1.046310629249092e-7" width="25.156269713697952" height="23.999998947322922" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.000029898526236138423" y="17.999977171175004" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Yes</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(598.2734375, 307.16796875)">
+          <g class="label" transform="translate(-10.5390625, -12)">
+            <g class="svg-label">
+              <rect x="0.000008473332513858622" y="-6.175754379000864e-7" width="21.0781118340783" height="24.000010391506976" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000008473332513858622" y="-6.175754379000864e-7" width="21.0781118340783" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000008473332513858622" y="-6.175754379000864e-7" width="21.0781118340783" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000008473332513858622" y="17.999961399318522" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">No</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(973.390625, 216)">
+          <g class="label" transform="translate(-12.578125, -12)">
+            <g class="svg-label">
+              <rect x="0.000025644883180575562" y="-0.0000032256631072868913" width="25.156208678049666" height="24.000010391506976" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000025644883180575562" y="-0.0000032256631072868913" width="25.156208678049666" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000025644883180575562" y="-0.0000032256631072868913" width="25.156208678049666" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000025644883180575562" y="17.999974050142953" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Yes</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(973.390625, 371.16796875)">
+          <g class="label" transform="translate(-10.5390625, -12)">
+            <g class="svg-label">
+              <rect x="-0.00001895095533654967" y="-0.0000034247143503307598" width="21.078172869726586" height="24.000010391507033" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.00001895095533654967" y="-0.0000034247143503307598" width="21.078172869726586" height="24.000010391507033" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="-0.00001895095533654967" y="-0.0000034247143503307598" width="21.078172869726586" height="24.000010391507033" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="-0.00001895095533654967" y="17.99998911000381" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">No</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(1579.046875, 307.16796875)">
+          <g class="label" transform="translate(-10.5390625, -12)">
+            <g class="svg-label">
+              <rect x="0.00004229727687743434" y="-6.175754379000864e-7" width="21.078050798429786" height="24.000010391506976" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.00004229727687743434" y="-6.175754379000864e-7" width="21.078050798429786" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.00004229727687743434" y="-6.175754379000864e-7" width="21.078050798429786" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.00004229727687743434" y="17.999961399318522" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">No</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel" transform="translate(1579.046875, 435.16796875)">
+          <g class="label" transform="translate(-12.578125, -12)">
+            <g class="svg-label">
+              <rect x="0.000025857466653178562" y="-0.000006231853205918014" width="25.15620867804978" height="24.000010391506976" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000025857466653178562" y="-0.000006231853205918014" width="25.15620867804978" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <rect x="0.000025857466653178562" y="-0.000006231853205918014" width="25.15620867804978" height="24.000010391506976" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+              <text x="0.000025857466653178562" y="17.999986302864954" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Yes</text></g>
+          </g>
+        </g>
+        <g class="edgeLabel">
+          <g class="label" transform="translate(0, 0)">
+            <g class="svg-label" />
+          </g>
+        </g>
+      </g>
+      <g class="nodes">
+        <g class="node default  " id="picoos-diagram-17-flowchart-R-0" transform="translate(121.3671875, 208.16796875)">
+          <rect class="basic label-container" x="-113.3671875" y="-27" width="226.734375" height="54" rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1.5px" />
+          <g class="label" transform="translate(-83.3671875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.0000013598963164440647" y="17.999971940544498" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Resize an existing block</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-FIT-1" transform="translate(423.734375, 208.16796875)">
+          <polygon points="139,0 278,-139 139,-278 0,-139" class="label-container" transform="translate(-138.5, 139)" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-100, -24)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="21.375005465665993" y="17.99998200370308" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Current payload large </text><text x="69.76562388024462" y="41.999977136297986" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">enough?</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-SHRINK-3" transform="translate(1140.96875, 47)">
+          <rect class="basic label-container" x="-119.4765625" y="-39" width="238.953125" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-89.4765625, -24)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="29.64064414926861" y="17.999975790149534" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_split_block</text><text x="0.000024316234657817404" y="41.999974737472456" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_merge_free_blocks</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-SAME-5" transform="translate(1431.21875, 117)">
+          <rect class="basic label-container" x="-110.25" y="-27" width="220.5" height="54" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+          <g class="label" transform="translate(-80.25, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="-0.000002599230128907948" y="17.99997696191288" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Return original pointer</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-NEXT-7" transform="translate(784.8125, 307.16796875)">
+          <polygon points="151,0 302,-151 151,-302 0,-151" class="label-container" transform="translate(-150.5, 151)" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-100, -36)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="6.062485538892247" y="17.99998152563569" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Immediate next block free </text><text x="25.968773960452268" y="41.99996139931852" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">and combined space </text><text x="69.76563585604208" y="65.9999717908255" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">enough?</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-GROW-9" transform="translate(1140.96875, 216)">
+          <rect class="basic label-container" x="-130" y="-51" width="260" height="102" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-100, -36)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="14.312554865306538" y="17.99997891754805" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Absorb next header and </text><text x="72.07815731174537" y="41.99997405014295" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">payload</text><text x="40.17189421225612" y="65.99996918273786" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_split_block</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-ALLOC-13" transform="translate(1140.96875, 371.16796875)">
+          <rect class="basic label-container" x="-89.6015625" y="-27" width="179.203125" height="54" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-59.6015625, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.000021038901650172193" y="17.99998911000381" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_alloc_from</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-OK-15" transform="translate(1431.21875, 371.16796875)">
+          <polygon points="105.3359375,0 210.671875,-105.3359375 105.3359375,-210.671875 0,-105.3359375" class="label-container" transform="translate(-104.8359375, 105.3359375)" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+          <g class="label" transform="translate(-78.3359375, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="0.000012832775382776163" y="17.99998911000381" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Allocation succeeded?</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-KEEP-17" transform="translate(1745.0390625, 307.16796875)">
+          <rect class="basic label-container" x="-128.4140625" y="-39" width="256.828125" height="78" rx="0" ry="0" fill="#f4d5d2" stroke="#d9534f" stroke-width="1.5px" />
+          <g class="label" transform="translate(-98.4140625, -24)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="53.093751535326874" y="17.999986721389178" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Return NULL</text><text x="-0.00006031571774656186" y="41.99996659507201" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Old block remains allocated</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-COPY-19" transform="translate(1745.0390625, 435.16796875)">
+          <rect class="basic label-container" x="-120.8515625" y="-39" width="241.703125" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+          <g class="label" transform="translate(-90.8515625, -24)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="32.62501955081575" y="17.999981107111466" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_copy_cells</text><text x="6.564507657458307e-7" y="41.9999609807943" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">heap_free_from old block</text></g>
+          </g>
+        </g>
+        <g class="node default  " id="picoos-diagram-17-flowchart-NEW-21" transform="translate(2051.625, 435.16796875)">
+          <rect class="basic label-container" x="-128.171875" y="-27" width="256.34375" height="54" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+          <g class="label" transform="translate(-98.171875, -12)">
+            <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+            <g class="svg-label">
+              <text x="-0.000027959683848166605" y="17.999986302864954" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Return replacement pointer</text></g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <defs>
+    <filter id="picoos-diagram-17-drop-shadow" height="130%" width="130%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <defs>
+    <filter id="picoos-diagram-17-drop-shadow-small" height="150%" width="150%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <linearGradient id="picoos-diagram-17-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#637983" stop-opacity="1" />
+    <stop offset="100%" stop-color="#637983" stop-opacity="1" />
+  </linearGradient>
+</svg>

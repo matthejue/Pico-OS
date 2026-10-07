@@ -21,6 +21,15 @@ FREE = "#e7f3ea"
 AMBER = "#805916"
 FOCUS_FILL = "#fff1d6"
 
+# Storage-domain colors used throughout the Section 11 startup diagrams.
+STARTUP_MEMORY_COLORS = {
+    "eprom": FOCUS_FILL,
+    "periphery": PANEL,
+    "kernel_sram": FREE,
+    "process_shared_sram": ALLOCATED,
+}
+STARTUP_MEMORY_OPACITY = 0.3
+
 # Ordinary outlines and headers stay neutral. Amber denotes an existing focus,
 # a changed block/field or a waiting state, never a routine container. Teal
 # denotes stored references/allocated data, green addresses/active or free

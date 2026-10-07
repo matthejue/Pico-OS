@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="picoos-diagram-8" width="1790.421875" class="flowchart" viewBox="0 0 1790.421875 253.5" role="img" height="253.5" aria-labelledby="uart-emulated-host-service-title" preserveAspectRatio="xMidYMid meet">
+  <title id="uart-emulated-host-service-title">1.2.3 UART host-service protocol</title>
+  <rect x="0" y="0" width="1790.421875" height="253.5" fill="#ffffff" />
+  <g>
+    <marker id="picoos-diagram-8_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-pointEnd-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="11.5" refY="7" markerUnits="userSpaceOnUse" markerWidth="10.5" markerHeight="14" orient="auto">
+      <path d="M 0 0 L 11.5 7 L 0 14 z" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-pointStart-margin" class="marker flowchart-v2" viewBox="0 0 11.5 14" refX="1" refY="7" markerUnits="userSpaceOnUse" markerWidth="11.5" markerHeight="14" orient="auto">
+      <polygon points="0,7 11.5,14 11.5,0" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="1px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-circleEnd-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refY="5" refX="12.25" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-circleStart-margin" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-2" refY="5" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" orient="auto">
+      <circle cx="5" cy="5" r="5" class="arrowMarkerPath" fill="#637983" stroke="#637983" stroke-width="0px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-crossEnd-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="17.7" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" />
+    </marker>
+    <marker id="picoos-diagram-8_flowchart-v2-crossStart-margin" class="marker cross flowchart-v2" viewBox="0 0 15 15" refX="-3.5" refY="7.5" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" orient="auto">
+      <path d="M 1,1 L 14,14 M 1,14 L 14,1" class="arrowMarkerPath" fill="#167b84" stroke="#167b84" stroke-width="2.5px" stroke-dasharray="1px, 0px" />
+    </marker>
+    <g class="root">
+      <g class="clusters" />
+      <g class="edgePaths" />
+      <g class="edgeLabels" />
+      <g class="nodes">
+        <g class="root" transform="translate(0, 0)">
+          <g class="clusters">
+            <g class="cluster " id="picoos-diagram-8-HOST">
+              <rect x="8" y="8" width="1774.421875" height="237.5" rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+              <g class="cluster-label " transform="translate(814.9296875, 8)">
+                <g class="svg-label">
+                  <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Host operating system</text></g>
+              </g>
+            </g>
+          </g>
+          <g class="edgePaths">
+            <path d="M1211.321,82L1235.82,79.5C1260.318,77,1309.315,72,1358.617,69.5C1407.919,67,1457.526,67,1482.329,67L1507.133,67" id="picoos-diagram-8-L_SERVICE_TERMINAL_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-8_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+            <path d="M1223.313,143.441L1245.813,143.535C1268.313,143.628,1313.313,143.814,1357.65,146.24C1401.987,148.666,1445.661,153.333,1467.498,155.666L1489.335,157.999" id="picoos-diagram-8-L_SERVICE_FILES_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-8_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+            <path d="M1493.313,185.576L1470.813,187.98C1448.313,190.384,1403.313,195.192,1358.977,195.819C1314.641,196.447,1270.97,192.894,1249.135,191.117L1227.299,189.341" id="picoos-diagram-8-L_FILES_SERVICE_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-end="url(#picoos-diagram-8_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+          </g>
+          <g class="edgeLabels">
+            <g class="edgeLabel" transform="translate(1358.3125, 67)">
+              <g class="label" transform="translate(-72.6953125, -12)">
+                <g class="svg-label">
+                  <rect x="0" y="0" width="145.390625" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="145.390625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="145.390625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">normal UART output</text></g>
+              </g>
+            </g>
+            <g class="edgeLabel" transform="translate(1358.3125, 144)">
+              <g class="label" transform="translate(-100, -24)">
+                <g class="svg-label">
+                  <rect x="0" y="0" width="200" height="48" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="200" height="48" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="200" height="48" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <text x="21.34375" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">sandboxed filesystem </text><text x="65.625" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">operation</text></g>
+              </g>
+            </g>
+            <g class="edgeLabel" transform="translate(1358.47275, 199.98288)">
+              <g class="label" transform="translate(-47.2421875, -12)">
+                <g class="svg-label">
+                  <rect x="0" y="0" width="94.484375" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="94.484375" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <rect x="0" y="0" width="94.484375" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                  <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">data or result</text></g>
+              </g>
+            </g>
+          </g>
+          <g class="nodes">
+            <g class="root" transform="translate(35, 74)">
+              <g class="clusters">
+                <g class="cluster " id="picoos-diagram-8-EMU">
+                  <rect x="8" y="8" width="1180.3125" height="118" rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                  <g class="cluster-label " transform="translate(545.4765625, 8)">
+                    <g class="svg-label">
+                      <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">RETI-Emulator</text></g>
+                  </g>
+                </g>
+              </g>
+              <g class="edgePaths">
+                <path d="M223.156,67L245.59,67C268.023,67,312.891,67,357.758,67C402.625,67,447.492,67,469.926,67L492.359,67" id="picoos-diagram-8-L_GUEST_UART_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-start="url(#picoos-diagram-8_flowchart-v2-pointStart)" marker-end="url(#picoos-diagram-8_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+                <path d="M672.047,67L694.414,67C716.781,67,761.516,67,806.25,67C850.984,67,895.719,67,918.086,67L940.453,67" id="picoos-diagram-8-L_UART_SERVICE_0" class=" edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" marker-start="url(#picoos-diagram-8_flowchart-v2-pointStart)" marker-end="url(#picoos-diagram-8_flowchart-v2-pointEnd)" fill="none" stroke="#167b84" stroke-width="1px" stroke-dasharray="0px" />
+              </g>
+              <g class="edgeLabels">
+                <g class="edgeLabel" transform="translate(357.7578125, 67)">
+                  <g class="label" transform="translate(-91.1015625, -12)">
+                    <g class="svg-label">
+                      <rect x="0" y="0" width="182.203125" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <rect x="0" y="0" width="182.203125" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <rect x="0" y="0" width="182.203125" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">UART send / receive bytes</text></g>
+                  </g>
+                </g>
+                <g class="edgeLabel" transform="translate(806.25, 67)">
+                  <g class="label" transform="translate(-90.703125, -12)">
+                    <g class="svg-label">
+                      <rect x="0" y="0" width="181.40625" height="24" class="svg-label-background" fill="rgba(255, 255, 255, 0.5)" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <rect x="0" y="0" width="181.40625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <rect x="0" y="0" width="181.40625" height="24" class="svg-label-background" fill="#ffffff" stroke="none" stroke-width="1px" rx="0" ry="0" />
+                      <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">host requests / responses</text></g>
+                  </g>
+                </g>
+              </g>
+              <g class="nodes">
+                <g class="node default  " id="picoos-diagram-8-flowchart-GUEST-0" transform="translate(137.328125, 67)">
+                  <rect class="basic label-container" x="-81.828125" y="-39" width="163.65625" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+                  <g class="label" transform="translate(-51.828125, -24)">
+                    <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                    <g class="svg-label">
+                      <text x="15.53125" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">PicoOS on</text><text x="0" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">emulated RETI</text></g>
+                  </g>
+                </g>
+                <g class="node default  " id="picoos-diagram-8-flowchart-UART-1" transform="translate(582.203125, 67)">
+                  <rect class="basic label-container" x="-85.84375" y="-39" width="171.6875" height="78" rx="0" ry="0" fill="#fff1d6" stroke="#c8861a" stroke-width="1.5px" />
+                  <g class="label" transform="translate(-55.84375, -24)">
+                    <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                    <g class="svg-label">
+                      <text x="0" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Emulated UART</text><text x="20.90625" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">controller</text></g>
+                  </g>
+                </g>
+                <g class="node default  " id="picoos-diagram-8-flowchart-SERVICE-2" transform="translate(1042.6328125, 67)">
+                  <rect class="basic label-container" x="-98.1796875" y="-39" width="196.359375" height="78" rx="0" ry="0" fill="#eaf5f5" stroke="#078b98" stroke-width="1.5px" />
+                  <g class="label" transform="translate(-68.1796875, -24)">
+                    <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                    <g class="svg-label">
+                      <text x="41.6875" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Built-in</text><text x="0" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">host-service parser</text></g>
+                  </g>
+                </g>
+              </g>
+            </g>
+            <g class="node default  " id="picoos-diagram-8-flowchart-TERMINAL-8" transform="translate(1620.3671875, 67)">
+              <rect class="basic label-container" x="-109.234375" y="-39" width="218.46875" height="78" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+              <g class="label" transform="translate(-79.234375, -24)">
+                <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                <g class="svg-label">
+                  <text x="30.515625" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Host terminal</text><text x="0" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">launches the emulator</text></g>
+              </g>
+            </g>
+            <g class="node default  " id="picoos-diagram-8-flowchart-FILES-10" transform="translate(1620.3671875, 172)">
+              <rect class="basic label-container" x="-127.0546875" y="-39" width="254.109375" height="78" rx="0" ry="0" fill="#e7f3ea" stroke="#2f8f61" stroke-width="1.5px" />
+              <g class="label" transform="translate(-97.0546875, -24)">
+                <rect rx="0" ry="0" fill="#f4f8f8" stroke="#637983" stroke-width="1px" />
+                <g class="svg-label">
+                  <text x="2" y="18" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Sandboxed host filesystem</text><text x="0" y="42" font-family="Cantarell, sans-serif" font-size="16px" fill="#17313a" xml:space="preserve" stroke="none" stroke-width="1px">Launch directory = PicoOS /</text></g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <defs>
+    <filter id="picoos-diagram-8-drop-shadow" height="130%" width="130%">
+      <feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <defs>
+    <filter id="picoos-diagram-8-drop-shadow-small" height="150%" width="150%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000" />
+    </filter>
+  </defs>
+  <linearGradient id="picoos-diagram-8-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#637983" stop-opacity="1" />
+    <stop offset="100%" stop-color="#637983" stop-opacity="1" />
+  </linearGradient>
+</svg>

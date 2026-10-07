@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="720" viewBox="0 0 1360 720" role="img" aria-labelledby="title desc">
+<title id="title">Mutex acquisition and unlock</title>
+<desc id="desc">Two horizontal flows show separate mutex_lock and mutex_unlock calls. Above, testset atomically sets the lock. False acquires it, while true sleeps on mutex.waiters. The waiting process resumes when scheduled and retries. Below, unlock clears the lock and checks mutex.waiters.head. An empty queue wakes nobody. Otherwise, the first PCB is removed and that process is woken. The dotted arrow connects wakeup to the waiting process above. Both unlock paths return.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#167b84"/></marker></defs>
+<rect width="1360" height="720" fill="#ffffff"/>
+<g font-family="Cantarell, sans-serif" fill="#17313a" text-anchor="middle">
+<path id="lock-test" d="M 310 160 H 355" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="acquired" d="M 605 160 H 650 V 100 H 700" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="contended" d="M 605 160 H 650 V 250 H 700" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="resume" d="M 960 250 H 1050" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="retry" d="M 1140 298 V 340 H 180 V 208" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="unlock-check" d="M 310 520 H 355" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="empty" d="M 605 520 H 650 V 460 H 700" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="wake" d="M 605 520 H 650 V 610 H 1050" fill="none" stroke="#167b84" stroke-width="2" marker-end="url(#arrow)"/>
+<path id="wake-resume" d="M 1210 546 V 298" fill="none" stroke="#167b84" stroke-width="2" stroke-dasharray="4 7" marker-end="url(#arrow)"/>
+<text x="675" y="87" font-size="19" fill="#167b84">false</text>
+<text x="675" y="237" font-size="19" fill="#167b84">true</text>
+<text x="675" y="447" font-size="19" fill="#167b84">Yes</text>
+<text x="675" y="597" font-size="19" fill="#167b84">No</text>
+<text x="670" y="329" font-size="19" fill="#167b84">retry testset</text>
+<text x="1260" y="420" font-size="19" fill="#167b84">wakeup</text>
+<g id="lock">
+<a href="../../library/mutex/mutex.picoc#L18">
+<rect x="50" y="112.0" width="260" height="96" fill="#eaf5f5" stroke="#637983" stroke-width="1.5"/>
+<text x="180" y="153" font-size="21" fill="#17313a" font-weight="600">mutex_lock()</text>
+<text x="180" y="181" font-size="20" fill="#17313a">call testset(&amp;m-&gt;lock)</text>
+</a>
+</g>
+<g id="old-value">
+<a href="../../library/mutex/mutex.picoc#L3">
+<polygon points="355,160 480,85 605,160 480,235" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
+<text x="480" y="167" font-size="21" fill="#17313a" font-weight="600">Old lock value?</text>
+</a>
+</g>
+<g id="critical-section">
+<rect x="700" y="52.0" width="260" height="96" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
+<text x="830" y="93" font-size="21" fill="#17313a" font-weight="600">Lock acquired: 0 → 1</text>
+<text x="830" y="121" font-size="20" fill="#17313a">enter critical section</text>
+</g>
+<g id="sleep">
+<a href="../../library/unistd/blocking.picoc#L9">
+<rect x="700" y="202.0" width="260" height="96" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
+<text x="830" y="243" font-size="21" fill="#17313a" font-weight="600">sleep(&amp;m-&gt;waiters)</text>
+<text x="830" y="271" font-size="20" fill="#17313a">wait for wakeup</text>
+</a>
+</g>
+<g id="scheduled">
+<rect x="1050" y="202.0" width="260" height="96" fill="#f4f8f8" stroke="#637983" stroke-width="1.5"/>
+<text x="1180" y="243" font-size="21" fill="#17313a" font-weight="600">Waiting process resumes</text>
+<text x="1180" y="271" font-size="20" fill="#17313a">when scheduled</text>
+</g>
+<g id="unlock">
+<a href="../../library/mutex/mutex.picoc#L25">
+<rect x="50" y="472.0" width="260" height="96" fill="#eaf5f5" stroke="#637983" stroke-width="1.5"/>
+<text x="180" y="499" font-size="21" fill="#17313a" font-weight="600">mutex_unlock()</text>
+<text x="180" y="527" font-size="20" fill="#17313a">m-&gt;lock = false</text>
+<text x="180" y="555" font-size="20" fill="#17313a">wakeup(&amp;m-&gt;waiters)</text>
+</a>
+</g>
+<g id="queue-empty">
+<a href="../../common/wait_queue.header#L6">
+<polygon points="355,520 480,445 605,520 480,595" fill="#fff1d6" stroke="#637983" stroke-width="1.5"/>
+<text x="480" y="499" font-size="21" fill="#17313a" font-weight="600">Queue empty?</text>
+<text x="480" y="527" font-size="20" fill="#17313a">m-&gt;waiters.head</text>
+<text x="480" y="555" font-size="20" fill="#17313a">== NULL</text>
+</a>
+</g>
+<g id="no-waiter">
+<rect x="700" y="412.0" width="260" height="96" fill="#f4f8f8" stroke="#637983" stroke-width="1.5"/>
+<text x="830" y="453" font-size="21" fill="#17313a" font-weight="600">Wake nobody</text>
+<text x="830" y="481" font-size="20" fill="#17313a">mutex_unlock returns</text>
+</g>
+<g id="wake-waiter">
+<a href="../../kernel/process/process.picoc#L395">
+<rect x="1050" y="546.0" width="260" height="128" fill="#e7f3ea" stroke="#637983" stroke-width="1.5"/>
+<text x="1180" y="575" font-size="21" fill="#17313a" font-weight="600">Remove first PCB</text>
+<text x="1180" y="603" font-size="20" fill="#17313a">from m-&gt;waiters</text>
+<text x="1180" y="631" font-size="20" fill="#17313a">wake that process</text>
+<text x="1180" y="659" font-size="20" fill="#17313a">mutex_unlock returns</text>
+</a>
+</g>
+</g></svg>

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="420" viewBox="0 0 1800 420" role="img" aria-labelledby="title desc">
+<title id="title">Register destinations after start_loaded_kernel</title>
+<desc id="desc">Immediately after MOVE CS PC, before generated kernel startup runs. CS and PC point to kernel .text, DS to kernel .data, and SP and BAF to the highest kernel stack cell. The narrow cell at the end of the Kernel Stack marks stack_start. ACC, IN1 and IN2 retain the code, data and stack offsets, not absolute addresses. The old temporary stack is in the later Process and Shared Data Heap area. Addresses increase from left to right. SRAM labels are cell offsets. Memory widths are illustrative.</desc>
+<defs><marker id="address" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#25734f"/></marker></defs>
+<rect width="1800" height="420" fill="white"/>
+<g font-family="Cantarell, sans-serif" fill="#17313a">
+<rect x="32" y="144" width="500" height="198" fill="#fff1d6" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="532" y="144" width="160" height="198" fill="#f4f8f8" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="692" y="144" width="818" height="198" fill="#e7f3ea" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="1510" y="144" width="258" height="198" fill="#d8efef" stroke="none" stroke-width="1.5" fill-opacity="0.3"/>
+<rect x="32" y="144" width="500" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="282.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">EPROM · 0x00000000</text>
+<rect x="532" y="144" width="160" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">Periphery</text>
+<rect x="692" y="144" width="1076" height="36" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1230.0" y="169" font-size="19" font-weight="bold" text-anchor="middle" fill="#17313a">SRAM · 0x80000000</text>
+<rect x="32" y="180" width="138" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L9"><text x="101.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">_start()</text></a>
+<a href="../../boot/bootloader.picoc#L9"><text x="101.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">offset 0</text></a>
+<rect x="170" y="180" width="212" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L41"><text x="276.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">boot_main()</text></a>
+<a href="../../boot/bootloader.picoc#L41"><text x="276.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">entry in .text</text></a>
+<path d="M 170 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="382" y="180" width="150" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.sections"><text x="457.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Bootloader data</text></a>
+<a href="../../boot/bootloader.sections"><text x="457.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">3165–3289</text></a>
+<path d="M 382 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="532" y="180" width="160" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Memory-mapped</text>
+<text x="612.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">I/O</text>
+<text x="612.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">0x40000000</text>
+<rect x="692" y="180" width="68" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/kernel.sections"><text x="726.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">.ivt</text></a>
+<a href="../../kernel/kernel.sections"><text x="726.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">0–4</text></a>
+<rect x="760" y="180" width="220" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/kernel.reti#L7"><text x="870.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">.text</text></a>
+<a href="../../kernel/kernel.reti#L7"><text x="870.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">generated _start</text></a>
+<a href="../../kernel/kernel.reti#L7"><text x="870.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">5–40754</text></a>
+<path d="M 760 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="980" y="180" width="200" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/kernel.sections"><text x="1080.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">.data</text></a>
+<a href="../../kernel/kernel.sections"><text x="1080.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">kernel globals</text></a>
+<a href="../../kernel/kernel.sections"><text x="1080.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">40755–41485</text></a>
+<path d="M 980 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1180" y="180" width="170" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/kmalloc.picoc#L7"><text x="1265.0" y="235.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Kernel Heap</text></a>
+<a href="../../kernel/kmalloc.picoc#L7"><text x="1265.0" y="259.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">41486–45581</text></a>
+<path d="M 1180 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1350" y="180" width="128" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/memory_constants.header#L8"><text x="1414.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Kernel Stack</text></a>
+<a href="../../kernel/memory_constants.header#L8"><text x="1414.0" y="247.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">grows ←</text></a>
+<a href="../../kernel/memory_constants.header#L8"><text x="1414.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">45582–48297</text></a>
+<path d="M 1350 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1478" y="180" width="32" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<path d="M 1478 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1510" y="180" width="258" height="130" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../kernel/psdmalloc.picoc#L7"><text x="1639.0" y="223.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Process and</text></a>
+<a href="../../kernel/psdmalloc.picoc#L7"><text x="1639.0" y="247.0" font-size="16" font-weight="bold" text-anchor="middle" fill="#17313a">Shared Data Heap</text></a>
+<a href="../../kernel/psdmalloc.picoc#L7"><text x="1639.0" y="271.0" font-size="16" font-weight="normal" text-anchor="middle" fill="#17313a">48298–262143</text></a>
+<path d="M 1510 180 V 310" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="32" y="310" width="350" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="207.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">.text · bootloader code</text>
+<rect x="382" y="310" width="150" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="457.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">.data</text>
+<path d="M 382 310 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="532" y="310" width="160" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="612.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a"></text>
+<rect x="692" y="310" width="488" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="936.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">Kernel Image</text>
+<rect x="1180" y="310" width="170" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1265.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">Kernel Heap</text>
+<path d="M 1180 310 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1350" y="310" width="160" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1430.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">Kernel Stack</text>
+<path d="M 1350 310 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="1510" y="310" width="258" height="32" fill="none" stroke="none" stroke-width="1.5" fill-opacity="1"/>
+<text x="1639.0" y="332" font-size="15" font-weight="bold" text-anchor="middle" fill="#17313a">Process and Shared Data Heap</text>
+<path d="M 1510 310 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<path d="M 32 180 H 1768 M 32 310 H 1768 M 532 144 V 342 M 692 144 V 342" fill="none" stroke="#637983" stroke-width="1.5" />
+<rect x="32" y="144" width="1736" height="198" fill="none" stroke="#637983" stroke-width="1.5" fill-opacity="1"/>
+<path d="M 760 28 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="774" y="48" font-size="21" font-weight="bold" text-anchor="start" fill="#25734f">CS = PC = 0x80000005</text>
+<a href="../../boot/bootloader.picoc#L42"><text x="774" y="73" font-size="17" font-weight="normal" text-anchor="start" fill="#17313a">SRAM base + code_start</text></a>
+<path d="M 980 84 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="994" y="104" font-size="21" font-weight="bold" text-anchor="start" fill="#25734f">DS = 0x80009f33</text>
+<a href="../../boot/bootloader.picoc#L43"><text x="994" y="129" font-size="17" font-weight="normal" text-anchor="start" fill="#17313a">SRAM base + data_start</text></a>
+<path d="M 1494 28 V 178" fill="none" stroke="#25734f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#address)"/>
+<text x="1480" y="48" font-size="21" font-weight="bold" text-anchor="end" fill="#25734f">SP = BAF = 0x8000bca9</text>
+<a href="../../boot/bootloader.picoc#L44"><text x="1480" y="73" font-size="17" font-weight="normal" text-anchor="end" fill="#17313a">SRAM base + stack_start</text></a>
+<rect x="692" y="365" width="336" height="36" fill="#f4f8f8" stroke="#637983" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L42"><text x="860" y="389" font-size="17" font-weight="normal" text-anchor="middle" fill="#637983">ACC = code_start = 5</text></a>
+<rect x="1044" y="365" width="336" height="36" fill="#f4f8f8" stroke="#637983" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L43"><text x="1212" y="389" font-size="17" font-weight="normal" text-anchor="middle" fill="#637983">IN1 = data_start = 40755</text></a>
+<rect x="1396" y="365" width="336" height="36" fill="#f4f8f8" stroke="#637983" stroke-width="1.5" fill-opacity="1"/>
+<a href="../../boot/bootloader.picoc#L44"><text x="1564" y="389" font-size="17" font-weight="normal" text-anchor="middle" fill="#637983">IN2 = stack_start = 48297</text></a>
+<text x="32" y="389" font-size="18" font-weight="normal" text-anchor="start" fill="#17313a">Offsets retained in registers:</text>
+</g></svg>

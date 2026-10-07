@@ -9,7 +9,7 @@ from html import escape
 import json
 from pathlib import Path
 
-from diagram_style import ALLOCATED, FOCUS_FILL, FONT, FREE, INK, LINE, PANEL
+from diagram_style import FONT, INK, LINE, STARTUP_MEMORY_COLORS, STARTUP_MEMORY_OPACITY
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,9 +54,11 @@ def generate():
         parts.append(element)
 
     # One continuous memory map, with one shared line at each boundary.
-    for x, width, color in ((20, 250, FOCUS_FILL), (270, 220, PANEL),
-                             (490, 790, FREE), (1280, 1160, ALLOCATED)):
-        rect(x, 14, width, 840, color, opacity=0.3)
+    for x, width, region in ((20, 250, "eprom"), (270, 220, "periphery"),
+                              (490, 790, "kernel_sram"),
+                              (1280, 1160, "process_shared_sram")):
+        rect(x, 14, width, 840, STARTUP_MEMORY_COLORS[region],
+             opacity=STARTUP_MEMORY_OPACITY)
     parts.append(f'<path d="M 20 14 H 2440 V 854 H 20 Z M 270 14 V 854 '
                  f'M 490 14 V 854 M 1280 70 V 854 M 490 70 H 2440" '
                  f'fill="none" stroke="{LINE}" stroke-width="1.5"/>')
