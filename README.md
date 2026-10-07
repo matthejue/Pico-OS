@@ -45,16 +45,6 @@ requests the kernel binary over UART, reads its header, and copies the
 payload into SRAM. [`1.1.8 Linked .sections metadata and the five-word binary header`](#118-linked-sections-metadata-and-the-five-word-binary-header) explains the binary format, and [`1.1.9 Generated memory constants for the bootloader and kernel`](#119-generated-memory-constants-for-the-bootloader-and-kernel) explains the
 generated memory headers.
 
-Each stage passes the following files or runtime requests to the next:
-
-| Producer | Contract | Consumer |
-| --- | --- | --- |
-| PicoC-Compiler | Linked [`.reti`](../PicoC-Compiler/source/passes/linking/reti_pass.py), `.sections`, generated memory headers, and `.debuginfo` | RETI-Emulator assembler/debugger and PicoOS low-level builds |
-| RETI-Emulator assembler | Five-word layout header followed by encoded RETI words in `.bin` | EPROM bootloader and kernel process loader |
-| PicoOS libraries | Syscall number plus direct value/pointer or stack-local request structure | Interrupt entry, [`handle_syscall()`](kernel/syscall.picoc#L16), and the owning kernel subsystem |
-| Kernel subsystems | PCBs, activations, queues, descriptor/shared-memory state, and periphery-register writes | Scheduler/dispatcher and emulated RETI hardware |
-| PicoOS UART host request protocol | Bounded `<ESC>...<ESC>/` requests and big-endian responses | RETI-Emulator host file services, or a companion serial host on hardware |
-
 ## Build and run
 [\[↓ TOC\]](#contents)
 
@@ -9333,10 +9323,3 @@ $ hexyl -g 4 -s 20 -n 64 binary/user/echo.bin
 
 A header value `00000020` means 32 cells. Image word 32 is at file byte
 `20 + 4 × 32 = 148`, including the header.
-
-A negative skip counts from the file end. This command displays the last
-64 bytes, following [hexyl's negative-offset examples](https://github.com/sharkdp/hexyl/releases/tag/v0.9.0) and keeping the negative value attached to its option:
-
-```console
-$ hexyl --skip=-64 -n 64 binary/user/echo.bin
-```
