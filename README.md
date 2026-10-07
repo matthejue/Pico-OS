@@ -848,6 +848,9 @@ sections:
 $ picoc_compiler -c -O1 naked-function.picoc
 ```
 
+The following is the intermediate output of the `reti_blocks` pass, saved as
+`naked-function.reti_blocks`:
+
 ```reti
   .ivt
   .text
@@ -1912,6 +1915,17 @@ PicoC return convention in [`1.1.3 System V ABI stack frames and call cleanup`](
 
 For multiple arguments, the wrapper fills a request structure on its stack
 and passes its absolute address in `IN1`. [`10.1.2 Packing arguments and executing the syscall`](#1012-packing-arguments-and-executing-the-syscall) shows this for [`waitpid()`](library/sys/wait/wait.picoc#L15).
+
+The table applies this convention to
+[`invoke_waitpid_syscall()`](library/sys/wait/wait.picoc#L5). The `BAF`
+offsets follow
+[`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup):
+
+| Register | Prepared or read by the helper | Meaning for this call |
+| --- | --- | --- |
+| `ACC` | `LOADIN BAF ACC 3` reads the first argument | [`SYSCALL_WAITPID`](common/syscall.header#L13) selects the wait branch in [`handle_syscall()`](kernel/syscall.picoc#L16) |
+| `IN1` | `LOADIN BAF IN1 4` reads the second argument | Address of the stack-local [`WaitPidRequest`](common/syscall.header#L61), containing the child PID and status destination |
+| `IN2` | After `INT 0`, `STOREIN BAF IN2 0` saves it in the helper's local [`result`](library/sys/wait/wait.picoc#L6) | Completion indication returned by the syscall. The child status is written separately through [`WaitPidRequest.status`](common/syscall.header#L63) |
 
 <!-- Presentation: Copy the waitpid code example from Section 10.1.2 directly
 into the slides here. Do not merely link to it or jump between sections. -->
@@ -4715,7 +4729,9 @@ The kernel-call argument
 [`caller_context`](kernel/dispatcher.picoc#L71) points to the free cell just
 below the saved `DS`.
 
-The lower panels connect each stack offset to the field it updates. Gray
+Dashed zoom lines connect the lower panels to the corners of the activation
+and User Process Stack regions in the SRAM overview. The panels connect
+each stack offset to the field it updates. Gray
 arrows copy the values at offsets 1 through 6. The teal address arrow shows
 why [`activation.sp`](kernel/process/process.header#L25) receives
 `caller_context + 6`, the address of the saved `ACC` cell. The saved `PC`
@@ -6235,8 +6251,6 @@ calling [`waitpid()`](library/sys/wait/wait.picoc#L15):
 The complete public header, [`library/sys/wait/wait.header`](library/sys/wait/wait.header),
 establishes the caller's view of the library:
 
-**File:** [`library/sys/wait/wait.header`](library/sys/wait/wait.header)
-
 ```c
 #pragma once
 
@@ -6252,8 +6266,6 @@ public signatures. The function implementations are supplied during linking.
 
 The library compilation unit, [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc),
 collects the implementation through a single include. Its complete contents are:
-
-**File:** [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc)
 
 ```c
 #include "wait.picoc"
@@ -6285,24 +6297,24 @@ explained in
 The syscall interface passes one value or address in `IN1`. To supply both a
 child PID and a result destination, [`waitpid()`](library/sys/wait/wait.picoc#L15)
 uses [`WaitPidRequest`](common/syscall.header#L61), defined in the shared syscall
-header:
-
-**File:** [`common/syscall.header`](common/syscall.header#L61) (excerpt)
+header [`common/syscall.header`](common/syscall.header#L61):
 
 ```c
+// ...
+
 struct WaitPidRequest {
     int pid;
     int *status;
 };
+
+// ...
 ```
 
-The complete [`wait.picoc`](library/sys/wait/wait.picoc) implementation below
+The complete [`library/sys/wait/wait.picoc`](library/sys/wait/wait.picoc) implementation below
 shows the ordinary library call, both stack-local objects, and the assembly
 that enters the kernel. It also includes
 [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L26), which inspects the returned
 integer entirely in userspace:
-
-**File:** [`library/sys/wait/wait.picoc`](library/sys/wait/wait.picoc)
 
 ```c
 #include "wait.header"
@@ -6345,15 +6357,9 @@ parent's userspace stack for the duration of the call. Neither requires heap
 allocation. The helper receives the request's absolute address as its
 second argument.
 
-The register table connects the helper's instructions to the request and
-kernel result. The `BAF` offsets follow
-[`1.1.3 System V ABI stack frames and call cleanup`](#113-system-v-abi-stack-frames-and-call-cleanup):
-
-| Register | Prepared or read by the helper | Meaning for this call |
-| --- | --- | --- |
-| `ACC` | `LOADIN BAF ACC 3` reads the first argument | [`SYSCALL_WAITPID`](common/syscall.header#L13) selects the wait branch in [`handle_syscall()`](kernel/syscall.picoc#L16) |
-| `IN1` | `LOADIN BAF IN1 4` reads the second argument | Address of the stack-local [`WaitPidRequest`](common/syscall.header#L61), containing the child PID and status destination |
-| `IN2` | After `INT 0`, `STOREIN BAF IN2 0` saves it in the helper's local [`result`](library/sys/wait/wait.picoc#L6) | Completion indication returned by the syscall. The child status is written separately through [`WaitPidRequest.status`](common/syscall.header#L63) |
+[`2.4.1 Syscall selectors and register convention`](#241-syscall-selectors-and-register-convention)
+explains how the helper's instructions pass the request and receive the
+kernel's completion indication.
 
 The wrapper retries if the helper returns zero, then returns its updated
 local [`status`](library/sys/wait/wait.picoc#L16). A normal blocking wait
@@ -8234,7 +8240,7 @@ and error behavior.
 ## 13.1 Writing a simple user application
 [\[↑ TOC\]](#contents)
 
-The complete [`add.picoc`](documentation/add.picoc) example takes two decimal
+The complete [`documentation/add.picoc`](documentation/add.picoc) example takes two decimal
 integers as command arguments, adds them, and prints the result:
 
 ```c
@@ -8257,8 +8263,9 @@ int main(int argc, char **argv) {
 [`printf()`](library/stdio/stdio.picoc#L357) prints the sum.
 Returning `0` reports success, while `1` reports the wrong argument count.
 
-From the repository root, compile the source with the two library implementations
-and the process startup code, then assemble the binary:
+From the repository root, compile [`documentation/add.picoc`](documentation/add.picoc)
+with the two library implementations and the process startup code, then
+assemble the binary:
 
 ```console
 $ mkdir -p binary/documentation
@@ -8276,7 +8283,7 @@ and passes its return value to [`exit()`](library/stdlib/exit.picoc#L4).
 The compiler also writes the `.sections` file used by `reti_emulator -a`.
 
 With PicoOS running from [`binary/`](binary/), run the example by its absolute
-PicoOS path. Loading messages are omitted:
+PicoOS path, `/documentation/add.bin`. Loading messages are omitted:
 
 ```console
 PicoOS> /documentation/add.bin 7 5

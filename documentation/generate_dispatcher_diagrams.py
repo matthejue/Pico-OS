@@ -88,9 +88,22 @@ def save_context():
                "to its named activation field in the same PCB allocation. activation.sp receives "
                "the address caller_context + 6, not the ACC value. The saved PC at offset 7 stays "
                "on the user stack. Lower panels are an assignment view with exact PCB offsets, "
-               "not the physical ordering of activation fields.",
+               "not the physical ordering of activation fields. Dashed zoom guides connect the "
+               "bottom corners of the activation and User Process Stack regions in the SRAM map "
+               "to the top corners of their respective detail panels.",
                width=2200, height=1010, show_address_direction=False)
     sram_context(f, 3, saving=True)
+
+    # Draw straight zoom guides between memory-box and detail-panel corners.
+    ax, ay, aw, ah = f.cells["activation"]
+    sx, sy, sw, sh = f.cells["ustack"]
+    f.parts.append(
+        f'<path d="M {ax} {ay + ah} L 140 608 '
+        f'M {ax + aw} {ay + ah} L 840 608 '
+        f'M {sx} {sy + sh} L 1220 560 '
+        f'M {sx + sw} {sy + sh} L 2120 560" '
+        'fill="none" stroke="#96a3ae" stroke-width="2" stroke-dasharray="5 4"/>'
+    )
 
     # Each row is one assignment. Activation is embedded, with actual offsets
     # printed explicitly rather than suggesting that these rows are its layout.

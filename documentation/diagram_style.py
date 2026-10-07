@@ -140,5 +140,9 @@ def style_svg(svg, *, name=""):
         return f'{attribute}="{replacement}"'
 
     svg = re.sub(r'\b(fill|stroke|stop-color|color)="(#[\da-fA-F]{3,8})"', paint, svg)
+    # Mermaid can copy a highlighted box's thick outline onto its label.
+    # Keep text fill-only so those outlines cannot obscure the letters.
+    svg = re.sub(r'(<(?:text|tspan)\b[^>]*\s)stroke="[^"]*"',
+                 r'\1stroke="none"', svg)
     svg = re.sub(r'\bfont-family="[^"]*"', f'font-family="{FONT}"', svg)
     return re.sub(r'\b(rx|ry)="[^"]*"', r'\1="0"', svg)

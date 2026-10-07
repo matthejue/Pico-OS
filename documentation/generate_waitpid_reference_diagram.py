@@ -66,11 +66,9 @@ def main():
         figure.box(x, 300, width, 50, MUTED)
         figure.label(x + width / 2, 334, name, size=24, bold=True)
 
-    # Guide lines connect each expanded panel to its actual SRAM region.
+    # Start at the memory cells' bottom corners, above the hierarchy bands.
     for source, detail in (("kernel_heap", "heap_detail"),
                            ("user_stack", "stack_detail")):
-        x, _, width, _ = figure.cells[source]
-        figure.cells[source] = (x, 70, width, 142)
         figure.expand(source, detail, detail)
 
     figure.row(360, 208, [
