@@ -34,6 +34,15 @@ function Link(link)
     return link
 end
 
+function Image(image)
+    -- Keep the enclosing recording link without downloading its remote preview.
+    -- An asciinema outage must not delay or prevent the release PDF build.
+    if image.src:match("^https?://asciinema%.org/a/%d+%.svg$") then
+        return pandoc.Span({pandoc.Str("Watch terminal recording")})
+    end
+    return nil
+end
+
 function CodeBlock(block)
     if not block.classes:includes("mermaid") then
         return nil
@@ -90,7 +99,7 @@ end
 
 function Pandoc(document)
     local content = pandoc.Div(document.blocks)
-    document.blocks = pandoc.walk_block(content, {Header = Header, CodeBlock = CodeBlock, Table = Table}).content
+    document.blocks = pandoc.walk_block(content, {Header = Header, Image = Image, CodeBlock = CodeBlock, Table = Table}).content
     document.blocks = pandoc.walk_block(pandoc.Div(document.blocks), {Link = Link}).content
     return document
 end

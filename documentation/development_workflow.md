@@ -25,6 +25,11 @@ embeds them into `README.pdf`. The
 list levels in the contents, and allows long code lines to wrap without
 changing the Markdown source.
 
+Ubuntu CI installs `lmodern` explicitly because the Pandoc LaTeX template
+requires it and the minimal TeX installation omits recommended packages.
+Terminal recordings appear as text links in the PDF, so exporting does not
+fetch their external preview images.
+
 ## Build and boot from source
 
 The build expects `picoc_compiler`, `reti_emulator`, and `make` on `PATH`.
