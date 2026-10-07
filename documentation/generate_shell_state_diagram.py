@@ -92,9 +92,7 @@ def main():
     figure.band("user_heap", "user_heap", 540, "User Process Heap · malloc", HEAP_EMPHASIS)
     figure.band("user_stack", "user_stack", 540, "User Process Stack · grows ←")
     figure.band("user_text", "user_stack", 570, "Process Payload A · expanded")
-    # Begin the expansion below the overview's grouping bands.
-    sx, sy, sw, _ = figure.cells["shell"]
-    figure.cells["shell"] = (sx, sy, sw, 165)
+    # Connect the payload's bottom corners to the expanded view's top corners.
     figure.expand("shell", "user_text", "user_stack")
 
     figure.label(592, 375, ".data · globals stored inline", size=17, bold=True)

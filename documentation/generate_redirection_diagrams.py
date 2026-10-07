@@ -1,12 +1,13 @@
 """Generate the five descriptor snapshots in README section 12.6.
 
-The first snapshot locates the Kernel Heap in SRAM. Later snapshots show only
-its separately allocated PCBs, tables, entry arrays and path strings.
-Teal arrows follow stored pointers. Amber call arrows identify changed objects.
-Block letters and widths are illustrative, not allocator order or addresses.
+Start with the shell alone, then show save, install, inherit and restore.
+The child first appears when run copies the shell's descriptors.
+Each descriptor gets a row and every non-NULL path gets its own allocation.
+Teal arrows follow pointers; amber call arrows identify changed objects.
 Run with Python 3 from any directory. No external packages are required.
 """
 
+from diagram_style import AMBER, FOCUS_FILL, INK
 from generate_process_diagrams import Figure
 from generate_memory_layout_diagrams import (
     ALLOCATED, FOCUS, FREE, HEADER, HEAP_EMPHASIS, MUTED, POINTER,
@@ -18,184 +19,178 @@ PCB = "kernel/process/process.header"
 BLOCK = "common/heap.header#L5"
 TERMINAL = "/device/terminal.dev"
 OUTPUT = "/output.txt"
+GROUP_HEIGHT = 510
+ROW_HEIGHT = 48
+ARRAY_X = 430
+PATH_X = 1010
+BACKUP_FILL = FOCUS_FILL
+BACKUP_INK = AMBER
 
 
-def pointer(figure, path):
+def pointer(figure, path, color=POINTER):
     figure.parts.append(
-        f'<path d="{path}" fill="none" stroke="{POINTER}" '
-        f'stroke-width="2" marker-end="url(#{POINTER[1:]})"/>'
+        f'<path d="{path}" fill="none" stroke="{color}" '
+        f'stroke-width="2" marker-end="url(#{color[1:]})"/>'
     )
 
 
-def heap_block(figure, x, y, width, height, letter, lines):
-    figure.box(x, y, 40, height, HEADER)
-    for index, value in enumerate(("Block", "Header", letter)):
-        figure.label(x + 20, y + height / 2 - 16 + index * 18,
-                     value, size=11, bold=True, link=BLOCK)
-    figure.box(x + 40, y, width, height, ALLOCATED)
+def heap_block(figure, x, y, width, height, lines):
+    """Draw an allocation header above a PCB or descriptor table."""
+    figure.box(x, y, width, 24, HEADER)
+    figure.label(x + width / 2, y + 17, "BlockHeader", size=14, link=BLOCK)
+    figure.box(x, y + 24, width, height - 24, ALLOCATED)
     for index, (value, link) in enumerate(lines):
-        figure.label(x + 40 + width / 2, y + 29 + index * 28,
-                     value, size=16, bold=index == 0, link=link)
+        figure.label(x + width / 2, y + 52 + index * 27,
+                     value, size=18, bold=index == 0, link=link)
 
 
-def call(figure, y, center, width, text, link, target=None):
-    """Separate calls that change descriptors from the teal stored pointers."""
-    figure.box(center - width / 2, y - 59, width, 30, HEAP_EMPHASIS, FOCUS)
-    figure.label(center, y - 39, text, size=16, bold=True, color=FOCUS, link=link)
-    target = center if target is None else target
-    figure.parts.append(
-        f'<path d="M {center} {y - 29} L {target} {y}" fill="none" '
-        f'stroke="{FOCUS}" stroke-width="2" marker-end="url(#{FOCUS[1:]})"/>'
-    )
-
-
-def descriptor_row(figure, y, process_number, entries, letters, changed, *,
-                   calls=(), child_state="READY", unchanged=False):
-    """Keep the eight array cells fixed across snapshots and both processes."""
-    a, b, c, *path_letters = letters
-    role = "shell" if process_number == 1 else "child"
-    figure.box(32, y - 104, 1734, 326, "none")
-    figure.label(52, y - 78,
-                 f"{role.capitalize()} · process {process_number} · own file descriptors",
-                 size=18, bold=True, anchor="start", link=f"{PCB}#L42")
+def descriptor_group(figure, top, process_number, entries, changed, *,
+                     calls=(), child_state="READY"):
+    """Show one contiguous entry array beside all its separate path allocations."""
+    role = "Shell" if process_number == 1 else "Child"
+    figure.box(32, top, 1336, GROUP_HEIGHT, "none")
     pcb_lines = [
-        (f"PCB {process_number} · {role}", f"{PCB}#L31"),
+        (f"PCB {process_number} · {role.lower()}", f"{PCB}#L31"),
         ("file_descriptors", f"{PCB}#L42"),
     ]
     if process_number == 2:
         pcb_lines.append((f"state = {child_state}", f"{PCB}#L33"))
-    heap_block(figure, 32, y, 180, 104, a, pcb_lines)
-    heap_block(figure, 288, y, 170, 104, b, (
+    heap_block(figure, 52, top + 44, 278, 138, pcb_lines)
+    heap_block(figure, 52, top + 230, 278, 104, (
         ("FileDescriptorTable", f"{FD}#L22"),
         ("entries", f"{FD}#L23"),
     ))
-    heap_block(figure, 534, y, 1192, 104, c, ())
-    figure.label(1170, y - 78, "FileDescriptor entries[0..7] · one array allocation",
-                 size=17, bold=True, link=f"{FD}#L15")
-    for center, width, text, link, *target in calls:
-        call(figure, y, center, width, text, link,
-             target=target[0] if target else None)
-    if unchanged:
-        figure.label(1170, y - 39, "Descriptors unchanged", size=16)
-    pointer(figure, f"M 244 {y + 57} H 266 V {y - 25} H 342 V {y}")
-    pointer(figure, f"M 470 {y + 57} H 510 V {y - 25} H 589 V {y}")
+    pointer(figure, f"M 308 {top + 123} H 350 V {top + 210} H 38 V {top + 282} H 52")
+    pointer(figure, f"M 308 {top + 309} H 378 V {top + 103} H {ARRAY_X}")
 
-    roles = {0: "stdin", 1: "stdout", 2: "stderr", 3: "temporary", 6: "saved stdout"}
-    kinds = {0: "STDIN", 1: "STDOUT", 2: "STDERR"}
-    # Other standard paths exist, but only the three relevant slots are expanded.
+    figure.label(680, top + 32, "entries[0..7]",
+                 size=18, bold=True, link=f"{FD}#L15")
+    figure.box(ARRAY_X, top + 44, 500, 24, HEADER)
+    figure.label(680, top + 61, "BlockHeader", size=14, link=BLOCK)
+    figure.box(ARRAY_X, top + 68, 500, 28, MUTED)
+    for center, label, link in (
+        (525, "Descriptor", ""),
+        (695, "kind", f"{FD}#L16"),
+        (850, "path", f"{FD}#L19"),
+    ):
+        figure.label(center, top + 88, label, size=16, bold=True, link=link)
+
+    roles = {0: "stdin", 1: "stdout", 2: "stderr", 3: "temporary",
+             5: "backup stdin", 6: "backup stdout", 7: "backup stderr"}
+    kinds = {0: "STDIN", 1: "STDOUT", 2: "STDERR",
+             5: "STDIN", 6: "STDOUT", 7: "STDERR"}
     for index in range(8):
-        x = 574 + index * 149
+        y = top + 96 + index * ROW_HEIGHT
+        center_y = y + ROW_HEIGHT / 2
         destination = entries.get(index)
+        is_backup = index >= 5
         fill = ALLOCATED if destination else FREE
-        figure.box(x, y, 149, 104, fill)
-        figure.label(x + 74.5, y + 25,
+        if is_backup:
+            fill = BACKUP_FILL
+        figure.box(ARRAY_X, y, 500, ROW_HEIGHT, fill)
+        for divider in (620, 770):
+            figure.parts.append(
+                f'<path d="M {divider} {y} v {ROW_HEIGHT}" stroke="#637983"/>'
+            )
+        figure.label(444, center_y + 6,
                      f"{index} · {roles[index]}" if index in roles else str(index),
-                     size=16, bold=True)
+                     size=18, bold=True, anchor="start",
+                     color=BACKUP_INK if is_backup else INK)
         kind = "FILE" if destination == OUTPUT else kinds.get(index, "STDOUT")
         if destination is None:
             kind = "FREE"
         line = {"FREE": 9, "STDIN": 10, "STDOUT": 11, "STDERR": 12, "FILE": 13}[kind]
-        figure.label(x + 74.5, y + 53, kind, size=16, link=f"{FD}#L{line}")
-        figure.label(x + 74.5, y + 81,
-                     "path" if destination else "path = NULL", size=16,
-                     link=f"{FD}#L19")
+        figure.label(695, center_y + 6, kind, size=18, link=f"{FD}#L{line}")
+        figure.label(850, center_y + 6, "pointer" if destination else "NULL",
+                     size=18, link=f"{FD}#L19")
         if index in changed:
-            figure.box(x + 2, y + 2, 145, 100, "none", FOCUS, 3)
+            figure.box(ARRAY_X + 2, y + 2, 496, ROW_HEIGHT - 4, "none", FOCUS, 3)
 
-    for index, letter in zip((1, 3, 6), path_letters):
-        center = 574 + index * 149 + 74.5
-        destination = entries.get(index)
         if destination is None:
-            figure.label(center, y + 164, "No path allocation", size=15)
             continue
-        heap_block(figure, center - 145, y + 140, 250, 62, letter, (
-            (f'"{destination}\\0"', f"{FD}#L19"),
-        ))
-        pointer(figure, f"M {center} {y + 88} V {y + 140}")
-    figure.label(52, y + 154, f"Process {process_number}'s separate copied path strings",
-                 size=16, bold=True, anchor="start", link=f"{FD}#L19")
-    figure.label(52, y + 184, "… other Kernel Heap blocks …", size=15, anchor="start")
+        figure.box(PATH_X, y + 5, 42, ROW_HEIGHT - 10, HEADER)
+        figure.label(PATH_X + 21, center_y + 5, "BH", size=13, bold=True, link=BLOCK)
+        figure.box(PATH_X + 42, y + 5, 306, ROW_HEIGHT - 10,
+                   BACKUP_FILL if is_backup else ALLOCATED)
+        figure.label(PATH_X + 195, center_y + 6, f'"{destination}"',
+                     size=18, bold=True, link=f"{FD}#L19")
+        pointer(figure, f"M 916 {center_y} H 974 V {y + 1} H {PATH_X + 60} V {y + 5}")
+
+    for order, (text, link, target) in enumerate(calls, start=1):
+        y = top + 362 + (order - 1) * 64
+        figure.box(52, y, 278, 36, HEAP_EMPHASIS, FOCUS)
+        figure.label(191, y + 24, f"{order}. {text}", size=16,
+                     bold=True, color=FOCUS, link=link)
+        if target == "table":
+            pointer(figure, f"M 191 {y} V {top + 334}", FOCUS)
+        else:
+            target_y = top + 120 + target * ROW_HEIGHT
+            lane = 394 + (order - 1) * 14
+            pointer(figure, f"M 330 {y + 18} H {lane} V {target_y} H {ARRAY_X}", FOCUS)
 
 
 def overview(figure, expanded_top):
-    """Locate the expanded heap once, with guides from its own band corners."""
-    figure.label(32, 28, "SRAM · lower addresses → higher addresses", size=16, anchor="start")
-    figure.row(45, 70, [
+    """Locate the kernel heap before any child has been created."""
+    figure.row(32, 66, [
         ("ivt", 55, (".ivt",), MUTED),
-        ("text", 100, (".text",), MUTED),
-        ("data", 130, (".data",), MUTED),
-        ("kernel_heap", 480, ("PCBs · descriptor tables · entries · path strings",), ALLOCATED),
-        ("stack", 105, ("Kernel", "Stack"), MUTED),
-        ("outer_a", 45, ("Block", "Header A"), HEADER, BLOCK),
-        ("shell", 180, ("Process Payload A", "shell image · heap · stack"), ALLOCATED),
-        ("outer_b", 45, ("Block", "Header B"), HEADER, BLOCK),
-        ("child", 150, ("Process Payload B", "child image · heap · stack"), ALLOCATED),
-        ("other", 58, ("…",), MUTED),
+        ("text", 90, (".text",), MUTED),
+        ("data", 100, (".data",), MUTED),
+        ("kernel_heap", 345, ("PCBs · descriptor tables", "entries · path strings"), ALLOCATED),
+        ("stack", 120, ("Kernel", "Stack"), MUTED),
+        ("outer_a", 60, ("Block", "Header"), HEADER, BLOCK),
+        ("shell", 180, ("Shell Process Payload", "image · heap · stack"), ALLOCATED),
+        ("other", 70, ("…",), MUTED),
     ])
-    figure.band("ivt", "data", 115, "Kernel Image")
-    figure.band("kernel_heap", "kernel_heap", 115, "Kernel Heap · kmalloc", HEAP_EMPHASIS)
-    figure.band("stack", "stack", 115, "Kernel Stack")
-    figure.band("outer_a", "other", 115, "Process and Shared Data Heap")
-    figure.band("ivt", "stack", 145, "Kernel")
-    figure.band("outer_a", "other", 145, "After the Kernel region")
+    figure.band("ivt", "data", 98, "Kernel Image")
+    figure.band("kernel_heap", "kernel_heap", 98, "Kernel Heap · kmalloc", HEAP_EMPHASIS)
+    figure.band("stack", "stack", 98, "Kernel Stack")
+    figure.band("outer_a", "other", 98, "Process and Shared Data Heap")
     figure.focus("kernel_heap")
-
-    figure.box(1430, 45, 338, 130, MUTED)
-    figure.label(1599, 71, "Emulator host · outside SRAM", size=17, bold=True)
-    figure.label(1599, 111, '"/output.txt"', size=20)
-    figure.label(1599, 145, "open() creates the output file", size=17,
-                 link="library/fcntl/fcntl.picoc#L15")
-
+    figure.box(1072, 32, 296, 96, MUTED)
+    figure.label(1220, 58, "Emulator host · outside SRAM", size=17, bold=True)
+    figure.label(1220, 87, '"/output.txt"', size=19)
+    figure.label(1220, 114, "Not opened yet", size=17)
     x, _, width, _ = figure.cells["kernel_heap"]
     figure.parts.append(
-        f'<path d="M {x} 145 L 32 {expanded_top} '
-        f'M {x + width} 145 L 1766 {expanded_top}" '
+        f'<path d="M {x} 128 L 32 {expanded_top} '
+        f'M {x + width} 128 L 1368 {expanded_top}" '
         'fill="none" stroke="#96a3ae" stroke-dasharray="5 4"/>'
     )
 
 
 def snapshot(slug, title, shell, *, child=None, changed=(), child_changed=(),
              show_overview=False, shell_calls=(), child_calls=()):
-    expanded_top = 218 if show_overview else 32
-    expanded_height = 676 if child else 326
-    description = (
-        "The SRAM overview contains the Kernel Image, Kernel Heap, Kernel Stack "
-        "and Process and Shared Data Heap. The emulator host will store /output.txt "
-        "outside SRAM. Dashed guides run from the bottom corners of the Kernel "
-        "Heap band to the top corners of its expanded view. "
-        if show_overview else
-        "Only the expanded Kernel Heap is shown. The SRAM layout and emulator "
-        "host remain as in the first snapshot. "
-    )
+    top = 178 if show_overview else 24
+    expanded_height = GROUP_HEIGHT * (2 if child else 1) + (28 if child else 0)
     figure = Figure(
         f"redirection-{slug}", title,
-        description
-        + "PCB 1 for the shell points to its FileDescriptorTable and its "
-        "contiguous eight-entry array. Each object and each path string has "
-        "its own BlockHeader. Only entries 1, 3 and 6 have their path "
-        "allocations expanded. STDIN, STDOUT, STDERR, FILE and FREE abbreviate "
-        "FILE_DESCRIPTOR constants. Amber outlines mark changed entries. "
-        "Other allocations, flags and offsets are omitted. Teal arrows follow "
-        "stored pointers. Amber call boxes and arrows identify the calls and "
-        "the descriptor entries or tables they change. Each outlined group "
-        "contains one process's descriptors above and its copied paths below. "
-        + ("PCB 2 and its independent descriptor allocations are expanded in "
-           "the second row. " if child else "The child's pre-run table is omitted. ")
-        + "Block letters and widths do not specify allocation order or sizes.",
-        width=1800, height=expanded_top + expanded_height + 54,
+        f"{title}. Each outlined group belongs to one process. Its PCB points "
+        "to a separately allocated FileDescriptorTable, which points to one "
+        "contiguous eight-entry array drawn as eight rows. Every non-NULL path "
+        "points to a separate allocation displayed in full on its row, including "
+        "stdin and stderr. FREE entries have path NULL and no path allocation. "
+        "Quoted paths use C string literal notation with an implicit terminating "
+        "null character. BH abbreviates BlockHeader. STDIN, STDOUT, STDERR, FILE "
+        "and FREE abbreviate FILE_DESCRIPTOR constants. Pale amber rows 5–7 identify "
+        "reserved backup slots even when FREE, "
+        "and their allocated path strings use the same pale amber fill. Teal arrows follow stored "
+        "pointers. Amber call arrows identify changed objects; amber outlines mark "
+        "changed entries. Flags, offsets and unrelated allocations are omitted. "
+        "Sizes and allocation positions are illustrative. "
+        + ("The starting SRAM overview shows only the shell; no child exists yet. "
+           if show_overview else "Only the expanded Kernel Heap is shown. ")
+        + ("The child's independent allocations appear in the lower group."
+           if child else "Only the shell's allocations are expanded."),
+        width=1400, height=top + expanded_height + 24,
         show_address_direction=False,
     )
     if show_overview:
-        overview(figure, expanded_top)
-    descriptor_row(figure, expanded_top + 104, 1, shell, "ABCDEF", changed,
-                   calls=shell_calls, unchanged=slug in ("load", "inherit"))
+        overview(figure, top)
+    descriptor_group(figure, top, 1, shell, changed,
+                     calls=shell_calls)
     if child:
-        descriptor_row(figure, expanded_top + 454, 2, child, "GHIJKL", child_changed,
-                       calls=child_calls, child_state="NEW" if slug == "load" else "READY",
-                       unchanged=slug == "restore")
-    figure.label(899, expanded_top + expanded_height + 27,
-                 "Kernel Heap · expanded · each path box is a separate copied string",
-                 size=17, bold=True)
+        descriptor_group(figure, top + GROUP_HEIGHT + 28, 2, child, child_changed,
+                         calls=child_calls)
     figure.save()
 
 
@@ -204,28 +199,28 @@ def main():
     saved = {**initial, 3: OUTPUT, 6: TERMINAL}
     installed = {**initial, 1: OUTPUT, 6: TERMINAL}
     child = {**initial, 1: OUTPUT}
-    snapshot("load", "Load the child with its initial terminal descriptors", initial,
-             child=initial, show_overview=True,
-             child_calls=((413, 550, "Shell: load(COMMAND) → pid · initial table",
-                           "library/unistd/process.picoc#L17"),))
-    snapshot("save", "Open the output file and save shell stdout", saved,
-             changed=(3, 6), shell_calls=(
-                 (1095.5, 370, '1. open("output.txt", flags) → 3', "library/fcntl/fcntl.picoc#L15"),
-                 (1542.5, 200, "2. dup2(1, 6)", "library/unistd/io.picoc#L58"),
+    snapshot("initial", "0. Before load(): no child yet", initial,
+             show_overview=True)
+    snapshot("save", "2. Open the output file and save shell stdout", saved,
+             changed=(3, 6),
+             shell_calls=(
+                 ('open("output.txt", flags) → 3', "library/fcntl/fcntl.picoc#L15", 3),
+                 ("dup2(1, 6)", "library/unistd/io.picoc#L58", 6),
              ))
-    snapshot("install", "Install redirected shell stdout and close the temporary descriptor",
-             installed, changed=(1, 3), shell_calls=(
-                 (797.5, 200, "1. dup2(3, 1)", "library/unistd/io.picoc#L58"),
-                 (1095.5, 180, "2. close(3)", "library/unistd/io.picoc#L54"),
+    snapshot("install", "3. Redirect shell stdout and close the temporary descriptor",
+             installed, changed=(1, 3),
+             shell_calls=(
+                 ("dup2(3, 1)", "library/unistd/io.picoc#L58", 1),
+                 ("close(3)", "library/unistd/io.picoc#L54", 3),
              ))
-    snapshot("inherit", "Copy descriptors into the child's independent Kernel Heap allocations",
+    snapshot("inherit", "4. run(): copy shell descriptors into the child, then mark it READY",
              installed, child=child, child_changed=(1,),
-             child_calls=((797.5, 620, "Shell: run(pid, arguments, NULL) · copy descriptors",
-                           "library/unistd/process.picoc#L31"),))
-    snapshot("restore", "Restore shell stdout while the child keeps its output file",
-             initial, child=child, changed=(1, 6), shell_calls=(
-                 (797.5, 200, "1. dup2(6, 1)", "library/unistd/io.picoc#L58"),
-                 (1542.5, 180, "2. close(6)", "library/unistd/io.picoc#L54"),
+             child_calls=(("run(pid, arguments, NULL)", "library/unistd/process.picoc#L31", "table"),))
+    snapshot("restore", "5. Restore shell stdout: the child keeps its own output-file path",
+             initial, child=child, changed=(1, 6),
+             shell_calls=(
+                 ("dup2(6, 1)", "library/unistd/io.picoc#L58", 1),
+                 ("close(6)", "library/unistd/io.picoc#L54", 6),
              ))
 
 

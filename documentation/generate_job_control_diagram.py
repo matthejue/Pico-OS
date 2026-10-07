@@ -101,8 +101,7 @@ def main():
     figure.band("user_heap", "user_heap", 600, "User Process Heap · malloc", HEAP_EMPHASIS)
     figure.band("user_stack", "user_stack", 600, "User Process Stack")
     figure.band("user_text", "user_stack", 630, "Process Payload A · shell · expanded")
-    sx, sy, sw, _ = figure.cells["shell"]
-    figure.cells["shell"] = (sx, sy, sw, 200)
+    # Connect the payload's bottom corners to the expanded view's top corners.
     figure.expand("shell", "user_text", "user_stack")
     figure.label(642, 502, ".data · inline integers", size=20, bold=True)
     for x, name, value, meaning, line in (

@@ -6235,6 +6235,8 @@ calling [`waitpid()`](library/sys/wait/wait.picoc#L15):
 The complete public header, [`library/sys/wait/wait.header`](library/sys/wait/wait.header),
 establishes the caller's view of the library:
 
+**File:** [`library/sys/wait/wait.header`](library/sys/wait/wait.header)
+
 ```c
 #pragma once
 
@@ -6251,11 +6253,14 @@ public signatures. The function implementations are supplied during linking.
 The library compilation unit, [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc),
 collects the implementation through a single include. Its complete contents are:
 
+**File:** [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc)
+
 ```c
 #include "wait.picoc"
 ```
 
-Compile it from the repository root to produce the two reusable artifacts:
+Compile [`library/sys/wait/libwait.picoc`](library/sys/wait/libwait.picoc)
+from the repository root to produce the two reusable artifacts:
 
 ```console
 $ picoc_compiler -c -O1 library/sys/wait/libwait.picoc
@@ -6282,6 +6287,8 @@ child PID and a result destination, [`waitpid()`](library/sys/wait/wait.picoc#L1
 uses [`WaitPidRequest`](common/syscall.header#L61), defined in the shared syscall
 header:
 
+**File:** [`common/syscall.header`](common/syscall.header#L61) (excerpt)
+
 ```c
 struct WaitPidRequest {
     int pid;
@@ -6294,6 +6301,8 @@ shows the ordinary library call, both stack-local objects, and the assembly
 that enters the kernel. It also includes
 [`WIFSTOPPED()`](library/sys/wait/wait.picoc#L26), which inspects the returned
 integer entirely in userspace:
+
+**File:** [`library/sys/wait/wait.picoc`](library/sys/wait/wait.picoc)
 
 ```c
 #include "wait.header"
@@ -7871,57 +7880,60 @@ and copies of the path string, not the file's contents.
 
 The first diagram locates the Kernel Heap within the SRAM layout from
 [`3.2 SRAM image and heap hierarchy`](#32-sram-image-and-heap-hierarchy).
-Dashed lines connect the bottom corners of its Kernel Heap band to the
-expanded view below. Later diagrams show only the expanded Kernel Heap,
-since the surrounding SRAM layout and host storage remain unchanged.
-The shell's [`ProcessControlBlock`](kernel/process/process.header#L31), its
-[`FileDescriptorTable`](kernel/filesystem/file_descriptor.header#L22), the
-[`entries`](kernel/filesystem/file_descriptor.header#L23) array, and each
-copied [`path`](kernel/filesystem/file_descriptor.header#L19) string occupy
-separate allocations there. The PCB's
-[`file_descriptors`](kernel/process/process.header#L42) pointer reaches the
-table, whose [`entries`](kernel/filesystem/file_descriptor.header#L23)
-pointer reaches all eight descriptor slots. These allocations are separate
-from the shell's image, user heap, and stack in its Process Payload.
-[`8.1 Per-process file-descriptor table`](#81-per-process-file-descriptor-table)
-shows the complete allocation structure.
+The dashed lines expand it into the descriptor allocations below. Later
+snapshots show only this expanded view. The
+[`ProcessControlBlock.file_descriptors`](kernel/process/process.header#L42)
+pointer reaches a separately allocated
+[`FileDescriptorTable`](kernel/filesystem/file_descriptor.header#L22), whose
+[`entries`](kernel/filesystem/file_descriptor.header#L23) pointer reaches one
+eight-entry array. Each allocated [`path`](kernel/filesystem/file_descriptor.header#L19)
+string is shown in full beside its entry. These allocations are separate from
+the process image, user heap, and stack, as shown in
+[`8.1 Per-process file-descriptor table`](#81-per-process-file-descriptor-table).
 
-The slots stay in the same positions throughout. `STDIN`, `STDOUT`,
+The entries stay in the same positions throughout. `STDIN`, `STDOUT`,
 `STDERR`, `FILE`, and `FREE` abbreviate the
 [`FILE_DESCRIPTOR_*` constants](kernel/filesystem/file_descriptor.header#L9)
 in each entry's [`kind`](kernel/filesystem/file_descriptor.header#L16).
-Slots 0, 1, and 2 initially use separate `/device/terminal.dev` path copies
-for terminal input, output, and error output. Slots 3–7 initially have
-[`kind = FILE_DESCRIPTOR_FREE`](kernel/filesystem/file_descriptor.header#L9)
-and [`path = NULL`](kernel/filesystem/file_descriptor.header#L19).
-The diagrams expand only the path strings for slots 1, 3, and 6.
-Each outlined group belongs to the process named at its top. Within a group,
-the upper row contains that process's PCB, descriptor table, and descriptor
-entries. The boxes below it are that same process's copied path strings.
-When both processes are shown, the shell's group is above the child's group.
-Block letters and widths are illustrative. Teal arrows follow stored pointers.
-Amber call labels point to the entries or tables they change, and amber outlines
-mark changed entries. Numbers in the call labels give the order within that
-step. Other allocations and the entries' flags and offsets are omitted.
+Slots 0–2 initially own separate `/device/terminal.dev` strings. Free entries
+have [`path = NULL`](kernel/filesystem/file_descriptor.header#L19) and no path
+allocation. Quoted paths use C string literal notation with an implicit null
+terminator. `BH` abbreviates [`BlockHeader`](common/heap.header#L5).
+Pale amber rows distinguish the reserved backup slots 5–7 from ordinary slots 0–4,
+including when they are free. Their allocated path strings use the same color.
+The backup labels identify each slot's role, while
+[`kind`](kernel/filesystem/file_descriptor.header#L16) and
+[`path`](kernel/filesystem/file_descriptor.header#L19) show whether it is occupied.
 
-First, the shell calls [`load()`](library/unistd/process.picoc#L17) for `COMMAND`,
+Each outlined group contains the allocations of the process named in its PCB.
+When both processes are shown, the shell is above the child. Teal arrows follow
+stored pointers. Amber calls and outlines identify changed entries or tables,
+with call numbers giving the order within that step. Sizes and allocation
+positions are illustrative. Flags, offsets, and unrelated allocations are omitted.
+
+**0. Before loading:** the shell has terminal descriptors in slots 0–2,
+and slots 3–7 are free. The child for this command has not been created yet,
+so the starting diagram shows only the shell. The host output file has not
+been opened:
+
+![Starting SRAM overview before load(): only shell process 1 is shown. Its stdin, stdout and stderr each point to a separate complete /device/terminal.dev string. Slots 3–7 have NULL paths and no allocations. Child process 2 has not been created.](documentation/images/process-redirection-initial.svg)
+
+**1. Load the child:** the shell calls [`load()`](library/unistd/process.picoc#L17) for `COMMAND`,
 using [`load_from_path()`](user/shell.picoc#L1191) to search
 [`PATH`](user/shell.picoc#L1192) when the command contains no directory.
 The kernel loads the executable into a separate Process Payload and creates
 the child's PCB through [`create_process()`](kernel/process/process.picoc#L89).
 That function's
-[`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L36)
+[`create_file_descriptor_table()`](kernel/filesystem/file_descriptor.picoc#L35)
 call allocates the child's initial table, eight entries, and terminal path
 copies. The child's
 [`state`](kernel/process/process.header#L33) is
 [`PROCESS_STATE_NEW`](kernel/process/process.header#L12), so it cannot execute
-yet. The diagram shows the shell's descriptors above and the child's
-independent initial descriptors below. The host output file has not yet
-been opened:
+yet. Its initial allocations are omitted from the diagrams. The child first
+appears when [`run()`](library/unistd/process.picoc#L31) copies the shell's
+redirected descriptors into it.
 
-![The initial SRAM overview after load(). The upper outlined group contains shell process 1's descriptors and copied terminal path. The lower group contains child process 2's independent initial terminal descriptors and copied path, with state NEW. An amber load() label points to the child's initial table.](documentation/images/process-redirection-load.svg)
-
-After loading, [`redirect_output()`](user/shell.picoc#L1008) calls
+**2. Open and save:** [`redirect_output()`](user/shell.picoc#L1008) calls
 [`open()`](library/fcntl/fcntl.picoc#L15) with
 [`O_WRONLY | O_CREAT | O_TRUNC`](common/file.header#L10).
 [`open_file_descriptor()`](kernel/filesystem/filesystem.picoc#L39) creates
@@ -7934,9 +7946,9 @@ If opening fails, the shell's descriptor table remains unchanged.
 This step shows only the shell's group because the child's initial
 descriptors remain unchanged:
 
-![Shell process 1's descriptor group after open() creates slot 3 for /output.txt and dup2(1, 6) saves terminal stdout. The call labels point to the affected entries. The boxes below the entries are the shell's separate copied path strings.](documentation/images/process-redirection-save.svg)
+![Shell process 1's descriptor group after open() creates slot 3 for /output.txt and dup2(1, 6) saves terminal stdout. The call labels point to the affected entries. Every allocated path appears in full beside its descriptor, including stdin and stderr.](documentation/images/process-redirection-save.svg)
 
-Next, [`dup2(3, 1)`](library/unistd/io.picoc#L58) replaces shell stdout
+**3. Install the redirection:** [`dup2(3, 1)`](library/unistd/io.picoc#L58) replaces shell stdout
 with an independent copy of slot 3. Both entries now have
 [`kind = FILE_DESCRIPTOR_FILE`](kernel/filesystem/file_descriptor.header#L13),
 the output flags above, and [`offset = 0`](kernel/filesystem/file_descriptor.header#L18),
@@ -7946,9 +7958,9 @@ but each owns a separate `/output.txt` path string.
 which frees slot 3's path string and resets that entry. Slot 1's path
 survives, and slot 6 still saves terminal stdout:
 
-![Shell process 1's descriptor group after dup2(3, 1) installs redirected stdout and close(3) frees the temporary descriptor's path. The call labels point to entries 1 and 3. Copied paths below belong to the shell, while the child's initial descriptors are still unchanged and omitted.](documentation/images/process-redirection-install.svg)
+![Shell process 1's descriptor group after dup2(3, 1) installs redirected stdout and close(3) frees the temporary descriptor's path. The call labels point to entries 1 and 3. Every allocated path appears in full beside its shell descriptor, while the child's initial descriptors are still unchanged and omitted.](documentation/images/process-redirection-install.svg)
 
-Then [`run()`](library/unistd/process.picoc#L31) reaches
+**4. Copy into the child:** [`run()`](library/unistd/process.picoc#L31) reaches
 [`mark_process_ready_with_arguments()`](kernel/process/process_arguments.picoc#L241).
 It replaces the child's initial descriptor table with the result of
 [`inherit_file_descriptors()`](kernel/filesystem/file_descriptor.picoc#L99).
@@ -7961,7 +7973,7 @@ path string, while descriptor 6 remains free:
 
 ![The upper group contains shell process 1's unchanged descriptors and paths. The lower group contains child process 2's descriptors and paths after run() copies the shell's descriptors and sets the child's state to READY. Both stdout entries own independent /output.txt strings. Only the shell has saved terminal descriptor 6.](documentation/images/process-redirection-inherit.svg)
 
-Finally, [`restore_standard_descriptors()`](user/shell.picoc#L971) restores
+**5. Restore the shell:** [`restore_standard_descriptors()`](user/shell.picoc#L971) restores
 the shell's terminal stdout with [`dup2(6, 1)`](library/unistd/io.picoc#L58),
 then calls [`close(6)`](library/unistd/io.picoc#L54). The duplication frees
 slot 1's `/output.txt` path and installs a new terminal path copy. Closing
@@ -8103,15 +8115,53 @@ for example `sed.bin "5iNEW" < input.txt > output.txt 2> str_err_file.txt`.
 [\[↑ TOC\]](#contents)
 
 PicoOS supports one pipeline operator using a temporary host file. The
-producer finishes before the consumer starts.
+producer finishes before the consumer starts. For `LEFT | RIGHT > OUT`,
+the shell executes `LEFT > TMP` first, then `RIGHT < TMP > OUT`.
+`TMP` is `.picoos-pipe-<shell PID>.tmp` in the current directory, stored in
+[`shell_pipe_path`](user/shell.picoc#L34). `OUT` is the requested output file.
 
-[`run_pipeline()`](user/shell.picoc#L767) stores the temporary path
-`.picoos-pipe-<shell PID>.tmp` in
-[`shell_pipe_path`](user/shell.picoc#L34). The file is created in the current
-directory. It adds output redirection to the left command in
-[`shell_pipe_left_command`](user/shell.picoc#L32) and input redirection to
-the right in [`shell_pipe_right_command`](user/shell.picoc#L33). The code
-shows how these buffers pass through execution and temporary-file removal:
+Both diagrams keep the same rows: shell, producer, consumer, and temporary
+host file. Columns read from left to right. The PCB numbers are illustrative.
+Child rows stay blank until [`run()`](library/unistd/process.picoc#L31).
+Reaped processes keep their rows without descriptor tables.
+In each table, `terminal` means `/device/terminal.dev`,
+and the numbers identify the eight descriptor slots. The values summarize
+[`FileDescriptorTable.entries`](kernel/filesystem/file_descriptor.header#L23),
+reached through each process's
+[`ProcessControlBlock.file_descriptors`](kernel/process/process.header#L42).
+
+The first stage shows why shell restoration leaves the producer's output
+redirected. After [`load()`](library/unistd/process.picoc#L17) creates the
+producer, the shell redirects its own stdout to `TMP` and saves terminal
+stdout in slot 6. [`run()`](library/unistd/process.picoc#L31) copies the
+standard descriptors into the producer's independent table. The shell
+restores its own stdout before [`waitpid()`](library/sys/wait/wait.picoc#L15).
+The final column shows the producer reaped and its complete output in `TMP`:
+
+![Producer stage with fixed shell, producer, consumer, and temporary-file rows. The shell redirects stdout, run copies descriptors to the producer, the shell restores stdout, and waitpid reaps the producer. The consumer row remains uncreated throughout.](documentation/images/process-pipeline.svg)
+
+The second stage uses the same rows after the producer has been reaped.
+[`run_process()`](user/shell.picoc#L1039) redirects shell stdout to `OUT`
+before redirecting stdin to `TMP`. Saved terminal descriptors 5–6 stay in
+the shell when [`run()`](library/unistd/process.picoc#L31) copies the standard
+descriptors into the consumer. The shell restores its terminal descriptors,
+waits for the consumer, and calls
+[`unlink()`](library/unistd/file_removal.picoc#L4) to remove `TMP`:
+
+![Consumer stage with the same fixed rows. The producer remains reaped. The shell redirects stdin to TMP and stdout to OUT, run copies descriptors to the consumer, the shell restores its descriptors, and the consumer is reaped before TMP is removed.](documentation/images/process-pipeline-consumer.svg)
+
+Gray dashed arrows show descriptor copying, and amber outlines mark changed
+standard paths. Slots 3–7 are initially free. Both diagrams assume successful
+foreground execution. The individual open, save, duplicate, and close calls
+are explained in
+[`12.6 Input/output redirection`](#126-inputoutput-redirection).
+
+In [`user/shell.picoc`](user/shell.picoc),
+[`run_pipeline()`](user/shell.picoc#L767) builds the producer command in
+[`shell_pipe_left_command`](user/shell.picoc#L32) and the consumer command in
+[`shell_pipe_right_command`](user/shell.picoc#L33). The two
+[`eval()`](user/shell.picoc#L1229) calls perform the stages in order before
+removing the temporary file:
 
 ```c
 bool run_pipeline(char *command, int pipeline) {
@@ -8142,28 +8192,8 @@ bool run_pipeline(char *command, int pipeline) {
 }
 ```
 
-For `LEFT | RIGHT > OUT`, the diagram follows `LEFT > TMP` across the
-producer row, then `RIGHT < TMP > OUT` across the consumer row. It shows
-how each child's descriptors remain redirected while the shell restores
-its own descriptors before waiting. The snapshots show
-[`FileDescriptorTable.entries`](kernel/filesystem/file_descriptor.header#L23),
-reached through each process's
-[`ProcessControlBlock.file_descriptors`](kernel/process/process.header#L42).
-
-Here `TMP` is the generated temporary path and `OUT` is the requested
-output file. `T-in`, `T-out`, and `T-err` are the shell's original terminal
-endpoints in slots 0, 1, and 2. Slots 3–7 are initially free. The numbered
-steps show successful redirection and foreground execution.
-
-![Two horizontal stages showing pipeline redirection, child descriptor inheritance, shell restoration, waiting, and temporary-file removal](documentation/images/process-pipeline.svg)
-
-The producer's [`waitpid()`](library/sys/wait/wait.picoc#L15) separates the two stages. Each child inherits
-its final endpoints, and the shell restores itself before waiting.
-
-The left [`eval()`](user/shell.picoc#L1229) creates or truncates the file and waits for the producer.
-The right opens it as stdin and waits for the consumer. Then [`unlink()`](library/unistd/file_removal.picoc#L4)
-removes it. The two descriptors use the same path without a kernel pipe.
-An existing file with that generated name is also truncated and removed.
+The producer writes and the consumer reads the same pathname without a kernel
+pipe. An existing file with that generated name is also truncated and removed.
 
 Finite pipelines such as `cat.bin file.txt | sed.bin "5aNEW" > file2.txt`
 work. Longer pipelines and `&` combinations are unsupported. A background
