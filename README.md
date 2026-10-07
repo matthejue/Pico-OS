@@ -137,7 +137,9 @@ right command's output to `topics.txt`. See [`12.7 Sequential file-backed pipeli
 For each `v*` tag, the [release workflow](.github/workflows/build.yml) builds
 and verifies [`binary/`](binary/), then archives its contents as
 [`pico-os-runtime.tar.gz`](pico-os-runtime.tar.gz). This runtime contains the binaries, configuration,
-and launch scripts. The [development workflow](documentation/development_workflow.md#building-the-release-tree-and-archive)
+and launch scripts. The workflow also generates `README.pdf` from that tag's
+documentation and attaches it to the same release.
+The [development workflow](documentation/development_workflow.md#building-the-release-tree-and-archive)
 explains how to build it locally.
 
 The archive uses the extracted directory as PicoOS `/`. Host `/tmp` is not

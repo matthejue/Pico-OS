@@ -13,8 +13,10 @@ command from the repository root:
 $ make readme-pdf
 ```
 
-The export requires Pandoc, XeLaTeX, Chromium, Yarn, and the DejaVu Serif and
-DejaVu Sans Mono fonts. The target installs Mermaid CLI into the ignored
+The export requires Pandoc 3.6, XeLaTeX, Chromium or Google Chrome, Node.js 24
+or newer, Yarn, and the DejaVu Serif and DejaVu Sans Mono fonts. Set
+`README_PDF_BROWSER=/path/to/browser` to select another browser executable.
+The target installs pinned Mermaid CLI and Puppeteer versions into the ignored
 `.readme-pdf/` directory when needed. The
 [`Mermaid filter`](readme_pdf_mermaid.lua) renders diagrams as vector PDFs
 using the [`rendering configuration`](readme_pdf_mermaid.json), then XeLaTeX
@@ -139,7 +141,10 @@ This writes `pico-os-runtime.tar.gz` with the runtime directories and the four
 launcher/download-script variants at the archive root. The tagged-release job
 in [`.github/workflows/build.yml`](../.github/workflows/build.yml) performs the
 same release-tree build and verification, then publishes that archive as a
-GitHub release asset.
+GitHub release asset. A separate job generates `README.pdf` from the tagged
+source, including its diagrams, and uploads it to the same release. Publishing
+waits for both builds to succeed and fails if either asset is missing. Manual
+workflow runs also build both artifacts; publishing requires a `v*` tag.
 
 ## Documentation diagrams
 

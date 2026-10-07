@@ -1,6 +1,7 @@
 local output_directory = os.getenv("MERMAID_OUTPUT_DIR")
 local mermaid_cli = os.getenv("MERMAID_CLI") or ".readme-pdf/node_modules/.bin/mmdc"
 local mermaid_config = os.getenv("MERMAID_CONFIG") or "documentation/readme_pdf_mermaid.json"
+local puppeteer_config = os.getenv("MERMAID_PUPPETEER_CONFIG")
 local diagram_number = 0
 local contents_targets = {}
 local contents_target_aliases = {
@@ -53,6 +54,9 @@ function CodeBlock(block)
         " --output " .. shell_quote(image_path) ..
         " --configFile " .. shell_quote(mermaid_config) ..
         " --backgroundColor transparent"
+    if puppeteer_config then
+        command = command .. " --puppeteerConfigFile " .. shell_quote(puppeteer_config)
+    end
     local success, _, status = os.execute(command)
     if not success then
         error("Could not render Mermaid diagram " .. diagram_number .. " (exit status " .. status .. ")")

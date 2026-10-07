@@ -59,10 +59,63 @@ jobs:
           path: binary/
           if-no-files-found: error
 
+  pdf:
+    name: Generate README PDF
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install PDF dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-xetex texlive-latex-extra texlive-fonts-recommended \
+            fonts-dejavu fonts-cantarell librsvg2-bin poppler-utils
+          # Ubuntu's packaged Pandoc predates the PDF template used by this repo.
+          curl --fail --location --retry 3 \
+            https://github.com/jgm/pandoc/releases/download/3.6/pandoc-3.6-linux-amd64.tar.gz \
+            --output "$RUNNER_TEMP/pandoc.tar.gz"
+          mkdir -p "$RUNNER_TEMP/pandoc"
+          tar -xzf "$RUNNER_TEMP/pandoc.tar.gz" \
+            --strip-components=1 -C "$RUNNER_TEMP/pandoc"
+          echo "$RUNNER_TEMP/pandoc/bin" >> "$GITHUB_PATH"
+
+      - name: Install Mermaid renderer
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+        run: |
+          npm install --prefix .readme-pdf --no-save --package-lock=false \
+            @mermaid-js/mermaid-cli@12.0.0 puppeteer@25.12.0
+          # Use the runner's Chrome; disable its sandbox for headless CI rendering.
+          printf '%s\n' '{"args":["--no-sandbox"]}' > .readme-pdf/puppeteer.json
+
+      - name: Generate PDF from the tagged README
+        env:
+          MERMAID_PUPPETEER_CONFIG: .readme-pdf/puppeteer.json
+        run: make readme-pdf README_PDF_BROWSER="$(command -v google-chrome)"
+
+      - name: Verify generated PDF
+        run: |
+          test -s README.pdf
+          pdfinfo README.pdf
+          pdftotext README.pdf "$RUNNER_TEMP/readme.txt"
+          test -s "$RUNNER_TEMP/readme.txt"
+
+      - name: Upload README PDF
+        uses: actions/upload-artifact@v7
+        with:
+          name: pico-os-documentation
+          path: README.pdf
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release for version tag
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, pdf]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -71,6 +124,11 @@ jobs:
         with:
           name: pico-os-runtime
           path: release-tree
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: pico-os-documentation
+          path: .
 
       - name: Create release archive
         run: |
@@ -82,4 +140,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: pico-os-runtime.tar.gz
+          fail_on_unmatched_files: true
+          files: |
+            pico-os-runtime.tar.gz
+            README.pdf

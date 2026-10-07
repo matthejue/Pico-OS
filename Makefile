@@ -24,6 +24,7 @@ RELEASE_ARCHIVE ?= pico-os-runtime.tar.gz
 README_PDF ?= README.pdf
 README_PDF_TOOL_DIR ?= .readme-pdf
 README_PDF_MERMAID ?= $(README_PDF_TOOL_DIR)/node_modules/.bin/mmdc
+README_PDF_BROWSER ?=
 
 EXTRA_CPL_ARGS ?=
 EXTRA_EMU_ARGS ?=
@@ -214,11 +215,14 @@ readme-pdf:
 	trap 'rm -rf "$$build_dir"' EXIT; \
 	if [[ ! -x "$(README_PDF_MERMAID)" ]] || ! "$(README_PDF_MERMAID)" --version >/dev/null 2>&1; then \
 		mkdir -p "$(README_PDF_TOOL_DIR)"; \
-		PUPPETEER_SKIP_DOWNLOAD=true yarn --cwd "$(README_PDF_TOOL_DIR)" add --no-lockfile @mermaid-js/mermaid-cli puppeteer; \
+		PUPPETEER_SKIP_DOWNLOAD=true yarn --cwd "$(README_PDF_TOOL_DIR)" add --no-lockfile @mermaid-js/mermaid-cli@12.0.0 puppeteer@25.12.0; \
 	fi; \
-	browser="$$(command -v chromium || command -v chromium-browser)"; \
+	browser="$(README_PDF_BROWSER)"; \
 	if [[ -z "$$browser" ]]; then \
-		echo "README PDF export requires Chromium (install chromium or chromium-browser)." >&2; \
+		browser="$$(command -v chromium || command -v chromium-browser || command -v google-chrome || true)"; \
+	fi; \
+	if [[ -z "$$browser" ]]; then \
+		echo "README PDF export requires Chromium or Google Chrome (or set README_PDF_BROWSER)." >&2; \
 		exit 1; \
 	fi; \
 	PUPPETEER_EXECUTABLE_PATH="$$browser" \
